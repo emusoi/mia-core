@@ -46,7 +46,24 @@ mia window close monduli logs
 Name windows you start often under `[launch]` in the config, then
 `mia window new monduli logs`.
 
-## Names, stars, setup
+## Names
+
+Each worktree gets the name of a place, like `monduli`. A place is easier to
+remember than a branch or a number ("the fix is in monduli"), short enough to
+say and type, and it stays the same while the branch inside changes.
+
+mia's own places are neighbourhoods of Arusha, Dar es Salaam and Nairobi. Use
+places you know instead — the streets you grew up on, cities you have lived
+in — in `~/.config/mia/config.toml`:
+
+```toml
+names = ["kariakoo", "brooklyn", "shinjuku", "camden"]
+```
+
+mia hands out yours first, then its own. A name is lowercase letters, digits
+and hyphens, because it becomes a hostname and a tmux session.
+
+## Stars, setup
 
 ```bash
 mia rename monduli billing     # a name you choose

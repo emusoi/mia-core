@@ -9,6 +9,7 @@ setup = ["npm", "install"]          # on the host, once, in a new worktree; `mia
 clone = ["node_modules", "dist/*"]  # copied from the main checkout, copy-on-write, before setup
 commit_times = true                 # tracked files dated by their last commit, not the checkout
 editor = "nvim"
+names = ["kariakoo", "brooklyn"]   # places to name worktrees after, before mia's own (best in ~/.config/mia)
 
 [launch]                            # named windows: `mia window new <worktree> <name>`
 logs = "tail -f log/dev.log"

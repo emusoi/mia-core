@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -35,5 +36,28 @@ func TestAPluginsOwnSettingsAreItsToCheck(t *testing.T) {
 	}
 	if err := mergeFile(path, &Config{}); err == nil {
 		t.Error("an unknown core setting must still be refused")
+	}
+}
+
+func TestYourOwnNamesMustBeUsableAsHostnames(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	write := func(body string) error {
+		if err := os.MkdirAll(filepath.Join(dir, "mia"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "mia", "config.toml"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		_, err := Load("")
+		return err
+	}
+	if err := write(`names = ["brooklyn", "camden-town", "k2"]`); err != nil {
+		t.Errorf("good names were refused: %v", err)
+	}
+	for _, bad := range []string{`"Brooklyn"`, `"st. pauli"`, `"a:b"`, `"-x"`} {
+		if err := write(`names = [` + bad + `]`); err == nil || !strings.Contains(err.Error(), "hostname") {
+			t.Errorf("names = [%s] was accepted: %v", bad, err)
+		}
 	}
 }

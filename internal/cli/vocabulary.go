@@ -9,8 +9,9 @@ worktree     A checkout: a directory with your files in it. A PLACE. It has a
              it being switched, renamed or detached. Everything else attaches
              to it. Never "workspace" — editors took that word.
 
-name         A worktree's own word: monduli, kijenge. Allocated when the
-             worktree is made and stable for its life. It is how you refer to
+name         A worktree's own word, a place: monduli, kijenge. Allocated
+             when the worktree is made and stable for its life; names = [...]
+             in your config gives places you know first. It is how you refer to
              the worktree and to everything attached to it, and it is what the
              hostname is made of. Not derived from the branch: branches get
              renamed and abandoned, names do not.

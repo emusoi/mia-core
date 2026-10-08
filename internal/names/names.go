@@ -36,7 +36,22 @@ var pool = []string{
 	"kitisuru", "kabete", "uthiru", "kawangware", "jamhuri", "woodley", "otiende",
 }
 
-type Store struct{ Path string }
+type Store struct {
+	Path string
+	Own  []string
+}
+
+func (s *Store) pool() []string {
+	seen := map[string]bool{}
+	var names []string
+	for _, name := range append(append([]string{}, s.Own...), pool...) {
+		if name = strings.ToLower(name); !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	return names
+}
 
 type registry struct {
 	Owners map[string]string `json:"owners"`
@@ -57,8 +72,9 @@ func (s *Store) AllocateFor(derive func(name string) (owner string, usable bool)
 	for name := range reg.Owners {
 		taken[strings.ToLower(name)] = true
 	}
-	for attempt := 0; attempt < len(pool)*4; attempt++ {
-		name := firstFree(taken)
+	names := s.pool()
+	for attempt := 0; attempt < len(names)*4; attempt++ {
+		name := firstFree(taken, names)
 		owner, usable := derive(name)
 		if !usable {
 			taken[name] = true
@@ -95,7 +111,7 @@ func (s *Store) Allocate(owner string) (string, error) {
 			return name, nil
 		}
 	}
-	name := firstFree(takenIn(reg))
+	name := firstFree(takenIn(reg), s.pool())
 	reg.Owners[name] = owner
 	if err := s.write(reg); err != nil {
 		return "", err
@@ -140,7 +156,7 @@ func (s *Store) All() (map[string]string, error) {
 	return reg.Owners, nil
 }
 
-func firstFree(taken map[string]bool) string {
+func firstFree(taken map[string]bool, pool []string) string {
 	for _, name := range pool {
 		if !taken[name] {
 			return name

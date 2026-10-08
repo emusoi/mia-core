@@ -118,7 +118,7 @@ func TestThePoolDoesNotRunOut(t *testing.T) {
 	for _, name := range pool {
 		taken[name] = true
 	}
-	next := firstFree(taken)
+	next := firstFree(taken, pool)
 	if next != pool[0]+"-2" {
 		t.Errorf("after the pool is exhausted, got %q, want %q", next, pool[0]+"-2")
 	}
@@ -159,5 +159,24 @@ func TestANameHeldByAFolderThatIsGoneCanBeClaimed(t *testing.T) {
 	}
 	if err := s.Claim("project", t.TempDir()); err == nil {
 		t.Error("a name held by a folder that exists was taken")
+	}
+}
+
+func TestYourOwnPlacesComeFirst(t *testing.T) {
+	s := store(t)
+	s.Own = []string{"brooklyn", "Camden", "kariakoo"}
+	var got []string
+	for range 4 {
+		name, err := s.Allocate(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, name)
+	}
+	want := []string{"brooklyn", "camden", "kariakoo", pool[0]}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("handed out %v, want %v: your places, then the built-in ones", got, want)
+		}
 	}
 }

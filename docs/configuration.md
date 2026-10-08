@@ -18,6 +18,7 @@ uses every key.
 | `clone` | files copied from the main checkout into new worktrees |
 | `commit_times` | date files by their last commit |
 | `editor` | your editor; otherwise `$EDITOR` |
+| `names` | places to name worktrees after, used before mia's own |
 | `[launch]` | named windows: `logs = "tail -f log/dev.log"` |
 
 ## `[env]`

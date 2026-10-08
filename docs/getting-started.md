@@ -22,7 +22,7 @@ eval "$(mia shell-init zsh)"
 | word | means |
 |---|---|
 | worktree | a checkout of your repository in its own directory |
-| name | a worktree's short word, like `monduli`; it never changes |
+| name | a worktree's name: a place, like `monduli`, easy to remember; it never changes |
 | session | the worktree's tmux session, `mia-<name>` |
 | stack | several branches sharing one worktree, each on the one below |
 | environment | a container where a worktree's code runs |

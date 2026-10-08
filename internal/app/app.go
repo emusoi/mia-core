@@ -197,6 +197,7 @@ func Open(dir string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	nameStore.Own = cfg.Names
 	return &App{
 		Root:     git.Resolve(root),
 		MiaDir:   miaDir,

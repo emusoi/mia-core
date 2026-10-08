@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 
 	"github.com/BurntSushi/toml"
@@ -45,6 +46,8 @@ type Config struct {
 	Keys map[string]Keys `toml:"keys"`
 
 	Plugins []string `toml:"plugins"`
+
+	Names []string `toml:"names"`
 
 	Plugin map[string]map[string]any `toml:"plugin"`
 }
@@ -112,8 +115,15 @@ func Load(miaDir string) (Config, error) {
 			return Config{}, err
 		}
 	}
+	for _, name := range config.Names {
+		if !hostname.MatchString(name) {
+			return Config{}, fmt.Errorf("names: %q is not a usable name — lowercase letters, digits and hyphens only, since a name becomes a hostname and a tmux session", name)
+		}
+	}
 	return config, nil
 }
+
+var hostname = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 func mergeFile(path string, into *Config) error {
 	data, err := os.ReadFile(path)
