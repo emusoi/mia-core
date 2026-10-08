@@ -1469,8 +1469,6 @@ func (m model) composer() []string {
 
 var needsYou = map[string]bool{panel.GlyphWaiting: true, panel.GlyphUnseen: true, panel.GlyphDirty: true}
 
-var tabNeedsYou = map[string]bool{panel.GlyphWaiting: true, panel.GlyphUnseen: true}
-
 func (m model) nextNeed(after int, wanted map[string]bool) int {
 	for step := 1; step <= len(m.rows); step++ {
 		i := (after + step) % len(m.rows)
@@ -1680,10 +1678,6 @@ func (m model) tabWord() string {
 		return who
 	}
 	return "the tab"
-}
-
-func (m model) selectedTab() string {
-	return m.selected().Name
 }
 
 func (m model) selected() panel.Tab {
