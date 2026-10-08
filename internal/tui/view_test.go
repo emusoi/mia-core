@@ -309,10 +309,15 @@ func TestANudgeRedrawsOnceWithoutAnotherTick(t *testing.T) {
 	m := newModel(before)
 	m.width, m.height = 100, 20
 	m.reload = func() (panel.Panel, error) { return after, nil }
+	forgot := false
+	m.hooks.Refresh = func() { forgot = true }
 
 	_, cmd := m.Update(nudged{})
 	if cmd == nil {
 		t.Fatal("a nudge did not reload")
+	}
+	if !forgot {
+		t.Error("a nudge reloads from a cached listing; it must forget it so new sessions show")
 	}
 	msg := cmd()
 	got, ok := msg.(reloaded)

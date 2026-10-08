@@ -478,6 +478,9 @@ func (m model) update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.stack) > 0 || m.mode == working || m.reload == nil {
 			return m, nil
 		}
+		if m.hooks.Refresh != nil {
+			m.hooks.Refresh()
+		}
 		reload := m.reload
 		gen := m.gen
 		return m, func() tea.Msg { p, err := reload(); return reloaded{panel: p, err: err, once: true, gen: gen} }
