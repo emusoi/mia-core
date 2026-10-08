@@ -1,7 +1,10 @@
-.PHONY: install build test site platform
+.PHONY: install dev build test site platform
 
 install:
 	go install -ldflags='-s -w' ./cmd/mia
+
+dev:
+	go build -o $(shell go env GOPATH)/bin/miadev ./cmd/mia
 
 build:
 	go build -ldflags='-s -w' -o mia ./cmd/mia

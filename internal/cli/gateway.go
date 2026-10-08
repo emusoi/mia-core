@@ -21,6 +21,9 @@ func cmdGateway(args []string) int {
 	if len(args) > 0 {
 		sub = args[0]
 	}
+	if devBuild() && sub != "status" {
+		return fail(fmt.Errorf("miadev leaves the gateway to mia — `mia gateway %s`", sub))
+	}
 	switch sub {
 	case "serve":
 		return gatewayServe()
@@ -144,7 +147,18 @@ func gatewayUninstall() int {
 	return exitOK
 }
 
+func devBuild() bool {
+	self, err := os.Executable()
+	return err == nil && filepath.Base(self) == "miadev"
+}
+
 func EnsureGateway() error {
+	if devBuild() {
+		if _, ok := gateway.ServingBuild(); ok {
+			return nil
+		}
+		return fmt.Errorf("no gateway is running — `mia gateway start`; miadev leaves it to mia")
+	}
 	if serviceInstalled() {
 		if serving, ok := gateway.ServingBuild(); ok && serving == gateway.Build() {
 			return nil

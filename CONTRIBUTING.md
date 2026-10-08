@@ -11,6 +11,10 @@ The tests use real git and tmux.
 
 ## Try it safely
 
+`make dev` builds `miadev` beside your installed `mia`, so the two never
+overwrite each other. `miadev` uses the same config and worktrees, but
+leaves the gateway to `mia`.
+
 Never try mia against a repository you work in. Make a throwaway lab:
 
 ```bash
