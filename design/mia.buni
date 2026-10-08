@@ -1,0 +1,208 @@
+{
+  "agents": {},
+  "attachments": {},
+  "buni": 1,
+  "clusters": {},
+  "comments": {
+    "d8161a8c": {
+      "id": "d8161a8c",
+      "node": "71a90aac",
+      "posts": [
+        {
+          "at": "2026-10-08T05:09:21.087Z",
+          "author": "claude",
+          "body": "The loop: 28 dots take turns lit (r 5.5 → 13 in 0.6 s ease-out 0.22,1,0.36,1; hold ~4 s; back in 0.6 s), each on a 12 s cycle with its own start, about ten lit at once. Drawn here with SVG <animate>, so the exported SVG moves on its own. On the web, use the CSS version under prefers-reduced-motion: no-preference, and show the still mark otherwise."
+        }
+      ],
+      "state": "open"
+    }
+  },
+  "connections": {},
+  "decisions": {
+    "4a2323f1": {
+      "at": "2026-10-08T05:09:20.848Z",
+      "by": "claude",
+      "id": "4a2323f1",
+      "text": "Logo: the hundred-dot field (mia = 100). Full field at 64 px and up, the 4x4 small cut below. One colour; circles only."
+    }
+  },
+  "endpoints": {},
+  "environments": {},
+  "evals": {},
+  "events": {},
+  "flows": {},
+  "journeys": {},
+  "links": {},
+  "nodes": {
+    "1a7f0e22": {
+      "id": "1a7f0e22",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg viewBox=\"0 0 1024 1024\" width=\"1024\" height=\"1024\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"100\" y=\"100\" width=\"824\" height=\"824\" rx=\"186\" fill=\"#191919\"></rect><circle cx=\"224\" cy=\"224\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"288\" cy=\"224\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"352\" cy=\"224\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"416\" cy=\"224\" r=\"24\" fill=\"#f2f1ee\"></circle><circle cx=\"480\" cy=\"224\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"544\" cy=\"224\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"608\" cy=\"224\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"672\" cy=\"224\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"736\" cy=\"224\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"800\" cy=\"224\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"224\" cy=\"288\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"288\" cy=\"288\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"352\" cy=\"288\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"416\" cy=\"288\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"480\" cy=\"288\" r=\"24\" fill=\"#f2f1ee\"></circle><circle cx=\"544\" cy=\"288\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"608\" cy=\"288\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"672\" cy=\"288\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"736\" cy=\"288\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"800\" cy=\"288\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"224\" cy=\"352\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"288\" cy=\"352\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"352\" cy=\"352\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"416\" cy=\"352\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"480\" cy=\"352\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"544\" cy=\"352\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"608\" cy=\"352\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"672\" cy=\"352\" r=\"24\" fill=\"#f2f1ee\"></circle><circle cx=\"736\" cy=\"352\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"800\" cy=\"352\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"224\" cy=\"416\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"288\" cy=\"416\" r=\"24\" fill=\"#f2f1ee\"></circle><circle cx=\"352\" cy=\"416\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"416\" cy=\"416\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"480\" cy=\"416\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"544\" cy=\"416\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"608\" cy=\"416\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"672\" cy=\"416\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"736\" cy=\"416\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"800\" cy=\"416\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"224\" cy=\"480\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"288\" cy=\"480\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"352\" cy=\"480\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"416\" cy=\"480\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"480\" cy=\"480\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"544\" cy=\"480\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"608\" cy=\"480\" r=\"24\" fill=\"#f2f1ee\"></circle><circle cx=\"672\" cy=\"480\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"736\" cy=\"480\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"800\" cy=\"480\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"224\" cy=\"544\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"288\" cy=\"544\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"352\" cy=\"544\" r=\"24\" fill=\"#f2f1ee\"></circle><circle cx=\"416\" cy=\"544\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"480\" cy=\"544\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"544\" cy=\"544\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"608\" cy=\"544\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"672\" cy=\"544\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"736\" cy=\"544\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"800\" cy=\"544\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"224\" cy=\"608\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"288\" cy=\"608\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"352\" cy=\"608\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"416\" cy=\"608\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"480\" cy=\"608\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"544\" cy=\"608\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"608\" cy=\"608\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"672\" cy=\"608\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"736\" cy=\"608\" r=\"24\" fill=\"#f2f1ee\"></circle><circle cx=\"800\" cy=\"608\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"224\" cy=\"672\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"288\" cy=\"672\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"352\" cy=\"672\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"416\" cy=\"672\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"480\" cy=\"672\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"544\" cy=\"672\" r=\"24\" fill=\"#f2f1ee\"></circle><circle cx=\"608\" cy=\"672\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"672\" cy=\"672\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"736\" cy=\"672\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"800\" cy=\"672\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"224\" cy=\"736\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"288\" cy=\"736\" r=\"24\" fill=\"#f2f1ee\"></circle><circle cx=\"352\" cy=\"736\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"416\" cy=\"736\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"480\" cy=\"736\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"544\" cy=\"736\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"608\" cy=\"736\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"672\" cy=\"736\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"736\" cy=\"736\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"800\" cy=\"736\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"224\" cy=\"800\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"288\" cy=\"800\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"352\" cy=\"800\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"416\" cy=\"800\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"480\" cy=\"800\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"544\" cy=\"800\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"608\" cy=\"800\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"672\" cy=\"800\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"736\" cy=\"800\" r=\"11\" fill=\"#f2f1ee\"></circle><circle cx=\"800\" cy=\"800\" r=\"24\" fill=\"#f2f1ee\"></circle></svg>",
+      "name": "app icon",
+      "parent": "e6564048",
+      "style": {}
+    },
+    "3eaf74ec": {
+      "id": "3eaf74ec",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg viewBox=\"0 0 512 512\" width=\"512\" height=\"512\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"512\" height=\"512\" fill=\"#ffffff\"></rect><circle cx=\"76\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"76\" r=\"13\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"116\" r=\"13\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"156\" r=\"13\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"196\" r=\"13\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"236\" r=\"13\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"276\" r=\"13\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"316\" r=\"13\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"356\" r=\"13\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"396\" r=\"13\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"436\" r=\"13\" fill=\"#191919\"></circle></svg>",
+      "name": "mark",
+      "parent": "bef3083c",
+      "style": {}
+    },
+    "539409c6": {
+      "id": "539409c6",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg viewBox=\"0 0 512 512\" width=\"512\" height=\"512\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"512\" height=\"512\" fill=\"#191919\"></rect><circle cx=\"76\" cy=\"76\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"116\" cy=\"76\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"156\" cy=\"76\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"196\" cy=\"76\" r=\"13\" fill=\"#f2f1ee\"></circle><circle cx=\"236\" cy=\"76\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"276\" cy=\"76\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"316\" cy=\"76\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"356\" cy=\"76\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"396\" cy=\"76\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"436\" cy=\"76\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"76\" cy=\"116\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"116\" cy=\"116\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"156\" cy=\"116\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"196\" cy=\"116\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"236\" cy=\"116\" r=\"13\" fill=\"#f2f1ee\"></circle><circle cx=\"276\" cy=\"116\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"316\" cy=\"116\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"356\" cy=\"116\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"396\" cy=\"116\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"436\" cy=\"116\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"76\" cy=\"156\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"116\" cy=\"156\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"156\" cy=\"156\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"196\" cy=\"156\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"236\" cy=\"156\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"276\" cy=\"156\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"316\" cy=\"156\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"356\" cy=\"156\" r=\"13\" fill=\"#f2f1ee\"></circle><circle cx=\"396\" cy=\"156\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"436\" cy=\"156\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"76\" cy=\"196\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"116\" cy=\"196\" r=\"13\" fill=\"#f2f1ee\"></circle><circle cx=\"156\" cy=\"196\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"196\" cy=\"196\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"236\" cy=\"196\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"276\" cy=\"196\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"316\" cy=\"196\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"356\" cy=\"196\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"396\" cy=\"196\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"436\" cy=\"196\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"76\" cy=\"236\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"116\" cy=\"236\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"156\" cy=\"236\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"196\" cy=\"236\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"236\" cy=\"236\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"276\" cy=\"236\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"316\" cy=\"236\" r=\"13\" fill=\"#f2f1ee\"></circle><circle cx=\"356\" cy=\"236\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"396\" cy=\"236\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"436\" cy=\"236\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"76\" cy=\"276\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"116\" cy=\"276\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"156\" cy=\"276\" r=\"13\" fill=\"#f2f1ee\"></circle><circle cx=\"196\" cy=\"276\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"236\" cy=\"276\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"276\" cy=\"276\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"316\" cy=\"276\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"356\" cy=\"276\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"396\" cy=\"276\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"436\" cy=\"276\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"76\" cy=\"316\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"116\" cy=\"316\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"156\" cy=\"316\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"196\" cy=\"316\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"236\" cy=\"316\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"276\" cy=\"316\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"316\" cy=\"316\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"356\" cy=\"316\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"396\" cy=\"316\" r=\"13\" fill=\"#f2f1ee\"></circle><circle cx=\"436\" cy=\"316\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"76\" cy=\"356\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"116\" cy=\"356\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"156\" cy=\"356\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"196\" cy=\"356\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"236\" cy=\"356\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"276\" cy=\"356\" r=\"13\" fill=\"#f2f1ee\"></circle><circle cx=\"316\" cy=\"356\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"356\" cy=\"356\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"396\" cy=\"356\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"436\" cy=\"356\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"76\" cy=\"396\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"116\" cy=\"396\" r=\"13\" fill=\"#f2f1ee\"></circle><circle cx=\"156\" cy=\"396\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"196\" cy=\"396\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"236\" cy=\"396\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"276\" cy=\"396\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"316\" cy=\"396\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"356\" cy=\"396\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"396\" cy=\"396\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"436\" cy=\"396\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"76\" cy=\"436\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"116\" cy=\"436\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"156\" cy=\"436\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"196\" cy=\"436\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"236\" cy=\"436\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"276\" cy=\"436\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"316\" cy=\"436\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"356\" cy=\"436\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"396\" cy=\"436\" r=\"5.5\" fill=\"#f2f1ee\"></circle><circle cx=\"436\" cy=\"436\" r=\"13\" fill=\"#f2f1ee\"></circle></svg>",
+      "name": "mark reversed",
+      "parent": "d5c064d2",
+      "style": {}
+    },
+    "71a90aac": {
+      "id": "71a90aac",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg viewBox=\"0 0 512 512\" width=\"512\" height=\"512\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"512\" height=\"512\" fill=\"#ffffff\"></rect><circle cx=\"76\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"76\" r=\"13\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-8.59s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"236\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"76\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-1.42s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"396\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"76\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"116\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-2.14s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"156\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"116\" r=\"13\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-8.14s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"276\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"116\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-4.16s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"356\" cy=\"116\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-6.7s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"396\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"116\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"156\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-2.53s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"116\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"156\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-11.47s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"276\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"156\" r=\"13\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-9.51s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"396\" cy=\"156\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"156\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-5.69s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"76\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"196\" r=\"13\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-8.04s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"156\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"196\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-0.86s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"236\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"196\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-0.07s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"396\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"196\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"236\" r=\"13\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-8.91s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"356\" cy=\"236\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-3.94s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"396\" cy=\"236\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"236\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-2.31s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"76\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"156\" cy=\"276\" r=\"13\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-10.57s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"196\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"276\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-1.65s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"356\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"276\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"316\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-5.38s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"156\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"316\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-6.28s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"276\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"316\" r=\"13\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-7.91s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"436\" cy=\"316\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"356\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-6.65s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"156\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"356\" r=\"13\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-11.04s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"316\" cy=\"356\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-4.99s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"356\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"356\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"396\" r=\"13\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-10.32s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"156\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"236\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"396\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"76\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"116\" cy=\"436\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-6.09s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"156\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"196\" cy=\"436\" r=\"5.5\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-3.48s\" repeatCount=\"indefinite\"></animate></circle><circle cx=\"236\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"276\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"316\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"356\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"396\" cy=\"436\" r=\"5.5\" fill=\"#191919\"></circle><circle cx=\"436\" cy=\"436\" r=\"13\" fill=\"#191919\"><animate attributeName=\"r\" values=\"5.5;5.5;13;13;5.5\" keyTimes=\"0;0.55;0.6;0.95;1\" calcMode=\"spline\" keySplines=\"0 0 1 1;0.22 1 0.36 1;0 0 1 1;0.22 1 0.36 1\" dur=\"12.0s\" begin=\"-9.64s\" repeatCount=\"indefinite\"></animate></circle></svg>",
+      "motion": [
+        {
+          "durationMs": 900,
+          "easing": "dramatic",
+          "effect": "scale",
+          "trigger": "load"
+        }
+      ],
+      "name": "mark animated",
+      "parent": "86f3d90a",
+      "style": {}
+    },
+    "86f3d90a": {
+      "id": "86f3d90a",
+      "index": "a0",
+      "kind": "frame",
+      "name": "Mark / Animated",
+      "style": {
+        "height": "512px",
+        "overflow": "hidden",
+        "width": "512px"
+      }
+    },
+    "893fb908": {
+      "id": "893fb908",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg viewBox=\"0 0 512 512\" width=\"512\" height=\"512\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"512\" height=\"512\" fill=\"#ffffff\"></rect><circle cx=\"88\" cy=\"88\" r=\"20\" fill=\"#191919\"></circle><circle cx=\"200\" cy=\"88\" r=\"46\" fill=\"#191919\"></circle><circle cx=\"312\" cy=\"88\" r=\"20\" fill=\"#191919\"></circle><circle cx=\"424\" cy=\"88\" r=\"20\" fill=\"#191919\"></circle><circle cx=\"88\" cy=\"200\" r=\"20\" fill=\"#191919\"></circle><circle cx=\"200\" cy=\"200\" r=\"20\" fill=\"#191919\"></circle><circle cx=\"312\" cy=\"200\" r=\"20\" fill=\"#191919\"></circle><circle cx=\"424\" cy=\"200\" r=\"46\" fill=\"#191919\"></circle><circle cx=\"88\" cy=\"312\" r=\"20\" fill=\"#191919\"></circle><circle cx=\"200\" cy=\"312\" r=\"20\" fill=\"#191919\"></circle><circle cx=\"312\" cy=\"312\" r=\"20\" fill=\"#191919\"></circle><circle cx=\"424\" cy=\"312\" r=\"20\" fill=\"#191919\"></circle><circle cx=\"88\" cy=\"424\" r=\"46\" fill=\"#191919\"></circle><circle cx=\"200\" cy=\"424\" r=\"20\" fill=\"#191919\"></circle><circle cx=\"312\" cy=\"424\" r=\"20\" fill=\"#191919\"></circle><circle cx=\"424\" cy=\"424\" r=\"20\" fill=\"#191919\"></circle></svg>",
+      "name": "mark small",
+      "parent": "a48e37b4",
+      "style": {}
+    },
+    "a48e37b4": {
+      "id": "a48e37b4",
+      "index": "a0",
+      "kind": "frame",
+      "name": "Mark / Small",
+      "style": {
+        "height": "512px",
+        "overflow": "hidden",
+        "width": "512px"
+      }
+    },
+    "bef3083c": {
+      "id": "bef3083c",
+      "index": "a0",
+      "kind": "frame",
+      "name": "Mark",
+      "style": {
+        "height": "512px",
+        "overflow": "hidden",
+        "width": "512px"
+      }
+    },
+    "d5c064d2": {
+      "id": "d5c064d2",
+      "index": "a0",
+      "kind": "frame",
+      "name": "Mark / Reversed",
+      "style": {
+        "height": "512px",
+        "overflow": "hidden",
+        "width": "512px"
+      }
+    },
+    "e6564048": {
+      "id": "e6564048",
+      "index": "a0",
+      "kind": "frame",
+      "name": "App icon",
+      "style": {
+        "height": "1024px",
+        "overflow": "hidden",
+        "width": "1024px"
+      }
+    }
+  },
+  "operations": {},
+  "pages": {
+    "19999f90": {
+      "frame": "bef3083c",
+      "id": "19999f90",
+      "index": "a1",
+      "name": "Mark"
+    },
+    "50fb895f": {
+      "frame": "a48e37b4",
+      "id": "50fb895f",
+      "index": "a3",
+      "name": "Mark / Small"
+    },
+    "6e3a8abd": {
+      "frame": "86f3d90a",
+      "id": "6e3a8abd",
+      "index": "a5",
+      "name": "Mark / Animated"
+    },
+    "80b2e114": {
+      "frame": "e6564048",
+      "id": "80b2e114",
+      "index": "a4",
+      "name": "App icon"
+    },
+    "efe39581": {
+      "frame": "d5c064d2",
+      "id": "efe39581",
+      "index": "a2",
+      "name": "Mark / Reversed"
+    }
+  },
+  "parts": {},
+  "phases": {},
+  "placements": {},
+  "positions": {},
+  "questions": {},
+  "requirements": {},
+  "reviews": {},
+  "roles": {},
+  "rules": {},
+  "sections": {
+    "4b11c6f9": {
+      "body": "Mia is Swahili for 100. The mark is a field of a hundred dots, ten by ten, with about ten of them lit: a hundred places for your branches, a few of them in use. It is drawn as circles only, in one colour, ink #191919 on white or #f2f1ee on ink. The full field is for 64 px and up; below that the small cut, four by four with three lit, stands in (favicons, tabs). The app icon is the full field on an ink rounded square.",
+      "heading": "The mark",
+      "id": "4b11c6f9",
+      "index": "a0"
+    },
+    "5ed88834": {
+      "body": "Once, as it appears: the field scales in with the dramatic easing (about 900 ms). Then, only where the mark stands alone (the front page, a splash): 28 of the dots take turns being lit. Each grows from 5.5 to 13 over 0.6 s with ease-out (0.22, 1, 0.36, 1), stays lit for about 4 s, and shrinks back over 0.6 s, on a 12 s cycle with its own start, so about ten are lit at any moment and the picture never repeats in step. Nothing moves for people who ask for reduced motion: they see the still mark. Never animate the small cut or the app icon.",
+      "heading": "How the mark moves",
+      "id": "5ed88834",
+      "index": "a1"
+    }
+  },
+  "shapes": {},
+  "shared": {},
+  "tables": {},
+  "threads": {},
+  "tokens": {},
+  "traces": {}
+}

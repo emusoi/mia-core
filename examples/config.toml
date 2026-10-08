@@ -1,0 +1,43 @@
+# A repository's mia configuration, at .git/mia/config.toml (`mia config` opens it).
+# Every key is optional. Unknown keys are refused rather than ignored.
+# ~/.config/mia/config.toml holds the same keys for every repository; the
+# repository's own file wins.
+
+base = "main"                       # what a new branch starts from
+prefix = "you/"                     # put in front of every new branch name
+setup = ["npm", "install"]          # on the host, once, in a new worktree; `mia setup` again
+clone = ["node_modules", "dist/*"]  # copied from the main checkout, copy-on-write, before setup
+commit_times = true                 # tracked files dated by their last commit, not the checkout
+editor = "nvim"
+
+[launch]                            # named windows: `mia window new <worktree> <name>`
+logs = "tail -f log/dev.log"
+
+[popup]                             # the tmux popup the dashboard opens
+width = "80%"
+height = "75%"
+
+[keys]                              # rebind anything `?` lists in the dashboard
+down = ["j", "down"]
+quiet = "Q"
+
+[env]                               # the container a worktree's code runs in
+image = "node:22"                   # else devcontainer.json, else picked for the language
+image_setup = ["sh", "-c", "apt-get update && apt-get install -y socat"]  # baked in, survives `mia env rm`
+setup = ["npm", "install"]          # inside a fresh container
+ports = [5173]                      # what <name>.mia:<port> reaches
+page = 5173                         # what `mia env browse` opens
+container_only = ["node_modules"]   # a volume per worktree instead of the host directory
+cache = ["/root/.npm"]              # a volume per repository, shared by its environments
+pass = ["DATABASE_URL"]             # variables from your shell, passed in at `mia env up`
+
+[tools]                             # files carried from this machine into environments
+copy = ["~/.gitconfig"]             # by `mia env tools`
+credentials = ["~/.netrc"]          # only with `mia env tools --credentials`, 0600
+
+[[service]]                         # what an environment keeps running
+id = "web"
+run = ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+health = ["sh", "-c", "curl -fsS http://127.0.0.1:5173 >/dev/null"]
+autostart = true
+restart = "on-failure"              # or "on-unhealthy"
