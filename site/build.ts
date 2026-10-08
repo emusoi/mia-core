@@ -370,7 +370,7 @@ const home = `<main class="home">
   <article class="span">
     <p class="eyebrow">Nothing in your tree</p>
     <h2>Your repository stays yours.</h2>
-    <p>mia writes nothing into the working tree; everything it keeps is in <code>.git/mia</code>. It keeps no state it could lose, either: routes, sessions and names are worked out from git, tmux and the container engine every time.</p>
+    <p>mia writes nothing into the working tree; everything it keeps is in <code>.git/mia</code>. The one exception is <code>mia dev</code>, when you ask it to lend main\'s dev server a branch, and it gives main its files back. It keeps no state it could lose, either: routes, sessions and names are worked out from git, tmux and the container engine every time.</p>
     <a href="/docs/getting-started">Getting started →</a>
   </article>
 </section>

@@ -17,7 +17,7 @@ var groupOf = map[string]string{
 	"star": "Worktrees", "open": "Worktrees", "shell": "Worktrees", "window": "Worktrees", "rename": "Worktrees", "run": "Worktrees", "setup": "Worktrees", "switch": "Worktrees", "shell-init": "Worktrees",
 	"dash": "Working", "stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working", "pr": "Working",
-	"env": "Environments", "machine": "Environments", "gateway": "Environments",
+	"env": "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
 	"api": "Records", "plugin": "Records",
 }
 
@@ -34,6 +34,7 @@ var verbs = []Verb{
 	{"window", "mia window [ls|open|select|new|close|read|send] [worktree] [window] [--editor] [-- command|text]", "the windows of a worktree's session: land in one, pick one without landing, add a shell, close one, read or type into one", false, ""},
 	{"shell", "mia shell [--popup] [worktree]", "attach to a worktree's session", false, ""},
 	{"run", "mia run <worktree> <cmd…>", "run a command once in a worktree", false, ""},
+	{"dev", "mia dev [<worktree> [--follow]|off]", "lend the main checkout's running dev server a worktree's files; the one time mia writes into a working tree", false, ""},
 	{"env", "mia env <up|down|setup|dotfiles|sync|shell|exec|run|ports|image|tools|host|browse|service|status|rm> [worktree]", "the environment a worktree's code runs in", false, ""},
 	{"stack", "mia stack [--in <worktree>] [show|go <layer>|name <name>|merge <layer> [onto <layer>]|rm [--worktrees] [--branches] [--force]|restack|diff|pr]", "a feature too large for one pull request", false, ""},
 	{"up", "mia up", "move to the layer above, in place", false, ""},

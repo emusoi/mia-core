@@ -154,6 +154,25 @@ run = ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 autostart = true
 ```
 
+## Main's dev server
+
+No container needed. If your dev server is already running in the main
+checkout, lend it a worktree's files:
+
+```bash
+mia dev monduli            # main's dev server now shows monduli
+mia dev monduli --follow   # and keeps copying as you edit
+mia dev                    # whose files main has
+mia dev off                # main gets its own files back
+```
+
+This is the only time mia writes into a working tree. It puts main's own
+changes aside in a stash, then copies the worktree's files over main,
+uncommitted ones included. Ignored files such as `node_modules` and `.env`
+stay as they are, so the server keeps running and reloads. `mia dev off`
+resets main and restores the stash. Don't commit in main while it is lent.
+On the dashboard, `v` lends the selected worktree; `v` on main gives it back.
+
 ## `<name>.mia`
 
 Containers publish no ports. Open the app at `https://<name>.mia:<port>/`

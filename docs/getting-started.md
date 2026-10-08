@@ -66,3 +66,5 @@ setup = ["npm", "install"]
 ```
 
 mia keeps everything in `.git/mia` and `~/.config/mia`, never in your files.
+The one exception is [`mia dev`](environments.md#mains-dev-server), and only
+when you ask.

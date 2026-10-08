@@ -28,6 +28,7 @@ facts and session windows when the terminal is wide enough.
 | `o` | open in an editor |
 | `*` | star |
 | `E` | environment |
+| `v` | lend main's dev server, or give it back |
 | `S` | stack |
 | `t` | session windows |
 | `Y` | draft a pull request |

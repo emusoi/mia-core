@@ -30,3 +30,5 @@ configs to copy into `.git/mia/config.toml`. Delete it when done.
 - `gofmt` and `go vet`; no new dependency for what a few lines can do.
 - Every dashboard action is a `mia` command.
 - mia writes nothing into the working tree; everything goes in `.git/mia`.
+  `mia dev` is the one exception, and it must always give main its own files
+  back.

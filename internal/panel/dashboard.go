@@ -33,7 +33,7 @@ func Dashboard(listings []app.Listing, prefix string, extras []plugin.Rows) Pane
 		Empty:   "No worktrees yet. `n` here, or `mia new <branch>`.",
 		Order: []string{
 			"open", "shell", "editor", "blocks",
-			"env", "land", "star",
+			"env", "dev", "land", "star",
 			"stack", "begin", "layer", "apart", "claim", "worktree", "merge", "name", "restack", "forget",
 			"adopt", "delete", "abandoned", "tidy", "new", "branch", "pr", "machines", "config",
 		},
@@ -395,6 +395,9 @@ func dashboardRow(listing app.Listing, prefix string) Row {
 	if listing.Session {
 		facts = append(facts, "session  open")
 	}
+	if listing.Dev != "" {
+		facts = append(facts, "dev     "+listing.Dev)
+	}
 
 	actions := []string{"open", "shell"}
 	switch {
@@ -409,6 +412,9 @@ func dashboardRow(listing app.Listing, prefix string) Row {
 	}
 	if listing.Adopted && listing.Branch != "" && len(listing.Layers) == 0 {
 		actions = append(actions, "begin")
+	}
+	if (listing.Adopted && !listing.Main) || (listing.Main && listing.Dev != "") {
+		actions = append(actions, "dev")
 	}
 	if listing.Branch == "" {
 		actions = without(actions, "stack", "land")
@@ -510,6 +516,10 @@ func dashboardActions() map[string]Action {
 		"branch": {
 			Lands: true, Key: "+", Label: "new worktree", Verb: "new", Args: []string{"--shell", "{input}"}, Input: "branch",
 			Help: "create a worktree for a branch (new or existing), run setup, and go there",
+		},
+		"dev": {
+			Key: "v", Label: "on main's dev server", Verb: "dev", Args: []string{"{row}"}, Report: true,
+			Help: "copy the worktree's files over the main checkout, so its running dev server shows them; v on main gives main its own back",
 		},
 		"env": {
 			Key: "E", Label: "environment", Panel: "env-panel",

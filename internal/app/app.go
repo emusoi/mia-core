@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/emusoi/mia-core/internal/config"
+	"github.com/emusoi/mia-core/internal/dev"
 	"github.com/emusoi/mia-core/internal/env"
 	"github.com/emusoi/mia-core/internal/git"
 	"github.com/emusoi/mia-core/internal/model"
@@ -430,9 +431,12 @@ type Listing struct {
 	Windows     []session.Window `json:"windows,omitempty"`
 	Layers      []stack.Layer    `json:"layers,omitempty"`
 	Stack       string           `json:"stack,omitempty"`
+	Dev         string           `json:"dev,omitempty"`
 }
 
 type listing struct {
+	lent     dev.Lent
+	lending  bool
 	byPath   map[string]model.Record
 	trees    []git.Worktree
 	panes    map[string][]session.Pane
@@ -487,6 +491,7 @@ func (a *App) surveyRepository() (*listing, error) {
 		return nil, err
 	}
 	ctx := &listing{byPath: map[string]model.Record{}, trees: trees, panes: session.Here().AllPanes()}
+	ctx.lent, ctx.lending, _ = a.Dev().Current()
 	for _, record := range records {
 		if _, err := os.Stat(record.Path); errors.Is(err, fs.ErrNotExist) && !slices.ContainsFunc(trees, func(t git.Worktree) bool { return t.Path == record.Path }) {
 			_ = a.Store.Remove(record.Path)
@@ -505,6 +510,10 @@ func (a *App) surveyRepository() (*listing, error) {
 		ctx.baseHead = git.RevParse(a.Root, base)
 	}
 	return ctx, nil
+}
+
+func (a *App) Dev() dev.Main {
+	return dev.Main{Path: a.Root, State: filepath.Join(a.MiaDir, "dev.json")}
 }
 
 func (a *App) finishSurvey() {
@@ -535,6 +544,13 @@ func (a *App) listOne(ctx *listing, tree git.Worktree) Listing {
 		Session: worked,
 		Main:    tree.Main,
 		Adopted: adopted,
+	}
+	switch {
+	case !ctx.lending:
+	case tree.Main:
+		l.Dev = "has " + ctx.lent.Worktree + "'s files"
+	case adopted && record.Name == ctx.lent.Worktree:
+		l.Dev = "on main's dev server"
 	}
 	if adopted {
 		l.Where = env.Placement(record).String()

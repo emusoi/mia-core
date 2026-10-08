@@ -39,6 +39,7 @@
 | `mia env shell` | a shell inside |
 | `mia env exec <cmd…>` | run a command inside |
 | `mia env run <worktree> <cmd…>` | run where its code runs |
+| `mia dev [worktree\|off]` | lend main's dev server a worktree's files |
 | `mia env browse` | open it in the browser |
 | `mia env status\|ports\|service` | what it is doing |
 | `mia env host [machine]` | where it runs, or move it |

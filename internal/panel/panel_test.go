@@ -329,3 +329,30 @@ func TestTheMainCheckoutIsNotCalledStarredUnlessItIs(t *testing.T) {
 		t.Errorf("a starred main checkout sits under %q", got)
 	}
 }
+
+func TestALentMainCheckoutSaysWhoseFilesItHasAndGivesThemBack(t *testing.T) {
+	p := panel.Dashboard([]app.Listing{
+		{Name: "app", Path: "/w/app", Branch: "main", Main: true, Dev: "has longido's files"},
+		{Name: "longido", Path: "/w/app.longido", Branch: "fix", Adopted: true, Dev: "on main's dev server"},
+		{Name: "monduli", Path: "/w/app.monduli", Branch: "other", Adopted: true},
+	}, "", nil)
+	rows := map[string]panel.Row{}
+	for _, row := range p.Rows() {
+		rows[row.ID] = row
+	}
+	if !slices.Contains(rows["app"].Facts, "dev     has longido's files") || !slices.Contains(rows["app"].Actions, "dev") {
+		t.Errorf("main = %+v, want its dev fact and v to give it back", rows["app"])
+	}
+	if !slices.Contains(rows["longido"].Facts, "dev     on main's dev server") {
+		t.Errorf("longido facts = %v", rows["longido"].Facts)
+	}
+	if !slices.Contains(rows["monduli"].Actions, "dev") {
+		t.Error("an adopted worktree cannot be lent to main's dev server")
+	}
+	if p.Actions["dev"].Key != "v" {
+		t.Errorf("dev key = %q", p.Actions["dev"].Key)
+	}
+	if plain := panel.Dashboard([]app.Listing{{Name: "app", Path: "/w/app", Branch: "main", Main: true, Adopted: true}}, "", nil); slices.Contains(plain.Rows()[0].Actions, "dev") {
+		t.Error("main offers v when nothing is lent")
+	}
+}

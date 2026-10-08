@@ -182,6 +182,8 @@ func Run(args []string) int {
 		return cmdRun(a, rest)
 	case "env":
 		return cmdEnv(a, rest, asJSON)
+	case "dev":
+		return cmdDev(a, rest)
 	case "api":
 		return cmdAPI(a, rest)
 	case "dash":
