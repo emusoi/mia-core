@@ -118,6 +118,42 @@ host_ports = [5432]
 Inside, `127.0.0.1:5432` reaches your computer's 5432. It needs `socat` in
 the image.
 
+## A base configuration
+
+All of the above in one file, for a web app. `mia config` opens it; copy
+this and change what differs.
+
+```toml
+[env]
+setup = ["npm", "install"]
+container_only = ["node_modules"]
+cache = ["/root/.npm"]
+ports = [5173]
+page = 5173
+
+[[service]]
+id = "web"
+run = ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+health = ["sh", "-c", "curl -fsS http://127.0.0.1:5173 >/dev/null"]
+autostart = true
+restart = "on-failure"
+```
+
+For Python, the same shape:
+
+```toml
+[env]
+setup = ["sh", "-c", "pip install -e ."]
+cache = ["/root/.cache/pip"]
+ports = [8000]
+page = 8000
+
+[[service]]
+id = "api"
+run = ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+autostart = true
+```
+
 ## `<name>.mia`
 
 Containers publish no ports. Open the app at `https://<name>.mia:<port>/`
