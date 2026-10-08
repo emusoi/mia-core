@@ -4,6 +4,7 @@
 
 | | |
 |---|---|
+| [Why mia](why.md) | the problem, and the name |
 | [Getting started](getting-started.md) | install, the words mia uses, a first worktree |
 | [Worktrees](worktrees.md) | make, find, switch, remove; sessions and windows |
 | [Stacks](stacks.md) | several branches in one worktree |

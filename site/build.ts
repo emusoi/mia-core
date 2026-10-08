@@ -10,6 +10,7 @@ const repo = "https://github.com/emusoi/mia-core";
 const version = Date.now().toString(36);
 
 const pages = [
+  { file: "why.md", slug: "why", group: "Start" },
   { file: "getting-started.md", slug: "getting-started", group: "Start" },
   { file: "worktrees.md", slug: "worktrees", group: "Using mia" },
   { file: "stacks.md", slug: "stacks", group: "Using mia" },
@@ -312,10 +313,10 @@ const home = `<main class="home">
 </section>
 
 <section class="pitch" id="what">
-  <h1>A hundred branches at once, each in a place of its own.</h1>
+  <h1>Work on 100 things at once.</h1>
   <p>mia gives every branch a worktree, every worktree a name and a tmux session, and — when it needs one — a container you open at <code>https://&lt;name&gt;.mia</code>. Everything else is a plugin.</p>
   <div class="install">${sample("go install github.com/emusoi/mia-core/cmd/mia@latest")}</div>
-  <p class="actions"><a class="pill" href="/docs/getting-started">Get started</a><a class="quiet" href="/docs/">Read the docs</a></p>
+  <p class="actions"><a class="pill" href="/docs/getting-started">Get started</a><a class="quiet" href="/docs/why">Why mia</a></p>
 </section>
 
 <section class="features">
@@ -378,7 +379,7 @@ const home = `<main class="home">
 await writeFile(
   join(out, "index.html"),
   page({
-    title: "mia — a hundred branches at once",
+    title: "mia — work on 100 things at once",
     description: "mia gives every branch a worktree, every worktree a name and a tmux session, and a container you open at <name>.mia. Mia is Swahili for 100.",
     body: home,
     active: "home",
