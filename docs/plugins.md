@@ -8,6 +8,10 @@ mia plugin enable hello
 mia plugin ls
 ```
 
+[mia-plugins](https://github.com/emusoi/mia-plugins) has working ones to
+use or copy: agents (`mia agent`: which agent is waiting on you), plans
+proven by checks, Neovim, and pull request status.
+
 ## The smallest plugin
 
 ```sh
