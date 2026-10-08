@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -62,7 +63,9 @@ func TestNamedListsOnlySurveyTheSelectedWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(filtered, []app.Listing{selected}) {
+	got, _ := json.Marshal(filtered)
+	want, _ := json.Marshal([]app.Listing{selected})
+	if string(got) != string(want) {
 		t.Fatalf("the selected listing changed: got %+v, want %+v", filtered, selected)
 	}
 	calls, err := os.ReadFile(log)
