@@ -314,7 +314,7 @@ const home = `<main class="home">
 
 <section class="pitch" id="what">
   <h1>Work on 100 things at once.</h1>
-  <p>mia gives every branch a worktree, every worktree a name and a tmux session, and — when it needs one — a container you open at <code>https://&lt;name&gt;.mia</code>. Everything else is a plugin.</p>
+  <p>Every piece of work gets its own worktree, tmux session and name, and its own container at <code>https://&lt;name&gt;.mia</code> when it needs one. Build and test them side by side, here or on any machine you can ssh to. Everything else is a plugin.</p>
   <div class="install">${sample("go install github.com/emusoi/mia-core/cmd/mia@latest")}</div>
   <p class="actions"><a class="pill" href="/docs/getting-started">Get started</a><a class="quiet" href="/docs/why">Why mia</a></p>
 </section>
@@ -380,7 +380,7 @@ await writeFile(
   join(out, "index.html"),
   page({
     title: "mia — work on 100 things at once",
-    description: "mia gives every branch a worktree, every worktree a name and a tmux session, and a container you open at <name>.mia. Mia is Swahili for 100.",
+    description: "Every piece of work gets its own worktree, tmux session and name, and its own container at <name>.mia. Build and test them side by side, here or on any machine you can ssh to. Mia is Swahili for 100.",
     body: home,
     active: "home",
     bodyClass: "front",
