@@ -11,7 +11,6 @@ const version = Date.now().toString(36);
 
 const pages = [
   { file: "getting-started.md", slug: "getting-started", group: "Start" },
-  { file: "concepts.md", slug: "concepts", group: "Start" },
   { file: "worktrees.md", slug: "worktrees", group: "Using mia" },
   { file: "stacks.md", slug: "stacks", group: "Using mia" },
   { file: "environments.md", slug: "environments", group: "Using mia" },
@@ -19,7 +18,6 @@ const pages = [
   { file: "configuration.md", slug: "configuration", group: "Reference" },
   { file: "commands.md", slug: "commands", group: "Reference" },
   { file: "plugins.md", slug: "plugins", group: "Reference" },
-  { file: "architecture.md", slug: "architecture", group: "Reference" },
 ];
 
 const highlighter = await createHighlighter({
@@ -372,7 +370,7 @@ const home = `<main class="home">
     <p class="eyebrow">Nothing in your tree</p>
     <h2>Your repository stays yours.</h2>
     <p>mia writes nothing into the working tree; everything it keeps is in <code>.git/mia</code>. It keeps no state it could lose, either: routes, sessions and names are worked out from git, tmux and the container engine every time.</p>
-    <a href="/docs/concepts">Concepts →</a>
+    <a href="/docs/getting-started">Getting started →</a>
   </article>
 </section>
 </main>`;

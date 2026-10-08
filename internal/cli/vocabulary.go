@@ -61,19 +61,6 @@ stack        Several branches sharing ONE worktree, each built on the one
              below. A layer is one of those branches. 'mia up' and 'mia down'
              move between them in place, so the session, the environment and
              what runs in them survive. mia never merges into the base branch.
-
-RETIRED WORDS
-
-lane         Was both "the environment" and "the numbered slot it occupied".
-             That conflation is what broke identity. Say environment.
-city         Was the internal word for a name. The list happens to be place
-             names; that is not something anyone needs to know.
-slot         A number an environment occupied, which was then printed as
-             identity and used as a matching key — so a pin left behind for
-             slot 3 was inherited by the next environment to take that
-             number. mia has no slots. The worktree is the identity.
-berth        Say staging copy, and note it is derived rather than recorded.
-runtime      Say machine. A box, a host, a remote: all of them are a machine.
 `
 
 func printVocabulary() int {

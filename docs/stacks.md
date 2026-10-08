@@ -1,116 +1,67 @@
 # Stacks
 
-A feature too large for one pull request is a **stack**: several branches,
-each built on the one below, all in one worktree. Each branch is a **layer**,
-and each layer lands as its own pull request, bottom first.
+A stack is several branches in one worktree, each built on the one below.
+Each branch is a layer, and each layer becomes its own pull request.
 
 ```
 main
- └─ schema        ← the bottom layer: lands first
+ └─ schema
      └─ api
-         └─ ui    ← the top
+         └─ ui
 ```
 
-Because the layers share a worktree, moving between them is a `git checkout`
-in place. The session, the environment and everything running in them stay
-put.
+## Build
 
-## Building one
-
-Start on the branch the stack grows from, and add layers on top:
-
-    mia new schema --stack     # a branch on top of the one you are on, checked out here
-    mia new api --stack
-    mia new ui --stack
-
-Each new layer is a branch off the current one, checked out in place.
-`--in <worktree>` adds it to another worktree's stack. `--worktree` gives the
-new layer a worktree of its own instead, so two layers can run and be tested
-side by side.
-
-A layer added in the middle of a stack is inserted: the layers above it move
-on top of it.
-
-## Moving between layers
-
-    mia up                     # the layer above
-    mia down                   # the layer below
-    mia stack go api           # a layer by name
-
-These refuse when tracked files have uncommitted changes, rather than carry
-them to another branch. At either end they say so and do nothing.
-
-## Seeing it
-
-    mia stack
-
-```
-payments — 1/3 layers landed
-  schema   landed
-▸ api      4 commit(s)
-  ui       2 commit(s) · needs restack   in kijenge
+```bash
+mia new schema --stack     # a branch on top of this one, checked out here
+mia new api --stack
 ```
 
-`▸` is the layer checked out here. A layer is *landed* once the base branch
-contains it, and *needs restack* when the layer below has moved on without
-it. `mia stack --json` gives the same as data; the dashboard shows a stack as
-one row that unfolds into its layers, and `S` opens the stack panel.
+`--worktree` gives the new layer its own worktree. `--in <worktree>` adds to
+another worktree's stack.
 
-    mia stack name payments    # name it
-    mia switch payments        # and go to it by name, from anywhere
-    mia stack diff             # this layer against the one below
+## Move
 
-## Keeping it in shape
-
-When a lower layer changes — you amend it, or it is rebased onto a new base —
-the layers above have to follow:
-
-    mia stack restack
-
-rebases every layer that is not landed onto the layer below, bottom up, and
-leaves you on the layer you started on. It refuses when the tree has any
-uncommitted change, untracked files included, since it rewrites history under
-them. If a rebase stops for a conflict, resolve it, `git rebase --continue`,
-and run `mia stack restack` again.
-
-### Folding layers together
-
-    mia stack merge ui onto api
-
-fast-forwards `api` to `ui`: the layers in between and `ui` fold into it and
-disappear, and worktrees that had them checked out move to `api`. Without
-`onto`, a layer merges into the one below it. mia refuses to merge into the
-base branch — the bottom layer lands through a pull request — and refuses
-when a layer is behind the one below (restack first) or the target has
-uncommitted changes.
-
-## Landing it
-
-mia never pushes. It prints the commands, bottom-up, for you to run:
-
-    mia stack pr
-
-```
-# bottom-up; run these yourself
-git push -u origin api && gh pr create --base schema --head api
-git push -u origin ui && gh pr create --base api --head ui
+```bash
+mia up                     # the layer above
+mia down                   # the layer below
+mia stack go api           # a layer by name
 ```
 
-Landed layers are left out. `mia pr` drafts the text of one layer's pull
-request, against the layer below it.
+These refuse when tracked files have uncommitted changes.
 
-## Forgetting it
+## Look
 
-    mia stack rm
+```bash
+mia stack                  # the layers, landed or not, and which needs a restack
+mia stack name payments    # name it; then mia switch payments
+mia stack diff             # this layer against the one below
+```
 
-forgets the stack — the edges between the layers and its name. The branches
-and worktrees stay as ordinary ones. To take them too:
+## Keep it in shape
 
-    mia stack rm --worktrees --branches
+```bash
+mia stack restack          # rebase every layer onto the one below
+mia stack merge ui onto api    # fold layers into a lower one
+```
 
-`--worktrees` removes each layer's worktree (not the main checkout), with the
-same refusals as `mia rm`. `--branches` deletes branches no worktree has
-checked out, and refuses one whose work exists on no other branch. `--force`
-gets past both.
+mia never merges into your base branch.
 
-Stacks are kept in `.git/mia/stack.json`.
+## Land
+
+```bash
+mia stack pr
+```
+
+prints `git push` and `gh pr create` for each layer, bottom first, for you to
+run.
+
+## Forget
+
+```bash
+mia stack rm                       # forget the stack; branches and worktrees stay
+mia stack rm --worktrees --branches    # remove those too
+```
+
+`--branches` refuses a branch with work nowhere else; `--force` deletes it
+anyway.
