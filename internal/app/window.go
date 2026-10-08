@@ -97,11 +97,24 @@ func (a *App) CloseWindow(record model.Record, window string) error {
 	return host.KillWindow(record.Name, window)
 }
 
-func (a *App) WindowText(record model.Record, window string) string {
+func (a *App) SendToWindow(record model.Record, window, text string) error {
 	host, window, err := a.windowNamed(record, window)
 	if err != nil {
-		return ""
+		return err
 	}
-	text, _ := host.Capture(record.Name, window, false)
-	return strings.TrimSpace(text)
+	return host.Send(record.Name, window, text)
+}
+
+func (a *App) WindowText(record model.Record, window string) string {
+	text, _ := a.ReadWindow(record, window)
+	return text
+}
+
+func (a *App) ReadWindow(record model.Record, window string) (string, error) {
+	host, window, err := a.windowNamed(record, window)
+	if err != nil {
+		return "", err
+	}
+	text, err := host.Capture(record.Name, window, false)
+	return strings.TrimSpace(text), err
 }

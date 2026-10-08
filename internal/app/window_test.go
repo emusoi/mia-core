@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/gittest"
@@ -129,6 +130,43 @@ func TestAShellInAWorktreeWithoutASessionIsTheSessionsOwnShell(t *testing.T) {
 	}
 	if windows := session.Here().Windows("lonely"); len(windows) != 1 || windows[0] != opened {
 		t.Errorf("windows = %v, opened %q; want one shell", windows, opened)
+	}
+}
+
+func TestTextSentToAWindowCanBeReadBack(t *testing.T) {
+	gittest.Isolate(t)
+	socket, err := os.MkdirTemp("/tmp", "mia-send-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(socket) })
+	dir := filepath.Join(socket, "talker")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMUX_TMPDIR", socket)
+	t.Setenv("TMUX", "")
+	t.Cleanup(func() { exec.Command("tmux", "kill-server").Run() })
+	a := &app.App{Root: dir}
+	record := model.Record{Name: "talker", Path: dir}
+	if _, err := a.NewWindow(record, "agent", []string{"cat"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SendToWindow(record, "agent", "hello there"); err != nil {
+		t.Fatal(err)
+	}
+	var text string
+	for range 50 {
+		if text, err = a.ReadWindow(record, "agent"); err == nil && strings.Count(text, "hello there") == 2 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if strings.Count(text, "hello there") != 2 {
+		t.Fatalf("read back %q, want the typed line and cat's echo", text)
+	}
+	if _, err := a.ReadWindow(record, "nobody"); err == nil {
+		t.Error("reading a window that isn't there succeeded")
 	}
 }
 

@@ -297,6 +297,16 @@ func (h Host) Capture(worktree, window string, withEscapes bool) (string, error)
 	return h.CaptureBack(worktree, window, withEscapes, 0)
 }
 
+func (h Host) Send(worktree, window, text string) error {
+	if out, err := h.run("send-keys", "-t", Target(worktree, window), "-l", text); err != nil {
+		return fmt.Errorf("type into %s: %s", worktree, strings.TrimSpace(out))
+	}
+	if out, err := h.run("send-keys", "-t", Target(worktree, window), "Enter"); err != nil {
+		return fmt.Errorf("type into %s: %s", worktree, strings.TrimSpace(out))
+	}
+	return nil
+}
+
 func (h Host) CaptureBack(worktree, window string, withEscapes bool, back int) (string, error) {
 	args := []string{"capture-pane", "-p", "-t", Target(worktree, window)}
 	if withEscapes {

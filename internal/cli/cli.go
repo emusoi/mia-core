@@ -694,7 +694,7 @@ func subject(a *app.App, args []string, fallback string, subs ...string) (sub st
 }
 
 func cmdWindow(a *app.App, args []string, asJSON bool) int {
-	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close")
+	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close", "read", "send")
 	if err != nil {
 		return fail(err)
 	}
@@ -770,6 +770,21 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 			}
 		}
 		return exitOK
+	case "read":
+		if name == "" {
+			return usageErr("mia window read [worktree] <window>")
+		}
+		text, err := a.ReadWindow(record, name)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Println(text)
+		return exitOK
+	case "send":
+		if name == "" || len(argv) == 0 {
+			return usageErr("mia window send [worktree] <window> -- <text>")
+		}
+		return exitFor(a.SendToWindow(record, name, strings.Join(argv, " ")))
 	case "close":
 		if name == "" {
 			return usageErr("mia window close [worktree] <window>")
@@ -780,7 +795,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		fmt.Printf("%s: window %s closed\n", record.Name, name)
 		return exitOK
 	}
-	return usageErr("mia window [ls|open|select|new|close] [worktree] [window] [--editor] [-- command]")
+	return usageErr("mia window [ls|open|select|new|close|read|send] [worktree] [window] [--editor] [-- command|text]")
 }
 
 func configHere() config.Config {

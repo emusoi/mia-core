@@ -40,6 +40,8 @@ mia window                           # its windows
 mia window new monduli               # a new shell
 mia window new monduli --editor      # your editor
 mia window new monduli logs -- tail -f log/dev.log
+mia window read monduli logs         # what it shows
+mia window send monduli logs -- q    # type a line into it
 mia window close monduli logs
 ```
 
