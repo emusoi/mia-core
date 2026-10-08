@@ -45,6 +45,9 @@ func TestWindowsWithTheSameNameKeepTheirDistinctIndices(t *testing.T) {
 	if windows[0].Index != 1 || windows[1].Index != 3 || !windows[1].Active {
 		t.Errorf("window indices and active state = %+v", windows)
 	}
+	if windows[0].PID != 101 || windows[1].PID != 103 {
+		t.Errorf("window pids = %d, %d; want each window's first pane, so a plugin can tell what runs in it", windows[0].PID, windows[1].PID)
+	}
 }
 
 func TestAWindowNamedLikeAVersionIsTargetedByIndex(t *testing.T) {

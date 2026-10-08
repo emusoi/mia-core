@@ -428,6 +428,7 @@ type Window struct {
 	Index   int           `json:"index"`
 	Name    string        `json:"name"`
 	Command string        `json:"command"`
+	PID     int           `json:"pid,omitempty"`
 	Quiet   time.Duration `json:"-"`
 	Still   string        `json:"quiet"`
 	Screen  string        `json:"-"`
@@ -447,7 +448,7 @@ func WindowsFrom(panes []Pane) []Window {
 		}
 		seen[pane.Index] = true
 		quiet := pane.Quiet()
-		windows = append(windows, Window{Index: pane.Index, Name: pane.Window, Command: pane.Command, Quiet: quiet, Still: quiet.Round(time.Second).String(), Active: pane.Active})
+		windows = append(windows, Window{Index: pane.Index, Name: pane.Window, Command: pane.Command, PID: pane.PID, Quiet: quiet, Still: quiet.Round(time.Second).String(), Active: pane.Active})
 	}
 	return windows
 }
