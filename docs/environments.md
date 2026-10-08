@@ -11,9 +11,33 @@ mia env down               # stop it
 mia env rm                 # remove it
 ```
 
-## The image
+## What a container is
 
-`mia env up` uses the first of:
+One worktree, at most one container, named `mia-<name>`. It is a plain
+Linux box with your code in it:
+
+- **Your files, live.** The folder holding your worktrees is mounted at the
+  same path inside, so an edit on your computer is there at once and `git`
+  works inside too.
+- **Nothing running by itself.** The container only waits. Your shell,
+  commands and [services](#services) run in it through mia.
+- **No published ports.** Each container listens on its own ports, so two
+  apps on port 5173 don't collide. You reach them at `<name>.mia`.
+- **Kept until removed.** `mia env down` stops it and keeps everything;
+  `mia env up` starts it again. `mia env rm` throws it away, and the next
+  `mia env up` starts fresh.
+
+## Setting one up
+
+Start with nothing and add only what is missing.
+
+**1. Bring it up.**
+
+```bash
+mia env up
+```
+
+mia picks the image from the first of:
 
 1. `[env] image` in the config;
 2. the `image` in `.devcontainer/devcontainer.json`;
@@ -21,20 +45,78 @@ mia env rm                 # remove it
    `package-lock.json`, `pyproject.toml`, `Gemfile`, …);
 4. `mcr.microsoft.com/devcontainers/base:ubuntu`.
 
-The worktree is mounted at the same path inside the container.
+It prints which one it pulled and why.
 
-## Setup
+**2. Look around.**
 
-| key | runs |
-|---|---|
-| `[env] image_setup` | once, baked into an image by `mia env image` |
-| `[env] setup` | in each new container |
+```bash
+mia env shell
+```
+
+Install, run the app and the tests the way you would on a fresh computer.
+Whatever you had to type goes into one of two places.
+
+**3. System packages go in the image.**
 
 ```toml
 [env]
-image_setup = ["sh", "-c", "apt-get update && apt-get install -y socat"]
-setup = ["npm", "install"]
+image_setup = ["sh", "-c", "apt-get update && apt-get install -y postgresql-client socat"]
 ```
+
+```bash
+mia env image              # build it once, on this machine
+```
+
+The built image is used from then on and survives `mia env rm`. Change
+`image_setup` and build again for a new one.
+
+**4. The project's own install goes in setup.**
+
+```toml
+[env]
+setup = ["npm", "install"]
+container_only = ["node_modules"]
+cache = ["/root/.npm"]
+```
+
+`setup` runs once in each new container; `mia env setup` runs it again.
+`container_only` keeps a folder inside the container, so the Linux
+`node_modules` never mixes with your computer's. `cache` is shared by all
+the repository's containers, so the second install is fast.
+
+Check it from scratch:
+
+```bash
+mia env rm && mia env up
+```
+
+**5. Start the app as a service.**
+
+```toml
+[[service]]
+id = "web"
+run = ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+autostart = true
+```
+
+Serve on `0.0.0.0`, not `127.0.0.1`, so the gateway can reach it.
+
+**6. Open it.**
+
+```bash
+mia env browse
+```
+
+**7. Reach your computer, if you need to.** A database running on your
+computer, not in the container:
+
+```toml
+[env]
+host_ports = [5432]
+```
+
+Inside, `127.0.0.1:5432` reaches your computer's 5432. It needs `socat` in
+the image.
 
 ## `<name>.mia`
 
@@ -60,6 +142,9 @@ health = ["sh", "-c", "curl -fsS http://127.0.0.1:5173 >/dev/null"]
 autostart = true
 restart = "on-failure"
 ```
+
+`autostart` starts it with `mia env up`; `health` and `restart` keep it
+running.
 
 ```bash
 mia env service            # each service and its state
@@ -89,4 +174,5 @@ mia env up
 
 The URL stays the same. mia keeps a copy of the worktree there in sync with
 [mutagen](https://mutagen.io/documentation/introduction/installation).
-`mia env host local` moves it back.
+`mia env host local` moves it back. An image built with `mia env image` is
+built per machine: run it again there.
