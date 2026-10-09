@@ -55,6 +55,6 @@
 | `mia plugin ls\|enable\|disable` | plugins |
 | `mia api <query>` | state as JSON |
 | `mia help vocabulary` | the words |
-| `mia help tmux` | tmux key bindings |
+| `mia help tmux` | tmux key bindings and the prefix-m menu, with the room's sides and plugins' entries |
 
 Reading commands take `--json`.

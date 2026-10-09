@@ -87,4 +87,15 @@ Change any key under `[keys]` in the config.
 ## In tmux
 
 `mia help tmux` prints lines for `~/.tmux.conf`: `prefix g` opens the
-dashboard in a popup, `prefix j` jumps to a worktree by typing its name.
+dashboard in a full-size popup, `prefix j` jumps to a worktree by typing its
+name, and `prefix m` is a menu of popups for the worktree of the pane you
+are in:
+
+| key | opens |
+|---|---|
+| `g` `j` | the dashboard, the switch list |
+| `n` `b` `p` | a new worktree, a branch, a pull request |
+| `1`–`4` | the dashboard with the cursor in that side, named for the side's first tab (waiting, issues, cost, activity) |
+| a plugin's | what its manifest's `menu` names; one on a key above is left out and said on stderr |
+
+Run it again after enabling a plugin to pick up its entries.
