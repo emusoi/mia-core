@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/emusoi/mia-core/internal/panel"
 	"github.com/emusoi/mia-core/internal/plugin"
 )
@@ -154,5 +155,51 @@ func TestASideIsDrawnOnlyWhereItFits(t *testing.T) {
 	}
 	if (box{width: 81, height: 48, top: 14, bottom: 33}).fits("top") {
 		t.Error("the top side needs its 78 columns and the dots' margin")
+	}
+}
+
+func TestTheLegendAndSidesOffAreTheDesignsPages(t *testing.T) {
+	m := designModel(t)
+	m.legend, m.sides.Off = true, []string{"right"}
+	matchesShot(t, m, "room-legend.txt")
+
+	m = designModel(t)
+	m.sides.Off = []string{"top", "left", "right", "bottom"}
+	matchesShot(t, m, "room-off.txt")
+}
+
+func TestTheLegendTogglesSidesAndTabsAndSavesThem(t *testing.T) {
+	var saved []SideState
+	m := designModel(t)
+	m.hooks.Save = func(s SideState) { saved = append(saved, s) }
+
+	if m = press(m, runes("w"), runes("c")); len(saved) != 0 || len(m.sides.Off) != 0 {
+		t.Fatalf("outside the legend the sides take no keys: %+v", m.sides)
+	}
+	m = press(m, runes("v"))
+	if !m.legend || !strings.Contains(plain(m.View()), "sides   w ● waiting") {
+		t.Fatalf("v opens the legend:\n%s", plain(m.View()))
+	}
+	m = press(m, runes("]"))
+	if m.sides.Tabs["top"] != "agent/answered" {
+		t.Errorf("] with nothing toggled switches the top side's tab: %+v", m.sides)
+	}
+	m = press(m, runes("c"), runes("]"), runes("]"), runes("]"), runes("["))
+	if strings.Join(m.sides.Off, " ") != "right" || m.sides.Tabs["right"] != "machine/machine" {
+		t.Errorf("c turns the right side off and [ ] switch its tabs: %+v", m.sides)
+	}
+	if got := plain(m.View()); !strings.Contains(got, "c ○ machine") || strings.Contains(got, "spent today") {
+		t.Errorf("a side turned off is not drawn and the legend says so:\n%s", got)
+	}
+	m = press(m, runes("c"), tea.KeyMsg{Type: tea.KeyEsc})
+	if m.legend || len(m.sides.Off) != 0 || !strings.Contains(plain(m.View()), "v sides") {
+		t.Errorf("c turns it back on and esc closes: %+v legend %v", m.sides, m.legend)
+	}
+	if last := saved[len(saved)-1]; len(saved) != 7 || len(last.Off) != 0 || last.Tabs["top"] != "agent/answered" {
+		t.Errorf("every change is saved: %d %+v", len(saved), last)
+	}
+	m.width, m.height = 80, 24
+	if m = press(m, runes("v")); m.legend {
+		t.Error("with no room drawn v opens nothing")
 	}
 }

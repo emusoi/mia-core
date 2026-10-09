@@ -109,7 +109,9 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 		title = strings.TrimSuffix(name, "-panel") + " / " + target
 	}
 	var open map[string]bool
+	hooks.Save = func(sides tui.SideState) { saveSides(a, sides) }
 	for {
+		hooks.Sides = loadSides(a)
 		chosen, err := tui.Open(title, reload, hooks, open)
 		open = chosen.Open
 		cached = nil
@@ -369,5 +371,26 @@ func saveDrafts(a *app.App, drafts map[string]string) {
 	_ = os.MkdirAll(filepath.Dir(draftsPath(a)), 0o755)
 	if err := os.WriteFile(draftsPath(a), data, 0o600); err != nil {
 		trace("save drafts: %v", err)
+	}
+}
+
+func sidesPath(a *app.App) string { return filepath.Join(a.MiaDir, "dash-sides.json") }
+
+func loadSides(a *app.App) tui.SideState {
+	var sides tui.SideState
+	if data, err := os.ReadFile(sidesPath(a)); err == nil {
+		_ = json.Unmarshal(data, &sides)
+	}
+	return sides
+}
+
+func saveSides(a *app.App, sides tui.SideState) {
+	data, err := json.Marshal(sides)
+	if err != nil {
+		return
+	}
+	_ = os.MkdirAll(a.MiaDir, 0o755)
+	if err := os.WriteFile(sidesPath(a), data, 0o644); err != nil {
+		trace("save sides: %v", err)
 	}
 }

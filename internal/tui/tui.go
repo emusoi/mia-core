@@ -62,6 +62,8 @@ type Hooks struct {
 	Do      string
 	Here    string
 	Watch   func(nudge func())
+	Sides   SideState
+	Save    func(SideState)
 }
 
 type nudged struct{}
@@ -129,6 +131,8 @@ type model struct {
 	choice   string
 	details  bool
 	sides    SideState
+	legend   bool
+	lastSide string
 	stack    []model
 }
 
@@ -178,6 +182,7 @@ func Open(title string, reload Reload, hooks Hooks, open map[string]bool) (Chose
 	m := newModel(panel.Panel{Version: panel.Version, Title: title})
 	m.reload = reload
 	m.hooks = hooks
+	m.sides = hooks.Sides
 	for id, isOpen := range open {
 		m.expanded[id] = isOpen
 	}
@@ -935,6 +940,13 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.key(msg)
 	}
 
+	if m.legend && key != "ctrl+c" {
+		return m.legendKey(key), nil
+	}
+	if key == "v" && m.roomed() {
+		m.legend = true
+		return m, nil
+	}
 	if len(key) == 1 && key[0] >= '1' && key[0] <= '9' {
 		if n := int(key[0] - '1'); n < len(m.tabs()) {
 			m.tab = n
@@ -1898,6 +1910,14 @@ func (m model) problemLines() []string {
 }
 
 func (m model) View() string {
+	boxed := m.boxed()
+	if room, ok := m.room(boxed); ok {
+		return room
+	}
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, boxed)
+}
+
+func (m model) boxed() string {
 	lines, _ := m.body()
 	if m.loading() {
 		lines = m.loadingMark()
@@ -2006,10 +2026,7 @@ func (m model) View() string {
 		b.WriteString(dimmed.Render("│") + line + dimmed.Render("│") + "\n")
 	}
 	b.WriteString(m.frameBottom())
-	if room, ok := m.room(b.String()); ok {
-		return room
-	}
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, b.String())
+	return b.String()
 }
 
 func (m model) frameTop() string {

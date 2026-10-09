@@ -349,10 +349,10 @@ func TestALentMainCheckoutSaysWhoseFilesItHasAndGivesThemBack(t *testing.T) {
 	if !slices.Contains(rows["monduli"].Actions, "dev") {
 		t.Error("an adopted worktree cannot be lent to main's dev server")
 	}
-	if p.Actions["dev"].Key != "v" {
+	if p.Actions["dev"].Key != "V" {
 		t.Errorf("dev key = %q", p.Actions["dev"].Key)
 	}
 	if plain := panel.Dashboard([]app.Listing{{Name: "app", Path: "/w/app", Branch: "main", Main: true, Adopted: true}}, "", nil); slices.Contains(plain.Rows()[0].Actions, "dev") {
-		t.Error("main offers v when nothing is lent")
+		t.Error("main offers V when nothing is lent")
 	}
 }

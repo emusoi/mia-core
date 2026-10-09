@@ -518,8 +518,8 @@ func dashboardActions() map[string]Action {
 			Help: "create a worktree for a branch (new or existing), run setup, and go there",
 		},
 		"dev": {
-			Key: "v", Label: "on main's dev server", Verb: "dev", Args: []string{"{row}"}, Report: true,
-			Help: "copy the worktree's files over the main checkout, so its running dev server shows them; v on main gives main its own back",
+			Key: "V", Label: "on main's dev server", Verb: "dev", Args: []string{"{row}"}, Report: true,
+			Help: "copy the worktree's files over the main checkout, so its running dev server shows them; V on main gives main its own back",
 		},
 		"env": {
 			Key: "E", Label: "environment", Panel: "env-panel",

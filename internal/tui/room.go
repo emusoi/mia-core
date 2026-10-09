@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"maps"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -202,18 +204,14 @@ func (b box) fits(place string) bool {
 	return false
 }
 
-func (m model) off(place string) bool {
-	for _, p := range m.sides.Off {
-		if p == place {
-			return true
-		}
-	}
-	return false
-}
+func (m model) off(place string) bool { return slices.Contains(m.sides.Off, place) }
 
 func tabKey(tab plugin.SideTab) string { return tab.Plugin + "/" + tab.ID }
 
 func (m model) tabsAt(place string) []plugin.SideTab {
+	if m.panel.Room == nil {
+		return nil
+	}
 	var tabs []plugin.SideTab
 	for _, tab := range m.panel.Room.Sides {
 		if tab.Where == place {
@@ -310,6 +308,9 @@ func (m model) corners(c canvas, b box) {
 		bl = append(bl, plugin.Segment{Text: "      "})
 	}
 	bl = append(bl, plugin.Segment{Text: "v sides", Style: "dim"})
+	if m.legend {
+		bl = m.legendSegments()
+	}
 	c.segments(2, m.height-1, bl, m.width)
 	c.segments(m.width-2-segmentsWidth(br), m.height-1, br, m.width)
 }
@@ -378,4 +379,74 @@ func (m model) drawSide(c canvas, b box, place string) {
 		at = x + wide - segmentsWidth(row)
 	}
 	c.segments(max(at, x), tabY, row, x+wide)
+}
+
+func (m model) roomed() bool {
+	_, ok := m.room(m.boxed())
+	return ok
+}
+
+// sideKeys turn plugin.Places on and off, in the same order.
+var sideKeys = []string{"w", "i", "c", "a"}
+
+// legendKey is the only place the sides take keys: w i c a turn a side on
+// or off, [ ] switch the tabs of the side last turned, esc or v closes.
+func (m model) legendKey(key string) model {
+	switch key {
+	case "esc", "v":
+		m.legend = false
+		return m
+	case "[", "]":
+		place := m.lastSide
+		if place == "" {
+			place = "top"
+		}
+		tabs := m.tabsAt(place)
+		if len(tabs) == 0 {
+			return m
+		}
+		step := 1
+		if key == "[" {
+			step = len(tabs) - 1
+		}
+		m.sides.Tabs = maps.Clone(m.sides.Tabs)
+		if m.sides.Tabs == nil {
+			m.sides.Tabs = map[string]string{}
+		}
+		m.sides.Tabs[place] = tabKey(tabs[(m.activeAt(place, tabs)+step)%len(tabs)])
+	default:
+		i := slices.Index(sideKeys, key)
+		if i < 0 {
+			return m
+		}
+		place := plugin.Places[i]
+		m.lastSide = place
+		if m.off(place) {
+			m.sides.Off = slices.DeleteFunc(slices.Clone(m.sides.Off), func(p string) bool { return p == place })
+		} else {
+			m.sides.Off = append(slices.Clone(m.sides.Off), place)
+		}
+	}
+	if m.hooks.Save != nil {
+		m.hooks.Save(m.sides)
+	}
+	return m
+}
+
+func (m model) legendSegments() []plugin.Segment {
+	segs := []plugin.Segment{{Text: "sides", Style: "dim"}, {Text: "   "}}
+	for i, place := range plugin.Places {
+		label := place
+		if tabs := m.tabsAt(place); len(tabs) > 0 {
+			label = tabs[m.activeAt(place, tabs)].Label
+		}
+		dot, style := plugin.Segment{Text: "●", Style: "green"}, ""
+		if m.off(place) {
+			dot, style = plugin.Segment{Text: "○", Style: "dim"}, "dim strike"
+		}
+		segs = append(segs, plugin.Segment{Text: sideKeys[i], Style: "bold"}, plugin.Segment{Text: " "}, dot,
+			plugin.Segment{Text: " "}, plugin.Segment{Text: label, Style: style}, plugin.Segment{Text: "    "})
+	}
+	return append(segs, plugin.Segment{Text: "[ ]", Style: "bold"}, plugin.Segment{Text: " tabs", Style: "dim"},
+		plugin.Segment{Text: "   "}, plugin.Segment{Text: "esc", Style: "bold"}, plugin.Segment{Text: " done", Style: "dim"})
 }
