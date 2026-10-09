@@ -171,7 +171,7 @@ changes aside in a stash, then copies the worktree's files over main,
 uncommitted ones included. Ignored files such as `node_modules` and `.env`
 stay as they are, so the server keeps running and reloads. `mia dev off`
 resets main and restores the stash. Don't commit in main while it is lent.
-On the dashboard, `v` lends the selected worktree; `v` on main gives it back.
+On the dashboard, `V` lends the selected worktree; `V` on main gives it back.
 
 ## `<name>.mia`
 
