@@ -184,7 +184,9 @@ function page(opts: { title: string; description: string; body: string; active: 
 </head>
 <body class="${opts.bodyClass}">
 ${topbar(opts.active)}
+<!--email_off-->
 ${opts.body}
+<!--/email_off-->
 ${footer}
 ${searchDialog}
 <script src="/site.js?v=${version}" defer></script>
