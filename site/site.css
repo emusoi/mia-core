@@ -147,6 +147,7 @@ kbd {
 .definition-head em { font-family: var(--serif); font-style: italic; }
 .definition-head .from { font-size: 13px; color: var(--faint); }
 .definition-sense { font-size: 15px; line-height: 22px; }
+.definition-sense b { font-weight: 700; color: var(--ink); }
 
 .cue { margin-top: auto; display: inline-flex; gap: 8px; align-items: center; min-height: 44px; font-size: 13px; color: var(--faint); text-decoration: none; }
 .cue .arrow { display: inline-block; }
