@@ -1,7 +1,7 @@
 · mia  mia-plugins                                                                                                                                                                                thu 9 oct  08:41
   · ·                                                                                                                                                                                                           · ·
       · ·                                                                                                                                                                                                   · ·
-          · ·                                                                                  waiting 2   answered 5                                                                                   · ·
+          · ·                                                                                1   waiting 2   answered 5                                                                                 · ·
               ·                                                                                                                                                                                       ·
                 · ·                                                                                                                                                                               · ·
                     · ·                                            ●  sinza      claude  Allow Bash(go test ./...)                             3m                                             · ·
@@ -14,7 +14,7 @@
                                             ·                                                                                                                           ·
                                               ╭───Worktrees / mia-plugins────────────────────────────────────────────────────────────────────────────────────────────╮
                                               │                                              │                                                                       │
-    issues 4   prs 3   plans 4                │  finished  2                                 │  kinondoni                                                            │
+    2   issues 4   prs 3   plans 4            │  finished  2                                 │  kinondoni                                                            │
                                               │    kinondoni    cost   ✓ finished 22m    4h  │  cost · facts · blocks                                                │
     ● LB-9   Deleting a sheet       ilala     │    ilala        issue  ✓ finished 22m    4h  │                                                                       │
                                               │                                              │  claude claude-opus-5-5            $2.93                              │
@@ -22,7 +22,7 @@
     ○ LB-13  Support call booking             │    mia-plugins  main                    23h  │                                                                       │
     ! LB-15  MyCase integration               │                                              │                                                                       │
                                               │                                              │                                                                       │
-      13 in backlog                           │                                              │                                                                       │
+      13 more                                 │                                              │                                                                       │
                                               │                                              │                                                                       │
                                               │                                              │                                                                       │
                                               │                                              │                                                                       │
@@ -39,10 +39,10 @@
                               · ·                               8:03   ✓  ilala       finished · mia-issue committed c2af06f                                                        · ·
                           · ·                                   7:49   ›  kinondoni   started · build mia-cost                                                                          · ·
                         ·                                                                                                                                                                   ·
-                    · ·                                                                  activity 31   commits 6   checks 4                                                                   · ·
+                    · ·                                                                4   activity 31   commits 6   checks 4                                                                 · ·
                 · ·                                                                                                                                                                               · ·
               ·                                                                                                                                                                                       ·
           · ·                                                                                                                                                                                           · ·
       · ·                                                                                                                                                                                                   · ·
   · ·                                                                                                                                                                                                           · ·
-· sides   w ● waiting    i ● issues    c ○ cost    a ● activity    [ ] tabs   esc done                                                                                                                 $5.76 today
+· sides   1 ● waiting    2 ● issues    3 ○ cost    4 ● activity    esc done                                                                                                                            $5.76 today

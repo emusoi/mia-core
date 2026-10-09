@@ -27,21 +27,29 @@ plugins put in the bottom corners (agents waiting, today's spend).
 
 Plugins fill the four sides around the box with information: waiting on
 you above it, issues and pull requests left, cost right, activity below.
-Each side shows one tab at a time; its tab row lists them all with a count.
+Each side shows one tab at a time; its tab row starts with the side's number
+(1 top, 2 left, 3 right, 4 bottom) and lists every tab with a count.
 A side is drawn only where it fits — 30 free columns left or right, 6 free
 rows (and the side's width) above or below — and too small for any side,
 the dash is just the box.
+
+| key | does |
+|---|---|
+| `1`–`4` | select the top, left, right or bottom side; the same digit lets it go |
+| `tab` `shift+tab` | the selected side's next or previous tab |
+| `esc` | let the selected side go |
+
+The selected side's number is a green chip, its tab and the two dotted lines
+that frame it turn green, and the box's border dims.
 
 `v` opens the sides legend in the bottom-left corner:
 
 | key | does |
 |---|---|
-| `w` `i` `c` `a` | turn the top, left, right or bottom side on or off |
-| `[` `]` | switch the tabs of the side last turned (top if none) |
+| `1`–`4` | turn the top, left, right or bottom side on or off |
 | `esc` `v` | close the legend |
 
-Outside the legend the sides take no keys. What you choose is kept per
-repository in `.git/mia/dash-sides.json`.
+What you choose is kept per repository in `.git/mia/dash-sides.json`.
 
 ## Keys
 

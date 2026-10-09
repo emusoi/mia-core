@@ -1,0 +1,48 @@
+· mia  mia-plugins                                                                                                                                                                                thu 9 oct  08:41
+  · ·                                                                                                                                                                                                           · ·
+      · ·                                                                                                                                                                                                   · ·
+          · ·                                                                                1   waiting 2   answered 5                                                                                 · ·
+              ·                                                                                                                                                                                       ·
+                · ·                                                                                                                                                                               · ·
+                    · ·                                            ●  sinza      claude  Allow Bash(go test ./...)                             3m                                             · ·
+                        ·                                                                                                                                                                   ·
+                          · ·                                      ●  osunyai    codex   Push the branch to origin?                           11m                                       · ·
+                              · ·                                                                                                                                                   · ·
+                                  · ·                                                                                                                                           · ·
+                                      ·                                                                                                                                       ·
+                                        · ·                                                                                                                               · ·
+                                            ·                                                                                                                           ·
+                                              ╭───Worktrees / mia-plugins────────────────────────────────────────────────────────────────────────────────────────────╮
+                                              │                                              │                                                                       │
+     2    issues 4   prs 3   plans 4          │  finished  2                                 │  kinondoni                                                            │              3   cost   tokens   machine
+                                              │    kinondoni    cost   ✓ finished 22m    4h  │  cost · facts · blocks                                                │
+    #41  docs-plugins   ● review      2h      │    ilala        issue  ✓ finished 22m    4h  │                                                                       │                              spent today
+                                              │                                              │  claude claude-opus-5-5            $2.93                              │
+    #38  fix-login      ✓ approved    5h      │  main  1                                     │         in 84  out 39.1k  cache 142.4k write, 5M read                 │                                    $5.76
+    #37  cost           ○ draft       1d      │    mia-plugins  main                    23h  │                                                                       │                       7d ▁▂▂▃▅▇█  $18.40
+                                              │                                              │                                                                       │
+                                              │                                              │                                                                       │     kinondoni   ━━━━━━━━━━━━━━━━   $2.93
+                                              │                                              │                                                                       │     mia-plugins ━━━━━━━━━───────   $1.72
+                                              │                                              │                                                                       │     ilala       ━━━━━━──────────   $1.11
+                                              │                                              │                                                                       │
+                                              │                                              │                                                                       │
+                                              │                                              │                                                                       │
+                                              │                                              │                                                                       │
+                                              │                                              │                                                                       │
+                                              │                                              │                                                                       │
+                                              │                                                                                                                      │
+                                              ╰───⏎ attach──n new──/ find──? keys────────────────────────────────────────────────────────────────────────────────────╯
+                                            ·                                                                                                                           ·
+                                        · ·                                                                                                                               · ·
+                                      ·                         8:41   ●  osunyai     waiting · push the branch to origin?                                                    ·
+                                  · ·                           8:12   ✓  kinondoni   finished · mia-cost committed 53d2ba8                                                     · ·
+                              · ·                               8:03   ✓  ilala       finished · mia-issue committed c2af06f                                                        · ·
+                          · ·                                   7:49   ›  kinondoni   started · build mia-cost                                                                          · ·
+                        ·                                                                                                                                                                   ·
+                    · ·                                                                4   activity 31   commits 6   checks 4                                                                 · ·
+                · ·                                                                                                                                                                               · ·
+              ·                                                                                                                                                                                       ·
+          · ·                                                                                                                                                                                           · ·
+      · ·                                                                                                                                                                                                   · ·
+  · ·                                                                                                                                                                                                           · ·
+· ⠋ 2  ● 2  ✓ 2  agents      v sides                                                                                                                                                                   $5.76 today

@@ -8,8 +8,10 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/emusoi/mia-core/internal/panel"
 	"github.com/emusoi/mia-core/internal/plugin"
+	"github.com/muesli/termenv"
 )
 
 func cells(spec ...any) plugin.Line {
@@ -44,8 +46,12 @@ func designRoom() *panel.Room {
 				cells("○", 2, "", "dim", "LB-13", 7, "", "bold", "Support call booking", 22, "", "dim"),
 				cells("!", 2, "", "red", "LB-15", 7, "", "bold", "MyCase integration", 22, "", "dim"),
 				nil,
-				cells("  13 in backlog", 0, "", "dim")),
-			tab("gh", "left", "prs", 20, "3"),
+				cells("  13 more", 0, "", "dim")),
+			tab("gh", "left", "prs", 20, "3",
+				cells("#41", 5, "", "bold", "docs-plugins", 15, "", "", "●", 2, "", "yellow", "review", 10, "", "dim", "2h", 4, "right", "dim"),
+				nil,
+				cells("#38", 5, "", "bold", "fix-login", 15, "", "", "✓", 2, "", "green", "approved", 10, "", "dim", "5h", 4, "right", "dim"),
+				cells("#37", 5, "", "bold", "cost", 15, "", "", "○", 2, "", "dim", "draft", 10, "", "dim", "1d", 4, "right", "dim")),
 			tab("plan", "left", "plans", 30, "4"),
 			tab("cost", "right", "cost", 10, "",
 				cells("spent today", 0, "", "dim"),
@@ -168,39 +174,67 @@ func TestTheLegendAndSidesOffAreTheDesignsPages(t *testing.T) {
 	matchesShot(t, m, "room-off.txt")
 }
 
-func TestTheLegendTogglesSidesAndTabsAndSavesThem(t *testing.T) {
+func TestTheLegendTogglesSidesAndSavesThem(t *testing.T) {
 	var saved []SideState
 	m := designModel(t)
 	m.hooks.Save = func(s SideState) { saved = append(saved, s) }
 
-	if m = press(m, runes("w"), runes("c")); len(saved) != 0 || len(m.sides.Off) != 0 {
-		t.Fatalf("outside the legend the sides take no keys: %+v", m.sides)
-	}
 	m = press(m, runes("v"))
-	if !m.legend || !strings.Contains(plain(m.View()), "sides   w ● waiting") {
+	if !m.legend || !strings.Contains(plain(m.View()), "sides   1 ● waiting    2 ● issues") {
 		t.Fatalf("v opens the legend:\n%s", plain(m.View()))
 	}
-	m = press(m, runes("]"))
-	if m.sides.Tabs["top"] != "agent/answered" {
-		t.Errorf("] with nothing toggled switches the top side's tab: %+v", m.sides)
+	m = press(m, runes("3"))
+	if strings.Join(m.sides.Off, " ") != "right" || m.sideSel != "" {
+		t.Errorf("in the legend 3 turns the right side off and selects nothing: %+v %q", m.sides, m.sideSel)
 	}
-	m = press(m, runes("c"), runes("]"), runes("]"), runes("]"), runes("["))
-	if strings.Join(m.sides.Off, " ") != "right" || m.sides.Tabs["right"] != "machine/machine" {
-		t.Errorf("c turns the right side off and [ ] switch its tabs: %+v", m.sides)
-	}
-	if got := plain(m.View()); !strings.Contains(got, "c ○ machine") || strings.Contains(got, "spent today") {
+	if got := plain(m.View()); !strings.Contains(got, "3 ○ cost") || strings.Contains(got, "spent today") {
 		t.Errorf("a side turned off is not drawn and the legend says so:\n%s", got)
 	}
-	m = press(m, runes("c"), tea.KeyMsg{Type: tea.KeyEsc})
+	m = press(m, runes("3"), tea.KeyMsg{Type: tea.KeyEsc})
 	if m.legend || len(m.sides.Off) != 0 || !strings.Contains(plain(m.View()), "v sides") {
-		t.Errorf("c turns it back on and esc closes: %+v legend %v", m.sides, m.legend)
+		t.Errorf("3 turns it back on and esc closes: %+v legend %v", m.sides, m.legend)
 	}
-	if last := saved[len(saved)-1]; len(saved) != 7 || len(last.Off) != 0 || last.Tabs["top"] != "agent/answered" {
-		t.Errorf("every change is saved: %d %+v", len(saved), last)
+	if len(saved) != 2 || len(saved[1].Off) != 0 {
+		t.Errorf("every change is saved: %+v", saved)
 	}
 	m.width, m.height = 80, 24
 	if m = press(m, runes("v")); m.legend {
 		t.Error("with no room drawn v opens nothing")
+	}
+}
+
+func TestADigitSelectsASideAndTabCyclesItsTabs(t *testing.T) {
+	was := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.ANSI)
+	t.Cleanup(func() { lipgloss.SetColorProfile(was) })
+	var saved []SideState
+	m := designModel(t)
+	m.hooks.Save = func(s SideState) { saved = append(saved, s) }
+	m = press(m, runes("2"), tea.KeyMsg{Type: tea.KeyTab})
+	if m.sideSel != "left" || m.sides.Tabs["left"] != "gh/prs" || len(saved) != 1 {
+		t.Fatalf("2 selects the left side and tab shows its next tab: %q %+v", m.sideSel, m.sides)
+	}
+	matchesShot(t, m, "room-selected.txt")
+	got, _ := m.room(m.boxed())
+	if !strings.Contains(got, styleOf("green reverse").Render(" 2 ")) || !strings.Contains(got, styleOf("bold underline green").Render("prs 3")) {
+		t.Errorf("the selected side's number is a green chip and its active tab green:\n%q", got)
+	}
+	if !strings.Contains(m.boxed(), m.border().Render("╰── ")) || m.border().Render("╰── ") == dimmed.Render("╰── ") {
+		t.Error("the box border dims to bright-black while a side is selected")
+	}
+	m = press(m, tea.KeyMsg{Type: tea.KeyShiftTab}, tea.KeyMsg{Type: tea.KeyShiftTab})
+	if m.sides.Tabs["left"] != "plan/plans" {
+		t.Errorf("shift+tab goes back round the tabs: %+v", m.sides)
+	}
+	if m = press(m, runes("2")); m.sideSel != "" {
+		t.Error("the same digit lets the side go")
+	}
+	if m = press(m, runes("1"), tea.KeyMsg{Type: tea.KeyEsc}); m.sideSel != "" {
+		t.Error("esc lets the side go")
+	}
+	m.sides.Off = []string{"top"}
+	if m = press(m, runes("1")); m.sideSel != "" {
+		t.Error("a side the room does not draw cannot be selected")
 	}
 }
 

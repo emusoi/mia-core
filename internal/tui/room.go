@@ -45,6 +45,8 @@ func styleOf(spec string) lipgloss.Style {
 			s = s.Underline(true)
 		case "strike":
 			s = s.Strikethrough(true)
+		case "reverse":
+			s = s.Reverse(true)
 		default:
 			if c, ok := colours[word]; ok {
 				s = s.Foreground(lipgloss.Color(c))
@@ -145,7 +147,7 @@ func lineWidth(line plugin.Line) int {
 
 // dots lays a · on every 2nd column from (x0, y0) toward (x1, y1), y
 // rounded along x, on cells nothing else has taken.
-func (c canvas) dots(x0, y0, x1, y1 int) {
+func (c canvas) dots(x0, y0, x1, y1 int, style string) {
 	dx := x1 - x0
 	step := 2
 	if dx < 0 {
@@ -158,7 +160,7 @@ func (c canvas) dots(x0, y0, x1, y1 int) {
 		x := x0 + k*step/2
 		y := y0 + int(math.Round(float64((y1-y0)*k)/float64(dx)))
 		if y >= 0 && y < len(c) && x >= 0 && x < len(c[y]) && c[y][x].text == "" && !c[y][x].cont {
-			c[y][x] = cell{text: "·", style: "gray"}
+			c[y][x] = cell{text: "·", style: style}
 		}
 	}
 }
@@ -218,6 +220,10 @@ func (b box) fits(place string) bool {
 
 func (m model) off(place string) bool { return slices.Contains(m.sides.Off, place) }
 
+func (m model) shows(b box, place string) bool {
+	return b.fits(place) && !m.off(place) && len(m.tabsAt(place)) > 0
+}
+
 func tabKey(tab plugin.SideTab) string { return tab.Plugin + "/" + tab.ID }
 
 func (m model) tabsAt(place string) []plugin.SideTab {
@@ -242,14 +248,8 @@ func (m model) activeAt(place string, tabs []plugin.SideTab) int {
 	return 0
 }
 
-// room draws the dash's box inside the room — dotted lines to the
-// terminal's corners, a status line in each corner and the plugins' sides
-// where they fit — or says no when not one side fits.
-func (m model) room(boxed string) (string, bool) {
-	if m.panel.Room == nil || m.fill {
-		return "", false
-	}
-	lines := strings.Split(boxed, "\n")
+// boxIn is where the dash's box, as lines, sits in the terminal.
+func (m model) boxIn(lines []string) box {
 	b := box{width: m.width, height: m.height}
 	bw := 0
 	for _, line := range lines {
@@ -262,20 +262,40 @@ func (m model) room(boxed string) (string, bool) {
 		b.top = (m.height - len(lines) + 1) / 2
 	}
 	b.right, b.bottom = b.left+bw-1, b.top+len(lines)-1
+	return b
+}
+
+// room draws the dash's box inside the room — dotted lines to the
+// terminal's corners, a status line in each corner and the plugins' sides
+// where they fit — or says no when not one side fits.
+func (m model) room(boxed string) (string, bool) {
+	if m.panel.Room == nil || m.fill {
+		return "", false
+	}
+	lines := strings.Split(boxed, "\n")
+	b := m.boxIn(lines)
+	bw := b.right - b.left + 1
 	if !b.fits("top") && !b.fits("left") && !b.fits("right") && !b.fits("bottom") {
 		return "", false
 	}
 	c := newCanvas(m.width, m.height)
 	m.corners(c, b)
 	for _, place := range plugin.Places {
-		if b.fits(place) && !m.off(place) {
+		if m.shows(b, place) {
 			m.drawSide(c, b, place)
 		}
 	}
-	c.dots(0, 0, b.left-1, b.top-1)
-	c.dots(m.width, 0, b.right+2, b.top-1)
-	c.dots(0, m.height-1, b.left-1, b.bottom+1)
-	c.dots(m.width, m.height-1, b.right+2, b.bottom+1)
+	// The two lines that frame the selected side are green.
+	framing := func(a, b string) string {
+		if m.sideSel == a || m.sideSel == b {
+			return "green"
+		}
+		return "gray"
+	}
+	c.dots(0, 0, b.left-1, b.top-1, framing("top", "left"))
+	c.dots(m.width, 0, b.right+2, b.top-1, framing("top", "right"))
+	c.dots(0, m.height-1, b.left-1, b.bottom+1, framing("bottom", "left"))
+	c.dots(m.width, m.height-1, b.right+2, b.bottom+1, framing("bottom", "right"))
 
 	out := make([]string, m.height)
 	for y := range out {
@@ -378,17 +398,22 @@ func (m model) drawSide(c canvas, b box, place string) {
 		c.line(at, linesY+i, line, x+wide)
 	}
 
-	var row []plugin.Segment
+	number := plugin.Segment{Text: sideKeys[slices.Index(plugin.Places, place)], Style: "dim"}
+	if m.sideSel == place {
+		number = plugin.Segment{Text: " " + number.Text + " ", Style: "green reverse"}
+	}
+	row := []plugin.Segment{number}
 	for i, tab := range tabs {
-		if i > 0 {
-			row = append(row, plugin.Segment{Text: "   "})
-		}
+		row = append(row, plugin.Segment{Text: "   "})
 		label, style := tab.Label, "dim"
 		if tab.Count != "" && tab.Problem == "" {
 			label += " " + tab.Count
 		}
 		if i == active {
 			style = "bold underline"
+			if m.sideSel == place {
+				style += " green"
+			}
 		}
 		row = append(row, plugin.Segment{Text: label, Style: style})
 	}
@@ -407,50 +432,70 @@ func (m model) roomed() bool {
 	return ok
 }
 
-// sideKeys turn plugin.Places on and off, in the same order.
-var sideKeys = []string{"w", "i", "c", "a"}
+// drawn says whether the room draws this side now.
+func (m model) drawn(place string) bool {
+	return m.roomed() && m.shows(m.boxIn(strings.Split(m.boxed(), "\n")), place)
+}
 
-// legendKey is the only place the sides take keys: w i c a turn a side on
-// or off, [ ] switch the tabs of the side last turned, esc or v closes.
-func (m model) legendKey(key string) model {
-	switch key {
-	case "esc", "v":
-		m.legend = false
-		return m
-	case "[", "]":
-		place := m.lastSide
-		if place == "" {
-			place = "top"
-		}
-		tabs := m.tabsAt(place)
-		if len(tabs) == 0 {
-			return m
-		}
-		step := 1
-		if key == "[" {
-			step = len(tabs) - 1
-		}
-		m.sides.Tabs = maps.Clone(m.sides.Tabs)
-		if m.sides.Tabs == nil {
-			m.sides.Tabs = map[string]string{}
-		}
-		m.sides.Tabs[place] = tabKey(tabs[(m.activeAt(place, tabs)+step)%len(tabs)])
-	default:
-		i := slices.Index(sideKeys, key)
-		if i < 0 {
-			return m
-		}
-		place := plugin.Places[i]
-		m.lastSide = place
-		if m.off(place) {
-			m.sides.Off = slices.DeleteFunc(slices.Clone(m.sides.Off), func(p string) bool { return p == place })
-		} else {
-			m.sides.Off = append(slices.Clone(m.sides.Off), place)
-		}
+// sideKeys select the sides of plugin.Places, in the same order, and turn
+// them on and off in the legend.
+var sideKeys = []string{"1", "2", "3", "4"}
+
+// sideKey selects the side a digit names, or lets it go when it is the
+// one selected; a side the room does not draw cannot be selected.
+func (m model) sideKey(key string) model {
+	place := plugin.Places[slices.Index(sideKeys, key)]
+	switch {
+	case m.sideSel == place:
+		m.sideSel = ""
+	case m.drawn(place):
+		m.sideSel = place
 	}
+	return m
+}
+
+// cycleSide shows the selected side's next (step 1) or previous tab.
+func (m model) cycleSide(step int) model {
+	tabs := m.tabsAt(m.sideSel)
+	if len(tabs) == 0 {
+		return m
+	}
+	m.sides.Tabs = maps.Clone(m.sides.Tabs)
+	if m.sides.Tabs == nil {
+		m.sides.Tabs = map[string]string{}
+	}
+	m.sides.Tabs[m.sideSel] = tabKey(tabs[(m.activeAt(m.sideSel, tabs)+step+len(tabs))%len(tabs)])
+	m.save()
+	return m
+}
+
+func (m model) save() {
 	if m.hooks.Save != nil {
 		m.hooks.Save(m.sides)
 	}
+}
+
+// legendKey takes every key while the legend is open: 1–4 turn a side on
+// or off, esc or v closes.
+func (m model) legendKey(key string) model {
+	if key == "esc" || key == "v" {
+		m.legend = false
+		return m
+	}
+	i := slices.Index(sideKeys, key)
+	if i < 0 {
+		return m
+	}
+	place := plugin.Places[i]
+	if m.off(place) {
+		m.sides.Off = slices.DeleteFunc(slices.Clone(m.sides.Off), func(p string) bool { return p == place })
+	} else {
+		m.sides.Off = append(slices.Clone(m.sides.Off), place)
+		if m.sideSel == place {
+			m.sideSel = ""
+		}
+	}
+	m.save()
 	return m
 }
 
@@ -468,6 +513,5 @@ func (m model) legendSegments() []plugin.Segment {
 		segs = append(segs, plugin.Segment{Text: sideKeys[i], Style: "bold"}, plugin.Segment{Text: " "}, dot,
 			plugin.Segment{Text: " "}, plugin.Segment{Text: label, Style: style}, plugin.Segment{Text: "    "})
 	}
-	return append(segs, plugin.Segment{Text: "[ ]", Style: "bold"}, plugin.Segment{Text: " tabs", Style: "dim"},
-		plugin.Segment{Text: "   "}, plugin.Segment{Text: "esc", Style: "bold"}, plugin.Segment{Text: " done", Style: "dim"})
+	return append(segs, plugin.Segment{Text: "esc", Style: "bold"}, plugin.Segment{Text: " done", Style: "dim"})
 }

@@ -132,7 +132,7 @@ type model struct {
 	details  bool
 	sides    SideState
 	legend   bool
-	lastSide string
+	sideSel  string
 	stack    []model
 }
 
@@ -947,11 +947,25 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.legend = true
 		return m, nil
 	}
+	if slices.Contains(sideKeys, key) && m.roomed() {
+		return m.sideKey(key), nil
+	}
 	if len(key) == 1 && key[0] >= '1' && key[0] <= '9' {
 		if n := int(key[0] - '1'); n < len(m.tabs()) {
 			m.tab = n
 		}
 		return m, nil
+	}
+	if m.sideSel != "" {
+		switch key {
+		case "esc":
+			m.sideSel = ""
+			return m, nil
+		case "tab":
+			return m.cycleSide(1), nil
+		case "shift+tab":
+			return m.cycleSide(-1), nil
+		}
 	}
 	name := m.nav(key)
 	if name != "scrollup" && name != "scrolldown" && name != "" && name != "help" {
@@ -2012,21 +2026,30 @@ func (m model) boxed() string {
 			if pad := m.sideWidth() - lipgloss.Width(extra); pad > 0 {
 				extra += strings.Repeat(" ", pad)
 			}
-			line += " " + bar + " " + dimmed.Render("│") + "  " + extra
+			line += " " + bar + " " + m.border().Render("│") + "  " + extra
 		} else {
 			line += " " + bar + " "
 		}
-		b.WriteString(dimmed.Render("│") + "  " + line + " " + dimmed.Render("│") + "\n")
+		b.WriteString(m.border().Render("│") + "  " + line + " " + m.border().Render("│") + "\n")
 	}
 	for _, part := range m.problemLines() {
 		line := "    " + problem.Render(part)
 		if pad := m.boxWidth() - 2 - lipgloss.Width(line); pad > 0 {
 			line += strings.Repeat(" ", pad)
 		}
-		b.WriteString(dimmed.Render("│") + line + dimmed.Render("│") + "\n")
+		b.WriteString(m.border().Render("│") + line + m.border().Render("│") + "\n")
 	}
 	b.WriteString(m.frameBottom())
 	return b.String()
+}
+
+// border is the box's frame: bright-black while a side of the room is
+// selected, so the box reads as not the active one.
+func (m model) border() lipgloss.Style {
+	if m.sideSel != "" {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	}
+	return dimmed
 }
 
 func (m model) frameTop() string {
@@ -2036,7 +2059,7 @@ func (m model) frameTop() string {
 	} else if m.doTitle != "" {
 		name = m.doTitle
 	}
-	left := dimmed.Render("╭── ") + strong.Render(name) + " "
+	left := m.border().Render("╭── ") + strong.Render(name) + " "
 	if m.query != "" {
 		left += dimmed.Render("/ ") + m.query + " "
 	}
@@ -2048,21 +2071,21 @@ func (m model) frameTop() string {
 	if fill < 0 {
 		right, fill = "", m.boxWidth()-lipgloss.Width(left)-2
 	}
-	return left + dimmed.Render(strings.Repeat("─", max(fill, 0))) + right + dimmed.Render("─╮")
+	return left + m.border().Render(strings.Repeat("─", max(fill, 0))) + right + m.border().Render("─╮")
 }
 
 func (m model) frameBottom() string {
 	footer := strings.TrimLeft(m.footer(), " ")
-	left := dimmed.Render("╰── ") + footer + " "
+	left := m.border().Render("╰── ") + footer + " "
 	if footer == "" {
-		left = dimmed.Render("╰")
+		left = m.border().Render("╰")
 	}
 	fill := m.boxWidth() - lipgloss.Width(left) - 1
 	if fill < 0 {
-		left = dimmed.Render("╰── ") + fit(footer, m.boxWidth()-6) + " "
+		left = m.border().Render("╰── ") + fit(footer, m.boxWidth()-6) + " "
 		fill = m.boxWidth() - lipgloss.Width(left) - 1
 	}
-	return left + dimmed.Render(strings.Repeat("─", max(fill, 0))+"╯")
+	return left + m.border().Render(strings.Repeat("─", max(fill, 0))+"╯")
 }
 
 func (m model) footer() string {
