@@ -196,6 +196,24 @@ func TestAKeyNamesAVerbOrAPanelNeverBoth(t *testing.T) {
 	}
 }
 
+func TestAMenuEntryNeedsAKeyALabelAVerbAndAPopup(t *testing.T) {
+	h, dir := host(t)
+	write(t, dir, "nokey", `echo '{"protocol":1,"menu":[{"label":"type","verb":"type","popup":{"width":"80","height":"20"}}]}'`)
+	write(t, dir, "longkey", `echo '{"protocol":1,"menu":[{"key":"yy","label":"type","verb":"type","popup":{"width":"80","height":"20"}}]}'`)
+	write(t, dir, "nosize", `echo '{"protocol":1,"menu":[{"key":"y","label":"type","verb":"type"}]}'`)
+	write(t, dir, "fine", `echo '{"protocol":1,"menu":[{"key":"y","label":"type while you wait","verb":"type","popup":{"width":"80","height":"20"}}]}'`)
+	h.Configured = []string{"nokey", "longkey", "nosize", "fine"}
+	all, _ := h.List()
+	for _, p := range all {
+		if (p.Problem == "") != (p.Name == "fine") {
+			t.Errorf("%s: %q", p.Name, p.Problem)
+		}
+		if p.Name == "fine" && (len(p.Manifest.Menu) != 1 || p.Manifest.Menu[0].Popup.Height != "20") {
+			t.Errorf("menu: %+v", p.Manifest.Menu)
+		}
+	}
+}
+
 func TestAnEventReachesOnlyThePluginsThatWantIt(t *testing.T) {
 	h, dir := host(t)
 	got := filepath.Join(t.TempDir(), "got")

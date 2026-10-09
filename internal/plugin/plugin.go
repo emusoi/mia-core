@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -38,6 +39,20 @@ type Manifest struct {
 	Serve    bool      `json:"serve,omitempty"`
 	Sides    []Side    `json:"sides,omitempty"`
 	Corners  []Corner  `json:"corners,omitempty"`
+	Menu     []Entry   `json:"menu,omitempty"`
+}
+
+// Entry is one line of the tmux prefix-m menu `mia help tmux` prints:
+// key opens `mia <verb> [args]` in a width×height popup.
+type Entry struct {
+	Key   string   `json:"key"`
+	Label string   `json:"label"`
+	Verb  string   `json:"verb"`
+	Args  []string `json:"args,omitempty"`
+	Popup struct {
+		Width  string `json:"width"`
+		Height string `json:"height"`
+	} `json:"popup"`
 }
 
 type Tab struct {
@@ -221,6 +236,11 @@ func ReadManifest(path string) (Manifest, error) {
 	for _, key := range m.Keys {
 		if key.ID == "" || (key.Verb == "") == (key.Panel == "") {
 			return Manifest{}, fmt.Errorf("key %q needs an id and exactly one of verb or panel", key.Label)
+		}
+	}
+	for _, entry := range m.Menu {
+		if utf8.RuneCountInString(entry.Key) != 1 || entry.Label == "" || entry.Verb == "" || entry.Popup.Width == "" || entry.Popup.Height == "" {
+			return Manifest{}, fmt.Errorf("menu entry %q needs a one-character key, a label, a verb and a popup width and height", entry.Label)
 		}
 	}
 	if m.Rows != nil {

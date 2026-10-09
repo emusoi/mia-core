@@ -107,6 +107,17 @@ Lines without `open` are information; the cursor skips them.
 the plugin prints from `mia-<name> panel <id>`, in the same JSON as
 `mia api dashboard`.
 
+## The tmux menu
+
+```json
+{"menu": [{"key": "y", "label": "type while you wait", "verb": "type", "popup": {"width": "80", "height": "20"}}]}
+```
+
+An entry in the `prefix m` menu that `mia help tmux` prints: its one-character
+key opens `mia <verb> [args]` in a tmux popup of that width and height
+(cells, or a percentage), over the pane you are in. An entry whose key is
+already a core entry's is left out, and `mia help tmux` says so.
+
 ## Events
 
 `mia-<name> event <event>` runs in the background with the event on stdin:
