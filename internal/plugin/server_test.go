@@ -13,13 +13,15 @@ func served(t *testing.T) (Plugin, Context, string) {
 	h, dir := host(t)
 	starts := filepath.Join(t.TempDir(), "starts")
 	write(t, dir, "live", `case "$1" in
-manifest) echo '{"protocol":1,"serve":true,"rows":{}}' ;;
+manifest) echo '{"protocol":1,"serve":true,"rows":{},"sides":[{"id":"cost","side":"right","label":"cost"}],"corners":[{"id":"spend","at":"br"}]}' ;;
 serve)
 	echo started >> `+starts+`
 	while IFS= read -r line; do
 		id=$(printf %s "$line" | sed -n 's/^{"jsonrpc":"2.0","id":\([0-9]*\).*/\1/p')
 		case "$line" in
 		*'"method":"rows"'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"rows\":{\"monduli\":{\"status\":\"served\"}}}}" ;;
+		*'"method":"side","params":{"id":"cost"}'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"count\":\"\",\"lines\":[[{\"text\":\"\$5.76\"}]]}}" ;;
+		*'"method":"corner","params":{"id":"spend"}'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"segments\":[{\"text\":\"\$5.76\",\"style\":\"green\"}]}}" ;;
 		*'"method":"panel"'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"title\":\"from serve\"}}" ;;
 		*'"method":"event"'*) echo '{"jsonrpc":"2.0","method":"refresh"}' ;;
 		*'"method":"fail"'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"error\":{\"code\":1,\"message\":\"nope\"}}" ;;
@@ -45,6 +47,13 @@ func TestServeAnswersRowsPanelsAndPushesRefresh(t *testing.T) {
 	rows := p.Rows(c, map[string]any{})
 	if rows.Problem != "" || rows.Rows["monduli"].Status != "served" {
 		t.Fatalf("rows through serve: %+v", rows)
+	}
+	tabs, corners := AllSides([]Plugin{p}, func(Plugin) Context { return c })
+	if len(tabs) != 1 || tabs[0].Problem != "" || tabs[0].Lines[0][0].Text != "$5.76" {
+		t.Errorf("side through serve: %+v", tabs)
+	}
+	if len(corners) != 1 || corners[0].Problem != "" || corners[0].Segments[0].Style != "green" {
+		t.Errorf("corner through serve: %+v", corners)
 	}
 	panel, err := p.Panel(c, "x", nil)
 	if err != nil || !strings.Contains(string(panel), "from serve") {

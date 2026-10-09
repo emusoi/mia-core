@@ -36,6 +36,8 @@ type Manifest struct {
 	Keys     []Key     `json:"keys,omitempty"`
 	Events   []string  `json:"events,omitempty"`
 	Serve    bool      `json:"serve,omitempty"`
+	Sides    []Side    `json:"sides,omitempty"`
+	Corners  []Corner  `json:"corners,omitempty"`
 }
 
 type Tab struct {
@@ -223,6 +225,22 @@ func ReadManifest(path string) (Manifest, error) {
 	}
 	if m.Rows != nil {
 		if _, err := m.Rows.Interval(); err != nil {
+			return Manifest{}, err
+		}
+	}
+	for _, side := range m.Sides {
+		if side.ID == "" || !slices.Contains(Places, side.Where) {
+			return Manifest{}, fmt.Errorf("side %q needs an id and a side of %s", side.Label, strings.Join(Places, ", "))
+		}
+		if _, err := side.Interval(); err != nil {
+			return Manifest{}, err
+		}
+	}
+	for _, corner := range m.Corners {
+		if corner.ID == "" || !slices.Contains(Ats, corner.At) {
+			return Manifest{}, fmt.Errorf("corner %q needs an id and an at of %s", corner.ID, strings.Join(Ats, ", "))
+		}
+		if _, err := corner.Interval(); err != nil {
 			return Manifest{}, err
 		}
 	}

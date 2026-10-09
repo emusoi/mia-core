@@ -152,9 +152,11 @@ func (p Plugin) ask(c Context, args []string, method string, params, stdin any) 
 	if err != nil {
 		return nil, err
 	}
-	data, err := json.Marshal(stdin)
-	if err != nil {
-		return nil, err
+	var data []byte
+	if stdin != nil {
+		if data, err = json.Marshal(stdin); err != nil {
+			return nil, err
+		}
 	}
 	return call(p.Path, env, args, data, CallTimeout)
 }
