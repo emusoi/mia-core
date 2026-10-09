@@ -132,6 +132,10 @@ func TestPluginTabsAndKeysReachTheRows(t *testing.T) {
 			{ID: "prs", Key: "B", Label: "every PR", Panel: "prs", Global: true},
 			{ID: "dup", Key: "D", Label: "steals delete", Verb: "gh-x"},
 			{ID: "nav", Key: "J", Label: "steals a move", Verb: "gh-y"},
+			{ID: "lend", Key: "v", Label: "steals the sides legend", Verb: "gh-z"},
+			{ID: "side", Key: "2", Label: "steals a side", Verb: "gh-z"},
+			{ID: "cycle", Key: "tab", Label: "steals tab", Verb: "gh-z"},
+			{ID: "pop", Key: "f", Label: "steals the popup", Verb: "gh-z"},
 		},
 		Rows: map[string]plugin.RowInfo{"busy": {Tabs: map[string][]string{"pr": {"#12 open", "2 approvals"}, "ci": nil}}},
 	}}
@@ -156,6 +160,12 @@ func TestPluginTabsAndKeysReachTheRows(t *testing.T) {
 	}
 	if p.Actions["gh.nav"].Key != "" || !slices.Contains(rowOf(p, "app").Facts, "plugin  gh: J is already scrolldown; bind gh.nav in [keys]") {
 		t.Errorf("a move keeps its key: %+v", p.Actions["gh.nav"])
+	}
+	for _, told := range []string{"v is already the room's; bind gh.lend", "2 is already the room's; bind gh.side",
+		"tab is already tabnext; bind gh.cycle", "f is already popup; bind gh.pop"} {
+		if !slices.Contains(rowOf(p, "app").Facts, "plugin  gh: "+told+" in [keys]") {
+			t.Errorf("the room's keys and tab and f stay the dash's: %q not in %v", told, rowOf(p, "app").Facts)
+		}
 	}
 	p.Bind(map[string][]string{"gh.dup": {"X"}})
 	if p.Actions["gh.dup"].Key != "X" {
