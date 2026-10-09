@@ -284,7 +284,7 @@ var Moves = map[string][]string{
 	"next": {" "}, "details": {"i"}, "scrollup": {"K"}, "scrolldown": {"J"},
 	"down": {"j", "down"}, "up": {"k", "up"}, "first": {"g", "home"}, "last": {"G", "end"},
 	"pagedown": {"pgdown", "ctrl+d", "ctrl+f"}, "pageup": {"pgup", "ctrl+u", "ctrl+b"},
-	"filter": {"/"}, "help": {"?"}, "popup": {"tab"}, "refresh": {"r"},
-	"tabnext": {"]"}, "tabprev": {"["}, "unfold": {"l", "right"}, "fold": {"h", "left"},
+	"filter": {"/"}, "help": {"?"}, "popup": {"f"}, "refresh": {"r"},
+	"tabnext": {"tab", "]"}, "tabprev": {"shift+tab", "["}, "unfold": {"l", "right"}, "fold": {"h", "left"},
 	"back": {"q", "esc"}, "quit": {"ctrl+c"},
 }

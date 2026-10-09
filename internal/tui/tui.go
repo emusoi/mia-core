@@ -950,22 +950,9 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if slices.Contains(sideKeys, key) && m.roomed() {
 		return m.sideKey(key), nil
 	}
-	if len(key) == 1 && key[0] >= '1' && key[0] <= '9' {
-		if n := int(key[0] - '1'); n < len(m.tabs()) {
-			m.tab = n
-		}
+	if m.sideSel != "" && key == "esc" {
+		m.sideSel = ""
 		return m, nil
-	}
-	if m.sideSel != "" {
-		switch key {
-		case "esc":
-			m.sideSel = ""
-			return m, nil
-		case "tab":
-			return m.cycleSide(1), nil
-		case "shift+tab":
-			return m.cycleSide(-1), nil
-		}
 	}
 	name := m.nav(key)
 	if name != "scrollup" && name != "scrolldown" && name != "" && name != "help" {
@@ -1036,6 +1023,13 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "tabnext", "tabprev":
+		// [ and ] stay the detail pane's even while a side is selected.
+		if m.sideSel != "" && key != "[" && key != "]" {
+			if name == "tabnext" {
+				return m.cycleSide(1), nil
+			}
+			return m.cycleSide(-1), nil
+		}
 		tabs := m.tabs()
 		if len(tabs) > 1 {
 			if name == "tabnext" {
@@ -2249,7 +2243,8 @@ func (m model) help() []string {
 		entry("space", "next", "the next row that needs you: uncommitted, or flagged by a plugin"),
 		entry("K J", "scroll the side pane", "up and down the tab showing"),
 		entry(m.shown("details"), "details", "the side pane full screen · i or esc returns"),
-		entry(m.shown("tabprev", "tabnext"), "side tab", "or a digit · plugin tabs, facts, blocks"),
+		entry(m.shown("tabprev", "tabnext"), "tabs", "the selected side's, else the side pane's · [ ] the side pane's"),
+		entry("1–4", "select a side", "of the room: top, left, right, bottom · again or esc lets go"),
 		entry("⏎ "+m.shown("unfold", "fold"), "unfold, fold", "a stack row · "+m.shown("fold")+" on a layer returns to its stack"),
 		entry(m.shown("popup"), "popup", "the tab's thing in a tmux popup over the list · prefix d returns"),
 		entry(m.shown("refresh"), "refresh", "now; the list also refreshes itself"),

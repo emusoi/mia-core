@@ -21,22 +21,22 @@ func popupPanel() panel.Panel {
 			Tabs: []panel.Tab{{Name: "helper", Preview: []string{"❯"}}}}}}}}
 }
 
-func TestTabOpensTheTabsThingInAPopupAndReturnsWhenItCloses(t *testing.T) {
+func TestFOpensTheTabsThingInAPopupAndReturnsWhenItCloses(t *testing.T) {
 	var opened [][]string
 	m := newModel(popupPanel())
 	m.width, m.height = 140, 30
 	m.hooks = Hooks{Popup: func(c Chosen) error { opened = append(opened, c.Argv); return nil }}
-	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	next, cmd := m.Update(runes("f"))
 	m = next.(model)
 	if cmd == nil || m.popup == nil {
-		t.Fatal("tab did not open a popup")
+		t.Fatal("f did not open a popup")
 	}
 	msg := cmd()
 	if len(opened) != 1 || strings.Join(opened[0], " ") != "shell iringa" {
 		t.Fatalf("opened %v", opened)
 	}
-	if _, cmd = m.Update(tea.KeyMsg{Type: tea.KeyTab}); cmd != nil {
-		t.Error("tab while open opened again")
+	if _, cmd = m.Update(runes("f")); cmd != nil {
+		t.Error("f while open opened again")
 	}
 	next, _ = m.Update(msg)
 	if next.(model).popup != nil {
@@ -53,7 +53,7 @@ func TestResizingWhileOpenReopensTheModal(t *testing.T) {
 	m := newModel(popupPanel())
 	m.width, m.height = 140, 30
 	m.hooks = Hooks{Popup: func(Chosen) error { opened++; return nil }, Close: func() { closed++ }}
-	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	next, cmd := m.Update(runes("f"))
 	m = next.(model)
 	first := cmd()
 	next, _ = m.Update(tea.WindowSizeMsg{Width: 200, Height: 60})
@@ -103,10 +103,14 @@ func TestSideTabsSwitchBetweenTabFactsAndBlocks(t *testing.T) {
 	if v := m.View(); !strings.Contains(v, "due-dates") {
 		t.Errorf("] did not move to facts:\n%s", v)
 	}
-	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = next.(model)
 	if v := m.View(); !strings.Contains(v, "web-server") {
-		t.Errorf("3 did not move to blocks:\n%s", v)
+		t.Errorf("tab did not move to blocks:\n%s", v)
+	}
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	if next.(model).tab != 1 {
+		t.Errorf("shift+tab did not move back to facts: tab %d", next.(model).tab)
 	}
 }
 

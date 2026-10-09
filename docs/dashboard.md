@@ -36,7 +36,7 @@ the dash is just the box.
 | key | does |
 |---|---|
 | `1`–`4` | select the top, left, right or bottom side; the same digit lets it go |
-| `tab` `shift+tab` | the selected side's next or previous tab |
+| `tab` `shift+tab` | the selected side's next or previous tab; with none selected, the side pane's |
 | `esc` | let the selected side go |
 
 The selected side's number is a green chip, its tab and the two dotted lines
@@ -70,6 +70,8 @@ What you choose is kept per repository in `.git/mia/dash-sides.json`.
 | `a` | adopt |
 | `c` | config |
 | `j` `k` | move |
+| `[` `]` | the side pane's previous or next tab, even with a side selected |
+| `f` | the side pane's tab in a tmux popup over the list |
 | `q` | back, or quit |
 
 Change any key under `[keys]` in the config.

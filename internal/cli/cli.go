@@ -629,7 +629,7 @@ const starterConfig = `# mia — this repository's configuration. Every key is o
 # prefix = "you/"                  # put in front of every branch name
 # setup = ["npm", "install"]       # run once in a new worktree
 # editor = "nvim"
-# [popup]                          # the tmux popup ⇥ opens over the list
+# [popup]                          # the tmux popup f opens over the list
 # width = "80%"
 # height = "75%"
 #

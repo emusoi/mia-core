@@ -210,7 +210,11 @@ func TestADigitSelectsASideAndTabCyclesItsTabs(t *testing.T) {
 	var saved []SideState
 	m := designModel(t)
 	m.hooks.Save = func(s SideState) { saved = append(saved, s) }
-	m = press(m, runes("2"), tea.KeyMsg{Type: tea.KeyTab})
+	m = press(m, runes("2"), runes("]"))
+	if m.sideSel != "left" || m.sides.Tabs["left"] != "" {
+		t.Errorf("] stays the detail pane's while a side is selected: %q %+v", m.sideSel, m.sides)
+	}
+	m = press(m, tea.KeyMsg{Type: tea.KeyTab})
 	if m.sideSel != "left" || m.sides.Tabs["left"] != "gh/prs" || len(saved) != 1 {
 		t.Fatalf("2 selects the left side and tab shows its next tab: %q %+v", m.sideSel, m.sides)
 	}
