@@ -93,7 +93,7 @@ type Popup struct {
 }
 
 func (p Popup) Size() (width, height string) {
-	width, height = "80%", "75%"
+	width, height = "100%", "100%"
 	if p.Width != "" {
 		width = p.Width
 	}

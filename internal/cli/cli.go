@@ -630,8 +630,8 @@ const starterConfig = `# mia — this repository's configuration. Every key is o
 # setup = ["npm", "install"]       # run once in a new worktree
 # editor = "nvim"
 # [popup]                          # the tmux popup f opens over the list
-# width = "80%"
-# height = "75%"
+# width = "100%"
+# height = "100%"
 #
 # [launch]                         # named windows: n in the windows panel, or ` + "`mia window new <name>`" + `
 # test = "go test ./..."
@@ -659,7 +659,7 @@ func printTmuxHelp() int {
 	fmt.Print(`# In ~/.tmux.conf — prefix g opens the dashboard over the current window,
 # and it is gone again when you leave it:
 
-bind-key g display-popup -B -E -e MIA_POPUP=1 -e "MIA_TMUX_PANE=#{pane_id}" -d "#{pane_current_path}" -w 80% -h 70% "mia dash"
+bind-key g display-popup -B -E -e MIA_POPUP=1 -e "MIA_TMUX_PANE=#{pane_id}" -d "#{pane_current_path}" -w 100% -h 100% "mia dash"
 
 # prefix j picks another worktree and switches to its session in place:
 bind-key j display-popup -B -E -e MIA_POPUP=1 -e "MIA_TMUX_PANE=#{pane_id}" -d "#{pane_current_path}" -w 60% -h 50% "mia dash --switch"
@@ -667,7 +667,7 @@ bind-key j display-popup -B -E -e MIA_POPUP=1 -e "MIA_TMUX_PANE=#{pane_id}" -d "
 # prefix m: a menu where each entry opens one thing in its own popup,
 # on the worktree of the pane you are in:
 bind-key m display-menu -T " mia " \
-  "dashboard"     g "display-popup -B -E -e MIA_POPUP=1 -e 'MIA_TMUX_PANE=#{pane_id}' -d '#{pane_current_path}' -w 80% -h 70% 'mia dash'" \
+  "dashboard"     g "display-popup -B -E -e MIA_POPUP=1 -e 'MIA_TMUX_PANE=#{pane_id}' -d '#{pane_current_path}' -w 100% -h 100% 'mia dash'" \
   "switch"        j "display-popup -B -E -e MIA_POPUP=1 -e 'MIA_TMUX_PANE=#{pane_id}' -d '#{pane_current_path}' -w 60% -h 50% 'mia dash --switch'" \
   "" \
   "new"           n "display-popup -B -E -e MIA_POPUP=1 -e 'MIA_TMUX_PANE=#{pane_id}' -d '#{pane_current_path}' -w 70% -h 40% 'mia dash --do new'" \
