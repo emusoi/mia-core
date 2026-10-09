@@ -81,3 +81,31 @@ func TestAnItemOpensExactlyOneWay(t *testing.T) {
 		}
 	}
 }
+
+func TestAFailureIsKeptForEverySoTheDashDoesNotWaitOnIt(t *testing.T) {
+	h, dir := host(t)
+	counter := filepath.Join(t.TempDir(), "calls")
+	write(t, dir, "gh", `case "$1" in
+manifest) echo '{"protocol":1,"rows":{"every":"1h"},"sides":[{"id":"prs","side":"left","label":"prs","every":"1h"}]}' ;;
+*) echo "$1" >> `+counter+`; echo slow >&2; exit 1 ;;
+esac
+`)
+	h.Configured = []string{"gh"}
+	on, _ := h.Enabled()
+	c := Context{MiaDir: t.TempDir()}
+	contextOf := func(Plugin) Context { return c }
+
+	var tabs []SideTab
+	var rows Rows
+	for range 2 {
+		tabs, _ = AllSides(on, contextOf)
+		rows = on[0].Rows(c, nil)
+	}
+	calls, _ := os.ReadFile(counter)
+	if string(calls) != "side\nrows\n" {
+		t.Errorf("a failing side and rows are each asked once per every: %q", calls)
+	}
+	if !strings.Contains(tabs[0].Problem, "slow") || !strings.Contains(rows.Problem, "slow") {
+		t.Errorf("the kept failure still says why: side %q rows %q", tabs[0].Problem, rows.Problem)
+	}
+}

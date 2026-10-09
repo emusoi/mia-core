@@ -56,8 +56,9 @@ type Rows struct {
 }
 
 type cached struct {
-	At   time.Time          `json:"at"`
-	Rows map[string]RowInfo `json:"rows"`
+	At      time.Time          `json:"at"`
+	Rows    map[string]RowInfo `json:"rows"`
+	Problem string             `json:"problem,omitempty"`
 }
 
 func call(path string, env []string, args []string, stdin []byte, timeout time.Duration) ([]byte, error) {
@@ -91,13 +92,19 @@ func (p Plugin) Rows(c Context, input any) Rows {
 	var last cached
 	if data, err := os.ReadFile(cachePath); err == nil && json.Unmarshal(data, &last) == nil {
 		result.Rows = last.Rows
-		if p.Server == nil && time.Since(last.At) < every {
+		// A failure waits out every too, even for a serve plugin, so a plugin
+		// that times out does not stall each reload of the dash.
+		if (p.Server == nil || last.Problem != "") && time.Since(last.At) < every {
+			result.Problem = last.Problem
 			return result
 		}
 	}
 	fresh, err := p.fetchRows(c, input)
 	if err != nil {
 		result.Problem = err.Error()
+		if data, err := json.Marshal(cached{At: time.Now(), Rows: last.Rows, Problem: result.Problem}); err == nil {
+			_ = os.WriteFile(cachePath, data, 0o644)
+		}
 		return result
 	}
 	result.Rows = fresh

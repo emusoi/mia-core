@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -120,25 +121,37 @@ type idParams struct {
 }
 
 type cachedAnswer[T any] struct {
-	At     time.Time `json:"at"`
-	Answer T         `json:"answer"`
+	At      time.Time `json:"at"`
+	Answer  T         `json:"answer"`
+	Problem string    `json:"problem,omitempty"`
 }
 
 // fetch asks `mia-<name> <kind> <id>` (or the serve method <kind>), keeping
 // the answer for every so the dash does not run the plugin on each redraw.
+// A failure is kept for every as well, serve or not, so a plugin that times
+// out costs one timeout per every rather than one per reload.
 func fetch[T any](p Plugin, c Context, kind, id string, every time.Duration) (T, error) {
 	path := filepath.Join(p.DataDir(c), kind+"-"+id+".json")
 	var last cachedAnswer[T]
-	if data, err := os.ReadFile(path); err == nil && json.Unmarshal(data, &last) == nil && p.Server == nil && time.Since(last.At) < every {
+	if data, err := os.ReadFile(path); err == nil && json.Unmarshal(data, &last) == nil &&
+		(p.Server == nil || last.Problem != "") && time.Since(last.At) < every {
+		if last.Problem != "" {
+			return last.Answer, errors.New(last.Problem)
+		}
 		return last.Answer, nil
 	}
 	var answer T
 	out, err := p.ask(c, []string{kind, id}, kind, idParams{ID: id}, nil)
-	if err != nil {
-		return answer, err
+	if err == nil {
+		if bad := json.Unmarshal(out, &answer); bad != nil {
+			err = fmt.Errorf("%s %s is not JSON: %w", kind, id, bad)
+		}
 	}
-	if err := json.Unmarshal(out, &answer); err != nil {
-		return answer, fmt.Errorf("%s %s is not JSON: %w", kind, id, err)
+	if err != nil {
+		if data, err := json.Marshal(cachedAnswer[T]{At: time.Now(), Problem: err.Error()}); err == nil {
+			_ = os.WriteFile(path, data, 0o644)
+		}
+		return answer, err
 	}
 	if data, err := json.Marshal(cachedAnswer[T]{At: time.Now(), Answer: answer}); err == nil {
 		_ = os.WriteFile(path, data, 0o644)
