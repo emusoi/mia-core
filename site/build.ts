@@ -125,37 +125,25 @@ const mark = (size: number, moving = false) => {
   return `<svg class="mark" viewBox="0 0 512 512" width="${size}" height="${size}" role="img" aria-label="mia: a hundred dots, a few of them lit">${cells.join("")}</svg>`;
 };
 
-const small = (size: number) => {
-  const cells: string[] = [];
-  for (let i = 0; i < 16; i++) {
-    const x = 88 + (i % 4) * 112;
-    const y = 88 + Math.floor(i / 4) * 112;
-    cells.push(`<circle cx="${x}" cy="${y}" r="${[1, 7, 12].includes(i) ? 46 : 20}"/>`);
-  }
-  return `<svg class="mark small" viewBox="0 0 512 512" width="${size}" height="${size}" aria-hidden="true">${cells.join("")}</svg>`;
-};
-
 const icon = {
   github: `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>`,
   search: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`,
-  theme: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`,
 };
 
 function topbar(active: "home" | "docs"): string {
   return `<header class="topbar">
-  <a class="brand" href="/">${small(18)}<span>mia</span></a>
+  <a class="home" href="https://emusoi.app">emusoi</a>
   <nav>
     <button class="search-open" type="button" aria-label="Search the docs">${icon.search}<span>Search</span><kbd>⌘K</kbd></button>
     <a class="link${active === "docs" ? " here" : ""}" href="/docs/">Docs</a>
-    <a class="link" href="${repo}" rel="noopener">${icon.github}<span>GitHub</span></a>
-    <button class="theme" type="button" aria-label="Light or dark">${icon.theme}</button>
+    <a class="pill" href="${repo}" rel="noopener">GitHub</a>
   </nav>
 </header>`;
 }
 
 const footer = `<footer class="foot">
-  <span><em lang="sw">mia</em> · Swahili for 100</span>
-  <span><a href="/docs/">Docs</a><a href="/docs/plugins">Plugins</a><a href="${repo}" rel="noopener">GitHub</a><a href="${repo}/blob/main/LICENSE" rel="noopener">MIT</a></span>
+  <p>mia is one of the tools at <a href="https://emusoi.app">emusoi.app</a>.</p>
+  <p>See also <a href="https://buni.emusoi.app">buni</a>, <a href="https://wazo.emusoi.app">wazo</a></p>
 </footer>`;
 
 const searchDialog = `<dialog class="search" aria-label="Search">
@@ -178,9 +166,9 @@ function page(opts: { title: string; description: string; body: string; active: 
 <link rel="apple-touch-icon" href="/app-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&display=swap">
 <link rel="stylesheet" href="/site.css?v=${version}">
-<script>try{const t=localStorage.getItem("mia-theme");if(t)document.documentElement.dataset.theme=t}catch{}</script>
+<meta name="theme-color" content="#1b1b1b">
 </head>
 <body class="${opts.bodyClass}">
 ${topbar(opts.active)}
@@ -311,7 +299,7 @@ const home = `<main class="home">
     <p class="definition-head"><strong lang="sw">mia</strong><span class="say" aria-label="pronounced MEE-ah">/ˈmi.a/</span><em>number</em><span class="from">Swahili</span></p>
     <p class="definition-sense">100.</p>
   </div>
-  <a class="cue" href="#what">What it does <span aria-hidden="true">↓</span></a>
+  <a class="cue" href="#what"><span class="said">Scroll down to work on <em lang="sw">mia</em> things at once</span><span class="arrow" aria-hidden="true">↓</span></a>
 </section>
 
 <section class="pitch" id="what">
@@ -321,59 +309,52 @@ const home = `<main class="home">
   <p class="actions"><a class="pill" href="/docs/getting-started">Get started</a><a class="quiet" href="/docs/why">Why mia</a></p>
 </section>
 
-<section class="features">
-  <article class="wide">
-    <div>
-    <p class="eyebrow">The dashboard</p>
-    <h2>One list, grouped by what needs you.</h2>
-    <p>The main checkout, what is in progress, what has gone quiet. Every key is a <code>mia</code> command, and <code>?</code> shows which. Pop it over tmux with one key.</p>
-    <a href="/docs/dashboard">The dashboard →</a>
+<section class="words" aria-label="The words mia uses">
+  <p class="eyebrow">The words mia uses</p>
+  <article>
+    <h2>worktree</h2>
+    <div class="entry">
+      <p class="pos">noun</p>
+      <p>A checkout of your repository in a folder of its own, with a name and a tmux session that keeps running when you leave.</p>
+      ${sample("mia new due-dates      # monduli\nmia shell monduli")}
+      <a href="/docs/worktrees">Worktrees</a>
     </div>
-    <pre class="frame" aria-label="The mia dashboard">╭── Worktrees / shop ─────────────────────────╮
-│                                             │
-│   main  1                                   │
-│   shop       main                     2h    │
-│                                             │
-│   in progress  2                            │
-│ ± monduli    due-dates   uncommitted  12m   │
-│   kijenge    search      +1 −4         3h   │
-│                                             │
-│   quiet  4                                  │
-╰── ⏎ attach   n new   / find   ? keys ───────╯</pre>
   </article>
   <article>
-    <p class="eyebrow">Worktrees</p>
-    <h2>Every branch, a place with a name.</h2>
-    <p><code>mia new due-dates</code> makes a worktree beside your repository and names it — <code>monduli</code> — for life. Its tmux session keeps running when you leave.</p>
-    ${sample("mia new due-dates\nmia shell monduli\nmia switch monduli")}
-    <a href="/docs/worktrees">Worktrees →</a>
+    <h2>name</h2>
+    <div class="entry">
+      <p class="pos">noun</p>
+      <p>A worktree's own word, the name of a place: monduli, kijenge. Yours first, then mia's. It never changes, and it becomes the hostname.</p>
+      ${sample("names = [\"zanzibar\", \"pemba\"]   # ~/.config/mia/config.toml")}
+      <a href="/docs/worktrees#names">Names</a>
+    </div>
   </article>
   <article>
-    <p class="eyebrow">Stacks</p>
-    <h2>One feature, several pull requests.</h2>
-    <p>Layers share one worktree, so <code>mia up</code> and <code>mia down</code> move between them in place. mia never merges into your base and never pushes — it prints the commands.</p>
-    ${sample("mia new schema --stack\nmia new api --stack\nmia stack pr")}
-    <a href="/docs/stacks">Stacks →</a>
+    <h2>stack</h2>
+    <div class="entry">
+      <p class="pos">noun</p>
+      <p>Several branches sharing one worktree, each built on the one below, each its own pull request.</p>
+      ${sample("mia new schema --stack\nmia new api --stack\nmia stack pr")}
+      <a href="/docs/stacks">Stacks</a>
+    </div>
   </article>
   <article>
-    <p class="eyebrow">Environments</p>
-    <h2>localhost, with a name.</h2>
-    <p>A container per worktree, from what the project already says. Whatever you would type on <code>localhost:5173</code>, type <code>monduli.mia:5173</code> — here, or on any machine you can ssh to.</p>
-    ${sample("mia env up\nmia machine add build me@build.example.com\nmia env host build")}
-    <a href="/docs/environments">Environments →</a>
+    <h2>environment</h2>
+    <div class="entry">
+      <p class="pos">noun</p>
+      <p>A container where a worktree's code runs, opened at its own address, here or on any machine you can ssh to.</p>
+      ${sample("mia env up             # https://monduli.mia:5173\nmia env host build")}
+      <a href="/docs/environments">Environments</a>
+    </div>
   </article>
   <article>
-    <p class="eyebrow">Plugins</p>
-    <h2>The rest is yours.</h2>
-    <p>Plans, agents, editors, pull request status: a plugin is any program named <code>mia-&lt;name&gt;</code>. It can add verbs, rows, sections, keys, panels and listen for events.</p>
-    ${sample('#!/bin/sh\ncase "$1" in\nmanifest) echo \'{"protocol":1,"verbs":[{"name":"hello"}]}\' ;;\nhello) echo "hello from $MIA_WORKTREE" ;;\nesac')}
-    <a href="/docs/plugins">Writing a plugin →</a>
-  </article>
-  <article class="span">
-    <p class="eyebrow">Nothing in your tree</p>
-    <h2>Your repository stays yours.</h2>
-    <p>mia writes nothing into the working tree; everything it keeps is in <code>.git/mia</code>. The one exception is <code>mia dev</code>, when you ask it to lend main\'s dev server a branch, and it gives main its files back. It keeps no state it could lose, either: routes, sessions and names are worked out from git, tmux and the container engine every time.</p>
-    <a href="/docs/getting-started">Getting started →</a>
+    <h2>plugin</h2>
+    <div class="entry">
+      <p class="pos">noun</p>
+      <p>Any program named <code>mia-&lt;name&gt;</code> that adds verbs, rows, keys and panels. Everything mia does not do itself.</p>
+      ${sample("mia plugin enable agent\nmia agent run monduli")}
+      <a href="/docs/plugins">Plugins</a>
+    </div>
   </article>
 </section>
 </main>`;

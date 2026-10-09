@@ -1,13 +1,4 @@
 const version = document.currentScript?.src.split("v=")[1] ?? "";
-const root = document.documentElement;
-
-document.querySelector(".theme")?.addEventListener("click", () => {
-  const dark = root.dataset.theme
-    ? root.dataset.theme === "dark"
-    : matchMedia("(prefers-color-scheme: dark)").matches;
-  root.dataset.theme = dark ? "light" : "dark";
-  try { localStorage.setItem("mia-theme", root.dataset.theme); } catch {}
-});
 
 for (const button of document.querySelectorAll(".copy")) {
   button.addEventListener("click", async () => {
