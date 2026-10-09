@@ -83,3 +83,49 @@ func TestControlSessionOutlivesItsClient(t *testing.T) {
 		t.Fatal("the control session left with its client — destroy-unattached segfaults the tmux 3.6a server")
 	}
 }
+
+func TestAServerMiaStartsKeepsNoPluginCallVars(t *testing.T) {
+	if _, err := exec.LookPath("tmux"); err != nil {
+		t.Skip("tmux is not installed")
+	}
+	for _, name := range pluginCall {
+		t.Setenv(name, "leaked")
+	}
+	starts := map[string]func() error{
+		"command line": func() error {
+			_, err := Host{}.local("new-session", "-d", "-s", "mia-probe", "sleep 60")
+			return err
+		},
+		"control client": func() error {
+			c, err := startControl()
+			if err == nil {
+				c.cmd.Process.Kill()
+			}
+			return err
+		},
+	}
+	for how, start := range starts {
+		dir, err := os.MkdirTemp("/tmp", "mia-env-")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.RemoveAll(dir) })
+		t.Setenv("TMUX_TMPDIR", dir)
+		t.Setenv("TMUX", "")
+		if err := start(); err != nil {
+			t.Fatalf("%s: %v", how, err)
+		}
+		out, err := exec.Command("tmux", "show-environment", "-g").Output()
+		for _, session := range []string{"mia-probe", controlSession} {
+			exec.Command("tmux", "kill-session", "-t", exact(session)).Run()
+		}
+		if err != nil {
+			t.Fatalf("%s: show-environment: %v", how, err)
+		}
+		for _, name := range pluginCall {
+			if strings.Contains(string(out), name+"=") {
+				t.Errorf("a server started by the %s kept %s:\n%s", how, name, out)
+			}
+		}
+	}
+}

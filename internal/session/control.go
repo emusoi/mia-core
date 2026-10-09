@@ -17,6 +17,11 @@ import (
 
 const controlSession = "_mia-control"
 
+// pluginCall is what mia hands a plugin it calls. A tmux server keeps the
+// environment of the process that starts it for every pane after, so a
+// server mia starts on a plugin's behalf must not be handed these.
+var pluginCall = []string{"MIA_PLUGIN", "MIA_PLUGIN_PROTOCOL", "MIA_PLUGIN_DATA", "MIA_PLUGIN_CONFIG", "MIA_REPO", "MIA_WORKTREE"}
+
 type control struct {
 	mu   sync.Mutex
 	cmd  *exec.Cmd
@@ -50,7 +55,7 @@ func client() *control {
 }
 
 func startControl() (*control, error) {
-	cmd := run.Local("tmux").Command("-C", "new-session", "-A", "-D", "-s", controlSession, "-x", "20", "-y", "5", "sleep 2147483647")
+	cmd := run.Tool{Binary: "tmux", Drop: pluginCall}.Command("-C", "new-session", "-A", "-D", "-s", controlSession, "-x", "20", "-y", "5", "sleep 2147483647")
 	in, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -135,5 +140,5 @@ func (h Host) local(args ...string) (string, error) {
 			return out, err
 		}
 	}
-	return run.Tool{Binary: "tmux", Verbose: trace}.Combined(args...)
+	return run.Tool{Binary: "tmux", Drop: pluginCall, Verbose: trace}.Combined(args...)
 }

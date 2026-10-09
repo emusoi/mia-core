@@ -59,6 +59,7 @@ type Tool struct {
 	Dir     string
 	Label   string
 	Env     []string
+	Drop    []string // names left out of the inherited environment
 	Detail  func(string) string
 	Tty     bool
 	Verbose bool
@@ -111,8 +112,8 @@ func (t Tool) Command(args ...string) *exec.Cmd {
 		options = append(options, t.SSH, "--", ShellJoin(append([]string{t.Binary}, args...)))
 		command = exec.Command(SSHBinary(), options...)
 	}
-	if len(t.Env) > 0 {
-		command.Env = append(os.Environ(), t.Env...)
+	if len(t.Env) > 0 || len(t.Drop) > 0 {
+		command.Env = append(without(os.Environ(), t.Drop), t.Env...)
 	}
 	return command
 }
@@ -207,18 +208,21 @@ func (t Tool) Replace(drop []string, args ...string) error {
 	if err != nil {
 		return err
 	}
-	environment := os.Environ()
-	if len(drop) > 0 {
-		kept := environment[:0]
-		for _, entry := range environment {
-			name, _, _ := strings.Cut(entry, "=")
-			if !contains(drop, name) {
-				kept = append(kept, entry)
-			}
-		}
-		environment = kept
+	return syscall.Exec(path, append([]string{t.Binary}, args...), without(os.Environ(), drop))
+}
+
+func without(environment, drop []string) []string {
+	if len(drop) == 0 {
+		return environment
 	}
-	return syscall.Exec(path, append([]string{t.Binary}, args...), environment)
+	kept := environment[:0]
+	for _, entry := range environment {
+		name, _, _ := strings.Cut(entry, "=")
+		if !contains(drop, name) {
+			kept = append(kept, entry)
+		}
+	}
+	return kept
 }
 
 func contains(list []string, want string) bool {
