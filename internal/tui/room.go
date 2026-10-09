@@ -256,6 +256,11 @@ func (m model) room(boxed string) (string, bool) {
 		bw = max(bw, lipgloss.Width(line))
 	}
 	b.left, b.top = (m.width-bw)/2, (m.height-len(lines))/2
+	if m.off("bottom") {
+		// An odd spare row goes above the box when nothing is drawn below
+		// it, or the top side can miss its sixth row for nothing.
+		b.top = (m.height - len(lines) + 1) / 2
+	}
 	b.right, b.bottom = b.left+bw-1, b.top+len(lines)-1
 	if !b.fits("top") && !b.fits("left") && !b.fits("right") && !b.fits("bottom") {
 		return "", false

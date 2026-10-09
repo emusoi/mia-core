@@ -203,3 +203,19 @@ func TestTheLegendTogglesSidesAndTabsAndSavesThem(t *testing.T) {
 		t.Error("with no room drawn v opens nothing")
 	}
 }
+
+func TestWithTheBottomOffTheSpareRowGoesToTheTop(t *testing.T) {
+	m := designModel(t)
+	data, err := os.ReadFile("testdata/room.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.sides.Off = []string{"bottom"}
+	// 11 rows spare around the 20-row box: centered, the top gets 5 and the
+	// bottom, which is off, 6 — a room with not one side in it.
+	m.width, m.height = 140, 31
+	got, ok := m.room(designBox(t, string(data)))
+	if !ok || !strings.Contains(plain(got), "waiting 2") {
+		t.Errorf("the top side takes the spare row the bottom does not use:\n%s", plain(got))
+	}
+}
