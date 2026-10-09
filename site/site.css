@@ -146,8 +146,10 @@ kbd {
 .definition-head .say { font-family: var(--serif); }
 .definition-head em { font-family: var(--serif); font-style: italic; }
 .definition-head .from { font-size: 13px; color: var(--faint); }
-.definition-sense { font-size: 15px; line-height: 22px; }
-.definition-sense b { font-weight: 700; color: var(--ink); }
+.definition-senses { margin: 2px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; text-align: left; font-size: 15px; line-height: 22px; }
+.definition-senses li { display: flex; gap: 8px; }
+.definition-senses b { flex: none; width: 16px; font-weight: 700; color: var(--ink); }
+.definition-senses li:last-child span { color: var(--ink); }
 
 .cue { margin-top: auto; display: inline-flex; gap: 8px; align-items: center; min-height: 44px; font-size: 13px; color: var(--faint); text-decoration: none; }
 .cue .arrow { display: inline-block; }

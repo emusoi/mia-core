@@ -297,7 +297,7 @@ const home = `<main class="home">
   ${mark(220, true)}
   <div class="definition" lang="en">
     <p class="definition-head"><strong lang="sw">mia</strong><span class="say" aria-label="pronounced MEE-ah">/ˈmi.a/</span><em>number</em><span class="from">Swahili</span></p>
-    <p class="definition-sense"><b>1.</b> 100. <b>2.</b> a way to work on 100 things at once.</p>
+    <ol class="definition-senses"><li><b>1.</b><span>A hundred.</span></li><li><b>2.</b><span>A way to work on 100 things at once.</span></li></ol>
   </div>
   <a class="cue" href="#what"><span class="said">Scroll down to work on <em lang="sw">mia</em> things at once</span><span class="arrow" aria-hidden="true">↓</span></a>
 </section>
