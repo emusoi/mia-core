@@ -31,7 +31,8 @@ Each side shows one tab at a time; its tab row starts with the side's number
 (1 top, 2 left, 3 right, 4 bottom) and lists every tab with a count.
 A side is drawn only where it fits — 30 free columns left or right, 6 free
 rows (and the side's width) above or below — and too small for any side,
-the dash is just the box.
+the dash is just the box. In a tmux popup the same holds; the box fills the
+popup only when no side fits.
 
 | key | does |
 |---|---|

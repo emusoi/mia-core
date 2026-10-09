@@ -123,6 +123,7 @@ type model struct {
 	stale    bool
 	scroll   int
 	fill     bool
+	inPopup  bool
 	picking  bool
 	pickCol  int
 	pick     [3]string
@@ -187,7 +188,8 @@ func Open(title string, reload Reload, hooks Hooks, open map[string]bool) (Chose
 		m.expanded[id] = isOpen
 	}
 	m.mode, m.label = working, loadingLabel
-	m.fill = os.Getenv("MIA_POPUP") != ""
+	m.inPopup = os.Getenv("MIA_POPUP") != ""
+	m.fill = m.inPopup
 	return run(m)
 }
 
@@ -421,11 +423,19 @@ func (m model) matchesOne(row panel.Row) bool {
 func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(message)
 	m = next.(model)
+	m.fill = m.inPopup && !m.unfilled().roomed()
 	if !m.peeking && m.mode == browsing && m.peekCmd() != nil {
 		m.peeking = true
 		cmd = tea.Batch(cmd, m.nextPeek())
 	}
 	return m, cmd
+}
+
+// unfilled is the dash as a popup draws it while the room fits: today's
+// box, not one filling the popup.
+func (m model) unfilled() model {
+	m.fill = false
+	return m
 }
 
 func (m model) update(message tea.Msg) (tea.Model, tea.Cmd) {

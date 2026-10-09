@@ -257,3 +257,22 @@ func TestWithTheBottomOffTheSpareRowGoesToTheTop(t *testing.T) {
 		t.Errorf("the top side takes the spare row the bottom does not use:\n%s", plain(got))
 	}
 }
+
+func TestAPopupDrawsTheRoomWhenASideFitsAndFillsWhenNone(t *testing.T) {
+	m := designModel(t)
+	m.panel.Sections = []panel.Section{{Rows: []panel.Row{{ID: "iringa", Cells: []string{"iringa"}}}}}
+	m.rows = m.visibleRows()
+	plainDash := m
+	m.inPopup, m.fill = true, true
+
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 213, Height: 48})
+	m = next.(model)
+	plainDash.width, plainDash.height = 213, 48
+	if got := plain(m.View()); m.fill || got != plain(plainDash.View()) || !strings.Contains(got, "waiting 2") {
+		t.Errorf("a 213×48 popup draws today's box in the room:\n%s", got)
+	}
+	next, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 25})
+	if m = next.(model); !m.fill || strings.Contains(plain(m.View()), "v sides") {
+		t.Errorf("a popup with no side fitting fills as it did:\n%s", plain(m.View()))
+	}
+}
