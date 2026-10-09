@@ -27,7 +27,7 @@ func tab(owner, where, id string, rank int, count string, lines ...plugin.Line) 
 // designRoom is the plugin answers the design's Dash page shows.
 func designRoom() *panel.Room {
 	bar := func(name string, full int, cost string) plugin.Line {
-		return cells("", 1, "", "", name, 12, "", "dim", strings.Repeat("━", full), 0, "", "green", strings.Repeat("─", 16-full), 0, "", "dim", cost, 8, "right", "")
+		return cells(name, 12, "", "dim", strings.Repeat("━", full), 0, "", "green", strings.Repeat("─", 16-full), 0, "", "dim", cost, 8, "right", "")
 	}
 	return &panel.Room{
 		Repo: "mia-plugins",
@@ -48,10 +48,10 @@ func designRoom() *panel.Room {
 			tab("gh", "left", "prs", 20, "3"),
 			tab("plan", "left", "plans", 30, "4"),
 			tab("cost", "right", "cost", 10, "",
-				cells("spent today", 37, "right", "dim"),
+				cells("spent today", 0, "", "dim"),
 				nil,
-				cells("$5.76", 37, "right", "bold green"),
-				cells("7d ", 22, "right", "dim", "▁▂▂▃▅▇█", 0, "", "green", "  $18.40", 0, "", "dim"),
+				cells("$5.76", 0, "", "bold green"),
+				cells("7d ", 0, "", "dim", "▁▂▂▃▅▇█", 0, "", "green", "  $18.40", 0, "", "dim"),
 				nil,
 				bar("kinondoni", 16, "$2.93"), bar("mia-plugins", 9, "$1.72"), bar("ilala", 6, "$1.11")),
 			tab("cost", "right", "tokens", 20, ""),

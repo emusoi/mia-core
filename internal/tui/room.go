@@ -131,6 +131,18 @@ func (c canvas) line(x, y int, line plugin.Line, end int) {
 	}
 }
 
+func lineWidth(line plugin.Line) int {
+	w := 0
+	for _, cl := range line {
+		if cl.Width > 0 {
+			w += cl.Width
+		} else {
+			w += runewidth.StringWidth(cl.Text)
+		}
+	}
+	return w
+}
+
 // dots lays a · on every 2nd column from (x0, y0) toward (x1, y1), y
 // rounded along x, on cells nothing else has taken.
 func (c canvas) dots(x0, y0, x1, y1 int) {
@@ -354,7 +366,11 @@ func (m model) drawSide(c canvas, b box, place string) {
 		if i >= rows {
 			break
 		}
-		c.line(x, linesY+i, line, x+wide)
+		at := x
+		if align == "right" {
+			at = max(x+wide-lineWidth(line), x)
+		}
+		c.line(at, linesY+i, line, x+wide)
 	}
 
 	var row []plugin.Segment

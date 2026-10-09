@@ -74,7 +74,8 @@ tabs come from every plugin, ordered by `rank`; the lowest is the default.
 {"segments": [{"text": "$5.76", "style": "green"}, {"text": " today", "style": "dim"}]}
 ```
 
-A line is a list of cells (`[]` is a blank line). A cell's `width` defaults
+A line is a list of cells (`[]` is a blank line); on the right side each
+line ends flush with the side's right edge. A cell's `width` defaults
 to its text's, `align` is `left` or `right`, and `style` is any of `bold dim
 underline strike green yellow red blue cyan magenta white`. `count` `""`
 shows none. Answers are cached for `every` (default 10s); an error or a
