@@ -134,3 +134,19 @@ func TestPopupLinksOnlySafeWindowsAndCleansUp(t *testing.T) {
 		t.Fatalf("removal left popup windows or affected unrelated sessions: %s", got)
 	}
 }
+
+// The design's "Dash, side selected, item opened in a popup": 110×16,
+// centered, a green rounded border titled with the item, a pager inside.
+func TestAnItemShowsInTheDesignsPopup(t *testing.T) {
+	got := strings.Join(showArgs([]string{"wazo", "--local", "issues", "show", "LB-9"}, "%3", "/r", "issues / LB-9", false), " ")
+	want := "display-popup -E -t %3 -d /r -x C -y C -w 110 -h 16 -b rounded -S fg=green -T issues / LB-9 'wazo' '--local' 'issues' 'show' 'LB-9' 2>&1 | less -R -P' q close'"
+	if got != want {
+		t.Errorf("\n got %s\nwant %s", got, want)
+	}
+	if args := showArgs([]string{"mia", "plan", "show", "ilala"}, "%3", "/r", "plans", true); args[len(args)-1] != "'mia' 'plan' 'show' 'ilala'" {
+		t.Errorf("an interactive command owns the popup, no pager: %q", args[len(args)-1])
+	}
+	if err := Show([]string{"true"}, "", "/r", "x", false); err == nil {
+		t.Error("outside tmux there is no popup")
+	}
+}

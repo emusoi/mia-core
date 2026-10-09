@@ -49,7 +49,7 @@ func TestServeAnswersRowsPanelsAndPushesRefresh(t *testing.T) {
 		t.Fatalf("rows through serve: %+v", rows)
 	}
 	tabs, corners := AllSides([]Plugin{p}, func(Plugin) Context { return c })
-	if len(tabs) != 1 || tabs[0].Problem != "" || tabs[0].Lines[0][0].Text != "$5.76" {
+	if len(tabs) != 1 || tabs[0].Problem != "" || tabs[0].Lines[0].Cells[0].Text != "$5.76" {
 		t.Errorf("side through serve: %+v", tabs)
 	}
 	if len(corners) != 1 || corners[0].Problem != "" || corners[0].Segments[0].Style != "green" {

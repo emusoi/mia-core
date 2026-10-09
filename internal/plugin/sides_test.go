@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,7 +13,7 @@ func TestSidesAndCornersAreAskedCachedAndRanked(t *testing.T) {
 	counter := filepath.Join(t.TempDir(), "calls")
 	write(t, dir, "agent", `case "$1" in
 manifest) echo '{"protocol":1,"sides":[{"id":"answered","side":"top","label":"answered","rank":20,"every":"1h"},{"id":"waiting","side":"top","label":"waiting","rank":10,"every":"1h"}],"corners":[{"id":"agents","at":"bl","every":"1h"}]}' ;;
-side) echo "$2 $MIA_REPO" >> `+counter+`; echo '{"count":"2","lines":[[{"text":"●","width":3,"style":"yellow"},{"text":"sinza"}],[]]}' ;;
+side) echo "$2 $MIA_REPO" >> `+counter+`; echo '{"count":"2","lines":[[{"text":"●","width":3,"style":"yellow"},{"text":"sinza"}],[],{"cells":[{"text":"LB-9"}],"open":{"popup":["wazo","issues","show","LB-9"],"title":"issues / LB-9"}}]}' ;;
 corner) echo '{"segments":[{"text":"⠋ 2","style":"blue"},{"text":"  agents","style":"dim"}]}' ;;
 esac
 `)
@@ -43,8 +44,11 @@ esac
 		t.Errorf("tabs grouped by side, lowest rank first: %v", order)
 	}
 	waiting := tabs[1]
-	if waiting.Count != "2" || len(waiting.Lines) != 2 || waiting.Lines[0][0].Width != 3 || waiting.Lines[0][0].Style != "yellow" || len(waiting.Lines[1]) != 0 {
+	if waiting.Count != "2" || len(waiting.Lines) != 3 || waiting.Lines[0].Cells[0].Width != 3 || waiting.Lines[0].Cells[0].Style != "yellow" || len(waiting.Lines[1].Cells) != 0 || waiting.Lines[0].Open != nil {
 		t.Errorf("a side's answer: %+v", waiting)
+	}
+	if open := waiting.Lines[2]; open.Cells[0].Text != "LB-9" || open.Open == nil || open.Open.Title != "issues / LB-9" || len(open.Open.Popup) != 4 {
+		t.Errorf("a line may be {cells, open}: %+v", open)
 	}
 	if !strings.Contains(tabs[0].Problem, "boom") || tabs[0].Lines != nil {
 		t.Errorf("a failing side says why in one line: %+v", tabs[0])
@@ -65,6 +69,15 @@ func TestASideOrCornerInNoPlaceIsAManifestProblem(t *testing.T) {
 	for _, p := range all {
 		if (p.Problem == "") != (p.Name == "fine") {
 			t.Errorf("%s: %q", p.Name, p.Problem)
+		}
+	}
+}
+
+func TestAnItemOpensExactlyOneWay(t *testing.T) {
+	for _, bad := range []string{`{"cells":[],"open":{}}`, `{"cells":[],"open":{"verb":"issue","lands":"ilala"}}`} {
+		var it Item
+		if err := json.Unmarshal([]byte(bad), &it); err == nil {
+			t.Errorf("%s should be refused", bad)
 		}
 	}
 }

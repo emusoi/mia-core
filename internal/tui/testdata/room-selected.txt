@@ -16,13 +16,13 @@
                                               │                                              │                                                                       │
      2    issues 4   prs 3   plans 4          │  finished  2                                 │  kinondoni                                                            │              3   cost   tokens   machine
                                               │    kinondoni    cost   ✓ finished 22m    4h  │  cost · facts · blocks                                                │
-    #41  docs-plugins   ● review      2h      │    ilala        issue  ✓ finished 22m    4h  │                                                                       │                              spent today
+    ● LB-9   Deleting a sheet       ilala     │    ilala        issue  ✓ finished 22m    4h  │                                                                       │                              spent today
                                               │                                              │  claude claude-opus-5-5            $2.93                              │
-    #38  fix-login      ✓ approved    5h      │  main  1                                     │         in 84  out 39.1k  cache 142.4k write, 5M read                 │                                    $5.76
-    #37  cost           ○ draft       1d      │    mia-plugins  main                    23h  │                                                                       │                       7d ▁▂▂▃▅▇█  $18.40
-                                              │                                              │                                                                       │
+    ○ LB-14  PlusVibe → CRM                   │  main  1                                     │         in 84  out 39.1k  cache 142.4k write, 5M read                 │                                    $5.76
+    ○ LB-13  Support call booking             │    mia-plugins  main                    23h  │                                                                       │                       7d ▁▂▂▃▅▇█  $18.40
+    ! LB-15  MyCase integration               │                                              │                                                                       │
                                               │                                              │                                                                       │     kinondoni   ━━━━━━━━━━━━━━━━   $2.93
-                                              │                                              │                                                                       │     mia-plugins ━━━━━━━━━───────   $1.72
+      13 more                                 │                                              │                                                                       │     mia-plugins ━━━━━━━━━───────   $1.72
                                               │                                              │                                                                       │     ilala       ━━━━━━──────────   $1.11
                                               │                                              │                                                                       │
                                               │                                              │                                                                       │
@@ -45,4 +45,4 @@
           · ·                                                                                                                                                                                           · ·
       · ·                                                                                                                                                                                                   · ·
   · ·                                                                                                                                                                                                           · ·
-· ⠋ 2  ● 2  ✓ 2  agents      v sides                                                                                                                                                                   $5.76 today
+· ⠋ 2  ● 2  ✓ 2  agents      j k move   ⏎ open   tab tabs   esc back                                                                                                                                   $5.76 today

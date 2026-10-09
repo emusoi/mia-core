@@ -25,8 +25,7 @@ each terminal corner to the box's corner, and each corner carries one line:
 `mia` and the repository top left, the date and time top right, and what
 plugins put in the bottom corners (agents waiting, today's spend).
 
-Plugins fill the four sides around the box with information: waiting on
-you above it, issues and pull requests left, cost right, activity below.
+Plugins fill the four sides around the box: waiting on you above it, issues and pull requests left, cost right, activity below.
 Each side shows one tab at a time; its tab row starts with the side's number
 (1 top, 2 left, 3 right, 4 bottom) and lists every tab with a count.
 A side is drawn only where it fits — 30 free columns left or right, 6 free
@@ -36,12 +35,17 @@ popup only when no side fits.
 
 | key | does |
 |---|---|
-| `1`–`4` | select the top, left, right or bottom side; the same digit lets it go |
+| `1`–`4` | move the cursor into the top, left, right or bottom side; the same digit brings it back |
+| `j` `k` | the side's next or previous item |
+| `⏎` | open the item: a popup, the plugin's command, or its agent's window |
 | `tab` `shift+tab` | the selected side's next or previous tab; with none selected, the side pane's |
-| `esc` | let the selected side go |
+| `esc` | the cursor back to the box |
 
 The selected side's number is a green chip, its tab and the two dotted lines
-that frame it turn green, and the box's border dims.
+that frame it turn green, the item under the cursor takes the box's
+selection, the box's border dims, and the bottom-left corner reads
+`j k move   ⏎ open   tab tabs   esc back`. Lines that open nothing are
+skipped.
 
 `v` opens the sides legend in the bottom-left corner:
 

@@ -47,6 +47,8 @@ func styleOf(spec string) lipgloss.Style {
 			s = s.Strikethrough(true)
 		case "reverse":
 			s = s.Reverse(true)
+		case "cursor":
+			s = s.Background(lipgloss.Color("8"))
 		default:
 			if c, ok := colours[word]; ok {
 				s = s.Foreground(lipgloss.Color(c))
@@ -130,6 +132,24 @@ func (c canvas) line(x, y int, line plugin.Line, end int) {
 		if x >= end {
 			return
 		}
+	}
+}
+
+// highlight puts the cursor's background under a side's line, from x up to
+// (not including) end.
+func (c canvas) highlight(x, y, end int) {
+	if y < 0 || y >= len(c) {
+		return
+	}
+	for ; x < min(end, len(c[y])); x++ {
+		cl := &c[y][x]
+		if cl.cont {
+			continue
+		}
+		if cl.text == "" {
+			cl.text = " "
+		}
+		cl.style = strings.TrimSpace(cl.style + " cursor")
 	}
 }
 
@@ -344,7 +364,11 @@ func (m model) corners(c canvas, b box) {
 	if len(bl) > 0 {
 		bl = append(bl, plugin.Segment{Text: "      "})
 	}
-	bl = append(bl, plugin.Segment{Text: "v sides", Style: "dim"})
+	hint := "v sides"
+	if m.sideSel != "" {
+		hint = "j k move   ⏎ open   tab tabs   esc back"
+	}
+	bl = append(bl, plugin.Segment{Text: hint, Style: "dim"})
 	if m.legend {
 		bl = m.legendSegments()
 	}
@@ -362,7 +386,7 @@ func (m model) drawSide(c canvas, b box, place string) {
 	active := m.activeAt(place, tabs)
 	shown := tabs[active].Lines
 	if tabs[active].Problem != "" {
-		shown = []plugin.Line{{{Text: tabs[active].Problem, Style: "dim"}}}
+		shown = []plugin.Item{{Cells: plugin.Line{{Text: tabs[active].Problem, Style: "dim"}}}}
 	}
 	center := b.left + (b.right-b.left+1)/2
 	var x, wide, tabY, linesY, rows int
@@ -387,15 +411,18 @@ func (m model) drawSide(c canvas, b box, place string) {
 		tabY, linesY = b.top+2, b.top+4
 		rows = b.bottom + 1 - linesY
 	}
-	for i, line := range shown {
+	for i, item := range shown {
 		if i >= rows {
 			break
 		}
 		at := x
 		if align == "right" {
-			at = max(x+wide-lineWidth(line), x)
+			at = max(x+wide-lineWidth(item.Cells), x)
 		}
-		c.line(at, linesY+i, line, x+wide)
+		c.line(at, linesY+i, item.Cells, x+wide)
+		if m.sideSel == place && i == m.sideRow {
+			c.highlight(x, linesY+i, x+wide)
+		}
 	}
 
 	number := plugin.Segment{Text: sideKeys[slices.Index(plugin.Places, place)], Style: "dim"}
@@ -450,8 +477,39 @@ func (m model) sideKey(key string) model {
 		m.sideSel = ""
 	case m.drawn(place):
 		m.sideSel = place
+		m.sideRow = m.nextItem(-1, 1)
 	}
 	return m
+}
+
+// items is the active tab's lines of the selected side.
+func (m model) items() []plugin.Item {
+	tabs := m.tabsAt(m.sideSel)
+	if len(tabs) == 0 {
+		return nil
+	}
+	return tabs[m.activeAt(m.sideSel, tabs)].Lines
+}
+
+// nextItem is the line after (step 1) or before (step -1) from that opens
+// something, or from itself when there is none; lines without an action
+// cannot take the cursor.
+func (m model) nextItem(from, step int) int {
+	items := m.items()
+	for i := from + step; i >= 0 && i < len(items); i += step {
+		if items[i].Open != nil {
+			return i
+		}
+	}
+	return from
+}
+
+// openItem is what ⏎ does on the line under the side's cursor.
+func (m model) openItem() *plugin.Open {
+	if items := m.items(); m.sideRow >= 0 && m.sideRow < len(items) {
+		return items[m.sideRow].Open
+	}
+	return nil
 }
 
 // cycleSide shows the selected side's next (step 1) or previous tab.
@@ -465,6 +523,7 @@ func (m model) cycleSide(step int) model {
 		m.sides.Tabs = map[string]string{}
 	}
 	m.sides.Tabs[m.sideSel] = tabKey(tabs[(m.activeAt(m.sideSel, tabs)+step+len(tabs))%len(tabs)])
+	m.sideRow = m.nextItem(-1, 1)
 	m.save()
 	return m
 }

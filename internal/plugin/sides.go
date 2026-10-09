@@ -39,6 +39,52 @@ type Cell struct {
 
 type Line []Cell
 
+// Item is one line of a side: its cells, and what ⏎ does on it. A plugin
+// may answer a bare array of cells (nothing to open) or {"cells", "open"}.
+type Item struct {
+	Cells Line  `json:"cells"`
+	Open  *Open `json:"open,omitempty"`
+}
+
+// Open is what ⏎ on an item does: exactly one of a command in a tmux
+// popup, the plugin's own verb, or landing in a worktree[:window].
+type Open struct {
+	Popup       []string `json:"popup,omitempty"`
+	Title       string   `json:"title,omitempty"`
+	Interactive bool     `json:"interactive,omitempty"`
+	Verb        string   `json:"verb,omitempty"`
+	Args        []string `json:"args,omitempty"`
+	Report      bool     `json:"report,omitempty"`
+	Lands       string   `json:"lands,omitempty"`
+}
+
+func (it *Item) UnmarshalJSON(data []byte) error {
+	if err := json.Unmarshal(data, &it.Cells); err == nil {
+		it.Open = nil
+		return nil
+	}
+	var object struct {
+		Cells Line  `json:"cells"`
+		Open  *Open `json:"open"`
+	}
+	if err := json.Unmarshal(data, &object); err != nil {
+		return err
+	}
+	if o := object.Open; o != nil {
+		ways := 0
+		for _, set := range []bool{len(o.Popup) > 0, o.Verb != "", o.Lands != ""} {
+			if set {
+				ways++
+			}
+		}
+		if ways != 1 {
+			return fmt.Errorf("open needs exactly one of popup, verb or lands")
+		}
+	}
+	it.Cells, it.Open = object.Cells, object.Open
+	return nil
+}
+
 type Segment struct {
 	Text  string `json:"text"`
 	Style string `json:"style,omitempty"`
@@ -46,7 +92,7 @@ type Segment struct {
 
 type SideAnswer struct {
 	Count string `json:"count"`
-	Lines []Line `json:"lines"`
+	Lines []Item `json:"lines"`
 }
 
 type CornerAnswer struct {

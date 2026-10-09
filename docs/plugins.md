@@ -81,6 +81,22 @@ underline strike green yellow red blue cyan magenta white`. `count` `""`
 shows none. Answers are cached for `every` (default 10s); an error or a
 timeout shows as a dim line in the tab and never holds up the dashboard.
 
+A line can also be an object, so the cursor can stop on it and `⏎` open it:
+
+```json
+{"cells": [{"text": "LB-9", "width": 7, "style": "bold"}], "open": {"popup": ["wazo", "--local", "issues", "show", "LB-9"], "title": "issues / LB-9"}}
+```
+
+`open` is exactly one of:
+
+| open | ⏎ does |
+|---|---|
+| `{"popup": [argv], "title": "…"}` | runs argv in the repository, in a 110×16 tmux popup with the title in its border, through `less -R` (`q` closes); `"interactive": true` lets the command own the popup |
+| `{"verb": "issue", "args": [...]}` | runs the plugin's verb, as a key does; `"report": true` shows its output |
+| `{"lands": "<worktree>[:<window>]"}` | lands in that worktree's session, on that window, as the dashboard's `⏎` does |
+
+Lines without `open` are information; the cursor skips them.
+
 ## Keys and panels
 
 ```json

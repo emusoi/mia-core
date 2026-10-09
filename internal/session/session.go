@@ -152,6 +152,29 @@ func Popup(argv []string, beside, title, width, height string) error {
 	return nil
 }
 
+// Show runs a plugin's command in a tmux popup over the pane beside, in
+// dir: 110×16, centered, a green rounded border with the title in it.
+// Its output goes through a pager unless the command is interactive.
+func Show(argv []string, beside, dir, title string, interactive bool) error {
+	if beside == "" {
+		return fmt.Errorf("a popup needs tmux")
+	}
+	out, err := run.Local("tmux").Combined(showArgs(argv, beside, dir, title, interactive)...)
+	if err != nil {
+		return fmt.Errorf("popup: %s", strings.TrimSpace(out))
+	}
+	return nil
+}
+
+func showArgs(argv []string, beside, dir, title string, interactive bool) []string {
+	command := run.ShellJoin(argv)
+	if !interactive {
+		command += ` 2>&1 | less -R -P' q close'`
+	}
+	return []string{"display-popup", "-E", "-t", beside, "-d", dir, "-x", "C", "-y", "C", "-w", "110", "-h", "16",
+		"-b", "rounded", "-S", "fg=green", "-T", title, command}
+}
+
 func (h Host) CloseHover(beside string) {
 	if tty := clientOfPane(beside); tty != "" {
 		_, _ = run.Local("tmux").Combined("display-popup", "-C", "-c", tty)

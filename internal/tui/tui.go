@@ -14,6 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/emusoi/mia-core/internal/panel"
+	"github.com/emusoi/mia-core/internal/plugin"
 )
 
 var (
@@ -64,6 +65,7 @@ type Hooks struct {
 	Watch   func(nudge func())
 	Sides   SideState
 	Save    func(SideState)
+	Show    func(plugin.Open) error
 }
 
 type nudged struct{}
@@ -134,6 +136,7 @@ type model struct {
 	sides    SideState
 	legend   bool
 	sideSel  string
+	sideRow  int
 	stack    []model
 }
 
@@ -158,6 +161,11 @@ type peekTick struct{}
 type viewDone struct{ err error }
 
 type spinTick struct{}
+
+// landing lands in a worktree once its window has been selected.
+type landing struct{ chosen Chosen }
+
+type showFailed struct{ err error }
 
 type performed struct {
 	chosen  Chosen
@@ -635,6 +643,13 @@ func (m model) update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, again
 
+	case landing:
+		return m.start(msg.chosen)
+
+	case showFailed:
+		m.problem = msg.err.Error()
+		return m, nil
+
 	case loaded:
 		m.mode, m.label = browsing, ""
 		if msg.err != nil {
@@ -702,6 +717,43 @@ func (m model) start(chosen Chosen) (tea.Model, tea.Cmd) {
 		func() tea.Msg { return performed{chosen: chosen, outcome: perform(chosen)} },
 		tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg { return spinTick{} }),
 	)
+}
+
+// openSide runs the action of the side's line under the cursor: a command
+// in a tmux popup, the plugin's verb, or landing in a worktree[:window].
+func (m model) openSide() (tea.Model, tea.Cmd) {
+	open := m.openItem()
+	switch {
+	case open == nil:
+		return m, nil
+	case len(open.Popup) > 0:
+		show := m.hooks.Show
+		if show == nil {
+			m.problem = "a popup needs tmux"
+			return m, nil
+		}
+		item := *open
+		return m, func() tea.Msg {
+			if err := show(item); err != nil {
+				return showFailed{err}
+			}
+			return nil
+		}
+	case open.Verb != "":
+		return m.start(Chosen{Argv: append([]string{open.Verb}, open.Args...),
+			Action: panel.Action{Verb: open.Verb, Args: open.Args, Report: open.Report}})
+	}
+	worktree, window, _ := strings.Cut(open.Lands, ":")
+	land := Chosen{Argv: []string{"shell", worktree}, RowID: worktree,
+		Action: panel.Action{Lands: true, Verb: "shell", Args: []string{worktree}}}
+	if window == "" || m.hooks.Perform == nil {
+		return m.start(land)
+	}
+	perform := m.hooks.Perform
+	return m, func() tea.Msg {
+		perform(Chosen{Argv: []string{"window", "select", worktree, window}})
+		return landing{land}
+	}
 }
 
 func (m model) open(name, target string) (tea.Model, tea.Cmd) {
@@ -960,9 +1012,20 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if slices.Contains(sideKeys, key) && m.roomed() {
 		return m.sideKey(key), nil
 	}
-	if m.sideSel != "" && key == "esc" {
-		m.sideSel = ""
-		return m, nil
+	if m.sideSel != "" {
+		switch {
+		case key == "esc":
+			m.sideSel = ""
+			return m, nil
+		case key == "enter":
+			return m.openSide()
+		case m.nav(key) == "down":
+			m.sideRow = m.nextItem(m.sideRow, 1)
+			return m, nil
+		case m.nav(key) == "up":
+			m.sideRow = m.nextItem(m.sideRow, -1)
+			return m, nil
+		}
 	}
 	name := m.nav(key)
 	if name != "scrollup" && name != "scrolldown" && name != "" && name != "help" {
@@ -2254,7 +2317,7 @@ func (m model) help() []string {
 		entry("K J", "scroll the side pane", "up and down the tab showing"),
 		entry(m.shown("details"), "details", "the side pane full screen · i or esc returns"),
 		entry(m.shown("tabprev", "tabnext"), "tabs", "the selected side's, else the side pane's · [ ] the side pane's"),
-		entry("1–4", "select a side", "of the room: top, left, right, bottom · again or esc lets go"),
+		entry("1–4", "into a side", "of the room: top, left, right, bottom · j k move, ⏎ opens, again or esc back"),
 		entry("⏎ "+m.shown("unfold", "fold"), "unfold, fold", "a stack row · "+m.shown("fold")+" on a layer returns to its stack"),
 		entry(m.shown("popup"), "popup", "the tab's thing in a tmux popup over the list · prefix d returns"),
 		entry(m.shown("refresh"), "refresh", "now; the list also refreshes itself"),

@@ -23,7 +23,22 @@ func cells(spec ...any) plugin.Line {
 }
 
 func tab(owner, where, id string, rank int, count string, lines ...plugin.Line) plugin.SideTab {
-	return plugin.SideTab{Plugin: owner, Side: plugin.Side{ID: id, Where: where, Label: id, Rank: rank}, SideAnswer: plugin.SideAnswer{Count: count, Lines: lines}}
+	var items []plugin.Item
+	for _, line := range lines {
+		items = append(items, plugin.Item{Cells: line})
+	}
+	return plugin.SideTab{Plugin: owner, Side: plugin.Side{ID: id, Where: where, Label: id, Rank: rank}, SideAnswer: plugin.SideAnswer{Count: count, Lines: items}}
+}
+
+// issuesOpen makes the design's issue lines open in a popup, as mia-issue's do.
+func issuesOpen(t plugin.SideTab) plugin.SideTab {
+	for i, line := range t.Lines {
+		if len(line.Cells) > 1 {
+			ref := line.Cells[1].Text
+			t.Lines[i].Open = &plugin.Open{Popup: []string{"wazo", "--local", "issues", "show", ref}, Title: "issues / " + ref}
+		}
+	}
+	return t
 }
 
 // designRoom is the plugin answers the design's Dash page shows.
@@ -39,14 +54,14 @@ func designRoom() *panel.Room {
 				nil,
 				cells("●", 3, "", "yellow", "osunyai", 11, "", "bold", "codex", 8, "", "dim", "Push the branch to origin?", 50, "", "", "11m", 6, "right", "red")),
 			tab("agent", "top", "answered", 20, "5"),
-			tab("issue", "left", "issues", 10, "4",
+			issuesOpen(tab("issue", "left", "issues", 10, "4",
 				cells("●", 2, "", "yellow", "LB-9", 7, "", "bold", "Deleting a sheet", 22, "", "", "ilala", 6, "right", "dim"),
 				nil,
 				cells("○", 2, "", "dim", "LB-14", 7, "", "bold", "PlusVibe → CRM", 22, "", "dim"),
 				cells("○", 2, "", "dim", "LB-13", 7, "", "bold", "Support call booking", 22, "", "dim"),
 				cells("!", 2, "", "red", "LB-15", 7, "", "bold", "MyCase integration", 22, "", "dim"),
 				nil,
-				cells("  13 more", 0, "", "dim")),
+				cells("  13 more", 0, "", "dim"))),
 			tab("gh", "left", "prs", 20, "3",
 				cells("#41", 5, "", "bold", "docs-plugins", 15, "", "", "●", 2, "", "yellow", "review", 10, "", "dim", "2h", 4, "right", "dim"),
 				nil,
@@ -203,42 +218,101 @@ func TestTheLegendTogglesSidesAndSavesThem(t *testing.T) {
 	}
 }
 
-func TestADigitSelectsASideAndTabCyclesItsTabs(t *testing.T) {
+func TestADigitMovesTheCursorIntoASide(t *testing.T) {
 	was := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.ANSI)
 	t.Cleanup(func() { lipgloss.SetColorProfile(was) })
 	var saved []SideState
 	m := designModel(t)
 	m.hooks.Save = func(s SideState) { saved = append(saved, s) }
-	m = press(m, runes("2"), runes("]"))
+	m = press(m, runes("2"))
+	if m.sideSel != "left" || m.sideRow != 0 {
+		t.Fatalf("2 moves the cursor to the left side's first item: %q %d", m.sideSel, m.sideRow)
+	}
+	matchesShot(t, m, "room-selected.txt")
+	got, _ := m.room(m.boxed())
+	if !strings.Contains(got, styleOf("green reverse").Render(" 2 ")) || !strings.Contains(got, styleOf("bold underline green").Render("issues 4")) {
+		t.Errorf("the selected side's number is a green chip and its active tab green:\n%q", got)
+	}
+	if !strings.Contains(got, styleOf("bold cursor").Render("LB-9")) || !strings.Contains(got, styleOf("dim cursor").Render("ilala")) {
+		t.Errorf("the item under the cursor has the box's selection background across the side:\n%q", got)
+	}
+	if !strings.Contains(m.boxed(), m.border().Render("╰── ")) || m.border().Render("╰── ") == dimmed.Render("╰── ") {
+		t.Error("the box border dims to bright-black while a side is selected")
+	}
+
+	if m = press(m, runes("j")); m.sideRow != 2 {
+		t.Errorf("j skips the blank line to LB-14: %d", m.sideRow)
+	}
+	if m = press(m, runes("j"), runes("j"), runes("j")); m.sideRow != 4 {
+		t.Errorf("j stops at the last item; 13 more opens nothing: %d", m.sideRow)
+	}
+	if m = press(m, runes("k"), runes("k"), runes("k"), runes("k")); m.sideRow != 0 || m.cursor != 0 {
+		t.Errorf("k stops at the first item and leaves the box's cursor: %d %d", m.sideRow, m.cursor)
+	}
+
+	m = press(m, runes("]"))
 	if m.sideSel != "left" || m.sides.Tabs["left"] != "" {
 		t.Errorf("] stays the detail pane's while a side is selected: %q %+v", m.sideSel, m.sides)
 	}
 	m = press(m, tea.KeyMsg{Type: tea.KeyTab})
-	if m.sideSel != "left" || m.sides.Tabs["left"] != "gh/prs" || len(saved) != 1 {
-		t.Fatalf("2 selects the left side and tab shows its next tab: %q %+v", m.sideSel, m.sides)
-	}
-	matchesShot(t, m, "room-selected.txt")
-	got, _ := m.room(m.boxed())
-	if !strings.Contains(got, styleOf("green reverse").Render(" 2 ")) || !strings.Contains(got, styleOf("bold underline green").Render("prs 3")) {
-		t.Errorf("the selected side's number is a green chip and its active tab green:\n%q", got)
-	}
-	if !strings.Contains(m.boxed(), m.border().Render("╰── ")) || m.border().Render("╰── ") == dimmed.Render("╰── ") {
-		t.Error("the box border dims to bright-black while a side is selected")
+	if m.sides.Tabs["left"] != "gh/prs" || len(saved) != 1 || m.sideRow != -1 {
+		t.Errorf("tab shows the side's next tab, whose lines open nothing: %+v row %d", m.sides, m.sideRow)
 	}
 	m = press(m, tea.KeyMsg{Type: tea.KeyShiftTab}, tea.KeyMsg{Type: tea.KeyShiftTab})
 	if m.sides.Tabs["left"] != "plan/plans" {
 		t.Errorf("shift+tab goes back round the tabs: %+v", m.sides)
 	}
 	if m = press(m, runes("2")); m.sideSel != "" {
-		t.Error("the same digit lets the side go")
+		t.Error("the same digit returns the cursor to the box")
 	}
 	if m = press(m, runes("1"), tea.KeyMsg{Type: tea.KeyEsc}); m.sideSel != "" {
-		t.Error("esc lets the side go")
+		t.Error("esc returns the cursor to the box")
 	}
 	m.sides.Off = []string{"top"}
 	if m = press(m, runes("1")); m.sideSel != "" {
 		t.Error("a side the room does not draw cannot be selected")
+	}
+}
+
+func TestEnterOpensTheItemUnderTheCursor(t *testing.T) {
+	var shown []plugin.Open
+	var performed [][]string
+	m := designModel(t)
+	m.hooks.Show = func(o plugin.Open) error { shown = append(shown, o); return nil }
+	m.hooks.Perform = func(c Chosen) Outcome { performed = append(performed, c.Argv); return Outcome{} }
+
+	m = press(m, runes("2"))
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil || cmd() != nil {
+		t.Fatal("⏎ on a popup item shows it and says nothing back")
+	}
+	if len(shown) != 1 || shown[0].Title != "issues / LB-9" || strings.Join(shown[0].Popup, " ") != "wazo --local issues show LB-9" {
+		t.Fatalf("⏎ opens LB-9 in a popup: %+v", shown)
+	}
+
+	items := m.panel.Room.Sides[2].Lines
+	items[0].Open = &plugin.Open{Verb: "issue", Args: []string{"move", "in_review", "ilala"}, Report: true}
+	next, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m = next.(model); cmd == nil || m.mode != working {
+		t.Fatalf("⏎ on a verb runs it like a key: mode %v", m.mode)
+	}
+	if batch, ok := cmd().(tea.BatchMsg); ok {
+		batch[0]() // perform; batch[1] is the spinner
+	}
+	if len(performed) != 1 || strings.Join(performed[0], " ") != "issue move in_review ilala" {
+		t.Errorf("the plugin's verb ran: %v", performed)
+	}
+
+	m.mode = browsing
+	items[0].Open = &plugin.Open{Lands: "osunyai:codex"}
+	next, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	next, _ = next.Update(cmd())
+	if chosen := next.(model).chosen; strings.Join(chosen.Argv, " ") != "shell osunyai" || !chosen.Action.Lands {
+		t.Errorf("lands quits the dash into the worktree's session: %+v", chosen)
+	}
+	if last := performed[len(performed)-1]; strings.Join(last, " ") != "window select osunyai codex" {
+		t.Errorf("after selecting the window: %v", performed)
 	}
 }
 

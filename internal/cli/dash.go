@@ -15,6 +15,7 @@ import (
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/config"
 	"github.com/emusoi/mia-core/internal/panel"
+	"github.com/emusoi/mia-core/internal/plugin"
 	"github.com/emusoi/mia-core/internal/session"
 	"github.com/emusoi/mia-core/internal/tui"
 
@@ -288,6 +289,9 @@ func hooksFor(a *app.App, name, target string) tui.Hooks {
 			width, height := a.Config.Popup.Size()
 			return session.Popup(chosen.Argv, os.Getenv("TMUX_PANE"), title, width, height)
 		}
+	}
+	hooks.Show = func(open plugin.Open) error {
+		return session.Show(open.Popup, os.Getenv("TMUX_PANE"), a.Root, open.Title, open.Interactive)
 	}
 	hooks.Load = func(name, target string) (panel.Panel, tui.Reload, tui.Hooks, error) {
 		p, err := panelNamed(a, name, target)
