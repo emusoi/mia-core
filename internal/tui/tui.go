@@ -128,6 +128,7 @@ type model struct {
 	made     string
 	choice   string
 	details  bool
+	sides    SideState
 	stack    []model
 }
 
@@ -2005,6 +2006,9 @@ func (m model) View() string {
 		b.WriteString(dimmed.Render("│") + line + dimmed.Render("│") + "\n")
 	}
 	b.WriteString(m.frameBottom())
+	if room, ok := m.room(b.String()); ok {
+		return room
+	}
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, b.String())
 }
 

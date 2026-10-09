@@ -1,6 +1,10 @@
 package panel
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/emusoi/mia-core/internal/plugin"
+)
 
 const Version = 2
 
@@ -15,6 +19,15 @@ type Panel struct {
 	Order    []string            `json:"order,omitempty"`
 	Columns  []Column            `json:"columns,omitempty"`
 	Keys     map[string][]string `json:"keys,omitempty"`
+	Room     *Room               `json:"-"`
+}
+
+// Room is what the dash draws around its box when the terminal has the
+// space: the repository's name and what plugins answered for sides and corners.
+type Room struct {
+	Repo    string
+	Sides   []plugin.SideTab
+	Corners []plugin.CornerText
 }
 
 func (p *Panel) Bind(keys map[string][]string) {

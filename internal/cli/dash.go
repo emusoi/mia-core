@@ -81,7 +81,11 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 			}
 			cached, fetched = listings, time.Now()
 		}
-		p := withChoices(panel.Dashboard(cached, a.Config.Prefix, pluginRows(a, cached)))
+		plugins, _ := enabledPlugins(a)
+		room := make(chan *panel.Room, 1)
+		go func() { room <- pluginRoom(a, plugins) }()
+		p := withChoices(panel.Dashboard(cached, a.Config.Prefix, pluginRows(a, plugins, cached)))
+		p.Room = <-room
 		p.Bind(a.Config.KeyMap())
 		return p, nil
 	}
