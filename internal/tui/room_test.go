@@ -350,3 +350,17 @@ func TestAPopupDrawsTheRoomWhenASideFitsAndFillsWhenNone(t *testing.T) {
 		t.Errorf("a popup with no side fitting fills as it did:\n%s", plain(m.View()))
 	}
 }
+
+func TestTheDashCanOpenInASide(t *testing.T) {
+	m := designModel(t)
+	m.panel.Room, m.hooks.Side = nil, "2"
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 213, Height: 48})
+	if m = next.(model); m.sideSel != "" || m.hooks.Side != "2" {
+		t.Fatalf("before the room has loaded the side waits: %q", m.sideSel)
+	}
+	m.panel.Room, m.inPopup = designRoom(), true
+	next, _ = m.Update(tea.WindowSizeMsg{Width: 213, Height: 48})
+	if m = next.(model); m.sideSel != "left" || m.sideRow != 0 || m.hooks.Side != "" || m.fill {
+		t.Errorf("--side 2 in the full-size popup opens with the cursor on the left side's first item: %q %d", m.sideSel, m.sideRow)
+	}
+}

@@ -41,6 +41,9 @@ popup only when no side fits.
 | `tab` `shift+tab` | the selected side's next or previous tab; with none selected, the side pane's |
 | `esc` | the cursor back to the box |
 
+`mia dash --side N` (also with `--popup`) opens with the cursor already in
+side N.
+
 The selected side's number is a green chip, its tab and the two dotted lines
 that frame it turn green, the item under the cursor takes the box's
 selection, the box's border dims, and the bottom-left corner reads

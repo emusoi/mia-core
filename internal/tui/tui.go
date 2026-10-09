@@ -66,6 +66,7 @@ type Hooks struct {
 	Sides   SideState
 	Save    func(SideState)
 	Show    func(plugin.Open) error
+	Side    string // a SideKeys digit: open with the cursor in that side
 }
 
 type nudged struct{}
@@ -432,6 +433,10 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(message)
 	m = next.(model)
 	m.fill = m.inPopup && !m.unfilled().roomed()
+	if m.hooks.Side != "" && m.panel.Room != nil && m.width > 0 {
+		m = m.sideKey(m.hooks.Side)
+		m.hooks.Side = ""
+	}
 	if !m.peeking && m.mode == browsing && m.peekCmd() != nil {
 		m.peeking = true
 		cmd = tea.Batch(cmd, m.nextPeek())
@@ -1009,7 +1014,7 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.legend = true
 		return m, nil
 	}
-	if slices.Contains(sideKeys, key) && m.roomed() {
+	if slices.Contains(SideKeys, key) && m.roomed() {
 		return m.sideKey(key), nil
 	}
 	if m.sideSel != "" {

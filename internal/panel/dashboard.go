@@ -642,7 +642,7 @@ func addKeys(p *Panel, extras []plugin.Rows, worktrees map[string]app.Listing) [
 		}
 	}
 	// The room's keys, which the dash takes before any action: v opens the
-	// sides legend, 1–4 select a side (tui's sideKeys).
+	// sides legend, 1–4 select a side (tui.SideKeys).
 	for _, key := range []string{"v", "1", "2", "3", "4"} {
 		taken[key] = "the room's"
 	}

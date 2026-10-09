@@ -44,7 +44,7 @@ var verbs = []Verb{
 	{"gateway", "mia gateway <status|start|stop|install|uninstall|setup|trust|untrust>", "what makes <name>.mia reach an environment", false, ""},
 	{"api", "mia api <query>", "structured state, for clients and scripts", true, ""},
 	{"plugin", "mia plugin [ls|enable <name>|disable <name>]", "programs named mia-<name> that add verbs; installed on PATH, run once enabled", true, ""},
-	{"dash", "mia dash [--popup|--switch] [env|stack|blocks|machines [worktree]]", "the dashboard; --switch is a type-to-pick list that moves this tmux client to the worktree you pick", false, ""},
+	{"dash", "mia dash [--popup|--switch] [--side 1-4] [env|stack|blocks|machines [worktree]]", "the dashboard; --switch is a type-to-pick list that moves this tmux client to the worktree you pick; --side opens with the cursor in that side of the room", false, ""},
 	{"rename", "mia rename <worktree> <name>", "give a worktree the name you want; its session follows now, its container on its next start", false, ""},
 	{"open", "mia open [worktree] [--in <cursor|code|zed|idea|subl|xcode|finder|terminal>]", "open the worktree in your editor, IDE, Finder or a terminal", false, ""},
 	{"star", "mia star [worktree]", "mark the worktree you are on right now, or unmark it", false, ""},

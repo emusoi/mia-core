@@ -23,6 +23,12 @@ import (
 )
 
 func cmdDash(a *app.App, args []string) int {
+	if n := takeValue(&args, "--side"); n != "" {
+		if !slices.Contains(tui.SideKeys, n) {
+			return usageErr("mia dash --side <1|2|3|4>")
+		}
+		startSide = n
+	}
 	if take(&args, "--popup") {
 		return popup(a)
 	}
@@ -62,6 +68,9 @@ func do(a *app.App, action, pickTo string) int {
 
 var doAction, doHere string
 
+// startSide is --side: the side the dash opens with the cursor in.
+var startSide string
+
 const listingTTL = 10 * time.Second
 
 func browse(a *app.App, name, target, pickTo string, switching bool) int {
@@ -95,7 +104,7 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 	hooks.Keep = func(drafts map[string]string) { saveDrafts(a, drafts) }
 	hooks.Switch = switching
 	if name == "dashboard" {
-		hooks.Do, hooks.Here = doAction, doHere
+		hooks.Do, hooks.Here, hooks.Side = doAction, doHere, startSide
 	}
 	if pickTo != "" {
 		hooks.Picks = func(chosen tui.Chosen) bool { return len(chosen.Argv) > 0 && picks(chosen) }
@@ -262,10 +271,17 @@ func popup(a *app.App) int {
 	}
 	width, height := a.Config.Popup.Size()
 	if err := run.Local("tmux").Interactive("display-popup", "-B", "-E", "-e", "MIA_POPUP=1", "-e", "MIA_TMUX_PANE="+os.Getenv("TMUX_PANE"),
-		"-d", here, "-w", width, "-h", height, self+" dash"); err != nil {
+		"-d", here, "-w", width, "-h", height, run.ShellJoin(dashArgv(self))); err != nil {
 		return fail(err)
 	}
 	return exitOK
+}
+
+func dashArgv(self string) []string {
+	if startSide != "" {
+		return []string{self, "dash", "--side", startSide}
+	}
+	return []string{self, "dash"}
 }
 
 func joinArgs(argv []string) string {

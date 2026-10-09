@@ -425,7 +425,7 @@ func (m model) drawSide(c canvas, b box, place string) {
 		}
 	}
 
-	number := plugin.Segment{Text: sideKeys[slices.Index(plugin.Places, place)], Style: "dim"}
+	number := plugin.Segment{Text: SideKeys[slices.Index(plugin.Places, place)], Style: "dim"}
 	if m.sideSel == place {
 		number = plugin.Segment{Text: " " + number.Text + " ", Style: "green reverse"}
 	}
@@ -464,14 +464,14 @@ func (m model) drawn(place string) bool {
 	return m.roomed() && m.shows(m.boxIn(strings.Split(m.boxed(), "\n")), place)
 }
 
-// sideKeys select the sides of plugin.Places, in the same order, and turn
+// SideKeys select the sides of plugin.Places, in the same order, and turn
 // them on and off in the legend.
-var sideKeys = []string{"1", "2", "3", "4"}
+var SideKeys = []string{"1", "2", "3", "4"}
 
 // sideKey selects the side a digit names, or lets it go when it is the
 // one selected; a side the room does not draw cannot be selected.
 func (m model) sideKey(key string) model {
-	place := plugin.Places[slices.Index(sideKeys, key)]
+	place := plugin.Places[slices.Index(SideKeys, key)]
 	switch {
 	case m.sideSel == place:
 		m.sideSel = ""
@@ -541,7 +541,7 @@ func (m model) legendKey(key string) model {
 		m.legend = false
 		return m
 	}
-	i := slices.Index(sideKeys, key)
+	i := slices.Index(SideKeys, key)
 	if i < 0 {
 		return m
 	}
@@ -569,7 +569,7 @@ func (m model) legendSegments() []plugin.Segment {
 		if m.off(place) {
 			dot, style = plugin.Segment{Text: "○", Style: "dim"}, "dim strike"
 		}
-		segs = append(segs, plugin.Segment{Text: sideKeys[i], Style: "bold"}, plugin.Segment{Text: " "}, dot,
+		segs = append(segs, plugin.Segment{Text: SideKeys[i], Style: "bold"}, plugin.Segment{Text: " "}, dot,
 			plugin.Segment{Text: " "}, plugin.Segment{Text: label, Style: style}, plugin.Segment{Text: "    "})
 	}
 	return append(segs, plugin.Segment{Text: "esc", Style: "bold"}, plugin.Segment{Text: " done", Style: "dim"})
