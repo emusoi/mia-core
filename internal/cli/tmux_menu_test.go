@@ -21,8 +21,9 @@ func TestTheTmuxMenuHasTheSidesAndThePluginsEntries(t *testing.T) {
 	plugins[2].Manifest.Menu[0].Popup.X, plugins[2].Manifest.Menu[0].Popup.Y = "R", "S"
 	menu, problems := tmuxMenu(plugins)
 	for _, want := range []string{
-		`  "top"           1 "display-popup -B -E -e MIA_POPUP=1 -e 'MIA_TMUX_PANE=#{pane_id}' -d '#{pane_current_path}' -w 100% -h 100% 'mia dash --side 1'" \`,
+		`  "top"           1 "display-popup -B -E -e MIA_POPUP=1 -e 'MIA_TMUX_PANE=#{pane_id}' -d '#{pane_current_path}' -w 64 -h 18 'mia side 1'" \`,
 		`  "issues"        2 `,
+		`  "dashboard"     g "display-popup -B -E -e MIA_POPUP=1 -e 'MIA_TMUX_PANE=#{pane_id}' -d '#{pane_current_path}' -w 100% -h 100% 'mia dash'" \`,
 		`  "type while you wait" y "display-popup -B -E -e MIA_POPUP=1 -e 'MIA_TMUX_PANE=#{pane_id}' -d '#{pane_current_path}' -w 80 -h 20 -x R -y S 'mia type'"`,
 	} {
 		if !strings.Contains(menu, want) {

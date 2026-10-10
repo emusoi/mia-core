@@ -190,6 +190,8 @@ func Run(args []string) int {
 		return cmdAPI(a, rest)
 	case "dash":
 		return cmdDash(a, rest)
+	case "side":
+		return cmdSide(a, rest)
 	case "stack":
 		return cmdStack(a, rest, asJSON)
 	case "up":
@@ -669,8 +671,8 @@ bind-key g ` + dashPopup("100%", "100%", "mia dash") + `
 bind-key j ` + dashPopup("60%", "50%", "mia dash --switch") + `
 
 # prefix m: a menu where each entry opens one thing in its own popup,
-# on the worktree of the pane you are in; 1–4 open the dashboard in that
-# side of the room, then come the plugins' entries:
+# on the worktree of the pane you are in; 1–4 open that one side of the
+# room as a small widget, then come the plugins' entries:
 bind-key m display-menu -T " mia " \
 ` + menu + `
 # Then: tmux source-file ~/.tmux.conf
@@ -685,8 +687,8 @@ func dashPopup(width, height, command string) string {
 	return "display-popup -B -E -e MIA_POPUP=1 -e \"MIA_TMUX_PANE=#{pane_id}\" -d \"#{pane_current_path}\" -w " + width + " -h " + height + " \"" + command + "\""
 }
 
-// tmuxMenu is the prefix-m menu's entries: mia's own, a dashboard opening
-// in each side of the room (named for the side's default tab), and every
+// tmuxMenu is the prefix-m menu's entries: mia's own, a small popup of
+// each side of the room alone (named for the side's default tab), and every
 // plugin's, less those whose key mia's already use.
 func tmuxMenu(plugins []plugin.Plugin) (string, []string) {
 	type item struct{ label, key, command string }
@@ -710,7 +712,7 @@ func tmuxMenu(plugins []plugin.Plugin) (string, []string) {
 		{},
 	}
 	for i, label := range sideLabels(plugins) {
-		items = append(items, item{label, tui.SideKeys[i], popup("100%", "100%", "mia dash --side "+tui.SideKeys[i])})
+		items = append(items, item{label, tui.SideKeys[i], popup("64", "18", "mia side "+tui.SideKeys[i])})
 	}
 	taken := map[string]string{}
 	for _, it := range items {

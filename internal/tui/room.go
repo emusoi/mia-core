@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/emusoi/mia-core/internal/plugin"
 	"github.com/mattn/go-runewidth"
@@ -379,15 +380,10 @@ func (m model) corners(c canvas, b box) {
 // drawSide draws one side's tab row and the active tab's lines in the block
 // the room gives that side, cutting lines that do not fit.
 func (m model) drawSide(c canvas, b box, place string) {
-	tabs := m.tabsAt(place)
-	if len(tabs) == 0 {
+	if len(m.tabsAt(place)) == 0 {
 		return
 	}
-	active := m.activeAt(place, tabs)
-	shown := tabs[active].Lines
-	if tabs[active].Problem != "" {
-		shown = []plugin.Item{{Cells: plugin.Line{{Text: tabs[active].Problem, Style: "dim"}}}}
-	}
+	shown := m.shownAt(place)
 	center := b.left + (b.right-b.left+1)/2
 	var x, wide, tabY, linesY, rows int
 	align := "left"
@@ -411,17 +407,46 @@ func (m model) drawSide(c canvas, b box, place string) {
 		tabY, linesY = b.top+2, b.top+4
 		rows = b.bottom + 1 - linesY
 	}
-	for i, item := range shown {
-		if i >= rows {
+	m.paintSide(c, place, area{x: x, wide: wide, tabY: tabY, linesY: linesY, rows: rows, align: align, gap: "   "})
+}
+
+// area is where a side's tab row and lines go: from x, wide columns, the
+// lines aligned left, right or center, the tabs gap apart.
+type area struct {
+	x, wide, tabY, linesY, rows int
+	align, gap                  string
+}
+
+// shownAt is the active tab's lines of a side, or its problem.
+func (m model) shownAt(place string) []plugin.Item {
+	tabs := m.tabsAt(place)
+	if len(tabs) == 0 {
+		return nil
+	}
+	active := tabs[m.activeAt(place, tabs)]
+	if active.Problem != "" {
+		return []plugin.Item{{Cells: plugin.Line{{Text: active.Problem, Style: "dim"}}}}
+	}
+	return active.Lines
+}
+
+// paintSide draws a side's lines, the cursor on the selected one, and its
+// tab row in the area given, cutting lines that do not fit.
+func (m model) paintSide(c canvas, place string, a area) {
+	tabs := m.tabsAt(place)
+	active := m.activeAt(place, tabs)
+	x, wide, align := a.x, a.wide, a.align
+	for i, item := range m.shownAt(place) {
+		if i >= a.rows {
 			break
 		}
 		at := x
 		if align == "right" {
 			at = max(x+wide-lineWidth(item.Cells), x)
 		}
-		c.line(at, linesY+i, item.Cells, x+wide)
+		c.line(at, a.linesY+i, item.Cells, x+wide)
 		if m.sideSel == place && i == m.sideRow {
-			c.highlight(x, linesY+i, x+wide)
+			c.highlight(x, a.linesY+i, x+wide)
 		}
 	}
 
@@ -431,7 +456,7 @@ func (m model) drawSide(c canvas, b box, place string) {
 	}
 	row := []plugin.Segment{number}
 	for i, tab := range tabs {
-		row = append(row, plugin.Segment{Text: "   "})
+		row = append(row, plugin.Segment{Text: a.gap})
 		label, style := tab.Label, "dim"
 		if tab.Count != "" && tab.Problem == "" {
 			label += " " + tab.Count
@@ -451,7 +476,7 @@ func (m model) drawSide(c canvas, b box, place string) {
 	case "right":
 		at = x + wide - segmentsWidth(row)
 	}
-	c.segments(max(at, x), tabY, row, x+wide)
+	c.segments(max(at, x), a.tabY, row, x+wide)
 }
 
 func (m model) roomed() bool {
@@ -573,4 +598,88 @@ func (m model) legendSegments() []plugin.Segment {
 			plugin.Segment{Text: " "}, plugin.Segment{Text: label, Style: style}, plugin.Segment{Text: "    "})
 	}
 	return append(segs, plugin.Segment{Text: "esc", Style: "bold"}, plugin.Segment{Text: " done", Style: "dim"})
+}
+
+// widget is one side alone, filling the popup `mia side` opens it in: a
+// green rounded border titled with the active tab, the side's tab row and
+// lines as the room draws them, the keys in the bottom border.
+func (m model) widget() string {
+	w, h := m.width, m.height
+	if w < 8 || h < 4 {
+		return ""
+	}
+	place := m.hooks.Only
+	tabs := m.tabsAt(place)
+	title := place
+	if len(tabs) > 0 {
+		title = tabs[m.activeAt(place, tabs)].Label
+	}
+	c := newCanvas(w, h)
+	x := c.put(0, 0, "╭──", "green", w)
+	x = c.put(x, 0, title, "bold green", w-1)
+	c.put(x, 0, strings.Repeat("─", max(w-1-x, 0)), "green", w-1)
+	c.put(w-1, 0, "╮", "green", w)
+	for y := 1; y < h-1; y++ {
+		c.put(0, y, "│", "green", w)
+		c.put(w-1, y, "│", "green", w)
+	}
+	bottom := []plugin.Segment{{Text: "╰──", Style: "green"}}
+	for i, k := range [][2]string{{"j k", "move"}, {"⏎", "open"}, {"tab", "tabs"}, {"esc", "close"}} {
+		if i > 0 {
+			bottom = append(bottom, plugin.Segment{Text: "─", Style: "green"})
+		}
+		bottom = append(bottom, plugin.Segment{Text: k[0], Style: "bold"}, plugin.Segment{Text: "─", Style: "green"},
+			plugin.Segment{Text: " " + k[1] + "  "})
+	}
+	x = c.segments(0, h-1, bottom, w-1)
+	c.put(x, h-1, strings.Repeat("─", max(w-1-x, 0)), "green", w-1)
+	c.put(w-1, h-1, "╯", "green", w)
+
+	end := w - 2
+	switch {
+	case m.loading():
+		c.put(4, 2, "loading", "dim", end)
+	case m.mode == working:
+		c.put(4, 2, m.label+" …", "dim", end)
+	case m.mode == reporting:
+		for i, line := range m.report {
+			c.put(4, 2+i, strings.ReplaceAll(line, "\t", "    "), "", end)
+		}
+	case m.mode == confirming:
+		c.put(4, 2, m.pending.action.ConfirmFor(nameOf(m.pending.row))+"  y yes  n no", "yellow", end)
+	case len(tabs) == 0:
+		c.put(4, 2, "no plugin fills the "+place+" side", "dim", end)
+	default:
+		m.paintSide(c, place, area{x: 4, wide: w - 6, tabY: 2, linesY: 4, rows: h - 5, align: "left", gap: "      "})
+	}
+	if m.problem != "" {
+		c.put(4, h-2, m.problem, "red", end)
+	} else if m.notice != "" {
+		c.put(4, h-2, m.notice, "green", end)
+	}
+	out := make([]string, h)
+	for y := range out {
+		out[y] = c.render(y, 0, w)
+	}
+	return strings.Join(out, "\n")
+}
+
+// widgetKey takes the keys of `mia side`: j k move, ⏎ opens, tab and
+// shift+tab switch tabs, esc or q closes.
+func (m model) widgetKey(key string) (tea.Model, tea.Cmd) {
+	switch {
+	case key == "esc" || key == "q" || key == "ctrl+c":
+		return m, tea.Quit
+	case key == "enter":
+		return m.openSide()
+	case key == "tab":
+		return m.cycleSide(1), nil
+	case key == "shift+tab":
+		return m.cycleSide(-1), nil
+	case m.nav(key) == "down":
+		m.sideRow = m.nextItem(m.sideRow, 1)
+	case m.nav(key) == "up":
+		m.sideRow = m.nextItem(m.sideRow, -1)
+	}
+	return m, nil
 }

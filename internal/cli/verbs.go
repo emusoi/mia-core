@@ -15,7 +15,7 @@ var Groups = []string{"Worktrees", "Working", "Environments", "Records"}
 var groupOf = map[string]string{
 	"new": "Worktrees", "ls": "Worktrees", "path": "Worktrees", "adopt": "Worktrees", "rm": "Worktrees", "gc": "Worktrees",
 	"star": "Worktrees", "open": "Worktrees", "shell": "Worktrees", "window": "Worktrees", "rename": "Worktrees", "run": "Worktrees", "setup": "Worktrees", "switch": "Worktrees", "shell-init": "Worktrees",
-	"dash": "Working", "stack": "Working", "up": "Working", "down": "Working",
+	"dash": "Working", "side": "Working", "stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working", "pr": "Working",
 	"env": "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
 	"api": "Records", "plugin": "Records",
@@ -45,6 +45,7 @@ var verbs = []Verb{
 	{"api", "mia api <query>", "structured state, for clients and scripts", true, ""},
 	{"plugin", "mia plugin [ls|enable <name>|disable <name>]", "programs named mia-<name> that add verbs; installed on PATH, run once enabled", true, ""},
 	{"dash", "mia dash [--popup|--switch] [--side 1-4] [env|stack|blocks|machines [worktree]]", "the dashboard; --switch is a type-to-pick list that moves this tmux client to the worktree you pick; --side opens with the cursor in that side of the room", false, ""},
+	{"side", "mia side <1-4|top|left|right|bottom>", "one side of the room alone, small enough for a popup: j k move, ⏎ opens, tab switches tabs, esc closes", false, ""},
 	{"rename", "mia rename <worktree> <name>", "give a worktree the name you want; its session follows now, its container on its next start", false, ""},
 	{"open", "mia open [worktree] [--in <cursor|code|zed|idea|subl|xcode|finder|terminal>]", "open the worktree in your editor, IDE, Finder or a terminal", false, ""},
 	{"star", "mia star [worktree]", "mark the worktree you are on right now, or unmark it", false, ""},

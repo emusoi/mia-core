@@ -67,6 +67,7 @@ type Hooks struct {
 	Save    func(SideState)
 	Show    func(plugin.Open) error
 	Side    string // a SideKeys digit: open with the cursor in that side
+	Only    string // a plugin.Places side: show that side alone, as `mia side` does
 }
 
 type nudged struct{}
@@ -436,6 +437,10 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	if m.hooks.Side != "" && m.panel.Room != nil && m.width > 0 {
 		m = m.sideKey(m.hooks.Side)
 		m.hooks.Side = ""
+	}
+	if m.hooks.Only != "" && m.panel.Room != nil && m.sideSel == "" {
+		m.sideSel = m.hooks.Only
+		m.sideRow = m.nextItem(-1, 1)
 	}
 	if !m.peeking && m.mode == browsing && m.peekCmd() != nil {
 		m.peeking = true
@@ -1007,6 +1012,9 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.key(msg)
 	}
 
+	if m.hooks.Only != "" {
+		return m.widgetKey(key)
+	}
 	if m.legend && key != "ctrl+c" {
 		return m.legendKey(key), nil
 	}
@@ -1996,6 +2004,9 @@ func (m model) problemLines() []string {
 }
 
 func (m model) View() string {
+	if m.hooks.Only != "" {
+		return m.widget()
+	}
 	boxed := m.boxed()
 	if room, ok := m.room(boxed); ok {
 		return room

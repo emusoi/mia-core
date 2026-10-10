@@ -17,3 +17,11 @@ func TestDashSideTakesOneToFour(t *testing.T) {
 		t.Errorf("the popup passes --side on: %v", argv)
 	}
 }
+
+func TestSideTakesANumberOrAPlace(t *testing.T) {
+	for _, args := range [][]string{nil, {"5"}, {"middle"}, {"1", "2"}} {
+		if code := cmdSide(&app.App{}, args); code != exitUsage {
+			t.Errorf("mia side %v is a usage error: %d", args, code)
+		}
+	}
+}

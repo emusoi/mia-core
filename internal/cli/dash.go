@@ -52,6 +52,27 @@ func cmdDash(a *app.App, args []string) int {
 	return browse(a, name, target, pickTo, switching)
 }
 
+// cmdSide is `mia side N`: one side of the room alone, as the prefix-m
+// menu's small popup shows it.
+func cmdSide(a *app.App, args []string) int {
+	if len(args) != 1 {
+		return usageErr("mia side <1-4|top|left|right|bottom>")
+	}
+	place := args[0]
+	if i := slices.Index(tui.SideKeys, place); i >= 0 {
+		place = plugin.Places[i]
+	}
+	if !slices.Contains(plugin.Places, place) {
+		return usageErr("mia side <1-4|top|left|right|bottom>")
+	}
+	onlySide = place
+	defer startServers(a)()
+	return browse(a, "dashboard", "", "", false)
+}
+
+// onlySide is `mia side`'s side: the dash shows it alone.
+var onlySide string
+
 var doable = []string{"new", "pr", "branch"}
 
 func do(a *app.App, action, pickTo string) int {
@@ -81,6 +102,12 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 		if name != "dashboard" {
 			return panelNamed(a, name, target)
 		}
+		if onlySide != "" {
+			plugins, _ := enabledPlugins(a)
+			p := panel.Panel{Version: panel.Version, Room: pluginRoom(a, plugins)}
+			p.Bind(a.Config.KeyMap())
+			return p, nil
+		}
 		if cached == nil || time.Since(fetched) > listingTTL {
 			if cfg, err := config.Load(a.MiaDir); err == nil {
 				a.Config = cfg
@@ -104,7 +131,7 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 	hooks.Keep = func(drafts map[string]string) { saveDrafts(a, drafts) }
 	hooks.Switch = switching
 	if name == "dashboard" {
-		hooks.Do, hooks.Here, hooks.Side = doAction, doHere, startSide
+		hooks.Do, hooks.Here, hooks.Side, hooks.Only = doAction, doHere, startSide, onlySide
 	}
 	if pickTo != "" {
 		hooks.Picks = func(chosen tui.Chosen) bool { return len(chosen.Argv) > 0 && picks(chosen) }
@@ -149,7 +176,7 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 		default:
 			markOpened(a, chosen)
 			perform(chosen)
-			if switching || doAction != "" || landsHere(chosen) {
+			if switching || doAction != "" || onlySide != "" || landsHere(chosen) {
 				return exitOK
 			}
 		}

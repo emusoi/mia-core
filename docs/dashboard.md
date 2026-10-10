@@ -44,6 +44,13 @@ popup only when no side fits.
 `mia dash --side N` (also with `--popup`) opens with the cursor already in
 side N.
 
+`mia side N` (N is 1–4 or top, left, right, bottom) shows that one side
+alone, sized for a 64×18 popup: a green border titled with the active tab,
+the side's tab row and its lines, the cursor on the first item. `j` `k`,
+`⏎` and `tab` `shift+tab` work as above; `esc` or `q` closes it. It shows
+even when the side is off in the room, and ⏎ on an item that lands in an
+agent's window closes it.
+
 The selected side's number is a green chip, its tab and the two dotted lines
 that frame it turn green, the item under the cursor takes the box's
 selection, the box's border dims, and the bottom-left corner reads
@@ -95,7 +102,7 @@ are in:
 |---|---|
 | `g` `j` | the dashboard, the switch list |
 | `n` `b` `p` | a new worktree, a branch, a pull request |
-| `1`–`4` | the dashboard with the cursor in that side, named for the side's first tab (waiting, issues, cost, activity) |
+| `1`–`4` | that one side as a small centred popup (`mia side N`), named for the side's first tab (waiting, issues, cost, activity) |
 | a plugin's | what its manifest's `menu` names; one on a key above is left out and said on stderr |
 
 Run it again after enabling a plugin to pick up its entries.
