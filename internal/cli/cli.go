@@ -690,8 +690,15 @@ func dashPopup(width, height, command string) string {
 // plugin's, less those whose key mia's already use.
 func tmuxMenu(plugins []plugin.Plugin) (string, []string) {
 	type item struct{ label, key, command string }
+	placed := func(at plugin.Place, command string) string {
+		spot := ""
+		if at.X != "" {
+			spot = " -x " + at.X + " -y " + at.Y
+		}
+		return "display-popup -B -E -e MIA_POPUP=1 -e 'MIA_TMUX_PANE=#{pane_id}' -d '#{pane_current_path}' -w " + at.Width + " -h " + at.Height + spot + " '" + command + "'"
+	}
 	popup := func(width, height, command string) string {
-		return "display-popup -B -E -e MIA_POPUP=1 -e 'MIA_TMUX_PANE=#{pane_id}' -d '#{pane_current_path}' -w " + width + " -h " + height + " '" + command + "'"
+		return placed(plugin.Place{Width: width, Height: height}, command)
 	}
 	items := []item{
 		{"dashboard", "g", popup("100%", "100%", "mia dash")},
@@ -725,7 +732,7 @@ func tmuxMenu(plugins []plugin.Plugin) (string, []string) {
 			taken[entry.Key] = entry.Label
 			// ponytail: args are joined as words; one with a space or quote needs real quoting
 			command := strings.Join(append([]string{"mia", entry.Verb}, entry.Args...), " ")
-			items = append(items, item{entry.Label, entry.Key, popup(entry.Popup.Width, entry.Popup.Height, command)})
+			items = append(items, item{entry.Label, entry.Key, placed(entry.Popup, command)})
 		}
 	}
 	var b strings.Builder

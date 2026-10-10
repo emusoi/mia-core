@@ -49,10 +49,32 @@ type Entry struct {
 	Label string   `json:"label"`
 	Verb  string   `json:"verb"`
 	Args  []string `json:"args,omitempty"`
-	Popup struct {
-		Width  string `json:"width"`
-		Height string `json:"height"`
-	} `json:"popup"`
+	Popup Place    `json:"popup"`
+}
+
+// Place is a plugin popup's size, in cells or a percentage, and where it
+// sits: x and y as tmux display-popup -x and -y take them ("R", "S", "C",
+// a number), centered when left out.
+type Place struct {
+	Width  string `json:"width"`
+	Height string `json:"height"`
+	X      string `json:"x,omitempty"`
+	Y      string `json:"y,omitempty"`
+}
+
+// KeyPopup is a key's "popup": true opens it in the dashboard's popup,
+// a Place opens it in that one.
+type KeyPopup struct {
+	On    bool
+	Place *Place
+}
+
+func (p *KeyPopup) UnmarshalJSON(raw []byte) error {
+	if json.Unmarshal(raw, &p.On) == nil {
+		return nil
+	}
+	p.On, p.Place = true, &Place{}
+	return json.Unmarshal(raw, p.Place)
 }
 
 type Tab struct {
@@ -72,7 +94,7 @@ type Key struct {
 	Confirm string   `json:"confirm,omitempty"`
 	Report  bool     `json:"report,omitempty"`
 	Lands   bool     `json:"lands,omitempty"`
-	Popup   bool     `json:"popup,omitempty"`
+	Popup   KeyPopup `json:"popup,omitempty"`
 	Global  bool     `json:"global,omitempty"`
 }
 
@@ -237,10 +259,14 @@ func ReadManifest(path string) (Manifest, error) {
 		if key.ID == "" || (key.Verb == "") == (key.Panel == "") {
 			return Manifest{}, fmt.Errorf("key %q needs an id and exactly one of verb or panel", key.Label)
 		}
+		if key.Popup.Place != nil && (key.Popup.Place.Width == "" || key.Popup.Place.Height == "" || (key.Popup.Place.X == "") != (key.Popup.Place.Y == "")) {
+			return Manifest{}, fmt.Errorf("key %q needs a popup width and height, and x and y together or neither", key.Label)
+		}
 	}
 	for _, entry := range m.Menu {
-		if utf8.RuneCountInString(entry.Key) != 1 || entry.Label == "" || entry.Verb == "" || entry.Popup.Width == "" || entry.Popup.Height == "" {
-			return Manifest{}, fmt.Errorf("menu entry %q needs a one-character key, a label, a verb and a popup width and height", entry.Label)
+		if utf8.RuneCountInString(entry.Key) != 1 || entry.Label == "" || entry.Verb == "" || entry.Popup.Width == "" || entry.Popup.Height == "" ||
+			(entry.Popup.X == "") != (entry.Popup.Y == "") {
+			return Manifest{}, fmt.Errorf("menu entry %q needs a one-character key, a label, a verb and a popup width and height, and x and y together or neither", entry.Label)
 		}
 	}
 	if m.Rows != nil {

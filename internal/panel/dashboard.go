@@ -657,7 +657,7 @@ func addKeys(p *Panel, extras []plugin.Rows, worktrees map[string]app.Listing) [
 			name := extra.Plugin + "." + key.ID
 			action := Action{
 				Key: key.Key, Label: key.Label, Help: key.Help, Verb: key.Verb, Args: key.Args,
-				Input: key.Input, Confirm: key.Confirm, Report: key.Report, Lands: key.Lands, Popup: key.Popup, Global: key.Global,
+				Input: key.Input, Confirm: key.Confirm, Report: key.Report, Lands: key.Lands, Popup: key.Popup.On, Place: key.Popup.Place, Global: key.Global,
 			}
 			if key.Panel != "" {
 				action.Panel = PluginPanel(extra.Plugin, key.Panel)

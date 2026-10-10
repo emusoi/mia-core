@@ -107,15 +107,22 @@ Lines without `open` are information; the cursor skips them.
 the plugin prints from `mia-<name> panel <id>`, in the same JSON as
 `mia api dashboard`.
 
+A key with `"lands": true, "popup": true` opens its verb in a tmux popup the
+dashboard's `[popup]` size; `"popup": {"width": "80", "height": "20", "x": "R",
+"y": "S"}` opens it that size instead, with `x` and `y` as tmux
+`display-popup -x`/`-y` take them (`R` and `S` is the bottom-right corner).
+
 ## The tmux menu
 
 ```json
-{"menu": [{"key": "y", "label": "type while you wait", "verb": "type", "popup": {"width": "80", "height": "20"}}]}
+{"menu": [{"key": "y", "label": "type while you wait", "verb": "type", "popup": {"width": "80", "height": "20", "x": "R", "y": "S"}}]}
 ```
 
 An entry in the `prefix m` menu that `mia help tmux` prints: its one-character
 key opens `mia <verb> [args]` in a tmux popup of that width and height
-(cells, or a percentage), over the pane you are in. An entry whose key is
+(cells, or a percentage), over the pane you are in. Optional `x` and `y`, given
+together, place it as tmux `display-popup -x`/`-y` do; without them it is
+centered. An entry whose key is
 already a core entry's is left out, and `mia help tmux` says so.
 
 ## Events

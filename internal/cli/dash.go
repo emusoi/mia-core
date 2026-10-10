@@ -303,7 +303,11 @@ func hooksFor(a *app.App, name, target string) tui.Hooks {
 			title := fmt.Sprintf(" mia %s — prefix d or exit returns to the list ", strings.Join(chosen.Argv, " "))
 			trace("popup %v", chosen.Argv)
 			width, height := a.Config.Popup.Size()
-			return session.Popup(chosen.Argv, os.Getenv("TMUX_PANE"), title, width, height)
+			var x, y string
+			if at := chosen.Action.Place; at != nil {
+				width, height, x, y = at.Width, at.Height, at.X, at.Y
+			}
+			return session.Popup(chosen.Argv, os.Getenv("TMUX_PANE"), title, width, height, x, y)
 		}
 	}
 	hooks.Show = func(open plugin.Open) error {

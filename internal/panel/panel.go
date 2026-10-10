@@ -136,24 +136,25 @@ var keySpellings = map[string][]string{
 }
 
 type Action struct {
-	Key     string   `json:"key"`
-	Label   string   `json:"label"`
-	Verb    string   `json:"verb"`
-	Args    []string `json:"args,omitempty"`
-	Confirm string   `json:"confirm,omitempty"`
-	Retry   []Action `json:"retry,omitempty"`
-	When    string   `json:"when,omitempty"`
-	Input   string   `json:"input,omitempty"`
-	Choices []string `json:"choices,omitempty"`
-	Panel   string   `json:"panel,omitempty"`
-	Report  bool     `json:"report,omitempty"`
-	Lands   bool     `json:"lands,omitempty"`
-	Popup   bool     `json:"popup,omitempty"`
-	Prefill bool     `json:"prefill,omitempty"`
-	Pick    []string `json:"pick,omitempty"`
-	Lines   bool     `json:"lines,omitempty"`
-	Global  bool     `json:"global,omitempty"`
-	Help    string   `json:"help,omitempty"`
+	Key     string        `json:"key"`
+	Label   string        `json:"label"`
+	Verb    string        `json:"verb"`
+	Args    []string      `json:"args,omitempty"`
+	Confirm string        `json:"confirm,omitempty"`
+	Retry   []Action      `json:"retry,omitempty"`
+	When    string        `json:"when,omitempty"`
+	Input   string        `json:"input,omitempty"`
+	Choices []string      `json:"choices,omitempty"`
+	Panel   string        `json:"panel,omitempty"`
+	Report  bool          `json:"report,omitempty"`
+	Lands   bool          `json:"lands,omitempty"`
+	Popup   bool          `json:"popup,omitempty"`
+	Place   *plugin.Place `json:"place,omitempty"` // a plugin key's own popup size and spot
+	Prefill bool          `json:"prefill,omitempty"`
+	Pick    []string      `json:"pick,omitempty"`
+	Lines   bool          `json:"lines,omitempty"`
+	Global  bool          `json:"global,omitempty"`
+	Help    string        `json:"help,omitempty"`
 }
 
 func (a Action) NeedsRow() bool {
