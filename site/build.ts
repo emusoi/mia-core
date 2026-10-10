@@ -294,11 +294,11 @@ ${sidebar("")}
 const sample = (text: string, lang = "bash") => code(text, lang);
 const home = `<main class="home">
 <section class="hero">
-  ${mark(220, true)}
-  <div class="definition" lang="en">
-    <p class="definition-head"><strong lang="sw">mia</strong><span class="say" aria-label="pronounced MEE-ah">/ˈmi.a/</span><em>number</em><span class="from">Swahili</span></p>
-    <ol class="definition-senses"><li><b>1.</b><span>A hundred.</span></li><li><b>2.</b><span>A way to work on 100 things at once.</span></li></ol>
-  </div>
+  ${mark(88, true)}
+  <h1 lang="sw">mia</h1>
+  <p class="definition-head"><span class="say" aria-label="pronounced MEE-ah">/ˈmi.a/</span><em>number</em><span class="from">Swahili</span></p>
+  <ol class="definition-senses"><li><b>1.</b><span>A hundred.</span></li><li><b>2.</b><span>A way to work on 100 things at once.</span></li></ol>
+  <p class="origin"><em>Origin</em> Swahili. Made at <a href="https://emusoi.app">emusoi</a>, a studio for building software tools.</p>
   <a class="cue" href="#what"><span class="said">Scroll down to work on <em lang="sw">mia</em> things at once</span><span class="arrow" aria-hidden="true">↓</span></a>
 </section>
 
@@ -309,53 +309,60 @@ const home = `<main class="home">
   <p class="actions"><a class="pill" href="/docs/getting-started">Get started</a><a class="quiet" href="/docs/why">Why mia</a></p>
 </section>
 
-<section class="words" aria-label="The words mia uses">
-  <p class="eyebrow">The words mia uses</p>
-  <article>
-    <h2>worktree</h2>
-    <div class="entry">
-      <p class="pos">noun</p>
-      <p>A checkout of your repository in a folder of its own, with a name and a tmux session that keeps running when you leave.</p>
-      ${sample("mia new due-dates      # monduli\nmia shell monduli")}
-      <a href="/docs/worktrees">Worktrees</a>
-    </div>
-  </article>
-  <article>
-    <h2>name</h2>
-    <div class="entry">
-      <p class="pos">noun</p>
-      <p>A worktree's own word, the name of a place: monduli, kijenge. Yours first, then mia's. It never changes, and it becomes the hostname.</p>
-      ${sample("names = [\"zanzibar\", \"pemba\"]   # ~/.config/mia/config.toml")}
-      <a href="/docs/worktrees#names">Names</a>
-    </div>
-  </article>
-  <article>
-    <h2>stack</h2>
-    <div class="entry">
-      <p class="pos">noun</p>
-      <p>Several branches sharing one worktree, each built on the one below, each its own pull request.</p>
-      ${sample("mia new schema --stack\nmia new api --stack\nmia stack pr")}
-      <a href="/docs/stacks">Stacks</a>
-    </div>
-  </article>
-  <article>
-    <h2>environment</h2>
-    <div class="entry">
-      <p class="pos">noun</p>
-      <p>A container where a worktree's code runs, opened at its own address, here or on any machine you can ssh to.</p>
-      ${sample("mia env up             # https://monduli.mia:5173\nmia env host build")}
-      <a href="/docs/environments">Environments</a>
-    </div>
-  </article>
-  <article>
-    <h2>plugin</h2>
-    <div class="entry">
-      <p class="pos">noun</p>
-      <p>Any program named <code>mia-&lt;name&gt;</code> that adds verbs, rows, keys and panels. Everything mia does not do itself.</p>
-      ${sample("mia plugin enable agent\nmia agent run monduli")}
-      <a href="/docs/plugins">Plugins</a>
-    </div>
-  </article>
+<section class="words" id="words" aria-labelledby="words-title">
+  <h2 class="eyebrow" id="words-title">The words mia uses</h2>
+  <div class="columns">
+    <details id="environment">
+      <summary>
+        <p class="head"><strong>environment</strong><em>noun</em></p>
+        <p class="sense">A container where a worktree's code runs, opened at its own address, here or on any machine you can ssh to.</p>
+      </summary>
+      <div class="more">
+        ${sample("mia env up             # https://monduli.mia:5173\nmia env host build")}
+        <a href="/docs/environments">Environments</a>
+      </div>
+    </details>
+    <details id="name">
+      <summary>
+        <p class="head"><strong>name</strong><em>noun</em></p>
+        <p class="sense">A worktree's own word, the name of a place: monduli, kijenge. Yours first, then mia's. It never changes, and it becomes the hostname.</p>
+      </summary>
+      <div class="more">
+        ${sample("names = [\"zanzibar\", \"pemba\"]   # ~/.config/mia/config.toml")}
+        <a href="/docs/worktrees#names">Names</a>
+      </div>
+    </details>
+    <details id="plugin">
+      <summary>
+        <p class="head"><strong>plugin</strong><em>noun</em></p>
+        <p class="sense">Any program named <code>mia-&lt;name&gt;</code> that adds verbs, rows, keys and panels. Everything mia does not do itself.</p>
+      </summary>
+      <div class="more">
+        ${sample("mia plugin enable agent\nmia agent run monduli")}
+        <a href="/docs/plugins">Plugins</a>
+      </div>
+    </details>
+    <details id="stack">
+      <summary>
+        <p class="head"><strong>stack</strong><em>noun</em></p>
+        <p class="sense">Several branches sharing one worktree, each built on the one below, each its own pull request.</p>
+      </summary>
+      <div class="more">
+        ${sample("mia new schema --stack\nmia new api --stack\nmia stack pr")}
+        <a href="/docs/stacks">Stacks</a>
+      </div>
+    </details>
+    <details id="worktree">
+      <summary>
+        <p class="head"><strong>worktree</strong><em>noun</em></p>
+        <p class="sense">A checkout of your repository in a folder of its own, with a name and a tmux session that keeps running when you leave.</p>
+      </summary>
+      <div class="more">
+        ${sample("mia new due-dates      # monduli\nmia shell monduli")}
+        <a href="/docs/worktrees">Worktrees</a>
+      </div>
+    </details>
+  </div>
 </section>
 </main>`;
 
