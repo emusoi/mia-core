@@ -3,3 +3,6 @@
 /bin/
 /mia
 /.claude/
+design/*.buni
+design/*.buni.*
+design/.versions/

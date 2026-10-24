@@ -106,3 +106,48 @@ document.addEventListener("keydown", (event) => {
     openSearch();
   }
 });
+
+(() => {
+  const hero = document.querySelector(".front .hero");
+  if (!hero || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.body.classList.add("typed");
+  const keys = [...hero.querySelectorAll("h1, .definition-head, .definition-senses li, .origin")].map((part) => {
+    const out = [];
+    const walk = document.createTreeWalker(part, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walk.nextNode()) nodes.push(walk.currentNode);
+    for (const node of nodes) {
+      const frag = document.createDocumentFragment();
+      for (const ch of node.data) {
+        const k = document.createElement("span");
+        k.className = "k";
+        k.textContent = ch;
+        frag.append(k);
+        out.push(k);
+      }
+      node.replaceWith(frag);
+    }
+    return out;
+  });
+  const cue = hero.querySelector(".cue");
+  let at;
+  const step = (i, j) => {
+    if (i === keys.length) {
+      at?.classList.remove("at");
+      cue?.classList.add("shown");
+      return;
+    }
+    if (j === keys[i].length) return setTimeout(() => step(i + 1, 0), i === 0 ? 400 : 60);
+    at?.classList.remove("at");
+    at = keys[i][j];
+    at.classList.add("shown", "at");
+    setTimeout(() => step(i, j + 1), i === 0 ? 110 : 9);
+  };
+  setTimeout(() => step(0, 0), 600);
+})();
+
+(() => {
+  const open = () => document.getElementById(location.hash.slice(1))?.closest("details")?.setAttribute("open", "");
+  addEventListener("hashchange", open);
+  open();
+})();

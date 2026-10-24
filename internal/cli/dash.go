@@ -15,6 +15,7 @@ import (
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/config"
 	"github.com/emusoi/mia-core/internal/panel"
+	"github.com/emusoi/mia-core/internal/plugin"
 	"github.com/emusoi/mia-core/internal/session"
 	"github.com/emusoi/mia-core/internal/tui"
 
@@ -22,6 +23,12 @@ import (
 )
 
 func cmdDash(a *app.App, args []string) int {
+	if n := takeValue(&args, "--side"); n != "" {
+		if !slices.Contains(tui.SideKeys, n) {
+			return usageErr("mia dash --side <1|2|3|4>")
+		}
+		startSide = n
+	}
 	if take(&args, "--popup") {
 		return popup(a)
 	}
@@ -45,6 +52,27 @@ func cmdDash(a *app.App, args []string) int {
 	return browse(a, name, target, pickTo, switching)
 }
 
+// cmdSide is `mia side N`: one side of the room alone, as the prefix-m
+// menu's small popup shows it.
+func cmdSide(a *app.App, args []string) int {
+	if len(args) != 1 {
+		return usageErr("mia side <1-4|top|left|right|bottom>")
+	}
+	place := args[0]
+	if i := slices.Index(tui.SideKeys, place); i >= 0 {
+		place = plugin.Places[i]
+	}
+	if !slices.Contains(plugin.Places, place) {
+		return usageErr("mia side <1-4|top|left|right|bottom>")
+	}
+	onlySide = place
+	defer startServers(a)()
+	return browse(a, "dashboard", "", "", false)
+}
+
+// onlySide is `mia side`'s side: the dash shows it alone.
+var onlySide string
+
 var doable = []string{"new", "pr", "branch"}
 
 func do(a *app.App, action, pickTo string) int {
@@ -61,6 +89,9 @@ func do(a *app.App, action, pickTo string) int {
 
 var doAction, doHere string
 
+// startSide is --side: the side the dash opens with the cursor in.
+var startSide string
+
 const listingTTL = 10 * time.Second
 
 func browse(a *app.App, name, target, pickTo string, switching bool) int {
@@ -70,6 +101,12 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 	reload := func() (panel.Panel, error) {
 		if name != "dashboard" {
 			return panelNamed(a, name, target)
+		}
+		if onlySide != "" {
+			plugins, _ := enabledPlugins(a)
+			p := panel.Panel{Version: panel.Version, Room: pluginRoom(a, plugins)}
+			p.Bind(a.Config.KeyMap())
+			return p, nil
 		}
 		if cached == nil || time.Since(fetched) > listingTTL {
 			if cfg, err := config.Load(a.MiaDir); err == nil {
@@ -81,7 +118,11 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 			}
 			cached, fetched = listings, time.Now()
 		}
-		p := withChoices(panel.Dashboard(cached, a.Config.Prefix, pluginRows(a, cached)))
+		plugins, _ := enabledPlugins(a)
+		room := make(chan *panel.Room, 1)
+		go func() { room <- pluginRoom(a, plugins) }()
+		p := withChoices(panel.Dashboard(cached, a.Config.Prefix, pluginRows(a, plugins, cached)))
+		p.Room = <-room
 		p.Bind(a.Config.KeyMap())
 		return p, nil
 	}
@@ -90,7 +131,7 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 	hooks.Keep = func(drafts map[string]string) { saveDrafts(a, drafts) }
 	hooks.Switch = switching
 	if name == "dashboard" {
-		hooks.Do, hooks.Here = doAction, doHere
+		hooks.Do, hooks.Here, hooks.Side, hooks.Only = doAction, doHere, startSide, onlySide
 	}
 	if pickTo != "" {
 		hooks.Picks = func(chosen tui.Chosen) bool { return len(chosen.Argv) > 0 && picks(chosen) }
@@ -105,7 +146,9 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 		title = strings.TrimSuffix(name, "-panel") + " / " + target
 	}
 	var open map[string]bool
+	hooks.Save = func(sides tui.SideState) { saveSides(a, sides) }
 	for {
+		hooks.Sides = loadSides(a)
 		chosen, err := tui.Open(title, reload, hooks, open)
 		open = chosen.Open
 		cached = nil
@@ -133,7 +176,7 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 		default:
 			markOpened(a, chosen)
 			perform(chosen)
-			if switching || doAction != "" || landsHere(chosen) {
+			if switching || doAction != "" || onlySide != "" || landsHere(chosen) {
 				return exitOK
 			}
 		}
@@ -255,10 +298,17 @@ func popup(a *app.App) int {
 	}
 	width, height := a.Config.Popup.Size()
 	if err := run.Local("tmux").Interactive("display-popup", "-B", "-E", "-e", "MIA_POPUP=1", "-e", "MIA_TMUX_PANE="+os.Getenv("TMUX_PANE"),
-		"-d", here, "-w", width, "-h", height, self+" dash"); err != nil {
+		"-d", here, "-w", width, "-h", height, run.ShellJoin(dashArgv(self))); err != nil {
 		return fail(err)
 	}
 	return exitOK
+}
+
+func dashArgv(self string) []string {
+	if startSide != "" {
+		return []string{self, "dash", "--side", startSide}
+	}
+	return []string{self, "dash"}
 }
 
 func joinArgs(argv []string) string {
@@ -280,8 +330,15 @@ func hooksFor(a *app.App, name, target string) tui.Hooks {
 			title := fmt.Sprintf(" mia %s — prefix d or exit returns to the list ", strings.Join(chosen.Argv, " "))
 			trace("popup %v", chosen.Argv)
 			width, height := a.Config.Popup.Size()
-			return session.Popup(chosen.Argv, os.Getenv("TMUX_PANE"), title, width, height)
+			var x, y string
+			if at := chosen.Action.Place; at != nil {
+				width, height, x, y = at.Width, at.Height, at.X, at.Y
+			}
+			return session.Popup(chosen.Argv, os.Getenv("TMUX_PANE"), title, width, height, x, y)
 		}
+	}
+	hooks.Show = func(open plugin.Open) error {
+		return session.Show(open.Popup, os.Getenv("TMUX_PANE"), a.Root, open.Title, open.Interactive)
 	}
 	hooks.Load = func(name, target string) (panel.Panel, tui.Reload, tui.Hooks, error) {
 		p, err := panelNamed(a, name, target)
@@ -365,5 +422,26 @@ func saveDrafts(a *app.App, drafts map[string]string) {
 	_ = os.MkdirAll(filepath.Dir(draftsPath(a)), 0o755)
 	if err := os.WriteFile(draftsPath(a), data, 0o600); err != nil {
 		trace("save drafts: %v", err)
+	}
+}
+
+func sidesPath(a *app.App) string { return filepath.Join(a.MiaDir, "dash-sides.json") }
+
+func loadSides(a *app.App) tui.SideState {
+	var sides tui.SideState
+	if data, err := os.ReadFile(sidesPath(a)); err == nil {
+		_ = json.Unmarshal(data, &sides)
+	}
+	return sides
+}
+
+func saveSides(a *app.App, sides tui.SideState) {
+	data, err := json.Marshal(sides)
+	if err != nil {
+		return
+	}
+	_ = os.MkdirAll(a.MiaDir, 0o755)
+	if err := os.WriteFile(sidesPath(a), data, 0o644); err != nil {
+		trace("save sides: %v", err)
 	}
 }

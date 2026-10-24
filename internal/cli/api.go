@@ -110,7 +110,8 @@ func buildPanel(a *app.App, name, target string) (panel.Panel, error) {
 		if err != nil {
 			return panel.Panel{}, err
 		}
-		return withChoices(panel.Dashboard(listings, a.Config.Prefix, pluginRows(a, listings))), nil
+		plugins, _ := enabledPlugins(a)
+		return withChoices(panel.Dashboard(listings, a.Config.Prefix, pluginRows(a, plugins, listings))), nil
 
 	case "env-panel":
 		record, err := a.RecordOrHere(target)

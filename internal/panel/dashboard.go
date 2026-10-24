@@ -518,8 +518,8 @@ func dashboardActions() map[string]Action {
 			Help: "create a worktree for a branch (new or existing), run setup, and go there",
 		},
 		"dev": {
-			Key: "v", Label: "on main's dev server", Verb: "dev", Args: []string{"{row}"}, Report: true,
-			Help: "copy the worktree's files over the main checkout, so its running dev server shows them; v on main gives main its own back",
+			Key: "V", Label: "on main's dev server", Verb: "dev", Args: []string{"{row}"}, Report: true,
+			Help: "copy the worktree's files over the main checkout, so its running dev server shows them; V on main gives main its own back",
 		},
 		"env": {
 			Key: "E", Label: "environment", Panel: "env-panel",
@@ -641,6 +641,11 @@ func addKeys(p *Panel, extras []plugin.Rows, worktrees map[string]app.Listing) [
 			taken[key] = move
 		}
 	}
+	// The room's keys, which the dash takes before any action: v opens the
+	// sides legend, 1–4 select a side (tui.SideKeys).
+	for _, key := range []string{"v", "1", "2", "3", "4"} {
+		taken[key] = "the room's"
+	}
 	for _, name := range slices.Sorted(maps.Keys(p.Actions)) {
 		if key := p.Actions[name].Key; key != "" && taken[key] == "" {
 			taken[key] = name
@@ -652,7 +657,7 @@ func addKeys(p *Panel, extras []plugin.Rows, worktrees map[string]app.Listing) [
 			name := extra.Plugin + "." + key.ID
 			action := Action{
 				Key: key.Key, Label: key.Label, Help: key.Help, Verb: key.Verb, Args: key.Args,
-				Input: key.Input, Confirm: key.Confirm, Report: key.Report, Lands: key.Lands, Popup: key.Popup, Global: key.Global,
+				Input: key.Input, Confirm: key.Confirm, Report: key.Report, Lands: key.Lands, Popup: key.Popup.On, Place: key.Popup.Place, Global: key.Global,
 			}
 			if key.Panel != "" {
 				action.Panel = PluginPanel(extra.Plugin, key.Panel)

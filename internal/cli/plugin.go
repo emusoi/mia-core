@@ -118,9 +118,8 @@ func runPluginVerb(a *app.App, verb string, args []string) (int, bool) {
 	return code, true
 }
 
-func pluginRows(a *app.App, listings []app.Listing) []plugin.Rows {
-	plugins, err := enabledPlugins(a)
-	if err != nil || len(plugins) == 0 {
+func pluginRows(a *app.App, plugins []plugin.Plugin, listings []app.Listing) []plugin.Rows {
+	if len(plugins) == 0 {
 		return nil
 	}
 	input := struct {
@@ -129,6 +128,11 @@ func pluginRows(a *app.App, listings []app.Listing) []plugin.Rows {
 		Worktrees []app.Listing `json:"worktrees"`
 	}{plugin.Protocol, a.Root, listings}
 	return plugin.AllRows(plugins, func(p plugin.Plugin) plugin.Context { return pluginContext(a, p.Name) }, input)
+}
+
+func pluginRoom(a *app.App, plugins []plugin.Plugin) *panel.Room {
+	tabs, corners := plugin.AllSides(plugins, func(p plugin.Plugin) plugin.Context { return pluginContext(a, p.Name) })
+	return &panel.Room{Repo: filepath.Base(a.Root), Sides: tabs, Corners: corners}
 }
 
 func pluginPanel(a *app.App, owner, id, target string) (panel.Panel, error) {

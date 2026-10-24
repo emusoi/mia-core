@@ -44,8 +44,8 @@ func newBackend(t *testing.T, ports ...int) *backend {
 				}
 				return
 			}
-			fmt.Fprintf(w, "port=%d host=%s fwd-host=%s fwd-proto=%s",
-				port, r.Host, r.Header.Get("X-Forwarded-Host"), r.Header.Get("X-Forwarded-Proto"))
+			fmt.Fprintf(w, "port=%d host=%s fwd-host=%s fwd-proto=%s origin=%s",
+				port, r.Host, r.Header.Get("X-Forwarded-Host"), r.Header.Get("X-Forwarded-Proto"), r.Header.Get("Origin"))
 		})}
 		go server.Serve(listener)
 		t.Cleanup(func() { server.Close() })
@@ -115,6 +115,7 @@ func TestLocalhostAliasReachesTheConfiguredPageWithoutBrowserProxySettings(t *te
 	}}
 
 	request := httptest.NewRequest("GET", "http://monduli.localhost:7842/", nil)
+	request.Header.Set("Origin", "http://monduli.localhost:7842")
 	response := httptest.NewRecorder()
 	proxy.ServeHTTP(response, request)
 
@@ -123,6 +124,11 @@ func TestLocalhostAliasReachesTheConfiguredPageWithoutBrowserProxySettings(t *te
 	}
 	if !strings.Contains(response.Body.String(), "port=5173") {
 		t.Fatalf("localhost alias missed the configured page: %s", response.Body.String())
+	}
+	for _, want := range []string{"fwd-proto=http", "fwd-host=monduli.localhost:7842", "origin=http://localhost:5173"} {
+		if !strings.Contains(response.Body.String(), want) {
+			t.Errorf("direct request missing %q: %s", want, response.Body.String())
+		}
 	}
 }
 

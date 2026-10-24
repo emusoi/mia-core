@@ -196,6 +196,48 @@ func TestAKeyNamesAVerbOrAPanelNeverBoth(t *testing.T) {
 	}
 }
 
+func TestAMenuEntryNeedsAKeyALabelAVerbAndAPopup(t *testing.T) {
+	h, dir := host(t)
+	write(t, dir, "nokey", `echo '{"protocol":1,"menu":[{"label":"type","verb":"type","popup":{"width":"80","height":"20"}}]}'`)
+	write(t, dir, "longkey", `echo '{"protocol":1,"menu":[{"key":"yy","label":"type","verb":"type","popup":{"width":"80","height":"20"}}]}'`)
+	write(t, dir, "nosize", `echo '{"protocol":1,"menu":[{"key":"y","label":"type","verb":"type"}]}'`)
+	write(t, dir, "xalone", `echo '{"protocol":1,"menu":[{"key":"y","label":"type","verb":"type","popup":{"width":"80","height":"20","x":"R"}}]}'`)
+	write(t, dir, "fine", `echo '{"protocol":1,"menu":[{"key":"y","label":"type while you wait","verb":"type","popup":{"width":"80","height":"20","x":"R","y":"S"}}]}'`)
+	h.Configured = []string{"nokey", "longkey", "nosize", "xalone", "fine"}
+	all, _ := h.List()
+	for _, p := range all {
+		if (p.Problem == "") != (p.Name == "fine") {
+			t.Errorf("%s: %q", p.Name, p.Problem)
+		}
+		if p.Name == "fine" && (len(p.Manifest.Menu) != 1 || p.Manifest.Menu[0].Popup != Place{Width: "80", Height: "20", X: "R", Y: "S"}) {
+			t.Errorf("menu: %+v", p.Manifest.Menu)
+		}
+	}
+}
+
+func TestAKeysPopupIsTrueOrAPlaceWithASizeAndXAndYTogether(t *testing.T) {
+	h, dir := host(t)
+	write(t, dir, "plain", `echo '{"protocol":1,"keys":[{"id":"t","key":"w","label":"type","verb":"type","popup":true}]}'`)
+	write(t, dir, "placed", `echo '{"protocol":1,"keys":[{"id":"t","key":"w","label":"type","verb":"type","popup":{"width":"80","height":"20","x":"R","y":"S"}}]}'`)
+	write(t, dir, "nosize", `echo '{"protocol":1,"keys":[{"id":"t","key":"w","label":"type","verb":"type","popup":{"x":"R","y":"S"}}]}'`)
+	write(t, dir, "yalone", `echo '{"protocol":1,"keys":[{"id":"t","key":"w","label":"type","verb":"type","popup":{"width":"80","height":"20","y":"S"}}]}'`)
+	h.Configured = []string{"plain", "placed", "nosize", "yalone"}
+	all, _ := h.List()
+	for _, p := range all {
+		fine := p.Name == "plain" || p.Name == "placed"
+		if (p.Problem == "") != fine {
+			t.Errorf("%s: %q", p.Name, p.Problem)
+		}
+		if !fine {
+			continue
+		}
+		popup := p.Manifest.Keys[0].Popup
+		if !popup.On || (popup.Place != nil) != (p.Name == "placed") || p.Name == "placed" && *popup.Place != (Place{Width: "80", Height: "20", X: "R", Y: "S"}) {
+			t.Errorf("%s: %+v", p.Name, popup)
+		}
+	}
+}
+
 func TestAnEventReachesOnlyThePluginsThatWantIt(t *testing.T) {
 	h, dir := host(t)
 	got := filepath.Join(t.TempDir(), "got")

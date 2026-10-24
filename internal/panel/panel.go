@@ -1,6 +1,10 @@
 package panel
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/emusoi/mia-core/internal/plugin"
+)
 
 const Version = 2
 
@@ -15,6 +19,15 @@ type Panel struct {
 	Order    []string            `json:"order,omitempty"`
 	Columns  []Column            `json:"columns,omitempty"`
 	Keys     map[string][]string `json:"keys,omitempty"`
+	Room     *Room               `json:"-"`
+}
+
+// Room is what the dash draws around its box when the terminal has the
+// space: the repository's name and what plugins answered for sides and corners.
+type Room struct {
+	Repo    string
+	Sides   []plugin.SideTab
+	Corners []plugin.CornerText
 }
 
 func (p *Panel) Bind(keys map[string][]string) {
@@ -123,24 +136,25 @@ var keySpellings = map[string][]string{
 }
 
 type Action struct {
-	Key     string   `json:"key"`
-	Label   string   `json:"label"`
-	Verb    string   `json:"verb"`
-	Args    []string `json:"args,omitempty"`
-	Confirm string   `json:"confirm,omitempty"`
-	Retry   []Action `json:"retry,omitempty"`
-	When    string   `json:"when,omitempty"`
-	Input   string   `json:"input,omitempty"`
-	Choices []string `json:"choices,omitempty"`
-	Panel   string   `json:"panel,omitempty"`
-	Report  bool     `json:"report,omitempty"`
-	Lands   bool     `json:"lands,omitempty"`
-	Popup   bool     `json:"popup,omitempty"`
-	Prefill bool     `json:"prefill,omitempty"`
-	Pick    []string `json:"pick,omitempty"`
-	Lines   bool     `json:"lines,omitempty"`
-	Global  bool     `json:"global,omitempty"`
-	Help    string   `json:"help,omitempty"`
+	Key     string        `json:"key"`
+	Label   string        `json:"label"`
+	Verb    string        `json:"verb"`
+	Args    []string      `json:"args,omitempty"`
+	Confirm string        `json:"confirm,omitempty"`
+	Retry   []Action      `json:"retry,omitempty"`
+	When    string        `json:"when,omitempty"`
+	Input   string        `json:"input,omitempty"`
+	Choices []string      `json:"choices,omitempty"`
+	Panel   string        `json:"panel,omitempty"`
+	Report  bool          `json:"report,omitempty"`
+	Lands   bool          `json:"lands,omitempty"`
+	Popup   bool          `json:"popup,omitempty"`
+	Place   *plugin.Place `json:"place,omitempty"` // a plugin key's own popup size and spot
+	Prefill bool          `json:"prefill,omitempty"`
+	Pick    []string      `json:"pick,omitempty"`
+	Lines   bool          `json:"lines,omitempty"`
+	Global  bool          `json:"global,omitempty"`
+	Help    string        `json:"help,omitempty"`
 }
 
 func (a Action) NeedsRow() bool {
@@ -271,7 +285,7 @@ var Moves = map[string][]string{
 	"next": {" "}, "details": {"i"}, "scrollup": {"K"}, "scrolldown": {"J"},
 	"down": {"j", "down"}, "up": {"k", "up"}, "first": {"g", "home"}, "last": {"G", "end"},
 	"pagedown": {"pgdown", "ctrl+d", "ctrl+f"}, "pageup": {"pgup", "ctrl+u", "ctrl+b"},
-	"filter": {"/"}, "help": {"?"}, "popup": {"tab"}, "refresh": {"r"},
-	"tabnext": {"]"}, "tabprev": {"["}, "unfold": {"l", "right"}, "fold": {"h", "left"},
+	"filter": {"/"}, "help": {"?"}, "popup": {"f"}, "refresh": {"r"},
+	"tabnext": {"tab", "]"}, "tabprev": {"shift+tab", "["}, "unfold": {"l", "right"}, "fold": {"h", "left"},
 	"back": {"q", "esc"}, "quit": {"ctrl+c"},
 }

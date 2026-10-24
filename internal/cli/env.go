@@ -22,7 +22,7 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 		return exitOK
 	}
 	sub, rest := args[0], args[1:]
-	var withCredentials, once bool
+	var withCredentials, once, direct bool
 	switch sub {
 	case "status", "ports":
 		asJSON = take(&rest, "--json") || asJSON
@@ -30,6 +30,8 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 		withCredentials = take(&rest, "--credentials")
 	case "shell":
 		once = take(&rest, "--once")
+	case "browse":
+		direct = take(&rest, "--direct")
 	case "run":
 		return envRun(a, rest)
 	}
@@ -204,7 +206,7 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 		return cmdHost(a, manager, record, rest)
 
 	case "browse":
-		return cmdBrowse(manager, record, rest)
+		return cmdBrowse(manager, record, rest, direct)
 
 	case "service":
 		if len(rest) == 0 {
@@ -335,7 +337,7 @@ func isServiceAction(word string) bool {
 	return false
 }
 
-func cmdBrowse(manager env.Manager, record model.Record, rest []string) int {
+func cmdBrowse(manager env.Manager, record model.Record, rest []string, direct bool) int {
 	if err := EnsureGateway(); err != nil {
 		return fail(err)
 	}
@@ -346,8 +348,11 @@ func cmdBrowse(manager env.Manager, record model.Record, rest []string) int {
 
 	port := 0
 	if len(rest) > 0 {
+		if len(rest) > 1 {
+			return usageErr("mia env browse [--direct] [worktree] [port]")
+		}
 		if _, err := fmt.Sscan(rest[0], &port); err != nil || port <= 0 {
-			return usageErr("mia env browse [worktree] [port]")
+			return usageErr("mia env browse [--direct] [worktree] [port]")
 		}
 	} else {
 		port = choosePort(ports)
@@ -358,6 +363,12 @@ func cmdBrowse(manager env.Manager, record model.Record, rest []string) int {
 	}
 
 	url := fmt.Sprintf("https://%s%s:%d/", record.Name, gateway.Suffix, port)
+	if direct {
+		if port != choosePort(ports) {
+			return fail(fmt.Errorf("direct browsing opens the configured page; use HTTPS to choose another port"))
+		}
+		url = fmt.Sprintf("http://%s.localhost:%d/", record.Name, gateway.Port)
+	}
 	fmt.Println(url)
 	if _, err := run.Local("open").Combined(url); err != nil {
 		fmt.Fprintf(os.Stderr, "mia: could not open a browser (%v)\n", err)

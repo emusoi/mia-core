@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -36,6 +37,44 @@ type Manifest struct {
 	Keys     []Key     `json:"keys,omitempty"`
 	Events   []string  `json:"events,omitempty"`
 	Serve    bool      `json:"serve,omitempty"`
+	Sides    []Side    `json:"sides,omitempty"`
+	Corners  []Corner  `json:"corners,omitempty"`
+	Menu     []Entry   `json:"menu,omitempty"`
+}
+
+// Entry is one line of the tmux prefix-m menu `mia help tmux` prints:
+// key opens `mia <verb> [args]` in a width×height popup.
+type Entry struct {
+	Key   string   `json:"key"`
+	Label string   `json:"label"`
+	Verb  string   `json:"verb"`
+	Args  []string `json:"args,omitempty"`
+	Popup Place    `json:"popup"`
+}
+
+// Place is a plugin popup's size, in cells or a percentage, and where it
+// sits: x and y as tmux display-popup -x and -y take them ("R", "S", "C",
+// a number), centered when left out.
+type Place struct {
+	Width  string `json:"width"`
+	Height string `json:"height"`
+	X      string `json:"x,omitempty"`
+	Y      string `json:"y,omitempty"`
+}
+
+// KeyPopup is a key's "popup": true opens it in the dashboard's popup,
+// a Place opens it in that one.
+type KeyPopup struct {
+	On    bool
+	Place *Place
+}
+
+func (p *KeyPopup) UnmarshalJSON(raw []byte) error {
+	if json.Unmarshal(raw, &p.On) == nil {
+		return nil
+	}
+	p.On, p.Place = true, &Place{}
+	return json.Unmarshal(raw, p.Place)
 }
 
 type Tab struct {
@@ -55,7 +94,7 @@ type Key struct {
 	Confirm string   `json:"confirm,omitempty"`
 	Report  bool     `json:"report,omitempty"`
 	Lands   bool     `json:"lands,omitempty"`
-	Popup   bool     `json:"popup,omitempty"`
+	Popup   KeyPopup `json:"popup,omitempty"`
 	Global  bool     `json:"global,omitempty"`
 }
 
@@ -220,9 +259,34 @@ func ReadManifest(path string) (Manifest, error) {
 		if key.ID == "" || (key.Verb == "") == (key.Panel == "") {
 			return Manifest{}, fmt.Errorf("key %q needs an id and exactly one of verb or panel", key.Label)
 		}
+		if key.Popup.Place != nil && (key.Popup.Place.Width == "" || key.Popup.Place.Height == "" || (key.Popup.Place.X == "") != (key.Popup.Place.Y == "")) {
+			return Manifest{}, fmt.Errorf("key %q needs a popup width and height, and x and y together or neither", key.Label)
+		}
+	}
+	for _, entry := range m.Menu {
+		if utf8.RuneCountInString(entry.Key) != 1 || entry.Label == "" || entry.Verb == "" || entry.Popup.Width == "" || entry.Popup.Height == "" ||
+			(entry.Popup.X == "") != (entry.Popup.Y == "") {
+			return Manifest{}, fmt.Errorf("menu entry %q needs a one-character key, a label, a verb and a popup width and height, and x and y together or neither", entry.Label)
+		}
 	}
 	if m.Rows != nil {
 		if _, err := m.Rows.Interval(); err != nil {
+			return Manifest{}, err
+		}
+	}
+	for _, side := range m.Sides {
+		if side.ID == "" || !slices.Contains(Places, side.Where) {
+			return Manifest{}, fmt.Errorf("side %q needs an id and a side of %s", side.Label, strings.Join(Places, ", "))
+		}
+		if _, err := side.Interval(); err != nil {
+			return Manifest{}, err
+		}
+	}
+	for _, corner := range m.Corners {
+		if corner.ID == "" || !slices.Contains(Ats, corner.At) {
+			return Manifest{}, fmt.Errorf("corner %q needs an id and an at of %s", corner.ID, strings.Join(Ats, ", "))
+		}
+		if _, err := corner.Interval(); err != nil {
 			return Manifest{}, err
 		}
 	}

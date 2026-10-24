@@ -14,6 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/emusoi/mia-core/internal/panel"
+	"github.com/emusoi/mia-core/internal/plugin"
 )
 
 var (
@@ -62,6 +63,11 @@ type Hooks struct {
 	Do      string
 	Here    string
 	Watch   func(nudge func())
+	Sides   SideState
+	Save    func(SideState)
+	Show    func(plugin.Open) error
+	Side    string // a SideKeys digit: open with the cursor in that side
+	Only    string // a plugin.Places side: show that side alone, as `mia side` does
 }
 
 type nudged struct{}
@@ -121,6 +127,7 @@ type model struct {
 	stale    bool
 	scroll   int
 	fill     bool
+	inPopup  bool
 	picking  bool
 	pickCol  int
 	pick     [3]string
@@ -128,6 +135,10 @@ type model struct {
 	made     string
 	choice   string
 	details  bool
+	sides    SideState
+	legend   bool
+	sideSel  string
+	sideRow  int
 	stack    []model
 }
 
@@ -153,6 +164,11 @@ type viewDone struct{ err error }
 
 type spinTick struct{}
 
+// landing lands in a worktree once its window has been selected.
+type landing struct{ chosen Chosen }
+
+type showFailed struct{ err error }
+
 type performed struct {
 	chosen  Chosen
 	outcome Outcome
@@ -177,11 +193,13 @@ func Open(title string, reload Reload, hooks Hooks, open map[string]bool) (Chose
 	m := newModel(panel.Panel{Version: panel.Version, Title: title})
 	m.reload = reload
 	m.hooks = hooks
+	m.sides = hooks.Sides
 	for id, isOpen := range open {
 		m.expanded[id] = isOpen
 	}
 	m.mode, m.label = working, loadingLabel
-	m.fill = os.Getenv("MIA_POPUP") != ""
+	m.inPopup = os.Getenv("MIA_POPUP") != ""
+	m.fill = m.inPopup
 	return run(m)
 }
 
@@ -415,11 +433,27 @@ func (m model) matchesOne(row panel.Row) bool {
 func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(message)
 	m = next.(model)
+	m.fill = m.inPopup && !m.unfilled().roomed()
+	if m.hooks.Side != "" && m.panel.Room != nil && m.width > 0 {
+		m = m.sideKey(m.hooks.Side)
+		m.hooks.Side = ""
+	}
+	if m.hooks.Only != "" && m.panel.Room != nil && m.sideSel == "" {
+		m.sideSel = m.hooks.Only
+		m.sideRow = m.nextItem(-1, 1)
+	}
 	if !m.peeking && m.mode == browsing && m.peekCmd() != nil {
 		m.peeking = true
 		cmd = tea.Batch(cmd, m.nextPeek())
 	}
 	return m, cmd
+}
+
+// unfilled is the dash as a popup draws it while the room fits: today's
+// box, not one filling the popup.
+func (m model) unfilled() model {
+	m.fill = false
+	return m
 }
 
 func (m model) update(message tea.Msg) (tea.Model, tea.Cmd) {
@@ -619,6 +653,13 @@ func (m model) update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, again
 
+	case landing:
+		return m.start(msg.chosen)
+
+	case showFailed:
+		m.problem = msg.err.Error()
+		return m, nil
+
 	case loaded:
 		m.mode, m.label = browsing, ""
 		if msg.err != nil {
@@ -686,6 +727,43 @@ func (m model) start(chosen Chosen) (tea.Model, tea.Cmd) {
 		func() tea.Msg { return performed{chosen: chosen, outcome: perform(chosen)} },
 		tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg { return spinTick{} }),
 	)
+}
+
+// openSide runs the action of the side's line under the cursor: a command
+// in a tmux popup, the plugin's verb, or landing in a worktree[:window].
+func (m model) openSide() (tea.Model, tea.Cmd) {
+	open := m.openItem()
+	switch {
+	case open == nil:
+		return m, nil
+	case len(open.Popup) > 0:
+		show := m.hooks.Show
+		if show == nil {
+			m.problem = "a popup needs tmux"
+			return m, nil
+		}
+		item := *open
+		return m, func() tea.Msg {
+			if err := show(item); err != nil {
+				return showFailed{err}
+			}
+			return nil
+		}
+	case open.Verb != "":
+		return m.start(Chosen{Argv: append([]string{open.Verb}, open.Args...),
+			Action: panel.Action{Verb: open.Verb, Args: open.Args, Report: open.Report}})
+	}
+	worktree, window, _ := strings.Cut(open.Lands, ":")
+	land := Chosen{Argv: []string{"shell", worktree}, RowID: worktree,
+		Action: panel.Action{Lands: true, Verb: "shell", Args: []string{worktree}}}
+	if window == "" || m.hooks.Perform == nil {
+		return m.start(land)
+	}
+	perform := m.hooks.Perform
+	return m, func() tea.Msg {
+		perform(Chosen{Argv: []string{"window", "select", worktree, window}})
+		return landing{land}
+	}
 }
 
 func (m model) open(name, target string) (tea.Model, tea.Cmd) {
@@ -934,11 +1012,33 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.key(msg)
 	}
 
-	if len(key) == 1 && key[0] >= '1' && key[0] <= '9' {
-		if n := int(key[0] - '1'); n < len(m.tabs()) {
-			m.tab = n
-		}
+	if m.hooks.Only != "" {
+		return m.widgetKey(key)
+	}
+	if m.legend && key != "ctrl+c" {
+		return m.legendKey(key), nil
+	}
+	if key == "v" && m.roomed() {
+		m.legend = true
 		return m, nil
+	}
+	if slices.Contains(SideKeys, key) && m.roomed() {
+		return m.sideKey(key), nil
+	}
+	if m.sideSel != "" {
+		switch {
+		case key == "esc":
+			m.sideSel = ""
+			return m, nil
+		case key == "enter":
+			return m.openSide()
+		case m.nav(key) == "down":
+			m.sideRow = m.nextItem(m.sideRow, 1)
+			return m, nil
+		case m.nav(key) == "up":
+			m.sideRow = m.nextItem(m.sideRow, -1)
+			return m, nil
+		}
 	}
 	name := m.nav(key)
 	if name != "scrollup" && name != "scrolldown" && name != "" && name != "help" {
@@ -1009,6 +1109,13 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "tabnext", "tabprev":
+		// [ and ] stay the detail pane's even while a side is selected.
+		if m.sideSel != "" && key != "[" && key != "]" {
+			if name == "tabnext" {
+				return m.cycleSide(1), nil
+			}
+			return m.cycleSide(-1), nil
+		}
 		tabs := m.tabs()
 		if len(tabs) > 1 {
 			if name == "tabnext" {
@@ -1897,6 +2004,17 @@ func (m model) problemLines() []string {
 }
 
 func (m model) View() string {
+	if m.hooks.Only != "" {
+		return m.widget()
+	}
+	boxed := m.boxed()
+	if room, ok := m.room(boxed); ok {
+		return room
+	}
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, boxed)
+}
+
+func (m model) boxed() string {
 	lines, _ := m.body()
 	if m.loading() {
 		lines = m.loadingMark()
@@ -1991,21 +2109,30 @@ func (m model) View() string {
 			if pad := m.sideWidth() - lipgloss.Width(extra); pad > 0 {
 				extra += strings.Repeat(" ", pad)
 			}
-			line += " " + bar + " " + dimmed.Render("│") + "  " + extra
+			line += " " + bar + " " + m.border().Render("│") + "  " + extra
 		} else {
 			line += " " + bar + " "
 		}
-		b.WriteString(dimmed.Render("│") + "  " + line + " " + dimmed.Render("│") + "\n")
+		b.WriteString(m.border().Render("│") + "  " + line + " " + m.border().Render("│") + "\n")
 	}
 	for _, part := range m.problemLines() {
 		line := "    " + problem.Render(part)
 		if pad := m.boxWidth() - 2 - lipgloss.Width(line); pad > 0 {
 			line += strings.Repeat(" ", pad)
 		}
-		b.WriteString(dimmed.Render("│") + line + dimmed.Render("│") + "\n")
+		b.WriteString(m.border().Render("│") + line + m.border().Render("│") + "\n")
 	}
 	b.WriteString(m.frameBottom())
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, b.String())
+	return b.String()
+}
+
+// border is the box's frame: bright-black while a side of the room is
+// selected, so the box reads as not the active one.
+func (m model) border() lipgloss.Style {
+	if m.sideSel != "" {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	}
+	return dimmed
 }
 
 func (m model) frameTop() string {
@@ -2015,7 +2142,7 @@ func (m model) frameTop() string {
 	} else if m.doTitle != "" {
 		name = m.doTitle
 	}
-	left := dimmed.Render("╭── ") + strong.Render(name) + " "
+	left := m.border().Render("╭── ") + strong.Render(name) + " "
 	if m.query != "" {
 		left += dimmed.Render("/ ") + m.query + " "
 	}
@@ -2027,21 +2154,21 @@ func (m model) frameTop() string {
 	if fill < 0 {
 		right, fill = "", m.boxWidth()-lipgloss.Width(left)-2
 	}
-	return left + dimmed.Render(strings.Repeat("─", max(fill, 0))) + right + dimmed.Render("─╮")
+	return left + m.border().Render(strings.Repeat("─", max(fill, 0))) + right + m.border().Render("─╮")
 }
 
 func (m model) frameBottom() string {
 	footer := strings.TrimLeft(m.footer(), " ")
-	left := dimmed.Render("╰── ") + footer + " "
+	left := m.border().Render("╰── ") + footer + " "
 	if footer == "" {
-		left = dimmed.Render("╰")
+		left = m.border().Render("╰")
 	}
 	fill := m.boxWidth() - lipgloss.Width(left) - 1
 	if fill < 0 {
-		left = dimmed.Render("╰── ") + fit(footer, m.boxWidth()-6) + " "
+		left = m.border().Render("╰── ") + fit(footer, m.boxWidth()-6) + " "
 		fill = m.boxWidth() - lipgloss.Width(left) - 1
 	}
-	return left + dimmed.Render(strings.Repeat("─", max(fill, 0))+"╯")
+	return left + m.border().Render(strings.Repeat("─", max(fill, 0))+"╯")
 }
 
 func (m model) footer() string {
@@ -2205,7 +2332,8 @@ func (m model) help() []string {
 		entry("space", "next", "the next row that needs you: uncommitted, or flagged by a plugin"),
 		entry("K J", "scroll the side pane", "up and down the tab showing"),
 		entry(m.shown("details"), "details", "the side pane full screen · i or esc returns"),
-		entry(m.shown("tabprev", "tabnext"), "side tab", "or a digit · plugin tabs, facts, blocks"),
+		entry(m.shown("tabprev", "tabnext"), "tabs", "the selected side's, else the side pane's · [ ] the side pane's"),
+		entry("1–4", "into a side", "of the room: top, left, right, bottom · j k move, ⏎ opens, again or esc back"),
 		entry("⏎ "+m.shown("unfold", "fold"), "unfold, fold", "a stack row · "+m.shown("fold")+" on a layer returns to its stack"),
 		entry(m.shown("popup"), "popup", "the tab's thing in a tmux popup over the list · prefix d returns"),
 		entry(m.shown("refresh"), "refresh", "now; the list also refreshes itself"),

@@ -24,6 +24,7 @@ mia new due-dates          # a worktree named for you, e.g. monduli
 mia shell monduli          # its tmux session
 mia dash                   # every worktree, and the keys to act on them
 mia env up                 # its container, at https://monduli.mia:<port>
+mia env browse --direct    # open its page; no proxy or certificate setup
 mia new api --stack        # a branch on top of this one, same worktree
 ```
 

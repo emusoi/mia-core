@@ -131,7 +131,9 @@ func (h Host) AttachWindow(worktree, window string) error {
 	return h.Attach(worktree)
 }
 
-func Popup(argv []string, beside, title, width, height string) error {
+// Popup runs mia argv in a width×height tmux popup over the pane beside,
+// at x and y when given (display-popup -x/-y), else centered.
+func Popup(argv []string, beside, title, width, height, x, y string) error {
 	if beside == "" {
 		return fmt.Errorf("a popup needs tmux — ⏎ lands there instead")
 	}
@@ -145,11 +147,38 @@ func Popup(argv []string, beside, title, width, height string) error {
 		return err
 	}
 	defer os.Remove(script)
-	out, err := run.Local("tmux").Combined("display-popup", "-E", "-t", beside, "-w", width, "-h", height, "-T", title, script)
+	args := []string{"display-popup", "-E", "-t", beside, "-w", width, "-h", height}
+	if x != "" {
+		args = append(args, "-x", x, "-y", y)
+	}
+	out, err := run.Local("tmux").Combined(append(args, "-T", title, script)...)
 	if err != nil {
 		return fmt.Errorf("popup: %s", strings.TrimSpace(string(out)))
 	}
 	return nil
+}
+
+// Show runs a plugin's command in a tmux popup over the pane beside, in
+// dir: 110×16, centered, a green rounded border with the title in it.
+// Its output goes through a pager unless the command is interactive.
+func Show(argv []string, beside, dir, title string, interactive bool) error {
+	if beside == "" {
+		return fmt.Errorf("a popup needs tmux")
+	}
+	out, err := run.Local("tmux").Combined(showArgs(argv, beside, dir, title, interactive)...)
+	if err != nil {
+		return fmt.Errorf("popup: %s", strings.TrimSpace(out))
+	}
+	return nil
+}
+
+func showArgs(argv []string, beside, dir, title string, interactive bool) []string {
+	command := run.ShellJoin(argv)
+	if !interactive {
+		command += ` 2>&1 | less -R -P' q close'`
+	}
+	return []string{"display-popup", "-E", "-t", beside, "-d", dir, "-x", "C", "-y", "C", "-w", "110", "-h", "16",
+		"-b", "rounded", "-S", "fg=green", "-T", title, command}
 }
 
 func (h Host) CloseHover(beside string) {
