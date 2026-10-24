@@ -10,7 +10,7 @@ import (
 )
 
 func (m Manager) fingerprint(record model.Record, where Location, image Image) string {
-	name := ContainerName(Sanitise(record.Name))
+	name := m.ContainerName(record)
 	volumes := m.privateVolumes(record, where, name)
 	caches, _ := m.cacheVolumes()
 	maps.Copy(volumes, caches)
@@ -26,10 +26,13 @@ func (m Manager) fingerprint(record model.Record, where Location, image Image) s
 }
 
 func (m Manager) drift(record model.Record, where Location, image Image, state string) (bool, error) {
+	if m.Settings.Compose.Enabled() {
+		return false, nil
+	}
 	if state == "" {
 		return false, nil
 	}
-	name := ContainerName(Sanitise(record.Name))
+	name := m.ContainerName(record)
 	recorded, err := where.Engine.Label(name, ConfigLabel)
 	if err != nil {
 		return false, err
@@ -38,11 +41,14 @@ func (m Manager) drift(record model.Record, where Location, image Image, state s
 }
 
 func (m Manager) Drift(record model.Record) (bool, error) {
+	if m.Settings.Compose.Enabled() {
+		return false, nil
+	}
 	where, err := m.Where(record)
 	if err != nil {
 		return false, err
 	}
 	image, _ := m.imageFor(where, record)
-	name := ContainerName(Sanitise(record.Name))
+	name := m.ContainerName(record)
 	return m.drift(record, where, image, where.Engine.State(name))
 }

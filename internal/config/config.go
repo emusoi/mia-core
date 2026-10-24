@@ -143,6 +143,19 @@ func (c Config) Validate() error {
 			return fmt.Errorf("names: %q is not a usable name — lowercase letters, digits and hyphens only, since a name becomes a hostname and a tmux session", name)
 		}
 	}
+	if err := c.Env.Compose.Validate(); err != nil {
+		return err
+	}
+	if c.Env.Compose.Enabled() {
+		switch {
+		case c.Env.Image != "" || len(c.Env.ImageSetup) > 0:
+			return fmt.Errorf("env.compose owns images; remove env.image and env.image_setup")
+		case len(c.Env.ContainerOnly) > 0 || len(c.Env.Cache) > 0:
+			return fmt.Errorf("env.compose owns volumes; remove env.container_only and env.cache")
+		case len(c.Env.Pass) > 0:
+			return fmt.Errorf("env.compose owns service environment; remove env.pass and use the compose file")
+		}
+	}
 	seen := map[string]bool{}
 	if c.Env.Session != "" && c.Env.Session != "local" && c.Env.Session != "runtime" {
 		return fmt.Errorf("env.session is \"local\" or \"runtime\", not %q", c.Env.Session)

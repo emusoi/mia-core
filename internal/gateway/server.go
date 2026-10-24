@@ -164,7 +164,8 @@ func buildRoutes() Table {
 		if !ok {
 			continue
 		}
-		containerName := env.ContainerName(env.Sanitise(record.Name))
+		settings := environmentSettings(owner)
+		containerName := env.ContainerNameFor(record, settings)
 		up, asked := running[where.Engine]
 		if !asked {
 			up = where.Engine.Running()
@@ -174,7 +175,6 @@ func buildRoutes() Table {
 			continue
 		}
 		engine := where.Engine
-		settings := environmentSettings(owner)
 		table[name+Suffix] = Route{
 			Host: name + Suffix,
 			Name: name,

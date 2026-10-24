@@ -39,6 +39,8 @@ type Settings struct {
 	SyncIgnore []string `toml:"sync_ignore" json:"sync_ignore,omitempty"`
 
 	SyncSecrets bool `toml:"sync_secrets" json:"sync_secrets,omitempty"`
+
+	Compose ComposeSettings `toml:"compose" json:"compose"`
 }
 
 type Environment struct {
@@ -93,7 +95,7 @@ func (m Manager) Describe(record model.Record) Environment {
 }
 
 func (m Manager) describe(record model.Record, where Location, whereErr error) (Environment, error) {
-	name := ContainerName(Sanitise(record.Name))
+	name := m.ContainerName(record)
 	e := Environment{
 		Worktree:  record.Path,
 		Name:      record.Name,
@@ -105,12 +107,20 @@ func (m Manager) describe(record model.Record, where Location, whereErr error) (
 		e.Machine = machine
 	}
 	if whereErr != nil {
-		e.Image = DiscoverImage(record.Path, m.Settings.Image)
+		if m.Settings.Compose.Enabled() {
+			e.Image = Image{Ref: m.Settings.Compose.File, Source: FromCompose}
+		} else {
+			e.Image = DiscoverImage(record.Path, m.Settings.Image)
+		}
 		e.Mirror = whereErr.Error()
 		e.Error = whereErr.Error()
 		return e, whereErr
 	}
-	e.Image, _ = m.imageFor(where, record)
+	if m.Settings.Compose.Enabled() {
+		e.Image = Image{Ref: m.Settings.Compose.File, Source: FromCompose}
+	} else {
+		e.Image, _ = m.imageFor(where, record)
+	}
 	if where.Remote() {
 		e.Machine = where.Machine.Name
 		if session, found, err := where.Mirror.Status(record.Name); err != nil {
@@ -145,8 +155,7 @@ func (m Manager) Up(record model.Record, out *os.File, recreate bool) (Environme
 	if err := where.Engine.Ready(); err != nil {
 		return Environment{}, err
 	}
-	name := ContainerName(Sanitise(record.Name))
-	image, _ := m.imageFor(where, record)
+	name := m.ContainerName(record)
 
 	if where.Remote() {
 		fmt.Fprintf(out, "staging %s on %s\n", record.Name, where.Machine.Name)
@@ -186,12 +195,30 @@ func (m Manager) Up(record model.Record, out *os.File, recreate bool) (Environme
 		}
 	}
 
+	compose, err := m.composeFor(record, where)
+	if err != nil {
+		return Environment{}, err
+	}
+	var image Image
+	if compose != nil {
+		name = compose.Container
+		record = withComposeContainer(record, name)
+	} else {
+		image, _ = m.imageFor(where, record)
+	}
+
 	state := where.Engine.State(name)
 	changed, err := m.drift(record, where, image, state)
 	if err != nil {
 		return m.Describe(record), fmt.Errorf("read the environment's configuration: %w", err)
 	}
-	if recreate && state != "" {
+	if recreate && compose != nil {
+		fmt.Fprintf(out, "recreating %s; compose volumes and sync are kept\n", record.Name)
+		if err := where.Engine.ComposeRemove(compose.Project, compose.File); err != nil {
+			return m.Describe(record), err
+		}
+		state = ""
+	} else if recreate && state != "" {
 		fmt.Fprintf(out, "recreating %s; its volumes and sync are kept\n", record.Name)
 		if err := where.Engine.Remove(name); err != nil {
 			return m.Describe(record), err
@@ -202,21 +229,38 @@ func (m Manager) Up(record model.Record, out *os.File, recreate bool) (Environme
 	}
 
 	fresh := state == ""
-	if fresh && !where.Engine.HasImage(image.Ref) {
+	if compose == nil && fresh && !where.Engine.HasImage(image.Ref) {
 		fmt.Fprintf(out, "pulling %s (%s)\n", image.Ref, image.Source)
 		if err := where.Engine.Pull(image.Ref); err != nil {
 			return Environment{}, err
 		}
 	}
 
-	volumes := m.privateVolumes(record, where, name)
-	caches, notAbsolute := m.cacheVolumes()
-	for _, dir := range notAbsolute {
-		fmt.Fprintf(out, "⚠ [env] cache %q is not an absolute path inside the container — skipped\n", dir)
+	volumes := map[string]string{}
+	if compose == nil {
+		volumes = m.privateVolumes(record, where, name)
+		caches, notAbsolute := m.cacheVolumes()
+		for _, dir := range notAbsolute {
+			fmt.Fprintf(out, "⚠ [env] cache %q is not an absolute path inside the container — skipped\n", dir)
+		}
+		maps.Copy(volumes, caches)
 	}
-	maps.Copy(volumes, caches)
 
-	if err := where.Engine.Start(container.Spec{
+	if compose != nil {
+		if err := where.Engine.ComposeUp(compose.Project, compose.File); err != nil {
+			return Environment{}, err
+		}
+		id, err := where.Engine.ComposeID(compose.Project, compose.File, compose.Service)
+		if err != nil {
+			return Environment{}, err
+		}
+		if id == "" {
+			return Environment{}, fmt.Errorf("compose service %s did not create a container", compose.Service)
+		}
+		compose.Container = id
+		name = id
+		record = withComposeContainer(record, id)
+	} else if err := where.Engine.Start(container.Spec{
 		Name:    name,
 		Image:   image.Ref,
 		Mount:   where.Dir,
@@ -261,7 +305,14 @@ func (m Manager) Down(record model.Record) error {
 	if err != nil {
 		return err
 	}
-	return where.Engine.Stop(ContainerName(Sanitise(record.Name)))
+	compose, err := m.composeFor(record, where)
+	if err != nil {
+		return err
+	}
+	if compose != nil {
+		return where.Engine.ComposeStop(compose.Project, compose.File)
+	}
+	return where.Engine.Stop(m.ContainerName(record))
 }
 
 func (m Manager) Remove(record model.Record) error {
@@ -269,7 +320,20 @@ func (m Manager) Remove(record model.Record) error {
 	if err != nil {
 		return err
 	}
-	name := ContainerName(Sanitise(record.Name))
+	name := m.ContainerName(record)
+	compose, err := m.composeFor(record, where)
+	if err != nil {
+		return err
+	}
+	if compose != nil {
+		if err := where.Engine.ComposeRemove(compose.Project, compose.File); err != nil {
+			return err
+		}
+		if where.Remote() {
+			return where.Mirror.Terminate(record.Name)
+		}
+		return nil
+	}
 	volumes := m.privateVolumes(record, where, name)
 	if err := where.Engine.Remove(name); err != nil {
 		return err
@@ -403,7 +467,7 @@ func (m Manager) running(record model.Record) (Location, string, error) {
 	if err != nil {
 		return Location{}, "", err
 	}
-	name := ContainerName(Sanitise(record.Name))
+	name := m.ContainerName(record)
 	if where.Engine.State(name) != "running" {
 		return Location{}, "", fmt.Errorf("%s has no environment running — `mia env up %s`", record.Name, record.Name)
 	}
@@ -422,7 +486,7 @@ func (m Manager) PortsOf(record model.Record) (Ports, error) {
 	if err != nil {
 		return ports, err
 	}
-	name := ContainerName(Sanitise(record.Name))
+	name := m.ContainerName(record)
 	if where.Engine.State(name) != "running" {
 		return ports, nil
 	}
@@ -437,7 +501,7 @@ func (m Manager) PortsOf(record model.Record) (Ports, error) {
 func (m Manager) Check(record model.Record, argv []string) (exit int, output string, where string) {
 	location, err := m.Where(record)
 	if err == nil {
-		name := ContainerName(Sanitise(record.Name))
+		name := m.ContainerName(record)
 		if location.Engine.State(name) == "running" {
 			exit, out := location.Engine.ExecStatus(name, location.Dir, []string{"sh", "-c", shellJoin(argv)})
 			return exit, out, "inside " + record.Name
