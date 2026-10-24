@@ -12,4 +12,5 @@
 | [The dashboard](dashboard.md) | the list and its keys |
 | [Configuration](configuration.md) | every setting |
 | [Commands](commands.md) | every command |
+| [Automation](api.md) | JSON, capabilities and exit status |
 | [Plugins](plugins.md) | adding commands and dashboard rows |

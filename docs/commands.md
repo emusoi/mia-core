@@ -58,6 +58,7 @@
 | `mia plugin ls\|enable\|disable` | plugins |
 | `mia doctor` | check tools, config, gateway, machines, plugins and environment drift |
 | `mia api <query>` | state as JSON |
+| `mia api capabilities` | API version, queries and feature markers |
 | `mia help vocabulary` | the words |
 | `mia help tmux` | tmux key bindings and the prefix-m menu, with the room's sides and plugins' entries |
 

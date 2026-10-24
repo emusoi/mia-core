@@ -43,6 +43,8 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 		follow = take(&rest, "--follow") || take(&rest, "-f")
 	case "sync":
 		asJSON = take(&rest, "--json") || asJSON
+	case "host":
+		asJSON = take(&rest, "--json") || asJSON
 	case "run":
 		return envRun(a, rest)
 	}
@@ -256,10 +258,7 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 		if len(rest) == 0 {
 			return usageErr("mia env exec <worktree> <command...>")
 		}
-		if err := manager.Exec(record, rest); err != nil {
-			return fail(err)
-		}
-		return exitOK
+		return exitFor(manager.Exec(record, rest))
 
 	case "ports":
 		ports, err := manager.PortsOf(record)
@@ -296,7 +295,7 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 		return exitOK
 
 	case "host":
-		return cmdHost(a, manager, record, rest)
+		return cmdHost(a, manager, record, rest, asJSON)
 
 	case "browse":
 		return cmdBrowse(manager, record, rest, direct)
@@ -494,11 +493,28 @@ func choosePort(ports env.Ports) int {
 	return 0
 }
 
-func cmdHost(a *app.App, manager env.Manager, record model.Record, rest []string) int {
+type hostReport struct {
+	Worktree string `json:"worktree"`
+	Machine  string `json:"machine"`
+	Staging  string `json:"staging,omitempty"`
+}
+
+func hostReportOf(record model.Record, where env.Location) hostReport {
+	report := hostReport{Worktree: record.Name, Machine: env.Placement(record).String()}
+	if where.Remote() {
+		report.Staging = where.Dir
+	}
+	return report
+}
+
+func cmdHost(a *app.App, manager env.Manager, record model.Record, rest []string, asJSON bool) int {
 	if len(rest) == 0 {
 		where, err := manager.Where(record)
 		if err != nil {
 			return fail(err)
+		}
+		if asJSON {
+			return emit(hostReportOf(record, where))
 		}
 		fmt.Println(env.Placement(record).String())
 		if where.Remote() {
@@ -528,6 +544,13 @@ func cmdHost(a *app.App, manager env.Manager, record model.Record, rest []string
 	}
 	if record, err = a.Host(record, machine); err != nil {
 		return fail(fmt.Errorf("the old environment was removed but placement is unchanged: %w", err))
+	}
+	if asJSON {
+		where, err := manager.Where(record)
+		if err != nil {
+			return fail(err)
+		}
+		return emit(hostReportOf(record, where))
 	}
 	fmt.Printf("%s will run on %s — `mia env up %s`\n", record.Name, machine.Name, record.Name)
 	return exitOK

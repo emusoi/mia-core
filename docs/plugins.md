@@ -125,6 +125,15 @@ together, place it as tmux `display-popup -x`/`-y` do; without them it is
 centered. An entry whose key is
 already a core entry's is left out, and `mia help tmux` says so.
 
+## Name collisions
+
+Each verb must be one non-empty word and unique inside a plugin. If two
+enabled plugins declare the same verb, `mia <verb>` is refused until all but
+one are disabled. Declaring a core command's name is also reported. Check
+with `mia plugin ls` or `mia doctor`; neither silently picks an owner.
+Dashboard key clashes are separate: they are shown on the dashboard and can
+be rebound with `[keys]`.
+
 ## Events
 
 `mia-<name> event <event>` runs in the background with the event on stdin:

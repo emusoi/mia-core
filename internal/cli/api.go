@@ -23,6 +23,9 @@ func cmdAPI(a *app.App, args []string) int {
 		target = args[1]
 	}
 	switch args[0] {
+	case "capabilities":
+		return emit(apiCapabilities())
+
 	case "worktrees":
 		listings, err := a.List(args[1:]...)
 		if err != nil {
@@ -81,7 +84,31 @@ func cmdAPI(a *app.App, args []string) int {
 	}
 }
 
-const apiQueries = "worktrees|dashboard|env-panel|stack-panel|blocks-panel|machines-panel|plugin:<name>:<panel>|env|stack|base"
+var apiQueryList = []string{
+	"capabilities", "worktrees", "dashboard", "env-panel", "stack-panel", "blocks-panel", "machines-panel",
+	"plugin:<name>:<panel>", "env", "stack", "base",
+}
+
+var apiQueries = strings.Join(apiQueryList, "|")
+
+const apiVersion = 1
+
+type capabilities struct {
+	Version  int      `json:"version"`
+	Queries  []string `json:"queries"`
+	Features []string `json:"features"`
+}
+
+func apiCapabilities() capabilities {
+	return capabilities{
+		Version: apiVersion,
+		Queries: apiQueryList,
+		Features: []string{
+			"direct-http", "project-config", "doctor", "environment-readiness", "environment-drift",
+			"local-sessions", "remote-sync-preview", "sync-conflicts", "safe-cleanup",
+		},
+	}
+}
 
 func panelNamed(a *app.App, name, target string) (panel.Panel, error) {
 	p, err := buildPanel(a, name, target)

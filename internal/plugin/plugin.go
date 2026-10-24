@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -250,6 +251,16 @@ func ReadManifest(path string) (Manifest, error) {
 	if m.Protocol != Protocol {
 		return Manifest{}, fmt.Errorf("speaks protocol %d; this mia speaks %d", m.Protocol, Protocol)
 	}
+	seenVerbs := map[string]bool{}
+	for _, verb := range m.Verbs {
+		if verb.Name == "" || strings.ContainsFunc(verb.Name, unicode.IsSpace) {
+			return Manifest{}, fmt.Errorf("verb %q must be one non-empty word", verb.Name)
+		}
+		if seenVerbs[verb.Name] {
+			return Manifest{}, fmt.Errorf("verb %q is declared more than once", verb.Name)
+		}
+		seenVerbs[verb.Name] = true
+	}
 	for _, event := range m.Events {
 		if event != "*" && !slices.Contains(Events, event) {
 			return Manifest{}, fmt.Errorf("no event called %q; there are %s", event, strings.Join(Events, ", "))
@@ -302,13 +313,37 @@ func (p Plugin) Declares(verb string) bool {
 	return slices.ContainsFunc(p.Manifest.Verbs, func(v Verb) bool { return v.Name == verb })
 }
 
-func Owner(plugins []Plugin, verb string) (Plugin, bool) {
+func Owners(plugins []Plugin, verb string) []Plugin {
+	var owners []Plugin
 	for _, p := range plugins {
 		if p.Declares(verb) {
-			return p, true
+			owners = append(owners, p)
 		}
 	}
-	return Plugin{}, false
+	return owners
+}
+
+type VerbCollision struct {
+	Verb    string   `json:"verb"`
+	Plugins []string `json:"plugins"`
+}
+
+func VerbCollisions(plugins []Plugin) []VerbCollision {
+	owners := map[string][]string{}
+	for _, p := range plugins {
+		for _, verb := range p.Manifest.Verbs {
+			owners[verb.Name] = append(owners[verb.Name], p.Name)
+		}
+	}
+	var collisions []VerbCollision
+	for verb, names := range owners {
+		if len(names) > 1 {
+			sort.Strings(names)
+			collisions = append(collisions, VerbCollision{Verb: verb, Plugins: names})
+		}
+	}
+	sort.Slice(collisions, func(i, j int) bool { return collisions[i].Verb < collisions[j].Verb })
+	return collisions
 }
 
 type Context struct {
