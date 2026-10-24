@@ -172,6 +172,7 @@ func cmdStack(a *app.App, args []string, asJSON bool) (code int) {
 		return fail(fmt.Errorf("%s is not in a stack", branch))
 
 	case "pr":
+		draft := take(&args, "--draft")
 		layers, err := store.Of(record.Path, branch, base)
 		if err != nil {
 			return fail(err)
@@ -181,7 +182,22 @@ func cmdStack(a *app.App, args []string, asJSON bool) (code int) {
 			if layer.Landed {
 				continue
 			}
-			branch, parent := run.ShellJoin([]string{layer.Branch}), run.ShellJoin([]string{layer.Parent})
+			layerRecord := record
+			if layer.Worktree != "" && layer.Worktree != record.Name {
+				layerRecord, err = a.RecordOrHere(layer.Worktree)
+				if err != nil {
+					return fail(err)
+				}
+			}
+			if draft {
+				saved, err := a.DraftPRForBranch(layerRecord, layer.Branch)
+				if err != nil {
+					return fail(err)
+				}
+				fmt.Printf("%s && %s\n", saved.PushCommand, saved.CreateCommand)
+				continue
+			}
+			branch, parent := run.ShellJoin([]string{layer.Branch}), run.ShellJoin([]string{strings.TrimPrefix(layer.Parent, "origin/")})
 			fmt.Printf("git push -u origin %s && gh pr create --base %s --head %s\n", branch, parent, branch)
 		}
 		if !git.HasRemote(record.Path, "origin") {

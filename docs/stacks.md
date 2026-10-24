@@ -68,10 +68,14 @@ without fetching.
 
 ```bash
 mia stack pr
+mia stack pr --draft
 ```
 
-prints `git push` and `gh pr create` for each layer, bottom first, for you to
-run.
+`stack pr` prints `git push` and `gh pr create` for each layer, bottom first,
+for you to run. `--draft` also creates missing PR drafts for every layer
+without checking out each branch, then includes their saved titles and
+`--body-file` paths in the commands. Existing draft bodies and manual edits
+are kept. Mia never pushes or opens a pull request itself.
 
 ## Forget
 

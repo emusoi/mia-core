@@ -28,7 +28,7 @@
 |---|---|
 | `mia up`, `mia down` | move between layers |
 | `mia stack` | show the stack |
-| `mia stack go\|name\|sync\|merge\|restack\|diff\|pr\|rm` | work on it |
+| `mia stack go\|name\|sync\|merge\|restack\|diff\|pr [--draft]\|rm` | work on it |
 | `mia pr [worktree]` | draft a pull request |
 
 ## Environments

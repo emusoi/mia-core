@@ -53,7 +53,11 @@ func (a *App) PRPath(branch string) (string, error) {
 }
 
 func (a *App) PRDraft(record model.Record) (PRDraft, error) {
-	draft, err := a.prPreview(record)
+	return a.prDraft(record, git.CurrentBranch(record.Path))
+}
+
+func (a *App) prDraft(record model.Record, branch string) (PRDraft, error) {
+	draft, err := a.prPreview(record, branch)
 	if err != nil {
 		return PRDraft{}, err
 	}
@@ -81,7 +85,15 @@ func (a *App) PRDraft(record model.Record) (PRDraft, error) {
 }
 
 func (a *App) DraftPR(record model.Record, options PRDraftOptions) (PRDraft, error) {
-	draft, err := a.PRDraft(record)
+	return a.draftPR(record, options, git.CurrentBranch(record.Path))
+}
+
+func (a *App) DraftPRForBranch(record model.Record, branch string) (PRDraft, error) {
+	return a.draftPR(record, PRDraftOptions{Branch: &branch}, branch)
+}
+
+func (a *App) draftPR(record model.Record, options PRDraftOptions, branch string) (PRDraft, error) {
+	draft, err := a.prDraft(record, branch)
 	if err != nil {
 		return PRDraft{}, err
 	}
@@ -164,8 +176,7 @@ func readPRMetadata(path string) (prMetadata, error) {
 	return metadata, err
 }
 
-func (a *App) prPreview(record model.Record) (PRDraft, error) {
-	branch := git.CurrentBranch(record.Path)
+func (a *App) prPreview(record model.Record, branch string) (PRDraft, error) {
 	path, err := a.PRPath(branch)
 	if err != nil {
 		return PRDraft{}, err
