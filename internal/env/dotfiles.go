@@ -22,14 +22,14 @@ import (
 //	packages = ["zsh", "fzf"]       # installed in the environment when missing
 //	setup = ["command -v nvim || ..."]  # run in the environment after the files land
 type Dotfiles struct {
-	Machine  []string `toml:"machine"`
-	Env      []string `toml:"env"`
-	Shell    string   `toml:"shell"`
-	Packages []string `toml:"packages"`
+	Machine  []string `toml:"machine" json:"machine,omitempty"`
+	Env      []string `toml:"env" json:"env,omitempty"`
+	Shell    string   `toml:"shell" json:"shell,omitempty"`
+	Packages []string `toml:"packages" json:"packages,omitempty"`
 	// Setup runs each command with sh -lc in the environment on every env up,
 	// after packages and files, for what a package manager cannot give (a
 	// newer release, a plugin restore). They should be quick when already done.
-	Setup []string `toml:"setup"`
+	Setup []string `toml:"setup" json:"setup,omitempty"`
 }
 
 // shellCommand is the login shell a window inside the environment opens: the

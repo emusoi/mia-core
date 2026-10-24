@@ -1,7 +1,8 @@
-# A repository's mia configuration, at .git/mia/config.toml (`mia config` opens it).
 # Every key is optional. Unknown keys are refused rather than ignored.
-# ~/.config/mia/config.toml holds the same keys for every repository; the
-# repository's own file wins.
+# Copy this file to .mia.toml for committed project settings shared by every
+# worktree, or to .git/mia/config.toml for local overrides (`mia config` opens
+# the local file). ~/.config/mia/config.toml holds user-wide defaults.
+# Precedence: user global < committed project < local overrides.
 
 base = "main"                       # what a new branch starts from
 prefix = "you/"                     # put in front of every new branch name

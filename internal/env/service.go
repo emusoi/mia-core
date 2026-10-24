@@ -32,6 +32,15 @@ var healthEvery = 10
 const runtimeDir = "/run/mia"
 
 func (s Service) Validate() error {
+	if s.ID == "" {
+		return fmt.Errorf("service: id is required")
+	}
+	if len(s.Run) == 0 {
+		return fmt.Errorf("service %s: run is required", s.ID)
+	}
+	if s.Grace < 0 {
+		return fmt.Errorf("service %s: grace cannot be negative", s.ID)
+	}
 	switch s.Restart {
 	case RestartNever, RestartOnFailure:
 		return nil

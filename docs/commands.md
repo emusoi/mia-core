@@ -52,7 +52,7 @@
 |---|---|
 | `mia dash` | the dashboard |
 | `mia side <1-4\|top\|left\|right\|bottom>` | one side of the room alone, in a small popup |
-| `mia config` | edit the repository's config |
+| `mia config [show\|validate]` | edit local overrides, or inspect the effective configuration |
 | `mia plugin ls\|enable\|disable` | plugins |
 | `mia api <query>` | state as JSON |
 | `mia help vocabulary` | the words |
