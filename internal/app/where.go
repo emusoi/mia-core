@@ -10,6 +10,15 @@ import (
 )
 
 func (a *App) SessionHostOf(record model.Record) (session.Host, error) {
+	if a.Config.Env.Session == "local" {
+		host := session.Here()
+		host.Shell = a.Config.Dotfiles.Shell
+		return host, nil
+	}
+	return a.RuntimeSessionHostOf(record)
+}
+
+func (a *App) RuntimeSessionHostOf(record model.Record) (session.Host, error) {
 	host := session.Here()
 	host.Shell = a.Config.Dotfiles.Shell
 	name := env.Placement(record).Runtime()
@@ -25,6 +34,13 @@ func (a *App) SessionHostOf(record model.Record) (session.Host, error) {
 }
 
 func (a *App) SessionDir(record model.Record) (string, error) {
+	if a.Config.Env.Session == "local" {
+		return record.Path, nil
+	}
+	return a.RuntimeSessionDir(record)
+}
+
+func (a *App) RuntimeSessionDir(record model.Record) (string, error) {
 	name := env.Placement(record).Runtime()
 	if name == "" || name == runtime.Local {
 		return record.Path, nil

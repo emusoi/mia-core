@@ -99,6 +99,9 @@ func TestServiceConfigurationIsValidatedOnLoad(t *testing.T) {
 		{"duplicate", "[[service]]\nid = \"web\"\nrun = [\"true\"]\n[[service]]\nid = \"web\"\nrun = [\"true\"]\n", "more than once"},
 		{"missing run", "[[service]]\nid = \"web\"\n", "run is required"},
 		{"bad restart", "[[service]]\nid = \"web\"\nrun = [\"true\"]\nrestart = \"sometimes\"\n", "on-failure"},
+		{"bad session", "[env]\nsession = \"elsewhere\"\n", "env.session"},
+		{"sync outside", "[env]\nsync_ignore = [\"../secret\"]\n", "inside the worktree"},
+		{"bad sync glob", "[env]\nsync_ignore = [\"[\"]\n", "valid glob"},
 	} {
 		t.Run(check.name, func(t *testing.T) {
 			t.Setenv("XDG_CONFIG_HOME", t.TempDir())

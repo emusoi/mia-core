@@ -33,6 +33,10 @@ func TestEnvWordsAreRecognisedNotPositional(t *testing.T) {
 
 		{"exec: a command is not a worktree", "exec", []string{"cat", "file"}, "", []string{"cat", "file"}},
 		{"exec: worktree then command", "exec", []string{"iringa", "cat", "file"}, "iringa", []string{"cat", "file"}},
+		{"sync: action alone", "sync", []string{"auto"}, "", []string{"auto"}},
+		{"sync: worktree then action", "sync", []string{"monduli", "now"}, "monduli", []string{"now"}},
+		{"sync: worktree alone reports status", "sync", []string{"monduli"}, "monduli", []string{}},
+		{"sync: preview alone", "sync", []string{"preview"}, "", []string{"preview"}},
 	} {
 		target, left := splitEnvWords(c.sub, c.words, is(runtimes), is(services), is(worktrees))
 		if target != c.target || !reflect.DeepEqual(left, c.left) {

@@ -6,8 +6,10 @@ import (
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/config"
+	"github.com/emusoi/mia-core/internal/container"
 	"github.com/emusoi/mia-core/internal/env"
 	"github.com/emusoi/mia-core/internal/gateway"
+	"github.com/emusoi/mia-core/internal/mirror"
 	"github.com/emusoi/mia-core/internal/model"
 	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/runtime"
@@ -39,6 +41,8 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 		all = take(&rest, "--all")
 	case "service":
 		follow = take(&rest, "--follow") || take(&rest, "-f")
+	case "sync":
+		asJSON = take(&rest, "--json") || asJSON
 	case "run":
 		return envRun(a, rest)
 	}
@@ -149,27 +153,72 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 
 	case "sync":
 		action := ""
+		if len(rest) > 1 {
+			return usageErr("mia env sync [worktree] [auto|manual|now|status|conflicts|preview|restart]")
+		}
 		if len(rest) > 0 {
 			action = rest[0]
+		}
+		if action == "dry-run" {
+			action = "preview"
+		}
+		if action == "preview" {
+			preview, err := manager.SyncPreview(record)
+			if err != nil {
+				return fail(err)
+			}
+			if asJSON {
+				return emit(preview)
+			}
+			for _, path := range preview.Excluded {
+				fmt.Printf("excluded  %s\n", path)
+			}
+			for _, path := range preview.Secrets {
+				fmt.Printf("would sync  %s\n", path)
+			}
+			if len(preview.Excluded)+len(preview.Secrets) == 0 {
+				fmt.Println("no potential secret files found")
+			}
+			fmt.Printf("%d ignore rules; preview shows paths, never contents\n", len(preview.IgnoreRules))
+			return exitOK
 		}
 		if action == "auto" || action == "manual" {
 			if record.Env == nil {
 				return fail(fmt.Errorf("%s has no environment — `mia env host %s <machine>` first", record.Name, record.Name))
 			}
 			record.Env.Sync = map[string]string{"auto": "", "manual": model.SyncManual}[action]
-			if err := a.Store.Put(record); err != nil {
-				return fail(err)
-			}
 		}
 		session, err := manager.Sync(record, action)
 		if err != nil {
 			return fail(err)
+		}
+		if action == "auto" || action == "manual" {
+			if err := a.Store.Put(record); err != nil {
+				return fail(err)
+			}
+		}
+		if asJSON {
+			return emit(session)
+		}
+		if action == "conflicts" {
+			if session.Conflicts == 0 {
+				fmt.Println("no conflicts")
+			} else if len(session.ConflictPaths) == 0 {
+				fmt.Println(session.Describe())
+			}
+			for _, path := range session.ConflictPaths {
+				fmt.Println(path)
+			}
+			return exitOK
 		}
 		mode := "auto — live, both ways"
 		if record.Manual() {
 			mode = "manual — `mia env sync " + record.Name + " now` moves changes"
 		}
 		fmt.Printf("%s  sync %s\n          %s\n", record.Name, mode, session.Describe())
+		if session.Outdated {
+			fmt.Fprintf(os.Stderr, "mia: sync ignore rules changed — `mia env sync %s restart` applies them\n", record.Name)
+		}
 		return exitOK
 
 	case "shell":
@@ -187,11 +236,11 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 		if err != nil {
 			return fail(err)
 		}
-		host, err := a.SessionHostOf(record)
+		host, err := a.RuntimeSessionHostOf(record)
 		if err != nil {
 			return fail(err)
 		}
-		dir, err := a.SessionDir(record)
+		dir, err := a.RuntimeSessionDir(record)
 		if err != nil {
 			return fail(err)
 		}
@@ -353,6 +402,10 @@ func splitEnvWords(sub string, rest []string, isRuntime, isService, isWorktree f
 		return "", nil
 	}
 	switch {
+	case sub == "sync" && isSyncAction(rest[0]):
+		return "", rest
+	case sub == "sync" && len(rest) > 1 && isSyncAction(rest[1]):
+		return rest[0], rest[1:]
 	case sub == "host" && len(rest) > 1 && isRuntime(rest[0]) && !isRuntime(rest[1]):
 		return rest[1], rest[:1]
 
@@ -379,6 +432,14 @@ func splitEnvWords(sub string, rest []string, isRuntime, isService, isWorktree f
 func isServiceAction(word string) bool {
 	switch word {
 	case "start", "stop", "restart", "logs":
+		return true
+	}
+	return false
+}
+
+func isSyncAction(word string) bool {
+	switch word {
+	case "auto", "manual", "now", "status", "conflicts", "preview", "dry-run", "restart":
 		return true
 	}
 	return false
@@ -453,11 +514,20 @@ func cmdHost(a *app.App, manager env.Manager, record model.Record, rest []string
 		return fail(err)
 	}
 
+	if machine.Name != runtime.Local && machine.SSH != "" {
+		if err := (container.Engine{Binary: machine.Engine, SSH: machine.SSH}).Ready(); err != nil {
+			return fail(fmt.Errorf("move preflight failed; the current environment is untouched: %w", err))
+		}
+		if _, err := mirror.Find(); err != nil {
+			return fail(fmt.Errorf("move preflight failed; the current environment is untouched: %w", err))
+		}
+	}
+
 	if err := manager.Remove(record); err != nil {
-		fmt.Fprintf(os.Stderr, "mia: %v\n", err)
+		return fail(fmt.Errorf("move aborted; %s still points to %s: %w", record.Name, env.Placement(record), err))
 	}
 	if record, err = a.Host(record, machine); err != nil {
-		return fail(err)
+		return fail(fmt.Errorf("the old environment was removed but placement is unchanged: %w", err))
 	}
 	fmt.Printf("%s will run on %s — `mia env up %s`\n", record.Name, machine.Name, record.Name)
 	return exitOK
