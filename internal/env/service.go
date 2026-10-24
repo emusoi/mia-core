@@ -188,7 +188,7 @@ func (m Manager) ServiceStatus(record model.Record) ([]Status, error) {
 	if err != nil {
 		return nil, err
 	}
-	name := ContainerName(Sanitise(record.Name))
+	name := m.ContainerName(record)
 	return m.serviceStatuses(where, name, where.Engine.State(name) == "running"), nil
 }
 

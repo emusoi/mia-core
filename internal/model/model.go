@@ -26,6 +26,10 @@ type Environment struct {
 	// Sync is how a box's copy follows this worktree: "" follows live, both
 	// ways; "manual" holds changes on each side until `mia env sync <wt> now`.
 	Sync string `json:"sync,omitempty"`
+
+	// Container is the Compose service's actual container name or ID, saved
+	// after up.
+	Container string `json:"container,omitempty"`
 }
 
 const SyncManual = "manual"

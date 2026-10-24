@@ -167,6 +167,49 @@ run = ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 autostart = true
 ```
 
+## Compose projects
+
+An app that needs Postgres, Redis or other sidecars can use its existing
+Compose file:
+
+```toml
+[env.compose]
+file = "compose.yaml"
+service = "app"
+```
+
+The Compose project is named `mia-<worktree>`, so containers and networks
+from different worktrees do not share names. `service` is `app` by default.
+It is where setup, shells, exec and `[[service]]` processes run, and the
+service the gateway reaches. Other services start and stop with the project.
+
+Use `expose`, not published `ports`, and do not use `network_mode: host`.
+Mia refuses either anywhere in the resolved Compose config: published ports
+would collide and host networking defeats isolation. If your normal dev file
+publishes ports, make a `compose.mia.yaml` variant or override that resolves
+to `expose` only.
+
+```bash
+mia env up --wait
+mia env service
+mia env down
+mia env rm
+```
+
+`up` reconciles the project through Compose. `--recreate` forces down/up.
+`down` stops containers; `rm` removes containers and networks. Compose
+volumes, including databases, are kept by all three. External volumes are
+never removed. The actual service container ID is resolved with
+`compose ps -q`, so custom `container_name` and supported Compose providers
+work. Switch between Compose and the single-container path with `mia env rm`
+before changing `env.compose`; the old mode is not discovered automatically.
+
+Compose owns images, service environment and volumes, so
+`env.image`, `env.image_setup`, `env.pass`, `env.container_only` and
+`env.cache` cannot be combined with it. `env.setup`, ports, host forwarding,
+dotfiles and services still work in the selected service. `mia doctor`
+checks for a Compose plugin with JSON config and `ps -q` support.
+
 ## Main's dev server
 
 No container needed. If your dev server is already running in the main

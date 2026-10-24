@@ -11,8 +11,10 @@ Three TOML files, all optional, later files taking precedence:
 Inspect the merged result with `mia config show` (TOML) or
 `mia config show --json`. `mia config validate` checks all three files and
 the service declarations. Unknown keys are an error.
-[examples/config.toml](../examples/config.toml) uses every key; copy it to
-`.mia.toml` for project settings or `.git/mia/config.toml` for local ones.
+[examples/config.toml](../examples/config.toml) shows common keys;
+[examples/compose.toml](../examples/compose.toml) configures a Compose
+project. Copy them to `.mia.toml` for project settings or
+`.git/mia/config.toml` for local ones.
 Keep credentials out of the committed file.
 
 ## Worktrees
@@ -45,6 +47,27 @@ Keep credentials out of the committed file.
 | `session` | `"runtime"` (default) runs shells on the environment's machine; `"local"` keeps worktree shells and agents in the local checkout |
 | `sync_ignore` | additional relative paths or globs excluded from remote sync |
 | `sync_secrets` | allow `.env*`, private keys and credential files to sync; false by default |
+
+## `[env.compose]`
+
+Use an existing Compose project instead of one container:
+
+```toml
+[env.compose]
+file = "compose.yaml"
+service = "app"       # optional; "app" by default
+```
+
+`file` is relative to the worktree. The selected service is where setup,
+shells, exec and `[[service]]` processes run, and the container the gateway
+reaches. Compose owns images, service environment and volumes, so
+`env.image`, `env.image_setup`, `env.pass`, `env.container_only` and
+`env.cache` cannot be combined with it. `env.setup`, `env.ports`, `env.page`,
+`env.host_ports`, dotfiles and services remain available.
+
+Every Compose service must use an isolated network and leave host `ports`
+unpublished; use `expose` instead. The Compose plugin must support
+`config --format json` and `ps -q`. `mia doctor` checks it.
 
 ## `[[service]]`
 

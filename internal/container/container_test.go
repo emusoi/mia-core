@@ -34,18 +34,18 @@ Error: unable to connect to Podman socket: failed to connect: dial tcp 127.0.0.1
 func TestRunningAsksTheEngineOnceForEveryName(t *testing.T) {
 	dir := t.TempDir()
 	fake := filepath.Join(dir, "podman")
-	script := "#!/bin/sh\necho \"$@\" >> " + filepath.Join(dir, "calls") + "\nprintf 'mia-longido\\nmia-monduli\\n'\n"
+	script := "#!/bin/sh\necho \"$@\" >> " + filepath.Join(dir, "calls") + "\nprintf 'id1 mia-longido\\nid2 mia-monduli\\n'\n"
 	if err := os.WriteFile(fake, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
 	up := Engine{Binary: fake}.Running()
 
-	if !up["mia-longido"] || !up["mia-monduli"] || up["mia-nope"] {
+	if !up["mia-longido"] || !up["mia-monduli"] || !up["id1"] || !up["id2"] || up["mia-nope"] {
 		t.Fatalf("running = %v", up)
 	}
 	calls, _ := os.ReadFile(filepath.Join(dir, "calls"))
-	if got := strings.TrimSpace(string(calls)); got != "ps --format {{.Names}}" {
+	if got := strings.TrimSpace(string(calls)); got != "ps --no-trunc --format {{.ID}} {{.Names}}" {
 		t.Fatalf("asked the engine %q", got)
 	}
 }
