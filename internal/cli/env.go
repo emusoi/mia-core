@@ -102,6 +102,15 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 			}
 			fmt.Fprintf(os.Stderr, "mia: %v\n", err)
 		}
+		if a.Config.Env.Compose.Enabled() && environment.Container != "" {
+			if record.Env == nil {
+				record.Env = &model.Environment{Placement: model.Local()}
+			}
+			record.Env.Container = environment.Container
+			if err := a.Store.Put(record); err != nil {
+				return fail(err)
+			}
+		}
 		if err := manager.CarryTools(record, a.Config.Tools, a.Config.Tools.CarryCredentials, os.Stderr); err != nil {
 			fmt.Fprintf(os.Stderr, "mia: the environment is up but %v\n", err)
 		}
@@ -530,9 +539,20 @@ func cmdHost(a *app.App, manager env.Manager, record model.Record, rest []string
 		return fail(err)
 	}
 
+	if a.Config.Env.Compose.Enabled() {
+		if err := manager.CheckCompose(record); err != nil {
+			return fail(fmt.Errorf("compose preflight failed; the current environment is untouched: %w", err))
+		}
+	}
 	if machine.Name != runtime.Local && machine.SSH != "" {
-		if err := (container.Engine{Binary: machine.Engine, SSH: machine.SSH}).Ready(); err != nil {
+		targetEngine := container.Engine{Binary: machine.Engine, SSH: machine.SSH}
+		if err := targetEngine.Ready(); err != nil {
 			return fail(fmt.Errorf("move preflight failed; the current environment is untouched: %w", err))
+		}
+		if a.Config.Env.Compose.Enabled() {
+			if err := targetEngine.ComposeReady(); err != nil {
+				return fail(fmt.Errorf("compose preflight failed; the current environment is untouched: %w", err))
+			}
 		}
 		if _, err := mirror.Find(); err != nil {
 			return fail(fmt.Errorf("move preflight failed; the current environment is untouched: %w", err))

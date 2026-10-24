@@ -1,0 +1,15 @@
+[env]
+setup = ["npm", "install"]
+ports = [5173]
+page = 5173
+
+[env.compose]
+file = "compose.yaml"
+service = "app"
+
+[[service]]
+id = "web"
+run = ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+health = ["sh", "-c", "curl -fsS http://127.0.0.1:5173 >/dev/null"]
+autostart = true
+restart = "on-failure"

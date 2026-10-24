@@ -62,6 +62,19 @@ func TestYourOwnNamesMustBeUsableAsHostnames(t *testing.T) {
 	}
 }
 
+func TestComposeExampleLoads(t *testing.T) {
+	var c Config
+	if err := mergeFile("../../examples/compose.toml", &c); err != nil {
+		t.Fatal(err)
+	}
+	if !c.Env.Compose.Enabled() || c.Env.Compose.ServiceName() != "app" {
+		t.Fatalf("compose example lost its service: %+v", c.Env.Compose)
+	}
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestCommittedProjectConfigLayersBetweenGlobalAndLocal(t *testing.T) {
 	xdg := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", xdg)
@@ -102,6 +115,8 @@ func TestServiceConfigurationIsValidatedOnLoad(t *testing.T) {
 		{"bad session", "[env]\nsession = \"elsewhere\"\n", "env.session"},
 		{"sync outside", "[env]\nsync_ignore = [\"../secret\"]\n", "inside the worktree"},
 		{"bad sync glob", "[env]\nsync_ignore = [\"[\"]\n", "valid glob"},
+		{"compose outside", "[env.compose]\nfile = \"../compose.yaml\"\n", "inside the worktree"},
+		{"compose image", "[env]\nimage = \"node:22\"\n[env.compose]\nfile = \"compose.yaml\"\n", "owns images"},
 	} {
 		t.Run(check.name, func(t *testing.T) {
 			t.Setenv("XDG_CONFIG_HOME", t.TempDir())

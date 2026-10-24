@@ -16,6 +16,7 @@ const (
 	FromStack        Source = "detected stack"
 	FromDefault      Source = "default base"
 	FromBuild        Source = "built by `mia env image`"
+	FromCompose      Source = "compose file"
 )
 
 type Image struct {

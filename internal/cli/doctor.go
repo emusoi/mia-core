@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/app"
@@ -11,6 +12,7 @@ import (
 	"github.com/emusoi/mia-core/internal/env"
 	"github.com/emusoi/mia-core/internal/gateway"
 	"github.com/emusoi/mia-core/internal/git"
+	"github.com/emusoi/mia-core/internal/model"
 	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/runtime"
 )
@@ -94,6 +96,17 @@ func cmdDoctor(args []string, asJSON bool) int {
 		return finish()
 	}
 	report.add("configuration", "ok", "effective configuration is valid")
+	if a.Config.Env.Compose.Enabled() && engineErr == nil {
+		if err := engine.ComposeReady(); err != nil {
+			report.add("compose", "fail", err.Error())
+		} else if manager, err := managerFor(a); err != nil {
+			report.add("compose", "fail", err.Error())
+		} else if err := manager.CheckCompose(model.Record{Path: a.Root, Name: filepath.Base(a.Root)}); err != nil {
+			report.add("compose", "fail", err.Error())
+		} else {
+			report.add("compose", "ok", "compose plugin and resolved config are valid")
+		}
+	}
 
 	machines, err := a.Runtimes.All()
 	if err != nil {

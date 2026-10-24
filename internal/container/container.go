@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -50,7 +51,11 @@ func (e Engine) run(args ...string) (string, error) {
 }
 
 func (e Engine) Ready() error {
-	if _, err := e.run("info", "--format", "{{.Host.Arch}}"); err != nil {
+	format := "{{.Host.Arch}}"
+	if filepath.Base(e.Binary) == "docker" {
+		format = "{{.Architecture}}"
+	}
+	if _, err := e.run("info", "--format", format); err != nil {
 		if e.SSH != "" {
 			return fmt.Errorf("%s cannot run containers — `systemctl --user start podman.socket` there, or check the machine is up", e.SSH)
 		}
@@ -106,13 +111,13 @@ func sorted(pairs map[string]string) []string {
 }
 
 func (e Engine) Running() map[string]bool {
-	out, err := e.run("ps", "--format", "{{.Names}}")
+	out, err := e.run("ps", "--no-trunc", "--format", "{{.ID}} {{.Names}}")
 	if err != nil {
 		return nil
 	}
 	up := map[string]bool{}
-	for _, name := range strings.Fields(out) {
-		up[name] = true
+	for _, idOrName := range strings.Fields(out) {
+		up[idOrName] = true
 	}
 	return up
 }
@@ -169,7 +174,7 @@ func (e Engine) ExecDetached(name, dir string, argv []string) error {
 }
 
 func (e Engine) HasImage(image string) bool {
-	_, err := e.run("image", "exists", image)
+	_, err := e.run("image", "inspect", image)
 	return err == nil
 }
 
