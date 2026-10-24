@@ -75,7 +75,9 @@ mia stack pr --draft
 for you to run. `--draft` also creates missing PR drafts for every layer
 without checking out each branch, then includes their saved titles and
 `--body-file` paths in the commands. Existing draft bodies and manual edits
-are kept. Mia never pushes or opens a pull request itself.
+are kept. Push commands use `--force-with-lease` because restacking rewrites
+branch history; the lease still refuses to overwrite unexpected remote work.
+Mia never pushes or opens a pull request itself.
 
 ## Forget
 
