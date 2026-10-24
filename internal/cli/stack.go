@@ -198,7 +198,7 @@ func cmdStack(a *app.App, args []string, asJSON bool) (code int) {
 				continue
 			}
 			branch, parent := run.ShellJoin([]string{layer.Branch}), run.ShellJoin([]string{strings.TrimPrefix(layer.Parent, "origin/")})
-			fmt.Printf("git push -u origin %s && gh pr create --base %s --head %s\n", branch, parent, branch)
+			fmt.Printf("git push --force-with-lease -u origin %s && gh pr create --base %s --head %s\n", branch, parent, branch)
 		}
 		if !git.HasRemote(record.Path, "origin") {
 			fmt.Println("\nthis repository has no remote called origin yet — `git remote add origin <url>` (or `gh repo create`) first")

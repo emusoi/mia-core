@@ -213,7 +213,7 @@ func (a *App) prPreview(record model.Record, branch string) (PRDraft, error) {
 }
 
 func (d *PRDraft) commands(root string, record model.Record) {
-	d.PushCommand = "git -C " + run.ShellJoin([]string{record.Path}) + " push -u origin " + run.ShellJoin([]string{d.Branch})
+	d.PushCommand = "git -C " + run.ShellJoin([]string{record.Path}) + " push --force-with-lease -u origin " + run.ShellJoin([]string{d.Branch})
 	d.CreateCommand = "cd " + run.ShellJoin([]string{record.Path}) + " && gh pr create --base " + run.ShellJoin([]string{d.Base}) + " --head " + run.ShellJoin([]string{d.Branch}) + " --title " + run.ShellJoin([]string{d.Title}) + " --body-file " + run.ShellJoin([]string{d.Path})
 	if record.Path != root && d.Branch != d.Base {
 		d.RemoveCommand = "cd " + run.ShellJoin([]string{root}) + " && mia rm " + run.ShellJoin([]string{record.Name})

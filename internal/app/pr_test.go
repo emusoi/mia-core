@@ -77,7 +77,7 @@ func TestPRDraftSavesExactBodyAndOnlyPrintsSafelyQuotedCommands(t *testing.T) {
 		command string
 		args    []string
 	}{
-		{draft.PushCommand, []string{"-C", path, "push", "-u", "origin", "fix/foo"}},
+		{draft.PushCommand, []string{"-C", path, "push", "--force-with-lease", "-u", "origin", "fix/foo"}},
 		{draft.CreateCommand, []string{"pr", "create", "--base", "main", "--head", "fix/foo", "--title", title, "--body-file", draft.Path}},
 		{draft.RemoveCommand, []string{"rm", "monduli"}},
 	} {
