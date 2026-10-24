@@ -89,6 +89,7 @@ func fromStack(worktree string) string {
 func ContainerName(worktree string) string { return "mia-" + worktree }
 
 const Label = "dev.mia.worktree"
+const ConfigLabel = "dev.mia.config"
 
 func Sanitise(name string) string {
 	return strings.Map(func(r rune) rune {

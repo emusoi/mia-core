@@ -110,6 +110,8 @@ func Run(args []string) int {
 		}
 	case "plugin", "plugins":
 		return cmdPlugin(configHere(), rest, asJSON)
+	case "doctor":
+		return cmdDoctor(rest, asJSON)
 	case "api":
 		if len(rest) == 1 && rest[0] == "repos" { // every repository, from anywhere
 			repos, err := app.Repositories()
