@@ -3,9 +3,11 @@ package config
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/emusoi/mia-core/internal/env"
@@ -142,6 +144,17 @@ func (c Config) Validate() error {
 		}
 	}
 	seen := map[string]bool{}
+	if c.Env.Session != "" && c.Env.Session != "local" && c.Env.Session != "runtime" {
+		return fmt.Errorf("env.session is \"local\" or \"runtime\", not %q", c.Env.Session)
+	}
+	for _, pattern := range c.Env.SyncIgnore {
+		if pattern == "" || filepath.IsAbs(pattern) || pattern == ".." || strings.HasPrefix(pattern, "../") {
+			return fmt.Errorf("env.sync_ignore: %q must be a relative path or glob inside the worktree", pattern)
+		}
+		if _, err := path.Match(pattern, "probe"); err != nil {
+			return fmt.Errorf("env.sync_ignore: %q is not a valid glob: %w", pattern, err)
+		}
+	}
 	for _, service := range c.Services {
 		if err := service.Validate(); err != nil {
 			return err

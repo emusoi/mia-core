@@ -428,8 +428,10 @@ func cmdRemove(a *app.App, args []string) int {
 
 	if manager, managerErr := managerFor(a); managerErr == nil {
 		if err := manager.Remove(removal.Record); err != nil {
-			fmt.Fprintf(os.Stderr, "mia: %v\n", err)
+			return fail(fmt.Errorf("environment cleanup failed for %s; the worktree and its records were kept so you can retry: %w", removal.Record.Name, err))
 		}
+	} else if removal.Record.Env != nil {
+		return fail(managerErr)
 	}
 
 	if err := a.Remove(removal, force, stopRunning); err != nil {

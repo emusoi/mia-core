@@ -43,7 +43,8 @@
 | `mia dev [worktree\|off]` | lend main's dev server a worktree's files |
 | `mia env browse [--direct]` | open it in the browser, with optional no-setup HTTP |
 | `mia env status\|ports\|service` | what it is doing |
-| `mia env host [machine]` | where it runs, or move it |
+| `mia env host [machine]` | where it runs, or move it after a target preflight |
+| `mia env sync [worktree] [auto\|manual\|now\|status\|conflicts\|preview\|restart]` | control and inspect remote file synchronization |
 | `mia machine list\|add\|shell\|rm` | machines |
 | `mia gateway status\|start\|stop\|setup\|trust` | the `<name>.mia` gateway |
 
