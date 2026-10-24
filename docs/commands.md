@@ -59,7 +59,7 @@
 |---|---|
 | `mia radar [--new]` | find and switch to any worktree, or make one — `prefix space` and `prefix n` in tmux |
 | `mia dash` | the radar, under its old name |
-| `mia config` | edit the repository's config |
+| `mia config [show\|validate]` | edit local overrides, or inspect the effective configuration |
 | `mia config [--global] <key> [<value>]` | say, or set, one setting: `base staging`, `keys.quizzicle.quiz K`, `plugin.agent.default codex`; one line edited, comments kept, and a setting mia would not load refused |
 | `mia plugin ls\|enable\|disable` | plugins |
 | `mia api <query>` | state as JSON |

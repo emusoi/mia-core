@@ -65,6 +65,15 @@ clone = ["node_modules"]
 setup = ["npm", "install"]
 ```
 
-mia keeps everything in `.git/mia` and `~/.config/mia`, never in your files.
+mia keeps its own state in `.git/mia` and `~/.config/mia`, never in your files.
+To share project settings, commit a `.mia.toml` in the main checkout instead.
+Precedence is user global, then committed project, then local overrides.
+
+```bash
+mia config show             # effective TOML
+mia config show --json      # the same settings for scripts
+mia config validate         # parse and check all three files
+```
+
 The one exception is [`mia dev`](environments.md#mains-dev-server), and only
 when you ask.

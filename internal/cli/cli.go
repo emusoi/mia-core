@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/emusoi/mia-core/internal/app"
@@ -324,10 +325,7 @@ func Run(args []string) int {
 	case "new":
 		return cmdNew(a, rest, asJSON)
 	case "config":
-		if len(rest) > 0 {
-			return cmdConfigKey(a, rest)
-		}
-		return cmdConfig(a)
+		return cmdConfig(a, rest, asJSON)
 	case "rename":
 		if len(rest) != 2 || strings.TrimSpace(rest[1]) == "" {
 			return usageErr("mia rename <worktree> <name>")
@@ -923,17 +921,51 @@ func configPath(a *app.App) (string, error) {
 	return path, nil
 }
 
-func cmdConfig(a *app.App) int {
-	path, err := configPath(a)
-	if err != nil {
-		return fail(err)
+func cmdConfig(a *app.App, args []string, asJSON bool) int {
+	sub := ""
+	if len(args) > 0 {
+		sub, args = args[0], args[1:]
 	}
-	command := run.Local(a.Config.EditorCommand()).Command(path)
-	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := command.Run(); err != nil {
-		return fail(err)
+	if sub != "" && sub != "show" && sub != "validate" {
+		return cmdConfigKey(a, append([]string{sub}, args...))
 	}
-	return exitOK
+	if len(args) > 0 || (sub == "" && asJSON) {
+		return usageErr("mia config [show|validate]")
+	}
+	switch sub {
+	case "show":
+		if asJSON {
+			return emit(a.Config)
+		}
+		if err := toml.NewEncoder(os.Stdout).Encode(a.Config); err != nil {
+			return fail(err)
+		}
+		return exitOK
+	case "validate":
+		if err := a.Config.Validate(); err != nil {
+			return fail(err)
+		}
+		if asJSON {
+			return emit(struct {
+				Valid bool `json:"valid"`
+			}{Valid: true})
+		}
+		fmt.Println("configuration valid")
+		return exitOK
+	case "":
+		path, err := configPath(a)
+		if err != nil {
+			return fail(err)
+		}
+		command := run.Local(a.Config.EditorCommand()).Command(path)
+		command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
+		if err := command.Run(); err != nil {
+			return fail(err)
+		}
+		return exitOK
+	default:
+		return usageErr("mia config [show|validate]")
+	}
 }
 
 // cmdConfigKey prints one setting, or sets it: mia config [--global] <key>
@@ -1104,8 +1136,9 @@ func setting(config, table, key, value string) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-const starterConfig = `# mia — this repository's configuration. Every key is optional, and an
+const starterConfig = `# mia — this repository's local configuration. Every key is optional, and an
 # unknown key is refused rather than ignored. ` + "`mia help vocabulary`" + ` explains the terms.
+# Use .mia.toml in the main checkout for committed settings shared by every worktree.
 #
 # base = "main"                    # what a new branch starts from
 # prefix = "you/"                  # put in front of every branch name

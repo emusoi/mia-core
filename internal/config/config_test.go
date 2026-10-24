@@ -61,3 +61,57 @@ func TestYourOwnNamesMustBeUsableAsHostnames(t *testing.T) {
 		}
 	}
 }
+
+func TestCommittedProjectConfigLayersBetweenGlobalAndLocal(t *testing.T) {
+	xdg := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	root := t.TempDir()
+	miaDir := filepath.Join(root, ".git", "mia")
+	write := func(path, body string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(filepath.Join(xdg, "mia", "config.toml"), "base = \"global\"\nprefix = \"global/\"\neditor = \"global-editor\"\n")
+	write(filepath.Join(root, ".mia.toml"), "base = \"project\"\nprefix = \"project/\"\n")
+	write(filepath.Join(miaDir, "config.toml"), "prefix = \"local/\"\n")
+
+	got, err := Load(miaDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Base != "project" || got.Prefix != "local/" || got.Editor != "global-editor" {
+		t.Fatalf("precedence was not global < project < local: %+v", got)
+	}
+	if path := ProjectPath(miaDir); path != filepath.Join(root, ".mia.toml") {
+		t.Fatalf("project path = %q", path)
+	}
+}
+
+func TestServiceConfigurationIsValidatedOnLoad(t *testing.T) {
+	for _, check := range []struct {
+		name, body, want string
+	}{
+		{"duplicate", "[[service]]\nid = \"web\"\nrun = [\"true\"]\n[[service]]\nid = \"web\"\nrun = [\"true\"]\n", "more than once"},
+		{"missing run", "[[service]]\nid = \"web\"\n", "run is required"},
+		{"bad restart", "[[service]]\nid = \"web\"\nrun = [\"true\"]\nrestart = \"sometimes\"\n", "on-failure"},
+	} {
+		t.Run(check.name, func(t *testing.T) {
+			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+			miaDir := filepath.Join(t.TempDir(), ".git", "mia")
+			if err := os.MkdirAll(miaDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(miaDir, "config.toml"), []byte(check.body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Load(miaDir); err == nil || !strings.Contains(err.Error(), check.want) {
+				t.Fatalf("error = %v, want %q", err, check.want)
+			}
+		})
+	}
+}

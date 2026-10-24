@@ -14,14 +14,14 @@ import (
 )
 
 type Tools struct {
-	Copy []string `toml:"copy"`
+	Copy []string `toml:"copy" json:"copy,omitempty"`
 
-	Credentials []string `toml:"credentials"`
+	Credentials []string `toml:"credentials" json:"credentials,omitempty"`
 
 	// CarryCredentials places the credential files on every `mia env up`, as
 	// `mia env tools --credentials` does. Off unless a repository asks for it:
 	// those files can act as you, wherever the environment runs.
-	CarryCredentials bool `toml:"carry_credentials"`
+	CarryCredentials bool `toml:"carry_credentials" json:"carry_credentials,omitempty"`
 }
 
 const marker = ".placed-by-mia"
