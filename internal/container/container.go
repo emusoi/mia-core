@@ -125,6 +125,11 @@ func (e Engine) State(name string) string {
 	return strings.TrimSpace(out)
 }
 
+func (e Engine) Label(name, key string) (string, error) {
+	format := fmt.Sprintf("{{index .Config.Labels %q}}", key)
+	return e.run("inspect", "--format", format, name)
+}
+
 func (e Engine) Stop(name string) error {
 	if e.State(name) == "" {
 		return nil

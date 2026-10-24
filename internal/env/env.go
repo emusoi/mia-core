@@ -129,7 +129,7 @@ func (m Manager) describe(record model.Record, where Location, whereErr error) (
 	return e, nil
 }
 
-func (m Manager) Up(record model.Record, out *os.File) (Environment, error) {
+func (m Manager) Up(record model.Record, out *os.File, recreate bool) (Environment, error) {
 	where, err := m.Where(record)
 	if err != nil {
 		return Environment{}, err
@@ -167,7 +167,22 @@ func (m Manager) Up(record model.Record, out *os.File) (Environment, error) {
 		}
 	}
 
-	fresh := where.Engine.State(name) == ""
+	state := where.Engine.State(name)
+	changed, err := m.drift(record, where, image, state)
+	if err != nil {
+		return m.Describe(record), fmt.Errorf("read the environment's configuration: %w", err)
+	}
+	if recreate && state != "" {
+		fmt.Fprintf(out, "recreating %s; its volumes and sync are kept\n", record.Name)
+		if err := where.Engine.Remove(name); err != nil {
+			return m.Describe(record), err
+		}
+		state = ""
+	} else if changed {
+		fmt.Fprintf(out, "⚠ environment configuration changed — `mia env up --recreate %s` applies it\n", record.Name)
+	}
+
+	fresh := state == ""
 	if fresh && !where.Engine.HasImage(image.Ref) {
 		fmt.Fprintf(out, "pulling %s (%s)\n", image.Ref, image.Source)
 		if err := where.Engine.Pull(image.Ref); err != nil {
@@ -186,7 +201,7 @@ func (m Manager) Up(record model.Record, out *os.File) (Environment, error) {
 		Name:    name,
 		Image:   image.Ref,
 		Mount:   where.Dir,
-		Labels:  map[string]string{Label: record.Name},
+		Labels:  map[string]string{Label: record.Name, ConfigLabel: m.fingerprint(record, where, image)},
 		Pass:    m.Settings.Passing(),
 		Private: volumes,
 	}); err != nil {

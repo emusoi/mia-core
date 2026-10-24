@@ -164,6 +164,15 @@ func (m Manager) Logs(record model.Record, id string, lines int) (string, error)
 			log, lines, log, shellJoin([]string{"(" + id + " has printed nothing)"})))
 }
 
+func (m Manager) FollowLogs(record model.Record, id string) error {
+	where, name, err := m.running(record)
+	if err != nil {
+		return err
+	}
+	return where.Engine.ExecInteractive(name, where.Dir,
+		[]string{"tail", "-n", "40", "-f", runtimeDir + "/" + id + ".log"})
+}
+
 func (m Manager) serviceRunning(where Location, container, id string) (bool, error) {
 	pid := shellJoin([]string{runtimeDir + "/" + id + ".pid"})
 	out, err := where.Engine.Exec(container, "sh", "-c",

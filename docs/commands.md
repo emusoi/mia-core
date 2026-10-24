@@ -35,12 +35,13 @@
 
 | command | does |
 |---|---|
-| `mia env up\|down\|rm` | start, stop, remove |
+| `mia env up [--wait] [--recreate]` | start; optionally wait for readiness or apply changed configuration |
+| `mia env down [--all]\|rm` | stop one or all, or remove |
 | `mia env shell` | a shell inside |
 | `mia env exec <cmd…>` | run a command inside |
 | `mia env run <worktree> <cmd…>` | run where its code runs |
 | `mia dev [worktree\|off]` | lend main's dev server a worktree's files |
-| `mia env browse` | open it in the browser |
+| `mia env browse [--direct]` | open it in the browser, with optional no-setup HTTP |
 | `mia env status\|ports\|service` | what it is doing |
 | `mia env host [machine]` | where it runs, or move it |
 | `mia machine list\|add\|shell\|rm` | machines |
@@ -54,6 +55,7 @@
 | `mia side <1-4\|top\|left\|right\|bottom>` | one side of the room alone, in a small popup |
 | `mia config [show\|validate]` | edit local overrides, or inspect the effective configuration |
 | `mia plugin ls\|enable\|disable` | plugins |
+| `mia doctor` | check tools, config, gateway, machines, plugins and environment drift |
 | `mia api <query>` | state as JSON |
 | `mia help vocabulary` | the words |
 | `mia help tmux` | tmux key bindings and the prefix-m menu, with the room's sides and plugins' entries |
