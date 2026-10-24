@@ -12,44 +12,44 @@ import (
 )
 
 type Config struct {
-	Base string `toml:"base"`
+	Base string `toml:"base" json:"base,omitempty"`
 
-	Prefix string `toml:"prefix"`
+	Prefix string `toml:"prefix" json:"prefix,omitempty"`
 
-	Setup []string `toml:"setup"`
+	Setup []string `toml:"setup" json:"setup,omitempty"`
 
 	// Clone names paths (globs allowed) copied from the main checkout into a new worktree
 	// before setup runs — node_modules, build outputs, caches — copy-on-write where the disk
 	// allows, so a fresh worktree starts built without costing the space twice.
-	Clone []string `toml:"clone"`
+	Clone []string `toml:"clone" json:"clone,omitempty"`
 
 	// CommitTimes gives a new worktree's tracked files the time of their last commit, not of
 	// the checkout, so tools that compare modification times see what the main checkout sees.
-	CommitTimes bool `toml:"commit_times"`
+	CommitTimes bool `toml:"commit_times" json:"commit_times,omitempty"`
 
-	Editor string `toml:"editor"`
+	Editor string `toml:"editor" json:"editor,omitempty"`
 
-	Env env.Settings `toml:"env"`
+	Env env.Settings `toml:"env" json:"env"`
 
-	Tools env.Tools `toml:"tools"`
+	Tools env.Tools `toml:"tools" json:"tools"`
 
 	// Dotfiles belong in the user-wide config: a person's own setup, carried
 	// to every machine and environment.
-	Dotfiles env.Dotfiles `toml:"dotfiles"`
+	Dotfiles env.Dotfiles `toml:"dotfiles" json:"dotfiles"`
 
-	Services []env.Service `toml:"service"`
+	Services []env.Service `toml:"service" json:"service,omitempty"`
 
-	Popup Popup `toml:"popup"`
+	Popup Popup `toml:"popup" json:"popup"`
 
-	Launch map[string]string `toml:"launch"`
+	Launch map[string]string `toml:"launch" json:"launch,omitempty"`
 
-	Keys map[string]Keys `toml:"keys"`
+	Keys map[string]Keys `toml:"keys" json:"keys,omitempty"`
 
-	Plugins []string `toml:"plugins"`
+	Plugins []string `toml:"plugins" json:"plugins,omitempty"`
 
-	Names []string `toml:"names"`
+	Names []string `toml:"names" json:"names,omitempty"`
 
-	Plugin map[string]map[string]any `toml:"plugin"`
+	Plugin map[string]map[string]any `toml:"plugin" json:"plugin,omitempty"`
 }
 
 type Keys []string
@@ -88,8 +88,8 @@ func (c Config) Launches() []string {
 }
 
 type Popup struct {
-	Width  string `toml:"width"`
-	Height string `toml:"height"`
+	Width  string `toml:"width" json:"width,omitempty"`
+	Height string `toml:"height" json:"height,omitempty"`
 }
 
 func (p Popup) Size() (width, height string) {
@@ -110,17 +110,48 @@ func Load(miaDir string) (Config, error) {
 			return Config{}, err
 		}
 	}
+	if project := ProjectPath(miaDir); project != "" {
+		if err := mergeFile(project, &config); err != nil {
+			return Config{}, err
+		}
+	}
 	if miaDir != "" {
 		if err := mergeFile(filepath.Join(miaDir, "config.toml"), &config); err != nil {
 			return Config{}, err
 		}
 	}
-	for _, name := range config.Names {
-		if !hostname.MatchString(name) {
-			return Config{}, fmt.Errorf("names: %q is not a usable name — lowercase letters, digits and hyphens only, since a name becomes a hostname and a tmux session", name)
-		}
+	if err := config.Validate(); err != nil {
+		return Config{}, err
 	}
 	return config, nil
+}
+
+// ProjectPath names the committed configuration in the main checkout. A
+// repository has one effective configuration, whichever worktree reads it.
+func ProjectPath(miaDir string) string {
+	if miaDir == "" || filepath.Base(filepath.Dir(miaDir)) != ".git" {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(filepath.Dir(miaDir)), ".mia.toml")
+}
+
+func (c Config) Validate() error {
+	for _, name := range c.Names {
+		if !hostname.MatchString(name) {
+			return fmt.Errorf("names: %q is not a usable name — lowercase letters, digits and hyphens only, since a name becomes a hostname and a tmux session", name)
+		}
+	}
+	seen := map[string]bool{}
+	for _, service := range c.Services {
+		if err := service.Validate(); err != nil {
+			return err
+		}
+		if seen[service.ID] {
+			return fmt.Errorf("service %s: declared more than once", service.ID)
+		}
+		seen[service.ID] = true
+	}
+	return nil
 }
 
 var hostname = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)

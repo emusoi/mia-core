@@ -1,12 +1,19 @@
 # Configuration
 
-Two TOML files, both optional:
+Three TOML files, all optional, later files taking precedence:
 
-- `~/.config/mia/config.toml`: yours, for every repository.
-- `.git/mia/config.toml`: one repository; `mia config` opens it.
+1. `~/.config/mia/config.toml`: yours, for every repository.
+2. `.mia.toml` in the main checkout: committed project configuration, shared
+   by every worktree and by everyone who clones the repository.
+3. `.git/mia/config.toml`: this repository's local overrides; `mia config`
+   opens it. It is never committed.
 
-Unknown keys are an error. [examples/config.toml](../examples/config.toml)
-uses every key.
+Inspect the merged result with `mia config show` (TOML) or
+`mia config show --json`. `mia config validate` checks all three files and
+the service declarations. Unknown keys are an error.
+[examples/config.toml](../examples/config.toml) uses every key; copy it to
+`.mia.toml` for project settings or `.git/mia/config.toml` for local ones.
+Keep credentials out of the committed file.
 
 ## Worktrees
 

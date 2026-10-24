@@ -14,25 +14,25 @@ import (
 )
 
 type Settings struct {
-	Image string `toml:"image"`
+	Image string `toml:"image" json:"image,omitempty"`
 
-	Setup []string `toml:"setup"`
+	Setup []string `toml:"setup" json:"setup,omitempty"`
 
-	ImageSetup []string `toml:"image_setup"`
+	ImageSetup []string `toml:"image_setup" json:"image_setup,omitempty"`
 
-	Ports []int `toml:"ports"`
+	Ports []int `toml:"ports" json:"ports,omitempty"`
 
-	Page int `toml:"page"`
+	Page int `toml:"page" json:"page,omitempty"`
 
-	PassHost bool `toml:"pass_host"`
+	PassHost bool `toml:"pass_host" json:"pass_host,omitempty"`
 
-	HostPorts []int `toml:"host_ports"`
+	HostPorts []int `toml:"host_ports" json:"host_ports,omitempty"`
 
-	ContainerOnly []string `toml:"container_only"`
+	ContainerOnly []string `toml:"container_only" json:"container_only,omitempty"`
 
-	Cache []string `toml:"cache"`
+	Cache []string `toml:"cache" json:"cache,omitempty"`
 
-	Pass []string `toml:"pass"`
+	Pass []string `toml:"pass" json:"pass,omitempty"`
 }
 
 type Environment struct {
