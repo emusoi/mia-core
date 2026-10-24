@@ -46,7 +46,7 @@ func TestSyncFetchesDropsLandedAndRestacksWithoutDeletingBranches(t *testing.T) 
 	}
 
 	clone := filepath.Join(t.TempDir(), "clone")
-	repo.GitIn(filepath.Dir(clone), "clone", remote, clone)
+	repo.GitIn(filepath.Dir(clone), "clone", "--branch", base, remote, clone)
 	repo.GitIn(clone, "config", "user.email", "other@example.com")
 	repo.GitIn(clone, "config", "user.name", "other")
 	if err := os.WriteFile(filepath.Join(clone, "remote.txt"), []byte("remote\n"), 0o644); err != nil {
