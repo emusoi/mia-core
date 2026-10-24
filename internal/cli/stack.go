@@ -30,7 +30,7 @@ func cmdStack(a *app.App, args []string, asJSON bool) (code int) {
 	base := a.BaseBranch(record.Path)
 	store := stackStore(a)
 	defer func() {
-		if code == exitOK && slices.Contains([]string{"restack", "rm", "forget", "merge", "name", "go"}, sub) {
+		if code == exitOK && slices.Contains([]string{"restack", "sync", "rm", "forget", "merge", "name", "go"}, sub) {
 			a.Emit("stack.changed", record, stackChange{Change: sub})
 		}
 	}()
@@ -45,6 +45,26 @@ func cmdStack(a *app.App, args []string, asJSON bool) (code int) {
 
 	case "restack":
 		return restack(a, record.Path, branch, base)
+
+	case "sync":
+		synced, err := a.Sync(record.Path, branch)
+		if err != nil {
+			return fail(err)
+		}
+		if asJSON {
+			return emit(synced)
+		}
+		fmt.Printf("base %s\n", synced.Base)
+		for _, layer := range synced.Dropped {
+			fmt.Printf("dropped landed layer %s; branch and worktree kept\n", layer)
+		}
+		if synced.Restacked > 0 {
+			fmt.Printf("restacked %d layer(s); current branch %s\n", synced.Restacked, synced.Current)
+		}
+		if len(synced.Dropped) == 0 && synced.Restacked == 0 {
+			fmt.Println("base fetched; every layer already sits on its parent")
+		}
+		return exitOK
 
 	case "rm", "forget":
 		worktrees := take(&args, "--worktrees")
@@ -170,7 +190,7 @@ func cmdStack(a *app.App, args []string, asJSON bool) (code int) {
 		return exitOK
 
 	default:
-		return usageErr("mia stack [--in <worktree>] [show|go <layer>|name <name>|restack|diff|pr]")
+		return usageErr("mia stack [--in <worktree>] [show|go <layer>|name <name>|sync|restack|diff|pr]")
 	}
 }
 

@@ -354,18 +354,30 @@ func cmdPath(a *app.App, args []string) int {
 
 func cmdGC(a *app.App, args []string, asJSON bool) int {
 	apply := take(&args, "--apply")
+	merged := take(&args, "--merged")
 	days := 14
 	if value := takeValue(&args, "--days"); value != "" {
+		if merged {
+			return usageErr("mia gc --merged [--apply] (cannot be combined with --days)")
+		}
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
-			return usageErr("mia gc [--apply] [--days N]")
+			return usageErr("mia gc [--merged] [--apply] [--days N]")
 		}
 		days = n
 	}
 	if len(args) > 0 {
-		return usageErr("mia gc [--apply] [--days N]")
+		return usageErr("mia gc [--merged] [--apply] [--days N]")
 	}
-	found, err := a.Abandoned(time.Duration(days)*24*time.Hour, time.Now())
+	var (
+		found []app.Abandoned
+		err   error
+	)
+	if merged {
+		found, err = a.Merged()
+	} else {
+		found, err = a.Abandoned(time.Duration(days)*24*time.Hour, time.Now())
+	}
 	if err != nil {
 		return fail(err)
 	}
@@ -373,6 +385,10 @@ func cmdGC(a *app.App, args []string, asJSON bool) int {
 		return emit(append([]app.Abandoned{}, found...))
 	}
 	if len(found) == 0 {
+		if merged {
+			fmt.Println("nothing merged and safe to remove — every merged worktree is starred, dirty, in a session, or already gone")
+			return exitOK
+		}
 		fmt.Printf("nothing abandoned — every worktree is starred, dirty, in a session, or touched within %d days\n", days)
 		return exitOK
 	}
@@ -380,19 +396,28 @@ func cmdGC(a *app.App, args []string, asJSON bool) int {
 		fmt.Printf("%-12s %-28s %6s  last commit %s\n", one.Record.Name, one.Branch, one.Size, one.LastWork.Format("2006-01-02"))
 	}
 	if !apply {
-		command := "mia gc --apply"
+		command := "mia gc"
+		if merged {
+			command += " --merged"
+		}
+		command += " --apply"
 		if days != 14 {
 			command += " --days " + strconv.Itoa(days)
 		}
 		fmt.Printf("\nnothing was removed — `%s` removes the above; star one to keep it\n", command)
 		return exitOK
 	}
+	failed := false
 	for _, one := range found {
 		if err := a.Collect(one); err != nil {
 			fmt.Fprintf(os.Stderr, "mia: %s: %v\n", one.Record.Name, err)
+			failed = true
 			continue
 		}
 		fmt.Printf("removed %s\n", one.Record.Name)
+	}
+	if failed {
+		return exitFailed
 	}
 	return exitOK
 }
@@ -424,14 +449,6 @@ func cmdRemove(a *app.App, args []string) int {
 	}
 	if err := removal.Blocked(force, stopRunning); err != nil {
 		return fail(err)
-	}
-
-	if manager, managerErr := managerFor(a); managerErr == nil {
-		if err := manager.Remove(removal.Record); err != nil {
-			return fail(fmt.Errorf("environment cleanup failed for %s; the worktree and its records were kept so you can retry: %w", removal.Record.Name, err))
-		}
-	} else if removal.Record.Env != nil {
-		return fail(managerErr)
 	}
 
 	if err := a.Remove(removal, force, stopRunning); err != nil {

@@ -360,6 +360,19 @@ func HasRemote(dir, name string) bool {
 	return err == nil && slices.Contains(strings.Fields(out), name)
 }
 
+func Fetch(dir, remote, branch string) error {
+	_, err := run(dir, "fetch", remote, branch)
+	return err
+}
+
+func Upstream(dir, branch string) string {
+	out, err := run(dir, "rev-parse", "--abbrev-ref", "--symbolic-full-name", branch+"@{upstream}")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
 func FetchPR(dir string, number int, branch string) error {
 	out, err := run(dir, "remote")
 	if err != nil {

@@ -615,6 +615,9 @@ func (a *App) Remove(removal Removal, force, stopRunning bool) error {
 	if err := removal.Blocked(force, stopRunning); err != nil {
 		return err
 	}
+	if err := a.removeEnvironment(removal.Record); err != nil {
+		return err
+	}
 	if err := a.sessionOf(removal.Record).Kill(removal.Record.Name); err != nil {
 		return err
 	}
