@@ -18,6 +18,7 @@ const pages = [
   { file: "dashboard.md", slug: "dashboard", group: "Using mia" },
   { file: "configuration.md", slug: "configuration", group: "Reference" },
   { file: "commands.md", slug: "commands", group: "Reference" },
+  { file: "api.md", slug: "api", group: "Reference" },
   { file: "plugins.md", slug: "plugins", group: "Reference" },
 ];
 

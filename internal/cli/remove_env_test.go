@@ -76,7 +76,7 @@ case "$1" in inspect) echo running ;; esac
 		t.Fatal(err)
 	}
 
-	if code := cmdHost(a, manager, record, []string{"box"}); code != exitFailed {
+	if code := cmdHost(a, manager, record, []string{"box"}, false); code != exitFailed {
 		t.Fatalf("failed move preflight exited %d", code)
 	}
 	calls, _ := os.ReadFile(log)

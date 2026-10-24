@@ -96,7 +96,7 @@ func Run(args []string) int {
 	case "shell-init":
 		return cmdShellInit(rest)
 	case "gateway":
-		return cmdGateway(rest)
+		return cmdGateway(rest, asJSON)
 	case "machine", "machines", "runtime":
 		return cmdRuntime(rest, asJSON)
 	case "plugin", "plugins":
@@ -188,7 +188,7 @@ func Run(args []string) int {
 	case "env":
 		return cmdEnv(a, rest, asJSON)
 	case "dev":
-		return cmdDev(a, rest)
+		return cmdDev(a, rest, asJSON)
 	case "api":
 		return cmdAPI(a, rest)
 	case "dash":
@@ -535,10 +535,15 @@ func emit(value any) int {
 }
 
 func exitFor(err error) int {
-	if err != nil {
+	if err == nil {
+		return exitOK
+	}
+	var notFound resolve.NotFound
+	if errors.As(err, &notFound) {
 		return fail(err)
 	}
-	return exitOK
+	fmt.Fprintln(os.Stderr, "mia:", err)
+	return run.ExitCode(err)
 }
 
 func padded(text string, width int) string {
