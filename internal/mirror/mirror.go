@@ -1,12 +1,15 @@
 package mirror
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
+	"slices"
+	"strings"
 
 	"github.com/emusoi/mia-core/internal/run"
-	"strings"
 )
 
 type Mirror struct{ Binary string }
@@ -36,18 +39,43 @@ var Ignores = []string{
 	".DS_Store",
 }
 
+var SecretIgnores = []string{
+	".env", ".env.*", ".envrc", ".netrc", ".npmrc", ".pypirc",
+	"*.pem", "*.key", "*.p12", "*.pfx", "id_rsa*", "id_ed25519*",
+}
+
+func Patterns(extra []string, includeSecrets bool) []string {
+	patterns := slices.Clone(Ignores)
+	if !includeSecrets {
+		patterns = append(patterns, SecretIgnores...)
+	}
+	return append(patterns, extra...)
+}
+
+const configurationLabel = "dev.mia.sync"
+
+var ErrConfigurationChanged = errors.New("sync ignore rules changed")
+
+func Configuration(patterns []string) string {
+	data, _ := json.Marshal(patterns)
+	return fmt.Sprintf("%x", sha256.Sum256(data))
+}
+
 type Session struct {
-	Name      string
-	Alpha     string
-	Beta      string
-	Status    string
-	Paused    bool
-	Problems  []string
-	Conflicts int
+	Name          string   `json:"name"`
+	Alpha         string   `json:"alpha"`
+	Beta          string   `json:"beta"`
+	Status        string   `json:"status"`
+	Paused        bool     `json:"paused"`
+	Problems      []string `json:"problems,omitempty"`
+	Conflicts     int      `json:"conflicts"`
+	ConflictPaths []string `json:"conflictPaths,omitempty"`
+	Outdated      bool     `json:"outdated,omitempty"`
+	Configuration string   `json:"-"`
 }
 
 func (s Session) Healthy() bool {
-	return !s.Paused && len(s.Problems) == 0 && strings.Contains(s.Status, "watching")
+	return !s.Paused && len(s.Problems) == 0 && s.Conflicts == 0 && strings.Contains(s.Status, "watching")
 }
 
 func (s Session) Describe() string {
@@ -57,7 +85,7 @@ func (s Session) Describe() string {
 	case len(s.Problems) > 0:
 		return "STALLED · " + strings.Join(s.Problems, "; ")
 	case s.Conflicts > 0:
-		return fmt.Sprintf("%s · %d conflict(s) — `mutagen sync list %s`", s.Status, s.Conflicts, s.Name)
+		return fmt.Sprintf("%s · %d conflict(s) — `mia env sync %s conflicts`", s.Status, s.Conflicts, strings.TrimPrefix(s.Name, "mia-"))
 	default:
 		return s.Status
 	}
@@ -68,12 +96,20 @@ func SessionName(worktree string) string { return "mia-" + worktree }
 // Ensure has a session between local and machine:remote. An existing one for
 // the same two ends is kept, paused or not: a manual worktree's session is
 // paused on purpose, and only `mia env sync` changes that.
-func (m Mirror) Ensure(worktree, local, machine, remote string) error {
+func (m Mirror) Ensure(worktree, local, machine, remote string, patterns []string) error {
 	name := SessionName(worktree)
 	beta := machine + ":" + remote
+	configuration := Configuration(patterns)
 
-	if existing, found, err := m.Status(worktree); err == nil && found {
+	existing, found, err := m.Status(worktree)
+	if err != nil {
+		return err
+	}
+	if found {
 		if existing.Alpha == local && existing.Beta == beta {
+			if existing.Configuration != configuration {
+				return fmt.Errorf("%w — `mia env sync %s restart` applies them", ErrConfigurationChanged, worktree)
+			}
 			return nil
 		}
 		if err := m.Terminate(worktree); err != nil {
@@ -87,8 +123,8 @@ func (m Mirror) Ensure(worktree, local, machine, remote string) error {
 	// dependency changed on the box, and `yarn install --immutable` refused
 	// the lockfile. Give new files the modes a checkout has.
 	args := []string{"sync", "create", "--name=" + name, "--sync-mode=two-way-safe", "--no-global-configuration",
-		"--default-file-mode=0644", "--default-directory-mode=0755"}
-	for _, ignore := range Ignores {
+		"--default-file-mode=0644", "--default-directory-mode=0755", "--label=" + configurationLabel + "=" + configuration}
+	for _, ignore := range patterns {
 		args = append(args, "--ignore="+ignore)
 	}
 	args = append(args, local, beta)
@@ -96,6 +132,13 @@ func (m Mirror) Ensure(worktree, local, machine, remote string) error {
 		return fmt.Errorf("start the mirror for %s: %s", worktree, err)
 	}
 	return nil
+}
+
+func (m Mirror) Restart(worktree, local, machine, remote string, patterns []string) error {
+	if err := m.Terminate(worktree); err != nil {
+		return err
+	}
+	return m.Ensure(worktree, local, machine, remote, patterns)
 }
 
 func (m Mirror) Seed(worktree string) error {
@@ -132,7 +175,7 @@ func (m Mirror) Terminate(worktree string) error {
 func (m Mirror) Status(worktree string) (Session, bool, error) {
 	out, err := m.tool().Capture("sync", "list", "--template", "{{json .}}", SessionName(worktree))
 	if err != nil {
-		return Session{}, false, nil
+		return Session{}, false, err
 	}
 	return parse([]byte(out), SessionName(worktree))
 }
@@ -158,12 +201,15 @@ func (e endpoint) address() string {
 
 func parse(data []byte, name string) (Session, bool, error) {
 	var listed []struct {
-		Name      string     `json:"name"`
-		Status    string     `json:"status"`
-		Paused    bool       `json:"paused"`
-		Alpha     endpoint   `json:"alpha"`
-		Beta      endpoint   `json:"beta"`
-		Conflicts []struct{} `json:"conflicts"`
+		Name      string            `json:"name"`
+		Status    string            `json:"status"`
+		Paused    bool              `json:"paused"`
+		Alpha     endpoint          `json:"alpha"`
+		Beta      endpoint          `json:"beta"`
+		Labels    map[string]string `json:"labels"`
+		Conflicts []struct {
+			Path string `json:"path"`
+		} `json:"conflicts"`
 	}
 	if err := json.Unmarshal(data, &listed); err != nil {
 		return Session{}, false, fmt.Errorf("read the mirror's state: %w", err)
@@ -173,12 +219,18 @@ func parse(data []byte, name string) (Session, bool, error) {
 			continue
 		}
 		session := Session{
-			Name:      entry.Name,
-			Alpha:     entry.Alpha.address(),
-			Beta:      entry.Beta.address(),
-			Status:    entry.Status,
-			Paused:    entry.Paused,
-			Conflicts: len(entry.Conflicts),
+			Name:          entry.Name,
+			Alpha:         entry.Alpha.address(),
+			Beta:          entry.Beta.address(),
+			Status:        entry.Status,
+			Paused:        entry.Paused,
+			Conflicts:     len(entry.Conflicts),
+			Configuration: entry.Labels[configurationLabel],
+		}
+		for _, conflict := range entry.Conflicts {
+			if conflict.Path != "" {
+				session.ConflictPaths = append(session.ConflictPaths, conflict.Path)
+			}
 		}
 		for _, side := range []struct {
 			where string

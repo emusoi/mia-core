@@ -42,6 +42,9 @@ Keep credentials out of the committed file.
 | `container_only` | paths kept inside the container, like `node_modules` |
 | `cache` | container paths shared by the repository's environments |
 | `pass` | environment variables passed from your shell |
+| `session` | `"runtime"` (default) runs shells on the environment's machine; `"local"` keeps worktree shells and agents in the local checkout |
+| `sync_ignore` | additional relative paths or globs excluded from remote sync |
+| `sync_secrets` | allow `.env*`, private keys and credential files to sync; false by default |
 
 ## `[[service]]`
 

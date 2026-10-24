@@ -32,6 +32,9 @@ page = 5173                         # what `mia env browse` opens
 container_only = ["node_modules"]   # a volume per worktree instead of the host directory
 cache = ["/root/.npm"]              # a volume per repository, shared by its environments
 pass = ["DATABASE_URL"]             # variables from your shell, passed in at `mia env up`
+session = "runtime"                # or "local": agents/shells stay in the local Git worktree
+sync_ignore = ["secrets/*"]       # extra paths excluded from remote sync
+sync_secrets = false               # true explicitly allows .env*, keys and credential files
 
 [tools]                             # files carried from this machine into environments
 copy = ["~/.gitconfig"]             # by `mia env tools`

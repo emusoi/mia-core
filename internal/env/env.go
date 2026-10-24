@@ -33,6 +33,12 @@ type Settings struct {
 	Cache []string `toml:"cache" json:"cache,omitempty"`
 
 	Pass []string `toml:"pass" json:"pass,omitempty"`
+
+	Session string `toml:"session" json:"session,omitempty"`
+
+	SyncIgnore []string `toml:"sync_ignore" json:"sync_ignore,omitempty"`
+
+	SyncSecrets bool `toml:"sync_secrets" json:"sync_secrets,omitempty"`
 }
 
 type Environment struct {
@@ -107,7 +113,9 @@ func (m Manager) describe(record model.Record, where Location, whereErr error) (
 	e.Image, _ = m.imageFor(where, record)
 	if where.Remote() {
 		e.Machine = where.Machine.Name
-		if session, found, _ := where.Mirror.Status(record.Name); found {
+		if session, found, err := where.Mirror.Status(record.Name); err != nil {
+			e.Mirror = "unavailable — " + err.Error()
+		} else if found {
 			e.Mirror = session.Describe()
 		} else {
 			e.Mirror = "not running"
@@ -145,15 +153,26 @@ func (m Manager) Up(record model.Record, out *os.File, recreate bool) (Environme
 		if _, err := runtime.Run(where.Machine.SSH, "mkdir", "-p", where.Dir); err != nil {
 			return Environment{}, err
 		}
-		if err := where.Mirror.Ensure(record.Name, record.Path, where.Machine.SSH, where.Dir); err != nil {
+		if err := where.Mirror.Ensure(record.Name, record.Path, where.Machine.SSH, where.Dir, m.syncPatterns()); err != nil {
 			return Environment{}, err
 		}
 		// A manual worktree's session stays paused: it was seeded when it was
 		// made, and moves again on `mia env sync <wt> now`. An auto one that
 		// was paused follows again.
-		session, found, _ := where.Mirror.Status(record.Name)
+		session, found, err := where.Mirror.Status(record.Name)
+		if err != nil {
+			return Environment{}, err
+		}
 		switch {
-		case found && session.Paused && record.Manual():
+		case record.Manual():
+			if !session.Paused {
+				if err := where.Mirror.Seed(record.Name); err != nil {
+					return Environment{}, err
+				}
+				if err := where.Mirror.Pause(record.Name); err != nil {
+					return Environment{}, err
+				}
+			}
 			fmt.Fprintf(out, "sync is manual for %s — `mia env sync %s now` to move changes\n", record.Name, record.Name)
 		default:
 			if found && session.Paused {
@@ -277,6 +296,14 @@ func (m Manager) Shell(record model.Record) error {
 	return where.Engine.ExecInteractive(name, where.Dir, m.shellCommand())
 }
 
+func (m Manager) syncPatterns() []string {
+	return mirror.Patterns(m.Settings.SyncIgnore, m.Settings.SyncSecrets)
+}
+
+func (m Manager) SyncPreview(record model.Record) (mirror.Preview, error) {
+	return mirror.BuildPreview(record.Path, m.syncPatterns())
+}
+
 // Sync carries out `mia env sync`: "auto" follows live, "manual" holds changes
 // on each side, "now" moves them once and keeps the mode. It returns the
 // session as it stands afterwards. The mode itself is the caller's to save.
@@ -289,11 +316,31 @@ func (m Manager) Sync(record model.Record, action string) (mirror.Session, error
 		return mirror.Session{}, fmt.Errorf("%s runs on this machine — there is no copy to sync", record.Name)
 	}
 	session, found, err := where.Mirror.Status(record.Name)
-	if err != nil || !found {
+	if err != nil {
+		return mirror.Session{}, err
+	}
+	if !found && action != "restart" {
 		return mirror.Session{}, fmt.Errorf("%s has no sync yet — `mia env up %s` makes it", record.Name, record.Name)
 	}
+	configuration := mirror.Configuration(m.syncPatterns())
+	session.Outdated = found && session.Configuration != configuration
 	switch action {
+	case "restart":
+		if err := where.Mirror.Restart(record.Name, record.Path, where.Machine.SSH, where.Dir, m.syncPatterns()); err != nil {
+			return mirror.Session{}, err
+		}
+		if record.Manual() {
+			if err := where.Mirror.Seed(record.Name); err != nil {
+				return mirror.Session{}, err
+			}
+			if err := where.Mirror.Pause(record.Name); err != nil {
+				return mirror.Session{}, err
+			}
+		}
 	case "auto", "now":
+		if session.Outdated {
+			return mirror.Session{}, fmt.Errorf("%w — `mia env sync %s restart` applies them", mirror.ErrConfigurationChanged, record.Name)
+		}
 		if session.Paused {
 			if err := where.Mirror.Resume(record.Name); err != nil {
 				return mirror.Session{}, err
@@ -308,6 +355,9 @@ func (m Manager) Sync(record model.Record, action string) (mirror.Session, error
 			}
 		}
 	case "manual":
+		if session.Outdated {
+			return mirror.Session{}, fmt.Errorf("%w — `mia env sync %s restart` applies them", mirror.ErrConfigurationChanged, record.Name)
+		}
 		// Settle what is in flight first, so nothing is left half moved.
 		if !session.Paused {
 			if err := where.Mirror.Seed(record.Name); err != nil {
@@ -317,11 +367,16 @@ func (m Manager) Sync(record model.Record, action string) (mirror.Session, error
 				return mirror.Session{}, err
 			}
 		}
-	case "":
+	case "", "status", "conflicts":
+		return session, nil
 	default:
-		return mirror.Session{}, fmt.Errorf("sync is auto, manual or now, not %q", action)
+		return mirror.Session{}, fmt.Errorf("sync is auto, manual, now, status, conflicts, preview or restart, not %q", action)
 	}
-	session, _, err = where.Mirror.Status(record.Name)
+	session, found, err = where.Mirror.Status(record.Name)
+	if err == nil && !found {
+		err = fmt.Errorf("sync for %s did not appear after %s", record.Name, action)
+	}
+	session.Outdated = found && session.Configuration != configuration
 	return session, err
 }
 

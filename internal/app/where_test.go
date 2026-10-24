@@ -62,6 +62,20 @@ func TestASessionFollowsItsEnvironment(t *testing.T) {
 	if host.Shell != "zsh" {
 		t.Errorf("remote session shell = %q, want zsh", host.Shell)
 	}
+
+	a.Config.Env.Session = "local"
+	host, err = a.SessionHostOf(away)
+	if err != nil || host.SSH != "" {
+		t.Fatalf("local session mode used host %q, %v", host.SSH, err)
+	}
+	dir, err := a.SessionDir(away)
+	if err != nil || dir != repo.Root {
+		t.Fatalf("local session directory = %q, %v", dir, err)
+	}
+	host, err = a.RuntimeSessionHostOf(away)
+	if err != nil || host.SSH != "fedora.invalid" {
+		t.Fatalf("environment shell no longer follows the runtime: %q, %v", host.SSH, err)
+	}
 }
 
 func TestFindingTheSessionHostNeverReachesForTheBox(t *testing.T) {

@@ -82,7 +82,8 @@ mia rm monduli
 
 removes the worktree, its session, its environment and its name. It refuses
 when there are uncommitted changes (`--force` discards them) or a session is
-running (`--stop-running` stops it).
+running (`--stop-running` stops it). If environment cleanup fails, it keeps
+the worktree and records so cleanup and removal can be retried.
 
 ```bash
 mia gc             # worktrees untouched for 14 days

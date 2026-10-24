@@ -35,7 +35,7 @@ var verbs = []Verb{
 	{"shell", "mia shell [--popup] [worktree]", "attach to a worktree's session", false, ""},
 	{"run", "mia run <worktree> <cmd…>", "run a command once in a worktree", false, ""},
 	{"dev", "mia dev [<worktree> [--follow]|off]", "lend the main checkout's running dev server a worktree's files; the one time mia writes into a working tree", false, ""},
-	{"env", "mia env <up [--wait] [--recreate]|down [--all]|setup|dotfiles|sync|shell|exec|run|ports|image|tools|host|browse [--direct]|service|status|rm> [worktree]", "the environment a worktree's code runs in", false, ""},
+	{"env", "mia env <up [--wait] [--recreate]|down [--all]|setup|dotfiles|sync [auto|manual|now|status|conflicts|preview|restart]|shell|exec|run|ports|image|tools|host|browse [--direct]|service|status|rm> [worktree]", "the environment a worktree's code runs in", false, ""},
 	{"stack", "mia stack [--in <worktree>] [show|go <layer>|name <name>|merge <layer> [onto <layer>]|rm [--worktrees] [--branches] [--force]|restack|diff|pr]", "a feature too large for one pull request", false, ""},
 	{"up", "mia up", "move to the layer above, in place", false, ""},
 	{"down", "mia down", "move to the layer below, in place", false, ""},

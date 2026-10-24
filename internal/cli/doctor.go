@@ -124,6 +124,12 @@ func cmdDoctor(args []string, asJSON bool) int {
 			if _, err := a.Runtimes.Get(machine); err != nil {
 				report.add("placement "+record.Name, "fail", err.Error())
 			}
+			if a.Config.Env.Session != "local" {
+				report.add("session "+record.Name, "warn", "remote staging has no .git; use `[env] session = \"local\"` for agents that commit or inspect Git")
+			}
+			if a.Config.Env.SyncSecrets {
+				report.add("sync "+record.Name, "warn", "sync_secrets = true allows .env, keys and credential files on this machine")
+			}
 		}
 	}
 	if engineErr == nil {

@@ -285,3 +285,66 @@ The URL stays the same. mia keeps a copy of the worktree there in sync with
 [mutagen](https://mutagen.io/documentation/introduction/installation).
 `mia env host local` moves it back. An image built with `mia env image` is
 built per machine: run it again there.
+
+A move preflights the target and aborts if old-environment cleanup fails.
+The worktree record keeps its old placement so the move can be retried.
+Private container volumes are not migrated: the target starts fresh, and
+the old environment and its private volumes are removed after preflight.
+
+### Git and sessions
+
+The remote staging copy deliberately excludes `.git`; syncing Git metadata
+two ways would corrupt it. By default, worktree shells and agent windows run
+on the runtime beside the environment, so they cannot commit or inspect the
+local Git branch.
+
+For agents that need Git, keep their sessions in the local worktree while
+the environment still runs remotely:
+
+```toml
+[env]
+session = "local"
+```
+
+`mia shell` and agent windows then use the local checkout. `mia env shell`
+always opens a shell inside the environment on its runtime.
+
+### Sync and secrets
+
+Remote sync is two-way-safe. New sessions exclude `.env*`, private keys and
+common credential files, in addition to `.git`, dependencies and build
+outputs. Add project exclusions with:
+
+```toml
+[env]
+sync_ignore = ["secrets/*", "*.local"]
+```
+
+Preview paths and effective rules without reading file contents:
+
+```bash
+mia env sync monduli preview
+mia env sync monduli preview --json
+```
+
+If the machine is trusted and these files must cross, explicitly set
+`sync_secrets = true`. This allows every matching secret pattern, not just
+one file. Excluding a file stops future synchronization; it does not delete
+a copy already on the machine. Remove old remote copies explicitly.
+
+### Sync operations
+
+```bash
+mia env sync monduli status     # mode and health
+mia env sync monduli conflicts  # conflicted paths, or "no conflicts"
+mia env sync monduli auto       # follow changes live, both ways
+mia env sync monduli manual     # pause after settling current changes
+mia env sync monduli now        # flush once, preserving the mode
+mia env sync monduli restart    # recreate the session with current rules
+```
+
+`status`, `conflicts` and `preview` also take `--json`. Changed ignore rules
+require `restart`; ordinary `up`, `auto`, `manual` and `now` refuse to keep
+using an old rule set. Sessions created before rules were labelled need one
+explicit restart. Restart keeps files on both sides but resets Mutagen's
+session history; any conflicts are then listed with `conflicts`.
