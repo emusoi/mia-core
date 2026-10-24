@@ -104,7 +104,8 @@ Serve on `0.0.0.0`, not `127.0.0.1`, so the gateway can reach it.
 **6. Open it.**
 
 ```bash
-mia env browse
+mia env browse --direct   # HTTP; no proxy or certificate setup
+mia env browse            # HTTPS, after the gateway setup below
 ```
 
 **7. Reach your computer, if you need to.** A database running on your
@@ -173,11 +174,28 @@ stay as they are, so the server keeps running and reloads. `mia dev off`
 resets main and restores the stash. Don't commit in main while it is lent.
 On the dashboard, `V` lends the selected worktree; `V` on main gives it back.
 
+## Direct HTTP
+
+For ordinary local web apps, no browser setup is needed:
+
+```bash
+mia env browse --direct
+```
+
+This opens `http://<name>.localhost:7842/`, which reaches the configured
+`[env] page`, or the first listening port when no page is configured. Direct
+browsing cannot choose another port; use HTTPS below for that.
+
 ## `<name>.mia`
 
-Containers publish no ports. Open the app at `https://<name>.mia:<port>/`
-instead of `localhost:<port>`. The gateway makes that work. It needs two
-settings on your computer, once:
+For HTTPS, open the app at `https://<name>.mia:<port>/` instead of
+`localhost:<port>`:
+
+```bash
+mia env browse
+```
+
+The gateway needs two settings on your computer, once:
 
 ```bash
 mia gateway setup          # prints both
@@ -186,6 +204,7 @@ mia gateway trust          # trusts mia's certificate (macOS)
 
 The other is pointing your system's automatic proxy setting at
 `http://127.0.0.1:7842/proxy.pac`. `mia env up` starts the gateway.
+Containers publish no ports of their own.
 
 ## Services
 
