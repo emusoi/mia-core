@@ -47,14 +47,35 @@ mia stack merge ui onto api    # fold layers into a lower one
 
 mia never merges into your base branch.
 
+## Sync with the base
+
+```bash
+mia stack sync
+```
+
+Fetch the base's upstream, fast-forward the base when it is local, forget
+landed layers and restack the survivors. Current and base worktrees must be
+clean; a base that cannot fast-forward is left for you to reconcile.
+
+Dropped layers' branches and worktrees stay. If the current layer landed,
+mia moves to a surviving layer when one exists; if the whole stack landed,
+the current branch stays where it is with no stack left. `mia stack sync
+--json` reports the base, current layer, dropped layers and rebase count.
+Mia never pushes. For a repository with no upstream, use `mia stack restack`
+without fetching.
+
 ## Land
 
 ```bash
 mia stack pr
+mia stack pr --draft
 ```
 
-prints `git push` and `gh pr create` for each layer, bottom first, for you to
-run.
+`stack pr` prints `git push` and `gh pr create` for each layer, bottom first,
+for you to run. `--draft` also creates missing PR drafts for every layer
+without checking out each branch, then includes their saved titles and
+`--body-file` paths in the commands. Existing draft bodies and manual edits
+are kept. Mia never pushes or opens a pull request itself.
 
 ## Forget
 

@@ -105,7 +105,7 @@ func apiCapabilities() capabilities {
 		Queries: apiQueryList,
 		Features: []string{
 			"direct-http", "project-config", "doctor", "environment-readiness", "environment-drift",
-			"local-sessions", "remote-sync-preview", "sync-conflicts", "safe-cleanup",
+			"local-sessions", "remote-sync-preview", "sync-conflicts", "safe-cleanup", "stack-sync", "merged-gc", "stack-pr-draft",
 		},
 	}
 }

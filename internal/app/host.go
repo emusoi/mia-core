@@ -1,12 +1,36 @@
 package app
 
 import (
+	"fmt"
 	"path/filepath"
 
+	"github.com/emusoi/mia-core/internal/container"
 	"github.com/emusoi/mia-core/internal/env"
 	"github.com/emusoi/mia-core/internal/model"
 	"github.com/emusoi/mia-core/internal/runtime"
 )
+
+func (a *App) removeEnvironment(record model.Record) error {
+	engine, err := container.Find()
+	if err != nil {
+		if record.Env != nil {
+			return err
+		}
+		return nil
+	}
+	manager := env.Manager{
+		Engine:   engine,
+		Runtimes: a.Runtimes,
+		Repo:     a.Root,
+		Settings: a.Config.Env,
+		Services: a.Config.Services,
+		Dotfiles: a.Config.Dotfiles,
+	}
+	if err := manager.Remove(record); err != nil {
+		return fmt.Errorf("environment cleanup failed for %s; the worktree and its records were kept so you can retry: %w", record.Name, err)
+	}
+	return nil
+}
 
 func (a *App) Host(record model.Record, machine runtime.Machine) (model.Record, error) {
 	placement := model.Local()

@@ -88,7 +88,15 @@ the worktree and records so cleanup and removal can be retried.
 ```bash
 mia gc             # worktrees untouched for 14 days
 mia gc --apply     # remove them
+mia gc --merged    # clean worktrees whose branch is an ancestor of base
+mia gc --merged --apply
 ```
+
+Both forms are dry runs unless `--apply` is present, and both skip starred,
+dirty, detached or session-running worktrees. `--merged` does not fetch and
+cannot be combined with `--days`; update the base first if needed. It detects
+ancestor merges, not squash merges. Removal also stops and removes the
+recorded environment; cleanup failure keeps the worktree for retry.
 
 ## Pull requests
 
