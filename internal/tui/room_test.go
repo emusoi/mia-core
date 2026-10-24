@@ -283,7 +283,7 @@ func TestEnterOpensTheItemUnderTheCursor(t *testing.T) {
 	m.hooks.Perform = func(c Chosen) Outcome { performed = append(performed, c.Argv); return Outcome{} }
 
 	m = press(m, runes("2"))
-	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil || cmd() != nil {
 		t.Fatal("⏎ on a popup item shows it and says nothing back")
 	}
@@ -293,7 +293,7 @@ func TestEnterOpensTheItemUnderTheCursor(t *testing.T) {
 
 	items := m.panel.Room.Sides[2].Lines
 	items[0].Open = &plugin.Open{Verb: "issue", Args: []string{"move", "in_review", "ilala"}, Report: true}
-	next, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if m = next.(model); cmd == nil || m.mode != working {
 		t.Fatalf("⏎ on a verb runs it like a key: mode %v", m.mode)
 	}
