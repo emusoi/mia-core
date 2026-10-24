@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -16,7 +17,7 @@ import (
 	"github.com/emusoi/mia-core/internal/session"
 )
 
-func cmdGateway(args []string) int {
+func cmdGateway(args []string, asJSON bool) int {
 	sub := "status"
 	if len(args) > 0 {
 		sub = args[0]
@@ -40,7 +41,7 @@ func cmdGateway(args []string) int {
 	case "uninstall":
 		return gatewayUninstall()
 	case "status":
-		return gatewayStatus()
+		return gatewayStatus(asJSON)
 	case "trust":
 		return gatewayTrust()
 	case "untrust":
@@ -237,23 +238,54 @@ func stopGateway() bool {
 	return true
 }
 
-func gatewayStatus() int {
-	if !gateway.Running() {
+type gatewayReport struct {
+	Running        bool     `json:"running"`
+	Address        string   `json:"address"`
+	PAC            string   `json:"pac"`
+	CA             string   `json:"ca"`
+	Trust          string   `json:"trust,omitempty"`
+	DifferentBuild bool     `json:"differentBuild,omitempty"`
+	Routes         []string `json:"routes"`
+}
+
+func gatewayStatus(asJSON bool) int {
+	report := gatewayReport{
+		Running: gateway.Running(),
+		Address: gateway.Addr,
+		PAC:     "http://" + gateway.Addr + "/proxy.pac",
+		CA:      filepath.Join(gateway.StateDir(), "ca.pem"),
+		Routes:  []string{},
+	}
+	if report.Running || asJSON {
+		report.Trust = trustState()
+	}
+	if report.Running {
+		if serving, ok := gateway.ServingBuild(); ok {
+			report.DifferentBuild = serving != gateway.Build()
+		}
+		for host := range gateway.LiveRoutes() {
+			report.Routes = append(report.Routes, host)
+		}
+		sort.Strings(report.Routes)
+	}
+	if asJSON {
+		return emit(report)
+	}
+	if !report.Running {
 		fmt.Printf("gateway  not running — `mia gateway start`\n")
 		return exitOK
 	}
-	fmt.Printf("gateway   listening on %s\n", gateway.Addr)
-	if serving, ok := gateway.ServingBuild(); ok && serving != gateway.Build() {
+	fmt.Printf("gateway   listening on %s\n", report.Address)
+	if report.DifferentBuild {
 		fmt.Println("build     a different mia build is serving — `mia gateway start` replaces it with this one")
 	}
-	fmt.Printf("pac       http://%s/proxy.pac\n", gateway.Addr)
-	fmt.Printf("ca        %s  (%s)\n", filepath.Join(gateway.StateDir(), "ca.pem"), trustState())
-	table := gateway.LiveRoutes()
-	if len(table) == 0 {
+	fmt.Printf("pac       %s\n", report.PAC)
+	fmt.Printf("ca        %s  (%s)\n", report.CA, report.Trust)
+	if len(report.Routes) == 0 {
 		fmt.Println("routes    none — no environment is running")
 		return exitOK
 	}
-	for host := range table {
+	for _, host := range report.Routes {
 		fmt.Printf("route     %s\n", host)
 	}
 	return exitOK

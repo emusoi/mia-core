@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/git"
@@ -19,6 +20,9 @@ func cmdAPI(a *app.App, args []string) int {
 		target = args[1]
 	}
 	switch args[0] {
+	case "capabilities":
+		return emit(apiCapabilities())
+
 	case "worktrees":
 		listings, err := a.List(args[1:]...)
 		if err != nil {
@@ -69,4 +73,27 @@ func cmdAPI(a *app.App, args []string) int {
 	}
 }
 
-const apiQueries = "worktrees|machines|here|repos|env|stack|base"
+var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base"}
+
+var apiQueries = strings.Join(apiQueryList, "|")
+
+// apiVersion is what `mia api capabilities` says the JSON speaks; it goes
+// up when a field changes meaning or goes, not when one is added.
+const apiVersion = 1
+
+type capabilities struct {
+	Version  int      `json:"version"`
+	Queries  []string `json:"queries"`
+	Features []string `json:"features"`
+}
+
+func apiCapabilities() capabilities {
+	return capabilities{
+		Version: apiVersion,
+		Queries: apiQueryList,
+		Features: []string{
+			"direct-http", "project-config", "doctor", "environment-readiness", "environment-drift",
+			"local-sessions", "remote-sync-preview", "sync-conflicts", "safe-cleanup",
+		},
+	}
+}

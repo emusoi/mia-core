@@ -12,5 +12,6 @@
 | [mia in tmux](tmux.md) | the status line, the radar, the menu, a new worktree, signals |
 | [Configuration](configuration.md) | every setting |
 | [Commands](commands.md) | every command |
+| [Automation](api.md) | JSON, capabilities and exit status |
 | [Plugins](plugins.md) | adding commands and signals |
 | [Changes](changes.md) | what each release adds, changes and takes away |

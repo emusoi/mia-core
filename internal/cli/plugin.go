@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/app"
@@ -49,6 +50,9 @@ func cmdPlugin(c config.Config, args []string, asJSON bool) int {
 		}
 		for _, p := range plugins {
 			fmt.Println(pluginLine(p))
+		}
+		for _, collision := range verbConflicts(plugins) {
+			fmt.Printf("⚠ verb %s is declared by %s; commands with this name are refused\n", collision.Verb, strings.Join(collision.Plugins, ", "))
 		}
 		return exitOK
 
@@ -99,15 +103,55 @@ func runPluginVerb(a *app.App, verb string, args []string) (int, bool) {
 	if err != nil {
 		return fail(err), true
 	}
-	p, ok := plugin.Owner(plugins, verb)
-	if !ok {
+	owners := plugin.Owners(plugins, verb)
+	if len(owners) == 0 {
 		return 0, false
 	}
+	if len(owners) > 1 {
+		names := make([]string, len(owners))
+		for i, p := range owners {
+			names[i] = p.Name
+		}
+		return fail(fmt.Errorf("verb %q is declared by plugins %s; disable all but one", verb, strings.Join(names, ", "))), true
+	}
+	p := owners[0]
 	code, err := p.Run(pluginContext(a, p.Name), append([]string{verb}, args...))
 	if err != nil {
 		return fail(err), true
 	}
 	return code, true
+}
+
+var coreAliases = map[string]bool{
+	"help": true, "-h": true, "--help": true, "version": true, "--version": true,
+	"__complete": true, "list": true, "remove": true, "windows": true,
+	"machines": true, "runtime": true, "plugins": true,
+}
+
+func coreVerb(name string) bool {
+	if _, ok := groupOf[name]; ok {
+		return true
+	}
+	return coreAliases[name]
+}
+
+func verbConflicts(plugins []plugin.Plugin) []plugin.VerbCollision {
+	active := make([]plugin.Plugin, 0, len(plugins))
+	for _, p := range plugins {
+		if p.Enabled && p.Problem == "" {
+			active = append(active, p)
+		}
+	}
+	conflicts := plugin.VerbCollisions(active)
+	for _, p := range active {
+		for _, verb := range p.Manifest.Verbs {
+			if coreVerb(verb.Name) {
+				conflicts = append(conflicts, plugin.VerbCollision{Verb: verb.Name, Plugins: []string{"mia", p.Name}})
+			}
+		}
+	}
+	sort.Slice(conflicts, func(i, j int) bool { return conflicts[i].Verb < conflicts[j].Verb })
+	return conflicts
 }
 
 func sendEvent(a *app.App, e app.Event) {

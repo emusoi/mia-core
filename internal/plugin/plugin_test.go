@@ -106,10 +106,11 @@ func TestAVerbGetsItsArgumentsContextAndData(t *testing.T) {
 	write(t, dir, "hello", good)
 	h.Configured = []string{"hello"}
 	on, _ := h.Enabled()
-	p, ok := Owner(on, "hi")
-	if !ok {
+	owners := Owners(on, "hi")
+	if len(owners) != 1 {
 		t.Fatal("hi has no owner")
 	}
+	p := owners[0]
 
 	out := filepath.Join(t.TempDir(), "out")
 	f, err := os.Create(out)

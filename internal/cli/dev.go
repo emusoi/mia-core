@@ -11,18 +11,35 @@ import (
 	"github.com/emusoi/mia-core/internal/git"
 )
 
-func cmdDev(a *app.App, args []string) int {
+type devState struct {
+	Lent     bool   `json:"lent"`
+	Worktree string `json:"worktree,omitempty"`
+	Path     string `json:"path,omitempty"`
+	Stashed  bool   `json:"stashed,omitempty"`
+}
+
+func devStateOf(current dev.Lent) devState {
+	return devState{Lent: current.Worktree != "", Worktree: current.Worktree, Path: current.Path, Stashed: current.Stashed}
+}
+
+func cmdDev(a *app.App, args []string, asJSON bool) int {
 	follow := take(&args, "--follow")
+	if follow && asJSON {
+		return usageErr("mia dev --follow cannot be combined with --json")
+	}
 	if len(args) > 1 {
 		return usageErr("mia dev [<worktree> [--follow]|off]")
 	}
 	main := a.Dev()
 	if len(args) == 0 {
-		current, ok, err := main.Current()
+		current, _, err := main.Current()
 		if err != nil {
 			return fail(err)
 		}
-		if !ok {
+		if asJSON {
+			return emit(devStateOf(current))
+		}
+		if current.Worktree == "" {
 			fmt.Println("main's dev server has main's own files")
 			return exitOK
 		}
@@ -30,10 +47,10 @@ func cmdDev(a *app.App, args []string) int {
 		return exitOK
 	}
 	if args[0] == "off" {
-		return devOff(main)
+		return devOff(main, asJSON)
 	}
 	if path, err := a.Locate(args[0]); err == nil && git.Resolve(path) == git.Resolve(a.Root) {
-		return devOff(main)
+		return devOff(main, asJSON)
 	}
 	record, err := a.RecordOrHere(args[0])
 	if err != nil {
@@ -42,6 +59,13 @@ func cmdDev(a *app.App, args []string) int {
 	if err := main.Lend(record.Name, record.Path); err != nil {
 		return fail(err)
 	}
+	if asJSON {
+		current, _, err := main.Current()
+		if err != nil {
+			return fail(err)
+		}
+		return emit(devStateOf(current))
+	}
 	fmt.Printf("main's dev server now has %s's files — `mia dev off` gives main its own back\n", record.Name)
 	if !follow {
 		return exitOK
@@ -49,10 +73,13 @@ func cmdDev(a *app.App, args []string) int {
 	return devFollow(record.Path, main)
 }
 
-func devOff(main dev.Main) int {
+func devOff(main dev.Main, asJSON bool) int {
 	was, err := main.Off()
 	if err != nil {
 		return fail(err)
+	}
+	if asJSON {
+		return emit(devStateOf(dev.Lent{}))
 	}
 	if was.Worktree == "" {
 		fmt.Println("main's dev server already has main's own files")

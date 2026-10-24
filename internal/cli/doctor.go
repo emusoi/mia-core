@@ -155,6 +155,9 @@ func cmdDoctor(args []string, asJSON bool) int {
 				report.add("plugin "+p.Name, "fail", p.Problem)
 			}
 		}
+		for _, collision := range verbConflicts(plugins) {
+			report.add("plugin verb "+collision.Verb, "fail", strings.Join(collision.Plugins, ", "))
+		}
 	}
 	return finish()
 }
