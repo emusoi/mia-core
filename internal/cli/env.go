@@ -22,7 +22,7 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 		return exitOK
 	}
 	sub, rest := args[0], args[1:]
-	var withCredentials, once, direct bool
+	var withCredentials, once, direct, wait, recreate, all, follow bool
 	switch sub {
 	case "status", "ports":
 		asJSON = take(&rest, "--json") || asJSON
@@ -32,6 +32,13 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 		once = take(&rest, "--once")
 	case "browse":
 		direct = take(&rest, "--direct")
+	case "up":
+		wait = take(&rest, "--wait")
+		recreate = take(&rest, "--recreate")
+	case "down":
+		all = take(&rest, "--all")
+	case "service":
+		follow = take(&rest, "--follow") || take(&rest, "-f")
 	case "run":
 		return envRun(a, rest)
 	}
@@ -39,6 +46,34 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 	manager, err := managerFor(a)
 	if err != nil {
 		return fail(err)
+	}
+
+	if all {
+		if len(rest) > 0 {
+			return usageErr("mia env down --all")
+		}
+		records, err := a.Store.Load()
+		if err != nil {
+			return fail(err)
+		}
+		if len(records) == 0 {
+			fmt.Println("no recorded worktrees")
+			return exitOK
+		}
+		failed := false
+		for _, record := range records {
+			if err := manager.Down(record); err != nil {
+				fmt.Fprintf(os.Stderr, "mia: %s: %v\n", record.Name, err)
+				failed = true
+				continue
+			}
+			a.Emit("env.down", record, envGone{Removed: false})
+			fmt.Printf("stopped %s\n", record.Name)
+		}
+		if failed {
+			return exitFailed
+		}
+		return exitOK
 	}
 
 	target, rest := splitEnvWords(sub, rest,
@@ -54,7 +89,7 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 	case "dotfiles":
 		return exitFor(manager.CopyMachineDotfiles(record, os.Stderr))
 	case "up":
-		environment, err := manager.Up(record, os.Stderr)
+		environment, err := manager.Up(record, os.Stderr, recreate)
 		if err != nil {
 			if environment.Container == "" {
 				return fail(err)
@@ -71,6 +106,15 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 			fmt.Fprintf(os.Stderr, "mia: the environment is up but %v\n", gatewayErr)
 		}
 		a.Emit("env.up", record, environment)
+		if wait {
+			if err != nil {
+				return exitFailed
+			}
+			if err := manager.Wait(record); err != nil {
+				return fail(err)
+			}
+			environment = manager.Describe(record)
+		}
 		if asJSON {
 			return emit(environment)
 		}
@@ -262,6 +306,9 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 		case "logs":
 			if len(ids) != 1 {
 				return usageErr("mia env service logs <worktree> <id>")
+			}
+			if follow {
+				return exitFor(manager.FollowLogs(record, ids[0]))
 			}
 			out, err := manager.Logs(record, ids[0], 40)
 			if err != nil {

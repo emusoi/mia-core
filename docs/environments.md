@@ -90,6 +90,18 @@ Check it from scratch:
 mia env rm && mia env up
 ```
 
+Changing the image, setup, volumes, passed environment or services does not
+silently rebuild an existing container. `mia env up` warns when they differ.
+Apply the new configuration with:
+
+```bash
+mia env up --recreate
+```
+
+Recreation replaces the container and reruns setup, but keeps its named
+volumes and remote sync. `mia env rm` is the destructive operation: it also
+removes the worktree's private volumes.
+
 **5. Start the app as a service.**
 
 ```toml
@@ -221,8 +233,19 @@ restart = "on-failure"
 running.
 
 ```bash
+mia env up --wait
+```
+
+`--wait` waits for every autostart service to be running and healthy (when
+it has a health check), and for every port in `[env] ports` to listen. It
+times out after one minute, or the largest configured service `grace` when
+that is longer. A timeout exits non-zero and leaves the environment running
+for inspection.
+
+```bash
 mia env service            # each service and its state
-mia env service logs web
+mia env service logs web   # the last 40 lines
+mia env service logs -f web
 ```
 
 ## Your files
@@ -237,6 +260,18 @@ shell = "zsh"
 ```
 
 `[env] pass = ["NAME"]` passes environment variables from your shell.
+
+## Many environments
+
+Stop every recorded environment in this repository without removing their
+containers, volumes or sync state:
+
+```bash
+mia env down --all
+```
+
+`mia doctor` checks local tools and configuration, registered machines,
+remote tmux, plugin manifests and environment configuration drift.
 
 ## Other machines
 

@@ -101,6 +101,8 @@ func Run(args []string) int {
 		return cmdRuntime(rest, asJSON)
 	case "plugin", "plugins":
 		return cmdPlugin(configHere(), rest, asJSON)
+	case "doctor":
+		return cmdDoctor(rest, asJSON)
 	}
 
 	here, err := os.Getwd()

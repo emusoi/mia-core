@@ -17,6 +17,16 @@ Add this to your shell's rc file, for `mia switch` and completion
 eval "$(mia shell-init zsh)"
 ```
 
+Check the installation and repository setup:
+
+```bash
+mia doctor
+mia doctor --json           # the same checks for automation
+```
+
+A failing required check exits non-zero. Gateway and HTTPS notes are
+non-fatal; direct HTTP needs no browser proxy or trusted certificate.
+
 ## The words
 
 | word | means |

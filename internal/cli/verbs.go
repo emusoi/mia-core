@@ -18,7 +18,7 @@ var groupOf = map[string]string{
 	"dash": "Working", "side": "Working", "stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working", "pr": "Working",
 	"env": "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
-	"api": "Records", "plugin": "Records",
+	"api": "Records", "plugin": "Records", "doctor": "Records",
 }
 
 var verbs = []Verb{
@@ -35,7 +35,7 @@ var verbs = []Verb{
 	{"shell", "mia shell [--popup] [worktree]", "attach to a worktree's session", false, ""},
 	{"run", "mia run <worktree> <cmd…>", "run a command once in a worktree", false, ""},
 	{"dev", "mia dev [<worktree> [--follow]|off]", "lend the main checkout's running dev server a worktree's files; the one time mia writes into a working tree", false, ""},
-	{"env", "mia env <up|down|setup|dotfiles|sync|shell|exec|run|ports|image|tools|host|browse|service|status|rm> [worktree]", "the environment a worktree's code runs in", false, ""},
+	{"env", "mia env <up [--wait] [--recreate]|down [--all]|setup|dotfiles|sync|shell|exec|run|ports|image|tools|host|browse [--direct]|service|status|rm> [worktree]", "the environment a worktree's code runs in", false, ""},
 	{"stack", "mia stack [--in <worktree>] [show|go <layer>|name <name>|merge <layer> [onto <layer>]|rm [--worktrees] [--branches] [--force]|restack|diff|pr]", "a feature too large for one pull request", false, ""},
 	{"up", "mia up", "move to the layer above, in place", false, ""},
 	{"down", "mia down", "move to the layer below, in place", false, ""},
@@ -43,6 +43,7 @@ var verbs = []Verb{
 	{"machine", "mia machine <list|add <name> <ssh-target>|shell <name>|rm <name>>", "the machines an environment can run on", false, ""},
 	{"gateway", "mia gateway <status|start|stop|install|uninstall|setup|trust|untrust>", "what makes <name>.mia reach an environment", false, ""},
 	{"api", "mia api <query>", "structured state, for clients and scripts", true, ""},
+	{"doctor", "mia doctor", "check tools, configuration, gateway, machines and environments", true, ""},
 	{"plugin", "mia plugin [ls|enable <name>|disable <name>]", "programs named mia-<name> that add verbs; installed on PATH, run once enabled", true, ""},
 	{"dash", "mia dash [--popup|--switch] [--side 1-4] [env|stack|blocks|machines [worktree]]", "the dashboard; --switch is a type-to-pick list that moves this tmux client to the worktree you pick; --side opens with the cursor in that side of the room", false, ""},
 	{"side", "mia side <1-4|top|left|right|bottom>", "one side of the room alone, small enough for a popup: j k move, ⏎ opens, tab switches tabs, esc closes", false, ""},
