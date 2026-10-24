@@ -72,9 +72,19 @@ type Abandoned struct {
 	Branch   string       `json:"branch"`
 	LastWork time.Time    `json:"last_work"`
 	Size     string       `json:"size"`
+	Merged   bool         `json:"merged,omitempty"`
 }
 
 func (a *App) Abandoned(olderThan time.Duration, now time.Time) ([]Abandoned, error) {
+	return a.abandoned(olderThan, now, false)
+}
+
+func (a *App) Merged() ([]Abandoned, error) {
+	return a.abandoned(0, time.Now(), true)
+}
+
+func (a *App) abandoned(olderThan time.Duration, now time.Time, mergedOnly bool) ([]Abandoned, error) {
+	a.ForgetDirtiness()
 	listings, err := a.List()
 	if err != nil {
 		return nil, err
@@ -93,10 +103,18 @@ func (a *App) Abandoned(olderThan time.Duration, now time.Time) ([]Abandoned, er
 			continue
 		}
 		last := git.LastCommitTime(l.Path)
-		if last.IsZero() || now.Sub(last) < olderThan {
+		if last.IsZero() {
 			continue
 		}
-		out = append(out, Abandoned{Record: byPath[l.Path], Branch: l.Branch, LastWork: last, Size: diskSize(l.Path)})
+		if mergedOnly {
+			base := a.BaseBranch(l.Path)
+			if l.Branch == "" || l.Branch == strings.TrimPrefix(base, "origin/") || !git.IsAncestor(l.Path, l.Branch, base) {
+				continue
+			}
+		} else if now.Sub(last) < olderThan {
+			continue
+		}
+		out = append(out, Abandoned{Record: byPath[l.Path], Branch: l.Branch, LastWork: last, Size: diskSize(l.Path), Merged: mergedOnly})
 	}
 	return out, nil
 }

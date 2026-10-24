@@ -362,6 +362,20 @@ func Push(dir, remote string, refs ...string) error {
 	return err
 }
 
+// FetchBranch fetches one branch from remote, for syncing a stack.
+func FetchBranch(dir, remote, branch string) error {
+	_, err := run(dir, "fetch", remote, branch)
+	return err
+}
+
+func Upstream(dir, branch string) string {
+	out, err := run(dir, "rev-parse", "--abbrev-ref", "--symbolic-full-name", branch+"@{upstream}")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
 func Fetch(dir, remote string) error {
 	_, err := run(dir, "fetch", "--quiet", remote)
 	return err

@@ -39,6 +39,8 @@ panel schema.
 | `mia env sync <worktree> status --json` | sync session, problems and conflict count |
 | `mia env sync <worktree> conflicts --json` | the same session with `conflictPaths` |
 | `mia env sync <worktree> preview --json` | ignore rules and secret paths excluded or allowed |
+| `mia gc --merged --json` | clean merged worktrees offered for removal, without removing them |
+| `mia stack sync --json` | fetched base, current layer, dropped landed layers and rebase count |
 
 `mia dev <worktree> --json` reports the new lent state; `mia dev off --json`
 reports `{"lent": false}`. `--follow` cannot be combined with `--json`.

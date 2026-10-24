@@ -90,12 +90,18 @@ the worktree and records so cleanup and removal can be retried.
 ```bash
 mia gc                  # idle worktrees: clean, no session, not starred, untouched for 14 days
 mia gc --apply          # remove them
+mia gc --merged         # clean worktrees whose branch is an ancestor of the base
+mia gc --merged --apply
 mia gc --others         # worktrees mia did not make, an agent's or another tool's
 mia gc --others --apply # remove the clean ones
 ```
 
-The radar folds both away under `idle` and `not mia's`, and removes them
-from there too; `^d` removes the one selected. Branches always stay.
+The radar folds idle ones and those mia did not make away under `idle` and
+`not mia's`, and removes them from there too; `^d` removes the one
+selected. Branches always stay. `--merged` does not fetch and cannot be
+combined with `--days`; update the base first if needed. It detects
+ancestor merges, not squash merges. Removal also stops and removes the
+recorded environment; a cleanup that fails keeps the worktree for retry.
 
 ## Put away, or try again
 

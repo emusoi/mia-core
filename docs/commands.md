@@ -28,6 +28,7 @@
 | `mia why <file:line\|commit>` | the claude conversation that made a commit, or the line's last commit: what you asked, and how to resume it |
 | `mia resurrect [--dry-run] [--list] [<worktree>...]` | after tmux or the computer went down, open each session again — or any one named, closed on purpose or not: its windows in their folders, their programs restarted, each claude resuming its own conversation; `--list` shows every session remembered |
 | `mia gc [--apply\|--ask] [--days N]` | find, or remove, idle worktrees: clean, no session, not starred, untouched for N days (14); `--ask` shows them and removes on `y` |
+| `mia gc --merged [--apply]` | find, or remove, clean worktrees whose branch the base already holds |
 | `mia gc --others [--apply\|--ask] [path…]` | find, or remove, the clean worktrees mia did not make; branches stay |
 
 ## Stacks
@@ -36,7 +37,7 @@
 |---|---|
 | `mia up`, `mia down` | move between layers |
 | `mia stack` | show the stack |
-| `mia stack go\|name\|merge\|restack\|diff\|rm` | work on it |
+| `mia stack go\|name\|sync\|merge\|restack\|diff\|rm` | work on it |
 
 ## Environments
 

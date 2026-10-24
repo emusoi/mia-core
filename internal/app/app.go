@@ -68,6 +68,10 @@ type reachability struct {
 	at     time.Time
 }
 
+// ForgetDirtiness drops what was cached about each worktree's changes, so
+// the next listing looks again: gc must not remove what just changed.
+func (a *App) ForgetDirtiness() { a.dirtiness = sync.Map{} }
+
 type dirtiness struct {
 	dirty          bool
 	at             time.Time
@@ -645,6 +649,9 @@ func (a *App) PlanRemoval(query string) (Removal, error) {
 
 func (a *App) Remove(removal Removal, force, stopRunning bool) error {
 	if err := removal.Blocked(force, stopRunning); err != nil {
+		return err
+	}
+	if err := a.removeEnvironment(removal.Record); err != nil {
 		return err
 	}
 	if err := a.sessionOf(removal.Record).Kill(removal.Record.Name); err != nil {
