@@ -77,7 +77,7 @@ func Serve(ctx context.Context) error {
 
 func isSelf(host string) bool {
 	name, _ := splitHostPort(host, Port)
-	return !strings.HasSuffix(name, Suffix)
+	return !strings.HasSuffix(name, Suffix) && !strings.HasSuffix(name, ".localhost")
 }
 
 func Build() string {

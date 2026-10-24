@@ -57,7 +57,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	p.forward(w, r, route, port)
+	p.forward(w, r, route, port, "http")
 }
 
 func (p *Proxy) connect(w http.ResponseWriter, r *http.Request) {
@@ -90,21 +90,28 @@ func (p *Proxy) connect(w http.ResponseWriter, r *http.Request) {
 	defer inside.Close()
 
 	serveOver(inside, func(rw http.ResponseWriter, req *http.Request) {
-		p.forward(rw, req, route, port)
+		p.forward(rw, req, route, port, "https")
 	})
 }
 
-func asLocalhost(header http.Header, name string) {
+func asLocalhost(header http.Header, name string, backendPort int) {
 	value := header.Get(name)
 	if value == "" {
 		return
 	}
 	parsed, err := url.Parse(value)
-	if err != nil || parsed.Host == "" || !strings.HasSuffix(parsed.Hostname(), Suffix) {
+	if err != nil || parsed.Host == "" {
+		return
+	}
+	hostname := parsed.Hostname()
+	direct := strings.HasSuffix(hostname, ".localhost")
+	if !direct && !strings.HasSuffix(hostname, Suffix) {
 		return
 	}
 	host := "localhost"
-	if port := parsed.Port(); port != "" {
+	if direct {
+		host = net.JoinHostPort(host, strconv.Itoa(backendPort))
+	} else if port := parsed.Port(); port != "" {
 		host = net.JoinHostPort(host, port)
 	}
 	parsed.Scheme, parsed.Host = "http", host
@@ -123,7 +130,7 @@ func asAsked(header http.Header, name, origin string) {
 	header.Set(name, origin)
 }
 
-func (p *Proxy) forward(w http.ResponseWriter, r *http.Request, route Route, port int) {
+func (p *Proxy) forward(w http.ResponseWriter, r *http.Request, route Route, port int, proto string) {
 	target := &url.URL{Scheme: "http", Host: net.JoinHostPort(route.Name, strconv.Itoa(port))}
 
 	proxy := &httputil.ReverseProxy{
@@ -132,12 +139,12 @@ func (p *Proxy) forward(w http.ResponseWriter, r *http.Request, route Route, por
 			pr.Out.Host = r.Host
 			if !route.PassHost {
 				pr.Out.Host = "localhost:" + strconv.Itoa(port)
-				asLocalhost(pr.Out.Header, "Origin")
-				asLocalhost(pr.Out.Header, "Referer")
+				asLocalhost(pr.Out.Header, "Origin", port)
+				asLocalhost(pr.Out.Header, "Referer", port)
 			}
 			pr.SetXForwarded()
 			pr.Out.Header.Set("X-Forwarded-Host", r.Host)
-			pr.Out.Header.Set("X-Forwarded-Proto", "https")
+			pr.Out.Header.Set("X-Forwarded-Proto", proto)
 		},
 		ModifyResponse: func(res *http.Response) error {
 			if !route.PassHost {
