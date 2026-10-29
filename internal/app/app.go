@@ -44,6 +44,8 @@ type App struct {
 	dirtiness  sync.Map
 	shots      sync.Map
 	reach      sync.Map
+	hereOnce   sync.Once
+	here       string
 	Events     func(Event)
 }
 
@@ -710,6 +712,17 @@ func (a *App) RecordOrHere(query string) (model.Record, error) {
 		}
 	}
 	return record, err
+}
+
+// HereName is the name of the worktree this process runs in, or "" outside
+// one. It is asked once: the dash asks for every plugin on every reload, and
+// each answer costs a few `git rev-parse` calls.
+func (a *App) HereName() string {
+	a.hereOnce.Do(func() {
+		record, _ := a.RecordOrHere("")
+		a.here = record.Name
+	})
+	return a.here
 }
 
 func (a *App) MarkSeen(query string) error {

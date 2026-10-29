@@ -26,11 +26,7 @@ func pluginHost(c config.Config) plugin.Host {
 }
 
 func pluginContext(a *app.App, name string) plugin.Context {
-	c := plugin.Context{Repo: a.Root, MiaDir: a.MiaDir, Settings: a.Config.Plugin[name]}
-	if record, err := a.RecordOrHere(""); err == nil {
-		c.Worktree = record.Name
-	}
-	return c
+	return plugin.Context{Repo: a.Root, MiaDir: a.MiaDir, Settings: a.Config.Plugin[name], Worktree: a.HereName()}
 }
 
 func cmdPlugin(c config.Config, args []string, asJSON bool) int {
