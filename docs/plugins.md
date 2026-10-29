@@ -67,7 +67,8 @@ row only if it ranks higher.
 
 `side` is `top`, `left`, `right` or `bottom`; `at` is `bl` or `br`. A side's
 tabs come from every plugin, ordered by `rank`; the lowest is the default.
-`mia-<name> side <id>` and `mia-<name> corner <id>` answer:
+`mia-<name> side <id>` and `mia-<name> corner <id>` get the same worktrees on
+stdin as `rows` and answer:
 
 ```json
 {"count": "2", "lines": [[{"text": "●", "width": 3, "style": "yellow"}, {"text": "sinza", "width": 11, "style": "bold"}], []]}
@@ -135,6 +136,6 @@ already a core entry's is left out, and `mia help tmux` says so.
 
 With `"serve": true`, the dashboard runs `mia-<name> serve` and talks JSON-RPC
 over stdin and stdout: `rows`, `panel`, `side` and `corner` requests (the
-last two with `{"id": "<id>"}`), `event` notifications.
+last two with `{"id": "<id>", "input": <the worktrees>}`), `event` notifications.
 The plugin sends `{"jsonrpc":"2.0","method":"refresh"}` to redraw the
 dashboard.

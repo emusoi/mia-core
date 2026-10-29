@@ -102,12 +102,6 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 		if name != "dashboard" {
 			return panelNamed(a, name, target)
 		}
-		if onlySide != "" {
-			plugins, _ := enabledPlugins(a)
-			p := panel.Panel{Version: panel.Version, Room: pluginRoom(a, plugins)}
-			p.Bind(a.Config.KeyMap())
-			return p, nil
-		}
 		if cached == nil || time.Since(fetched) > listingTTL {
 			if cfg, err := config.Load(a.MiaDir); err == nil {
 				a.Config = cfg
@@ -119,8 +113,13 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 			cached, fetched = listings, time.Now()
 		}
 		plugins, _ := enabledPlugins(a)
+		if onlySide != "" {
+			p := panel.Panel{Version: panel.Version, Room: pluginRoom(a, plugins, cached)}
+			p.Bind(a.Config.KeyMap())
+			return p, nil
+		}
 		room := make(chan *panel.Room, 1)
-		go func() { room <- pluginRoom(a, plugins) }()
+		go func() { room <- pluginRoom(a, plugins, cached) }()
 		p := withChoices(panel.Dashboard(cached, a.Config.Prefix, pluginRows(a, plugins, cached)))
 		p.Room = <-room
 		p.Bind(a.Config.KeyMap())

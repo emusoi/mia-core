@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -69,6 +70,10 @@ func call(path string, env []string, args []string, stdin []byte, timeout time.D
 	cmd.Env = env
 	cmd.Stdin = bytes.NewReader(stdin)
 	cmd.Stdout, cmd.Stderr = &out, &errOut
+	// A plugin that runs out of time takes what it started with it: a shell
+	// plugin's `mia` and `podman` children would otherwise run on, orphaned.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
 	cmd.WaitDelay = 100 * time.Millisecond
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {

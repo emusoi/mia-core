@@ -114,20 +114,25 @@ func runPluginVerb(a *app.App, verb string, args []string) (int, bool) {
 	return code, true
 }
 
+// pluginInput is what rows, sides and corners get on stdin: the worktrees
+// the dash already listed, so a plugin need not run `mia api worktrees`.
+type pluginInput struct {
+	Protocol  int           `json:"protocol"`
+	Repo      string        `json:"repo"`
+	Worktrees []app.Listing `json:"worktrees"`
+}
+
 func pluginRows(a *app.App, plugins []plugin.Plugin, listings []app.Listing) []plugin.Rows {
 	if len(plugins) == 0 {
 		return nil
 	}
-	input := struct {
-		Protocol  int           `json:"protocol"`
-		Repo      string        `json:"repo"`
-		Worktrees []app.Listing `json:"worktrees"`
-	}{plugin.Protocol, a.Root, listings}
+	input := pluginInput{plugin.Protocol, a.Root, listings}
 	return plugin.AllRows(plugins, func(p plugin.Plugin) plugin.Context { return pluginContext(a, p.Name) }, input)
 }
 
-func pluginRoom(a *app.App, plugins []plugin.Plugin) *panel.Room {
-	tabs, corners := plugin.AllSides(plugins, func(p plugin.Plugin) plugin.Context { return pluginContext(a, p.Name) })
+func pluginRoom(a *app.App, plugins []plugin.Plugin, listings []app.Listing) *panel.Room {
+	input := pluginInput{plugin.Protocol, a.Root, listings}
+	tabs, corners := plugin.AllSides(plugins, func(p plugin.Plugin) plugin.Context { return pluginContext(a, p.Name) }, input)
 	return &panel.Room{Repo: filepath.Base(a.Root), Sides: tabs, Corners: corners}
 }
 

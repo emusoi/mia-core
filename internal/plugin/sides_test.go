@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestSidesAndCornersAreAskedCachedAndRanked(t *testing.T) {
@@ -30,8 +31,8 @@ esac
 	c := Context{Repo: "/r", MiaDir: t.TempDir()}
 	contextOf := func(Plugin) Context { return c }
 
-	tabs, corners := AllSides(on, contextOf)
-	AllSides(on, contextOf)
+	tabs, corners := AllSides(on, contextOf, nil)
+	AllSides(on, contextOf, nil)
 	calls, _ := os.ReadFile(counter)
 	if string(calls) != "answered /r\nwaiting /r\n" && string(calls) != "waiting /r\nanswered /r\n" {
 		t.Errorf("each side asked once with its id and the repo, then cached: %q", calls)
@@ -98,7 +99,7 @@ esac
 	var tabs []SideTab
 	var rows Rows
 	for range 2 {
-		tabs, _ = AllSides(on, contextOf)
+		tabs, _ = AllSides(on, contextOf, nil)
 		rows = on[0].Rows(c, nil)
 	}
 	calls, _ := os.ReadFile(counter)
@@ -107,5 +108,34 @@ esac
 	}
 	if !strings.Contains(tabs[0].Problem, "slow") || !strings.Contains(rows.Problem, "slow") {
 		t.Errorf("the kept failure still says why: side %q rows %q", tabs[0].Problem, rows.Problem)
+	}
+}
+
+func TestSidesGetTheInputOnStdin(t *testing.T) {
+	h, dir := host(t)
+	got := filepath.Join(t.TempDir(), "stdin")
+	write(t, dir, "issue", `case "$1" in
+manifest) echo '{"protocol":1,"sides":[{"id":"issues","side":"left","label":"issues"}]}' ;;
+side) cat > `+got+`; echo '{"count":"","lines":[]}' ;;
+esac
+`)
+	h.Configured = []string{"issue"}
+	on, _ := h.Enabled()
+	AllSides(on, func(Plugin) Context { return Context{Repo: "/r", MiaDir: t.TempDir()} }, map[string]any{"worktrees": []string{"sinza"}})
+	if data, _ := os.ReadFile(got); string(data) != `{"worktrees":["sinza"]}` {
+		t.Fatalf("side read %q", data)
+	}
+}
+
+func TestATimedOutPluginTakesItsChildrenWithIt(t *testing.T) {
+	dir := t.TempDir()
+	late := filepath.Join(dir, "late")
+	path := write(t, dir, "slow", `(sleep 1; touch `+late+`) & wait`)
+	if _, err := call(path, os.Environ(), []string{"side"}, nil, 200*time.Millisecond); err == nil || !strings.Contains(err.Error(), "took longer") {
+		t.Fatalf("err %v", err)
+	}
+	time.Sleep(1500 * time.Millisecond)
+	if _, err := os.Stat(late); err == nil {
+		t.Fatal("the plugin's child outlived the timeout")
 	}
 }

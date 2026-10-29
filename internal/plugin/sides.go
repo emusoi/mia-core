@@ -116,10 +116,6 @@ type CornerText struct {
 	Problem string
 }
 
-type idParams struct {
-	ID string `json:"id"`
-}
-
 type cachedAnswer[T any] struct {
 	At      time.Time `json:"at"`
 	Answer  T         `json:"answer"`
@@ -130,7 +126,7 @@ type cachedAnswer[T any] struct {
 // the answer for every so the dash does not run the plugin on each redraw.
 // A failure is kept for every as well, serve or not, so a plugin that times
 // out costs one timeout per every rather than one per reload.
-func fetch[T any](p Plugin, c Context, kind, id string, every time.Duration) (T, error) {
+func fetch[T any](p Plugin, c Context, kind, id string, every time.Duration, input any) (T, error) {
 	path := filepath.Join(p.DataDir(c), kind+"-"+id+".json")
 	var last cachedAnswer[T]
 	if data, err := os.ReadFile(path); err == nil && json.Unmarshal(data, &last) == nil &&
@@ -141,7 +137,7 @@ func fetch[T any](p Plugin, c Context, kind, id string, every time.Duration) (T,
 		return last.Answer, nil
 	}
 	var answer T
-	out, err := p.ask(c, []string{kind, id}, kind, idParams{ID: id}, nil)
+	out, err := p.ask(c, []string{kind, id}, kind, panelParams{ID: id, Input: input}, input)
 	if err == nil {
 		if bad := json.Unmarshal(out, &answer); bad != nil {
 			err = fmt.Errorf("%s %s is not JSON: %w", kind, id, bad)
@@ -159,9 +155,10 @@ func fetch[T any](p Plugin, c Context, kind, id string, every time.Duration) (T,
 	return answer, nil
 }
 
-// AllSides asks every plugin for its sides and corners at once. Tabs come
-// back grouped by place and ordered by rank, so a place's first tab is its default.
-func AllSides(plugins []Plugin, contextOf func(Plugin) Context) ([]SideTab, []CornerText) {
+// AllSides asks every plugin for its sides and corners at once, each with
+// input on stdin as rows gets it. Tabs come back grouped by place and ordered
+// by rank, so a place's first tab is its default.
+func AllSides(plugins []Plugin, contextOf func(Plugin) Context, input any) ([]SideTab, []CornerText) {
 	var (
 		mu      sync.Mutex
 		wg      sync.WaitGroup
@@ -174,7 +171,7 @@ func AllSides(plugins []Plugin, contextOf func(Plugin) Context) ([]SideTab, []Co
 			wg.Go(func() {
 				every, _ := s.Interval()
 				tab := SideTab{Plugin: p.Name, Side: s}
-				answer, err := fetch[SideAnswer](p, c, "side", s.ID, every)
+				answer, err := fetch[SideAnswer](p, c, "side", s.ID, every, input)
 				if err != nil {
 					tab.Problem = firstLine(err.Error())
 				} else {
@@ -189,7 +186,7 @@ func AllSides(plugins []Plugin, contextOf func(Plugin) Context) ([]SideTab, []Co
 			wg.Go(func() {
 				every, _ := k.Interval()
 				corner := CornerText{Plugin: p.Name, Corner: k}
-				answer, err := fetch[CornerAnswer](p, c, "corner", k.ID, every)
+				answer, err := fetch[CornerAnswer](p, c, "corner", k.ID, every, input)
 				if err != nil {
 					corner.Problem = firstLine(err.Error())
 				} else {

@@ -20,8 +20,8 @@ serve)
 		id=$(printf %s "$line" | sed -n 's/^{"jsonrpc":"2.0","id":\([0-9]*\).*/\1/p')
 		case "$line" in
 		*'"method":"rows"'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"rows\":{\"monduli\":{\"status\":\"served\"}}}}" ;;
-		*'"method":"side","params":{"id":"cost"}'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"count\":\"\",\"lines\":[[{\"text\":\"\$5.76\"}]]}}" ;;
-		*'"method":"corner","params":{"id":"spend"}'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"segments\":[{\"text\":\"\$5.76\",\"style\":\"green\"}]}}" ;;
+		*'"method":"side","params":{"id":"cost",'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"count\":\"\",\"lines\":[[{\"text\":\"\$5.76\"}]]}}" ;;
+		*'"method":"corner","params":{"id":"spend",'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"segments\":[{\"text\":\"\$5.76\",\"style\":\"green\"}]}}" ;;
 		*'"method":"panel"'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{\"title\":\"from serve\"}}" ;;
 		*'"method":"event"'*) echo '{"jsonrpc":"2.0","method":"refresh"}' ;;
 		*'"method":"fail"'*) echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"error\":{\"code\":1,\"message\":\"nope\"}}" ;;
@@ -48,7 +48,7 @@ func TestServeAnswersRowsPanelsAndPushesRefresh(t *testing.T) {
 	if rows.Problem != "" || rows.Rows["monduli"].Status != "served" {
 		t.Fatalf("rows through serve: %+v", rows)
 	}
-	tabs, corners := AllSides([]Plugin{p}, func(Plugin) Context { return c })
+	tabs, corners := AllSides([]Plugin{p}, func(Plugin) Context { return c }, nil)
 	if len(tabs) != 1 || tabs[0].Problem != "" || tabs[0].Lines[0].Cells[0].Text != "$5.76" {
 		t.Errorf("side through serve: %+v", tabs)
 	}
