@@ -1784,6 +1784,14 @@ func (m model) tabsOf(i int) []string {
 }
 
 func (m model) scrolled(down bool) int {
+	if m.details && m.homes() && m.cursor < len(m.rows) {
+		// home's entry page reads from its top: J goes on down it
+		step := max(m.height/3, 1)
+		if !down {
+			step = -step
+		}
+		return min(max(m.scroll+step, 0), max(len(m.entry(m.rows[m.cursor], homeWidest))-1, 0))
+	}
 	i := m.attention()
 	if m.details {
 		i = m.cursor

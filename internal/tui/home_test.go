@@ -392,3 +392,21 @@ func TestAnAnswerIsPickedHeldAndSentOrTakenBack(t *testing.T) {
 		t.Errorf("u takes the answer back")
 	}
 }
+
+func TestTheEntryIsTheWorktreeInFull(t *testing.T) {
+	p := homePanel()
+	row := &p.Sections[0].Rows[0]
+	row.Facts = append(row.Facts, "branch  joneskim/docs-base", "layers  147 layers · 0 landed", "top  docs-shared", "dev  none", "runs  local", "session  open")
+	row.Tabs = []panel.Tab{{Name: "turns", Preview: []string{"13:02  moved the routes under subfolders"}}}
+	m := newModel(p)
+	m.width, m.height, m.details = 180, 45, true
+	view := stripANSI(m.View())
+	for _, want := range []string{"docs-base   behind", "facts", "session   open", "turns", "13:02  moved the routes", "i close"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the entry lacks %q:\n%s", want, view)
+		}
+	}
+	if m.scrolled(true) <= m.scroll {
+		t.Error("J goes on down the entry")
+	}
+}

@@ -143,8 +143,8 @@ func (m model) home() string {
 		}
 		return m.sheet(top[:1], "", body, 0, strings.TrimLeft(m.footer(), " "), false)
 	case m.details && m.mode == browsing && m.cursor < len(m.rows):
-		return m.sheet(top[:1], nameOf(m.rows[m.cursor]), m.paneOf(m.cursor, width, homeTallest-8), 0,
-			homeKey("j k", "scroll")+"    "+homeKey(m.shown("tabprev", "tabnext"), "tabs")+"    "+homeKey("i", "close"), false)
+		return m.sheet(top[:1], "", m.entry(m.rows[m.cursor], width), m.scroll,
+			homeKey("j k", "the next entry")+"    "+homeKey("K J", "scroll")+"    "+homeKey("i", "close"), false)
 	case m.mode == helping:
 		return m.sheet(top[:1], "Keys", m.homeHelp(), m.scroll, homeKey("j k", "scroll")+"    "+homeKey("?", "close"), false)
 	case m.mode == reporting:
@@ -542,6 +542,51 @@ func (m model) sheet(top []string, title string, body []string, at int, keys str
 	return strings.Join(page, "\n")
 }
 
+// entry is a worktree in full, as its own page: name and state, its title,
+// the answers it waits on, every fact, then each plugin's section.
+func (m model) entry(row panel.Row, width int) []string {
+	cells := append(append([]string{}, row.Cells...), "", "", "", "")
+	lines := []string{head.Render(nameOf(row)) + "   " + muted.Italic(true).Render(strings.TrimSpace(cells[2])) + "   " + faint.Render(strings.TrimSpace(cells[3])), ""}
+	title := row.Title
+	if title == "" {
+		title = strings.TrimSpace(cells[1])
+	}
+	for _, part := range wrap(title, width) {
+		lines = append(lines, ink.Bold(true).Render(part))
+	}
+	if len(row.Answers) > 0 {
+		lines = append(lines, "")
+		for i, a := range row.Answers {
+			lines = append(lines, muted.Render(fmt.Sprintf("%d.   ", i+1))+ink.Render(a.Label))
+		}
+	}
+	section := func(name string) { lines = append(lines, "", muted.Italic(true).Render(name)) }
+	if len(row.Facts) > 0 {
+		section("facts")
+		for _, fact := range row.Facts {
+			key, value, ok := strings.Cut(fact, "  ")
+			if !ok {
+				key, value = "", fact
+			}
+			style := muted
+			if problemFact(fact) {
+				style = danger
+			}
+			lines = append(lines, faint.Render(fmt.Sprintf("%-10s", strings.TrimSpace(key)))+style.Render(strings.TrimSpace(value)))
+		}
+	}
+	for _, tab := range row.Tabs {
+		if len(tab.Preview) == 0 {
+			continue
+		}
+		section(tab.Name)
+		for _, line := range tab.Preview {
+			lines = append(lines, ink.Render(line))
+		}
+	}
+	return lines
+}
+
 // homeHelp is every key home answers to: moving, the selected worktree's,
 // the ones that work anywhere, and what the dots say.
 func (m model) homeHelp() []string {
@@ -767,10 +812,9 @@ func viewStyle(spec string) lipgloss.Style {
 func (m model) cornerText() string {
 	var parts []string
 	for _, corner := range m.dashRoom().Corners {
-		if corner.Problem != "" {
-			continue
+		if text := strings.TrimSpace(plainSegments(corner.Segments)); corner.Problem == "" && text != "" {
+			parts = append(parts, text)
 		}
-		parts = append(parts, plainSegments(corner.Segments))
 	}
 	return strings.Join(append(parts, clock().Format("15:04")), "   ·   ")
 }
