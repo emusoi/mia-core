@@ -679,7 +679,7 @@ func addKeys(p *Panel, extras []plugin.Rows, worktrees map[string]app.Listing) [
 				action.Panel = PluginPanel(extra.Plugin, key.Panel)
 			}
 			if owner, clash := taken[key.Key]; clash {
-				problems = append(problems, "plugin  "+extra.Plugin+": "+key.Key+" is already "+owner+"; bind "+name+" in [keys]")
+				problems = append(problems, "plugin  "+extra.Plugin+": "+key.Key+" is already "+owner+"; mia config --global keys."+name+" <key>")
 				action.Key = ""
 			} else if key.Key != "" {
 				taken[key.Key] = name

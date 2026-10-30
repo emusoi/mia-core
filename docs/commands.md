@@ -53,7 +53,7 @@
 | `mia dash` | the dashboard |
 | `mia side <1-4\|top\|left\|right\|bottom>` | one side of the room alone, in a small popup |
 | `mia config` | edit the repository's config |
-| `mia config base [<branch>]` | say, or set, where a new branch starts; `B` in the dashboard |
+| `mia config [--global] <key> [<value>]` | say, or set, one setting: `base staging`, `keys.quizzicle.quiz K`, `plugin.agent.default codex`; one line edited, comments kept, and a setting mia would not load refused. `B` in the dashboard sets `base` |
 | `mia plugin ls\|enable\|disable` | plugins |
 | `mia api <query>` | state as JSON |
 | `mia help vocabulary` | the words |

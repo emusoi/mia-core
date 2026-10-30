@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/config"
 	"github.com/emusoi/mia-core/internal/panel"
 )
 
@@ -56,16 +57,34 @@ func TestNewSaysWhereANewBranchStarts(t *testing.T) {
 	}
 }
 
-func TestWithBaseSetsOneLineAndKeepsTheRest(t *testing.T) {
-	for _, c := range []struct{ in, want string }{
-		{"# a comment\nbase = \"main\"\nprefix = \"you/\"\n", "# a comment\nbase = \"staging\"\nprefix = \"you/\"\n"},
-		{"prefix = \"you/\"\n\n[popup]\nwidth = \"100%\"\n", "prefix = \"you/\"\n\nbase = \"staging\"\n\n[popup]\nwidth = \"100%\"\n"},
-		{"# base = \"main\"  # what a new branch starts from\n", "# base = \"main\"  # what a new branch starts from\nbase = \"staging\"\n"},
-		{"[keys]\nbase = \"B\"\n", "base = \"staging\"\n\n[keys]\nbase = \"B\"\n"},
+func TestASettingEditsOneLineAndKeepsTheRest(t *testing.T) {
+	for _, c := range []struct{ in, table, key, value, want string }{
+		{"# a comment\nbase = \"main\"\nprefix = \"you/\"\n", "", "base", `"staging"`, "# a comment\nbase = \"staging\"\nprefix = \"you/\"\n"},
+		{"prefix = \"you/\"\n\n[popup]\nwidth = \"100%\"\n", "", "base", `"staging"`, "prefix = \"you/\"\n\nbase = \"staging\"\n\n[popup]\nwidth = \"100%\"\n"},
+		{"# base = \"main\"\n", "", "base", `"staging"`, "# base = \"main\"\nbase = \"staging\"\n"},
+		{"[keys]\nmachines = \"B\"\n", "keys", "quizzicle.quiz", `"K"`, "[keys]\nmachines = \"B\"\n\"quizzicle.quiz\" = \"K\"\n"},
+		{"[keys]\n\"quizzicle.quiz\" = \"K\"\n\n[popup]\n", "keys", "quizzicle.quiz", `"J"`, "[keys]\n\"quizzicle.quiz\" = \"J\"\n\n[popup]\n"},
+		{"base = \"main\"\n", "plugin.agent", "default", `"codex"`, "base = \"main\"\n\n[plugin.agent]\ndefault = \"codex\"\n"},
+		{"", "keys", "share.pull", `"Y"`, "[keys]\n\"share.pull\" = \"Y\"\n"},
 	} {
-		if got := withBase(c.in, "staging"); got != c.want {
-			t.Errorf("withBase(%q)\n got %q\nwant %q", c.in, got, c.want)
+		if got := setting(c.in, c.table, c.key, c.value); got != c.want {
+			t.Errorf("setting(%q, %s.%s)\n got %q\nwant %q", c.in, c.table, c.key, got, c.want)
 		}
+	}
+	for dotted, want := range map[string][2]string{"base": {"", "base"}, "popup.width": {"popup", "width"},
+		"keys.quizzicle.quiz": {"keys", "quizzicle.quiz"}, "plugin.agent.default": {"plugin.agent", "default"}} {
+		if table, key := settingPath(dotted); table != want[0] || key != want[1] {
+			t.Errorf("settingPath(%s) = %s, %s", dotted, table, key)
+		}
+	}
+	if v, ok := lookup("[keys]\n\"share.pull\" = \"Y\"\n", "keys", "share.pull"); !ok || v != `"Y"` {
+		t.Errorf("lookup = %q %v", v, ok)
+	}
+	if literal("staging") != `"staging"` || literal(`["npm", "i"]`) != `["npm", "i"]` || literal("true") != "true" {
+		t.Error("a value is a string unless it reads as a list, a bool or a number")
+	}
+	if config.Check(setting("", "", "bsae", `"main"`)) == nil {
+		t.Error("a misspelt setting is refused before it is written")
 	}
 	p := panel.Panel{Actions: map[string]panel.Action{"base": {Key: "B"}}}
 	namesBase(p, "", []app.Listing{{Branch: "dash-needs-you", Main: true}})

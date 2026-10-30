@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"slices"
 	"strconv"
@@ -116,8 +117,8 @@ func Run(args []string) int {
 	case "new":
 		return cmdNew(a, rest, asJSON)
 	case "config":
-		if len(rest) > 0 && rest[0] == "base" {
-			return cmdConfigBase(a, rest[1:])
+		if len(rest) > 0 {
+			return cmdConfigKey(a, rest)
 		}
 		return cmdConfig(a)
 	case "rename":
@@ -629,56 +630,172 @@ func cmdConfig(a *app.App) int {
 	return exitOK
 }
 
-// cmdConfigBase prints, or sets, where a new branch starts: the base in
-// this repository's config. Unset, it is the branch the main checkout is on.
-func cmdConfigBase(a *app.App, args []string) int {
-	switch {
-	case len(args) == 0:
-		base := a.Config.Base
-		if base == "" {
-			base = git.CurrentBranch(a.Root) + "  (unset: the branch the main checkout is on)"
+// cmdConfigKey prints one setting, or sets it: mia config [--global] <key>
+// [<value>], the key a dotted path — base, popup.width, keys.quizzicle.quiz,
+// plugin.agent.default. Setting edits that one line, keeps the file's
+// comments, and refuses what mia would not load.
+func cmdConfigKey(a *app.App, args []string) int {
+	global := len(args) > 0 && args[0] == "--global"
+	if global {
+		args = args[1:]
+	}
+	if len(args) == 0 || len(args) > 2 {
+		return usageErr("mia config [--global] <key> [<value>]")
+	}
+	path := config.GlobalPath()
+	if !global {
+		var err error
+		if path, err = configPath(a); err != nil {
+			return fail(err)
 		}
-		fmt.Println(base)
-		return exitOK
-	case len(args) > 1:
-		return usageErr("mia config base [<branch>]")
-	}
-	branch := args[0]
-	if !git.BranchExists(a.Root, branch) && git.RevParse(a.Root, branch) == "" {
-		return fail(fmt.Errorf("no branch %s here", branch))
-	}
-	path, err := configPath(a)
-	if err != nil {
-		return fail(err)
 	}
 	data, err := os.ReadFile(path)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return fail(err)
 	}
-	if err := os.WriteFile(path, []byte(withBase(string(data), branch)), 0o644); err != nil {
+	table, key := settingPath(args[0])
+	if len(args) == 1 {
+		if value, ok := lookup(string(data), table, key); ok {
+			fmt.Println(value)
+		} else if args[0] == "base" {
+			fmt.Println(git.CurrentBranch(a.Root) + "  (unset: the branch the main checkout is on)")
+		} else {
+			fmt.Println("(unset)")
+		}
+		return exitOK
+	}
+	value := args[1]
+	if args[0] == "base" && !git.BranchExists(a.Root, value) && git.RevParse(a.Root, value) == "" {
+		return fail(fmt.Errorf("no branch %s here", value))
+	}
+	edited := setting(string(data), table, key, literal(value))
+	if err := config.Check(edited); err != nil {
+		return fail(fmt.Errorf("%s = %s: %w", args[0], value, err))
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fail(err)
 	}
-	fmt.Printf("new branches start from %s\n", branch)
+	if err := os.WriteFile(path, []byte(edited), 0o644); err != nil {
+		return fail(err)
+	}
+	fmt.Printf("%s = %s\n", args[0], literal(value))
 	return exitOK
 }
 
-// withBase is the config with base set to branch: its base line replaced,
-// or one put at the top level, before the first table; comments stay.
-func withBase(config, branch string) string {
-	line := fmt.Sprintf("base = %q", branch)
-	lines := strings.Split(config, "\n")
+// settingPath is a dotted key's table and key: base is top-level, keys.a.b
+// is "a.b" in [keys], and plugin.agent.default is default in [plugin.agent].
+func settingPath(dotted string) (table, key string) {
+	parts := strings.Split(dotted, ".")
+	switch {
+	case len(parts) == 1:
+		return "", dotted
+	case parts[0] == "plugin" && len(parts) > 2:
+		return "plugin." + parts[1], strings.Join(parts[2:], ".")
+	}
+	return parts[0], strings.Join(parts[1:], ".")
+}
+
+var bareKey = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+func tomlKey(key string) string {
+	if bareKey.MatchString(key) {
+		return key
+	}
+	return strconv.Quote(key)
+}
+
+var rawValue = regexp.MustCompile(`^(\[.*\]|true|false|-?[0-9]+(\.[0-9]+)?)$`)
+
+// literal is a value as TOML: a list, a bool or a number as written, else
+// a string.
+func literal(value string) string {
+	if rawValue.MatchString(value) {
+		return value
+	}
+	return strconv.Quote(value)
+}
+
+// keyOf is the key a "key = value" line sets, unquoted, or "".
+func keyOf(line string) string {
+	t := strings.TrimSpace(line)
+	if t == "" || strings.HasPrefix(t, "#") || strings.HasPrefix(t, "[") {
+		return ""
+	}
+	k, _, ok := strings.Cut(t, "=")
+	if !ok {
+		return ""
+	}
+	k = strings.TrimSpace(k)
+	if uq, err := strconv.Unquote(k); err == nil {
+		return uq
+	}
+	return k
+}
+
+// region is where table's keys sit in lines: from its first key line to the
+// line before the next table; ok is false when there is no such table.
+func region(lines []string, table string) (from, to int, ok bool) {
+	from, ok = 0, table == ""
 	for i, l := range lines {
 		t := strings.TrimSpace(l)
-		if strings.HasPrefix(t, "[") {
-			lines = append(lines[:i], append([]string{line, ""}, lines[i:]...)...)
-			return strings.Join(lines, "\n")
+		if !strings.HasPrefix(t, "[") {
+			continue
 		}
-		if key, _, ok := strings.Cut(t, "="); ok && strings.TrimSpace(key) == "base" {
-			lines[i] = line
-			return strings.Join(lines, "\n")
+		if ok {
+			return from, i, true
+		}
+		if t == "["+table+"]" {
+			from, ok = i+1, true
 		}
 	}
-	return strings.TrimRight(config, "\n") + "\n" + line + "\n"
+	return from, len(lines), ok
+}
+
+func lookup(config, table, key string) (string, bool) {
+	lines := strings.Split(config, "\n")
+	from, to, ok := region(lines, table)
+	for i := from; ok && i < to; i++ {
+		if keyOf(lines[i]) == key {
+			_, v, _ := strings.Cut(lines[i], "=")
+			return strings.TrimSpace(v), true
+		}
+	}
+	return "", false
+}
+
+// setting is config with key set to the TOML value in table: its line
+// replaced, or added to the table — made at the end when it is not there —
+// with every other line, comments too, as it was.
+func setting(config, table, key, value string) string {
+	line := tomlKey(key) + " = " + value
+	lines := strings.Split(strings.TrimRight(config, "\n"), "\n")
+	if config == "" {
+		lines = nil
+	}
+	from, to, ok := region(lines, table)
+	if !ok {
+		if len(lines) > 0 {
+			lines = append(lines, "")
+		}
+		return strings.Join(append(lines, "["+table+"]", line), "\n") + "\n"
+	}
+	for i := from; i < to; i++ {
+		if keyOf(lines[i]) == key {
+			lines[i] = line
+			return strings.Join(lines, "\n") + "\n"
+		}
+	}
+	at := to
+	if table == "" && to < len(lines) {
+		// before the first table, with a blank line between
+		lines = append(lines[:at], append([]string{line, ""}, lines[at:]...)...)
+		return strings.Join(lines, "\n") + "\n"
+	}
+	for at > from && strings.TrimSpace(lines[at-1]) == "" {
+		at--
+	}
+	lines = append(lines[:at], append([]string{line}, lines[at:]...)...)
+	return strings.Join(lines, "\n") + "\n"
 }
 
 const starterConfig = `# mia — this repository's configuration. Every key is optional, and an
@@ -697,7 +814,7 @@ const starterConfig = `# mia — this repository's configuration. Every key is o
 # logs = "tail -f log/dev.log"
 #
 # [keys]                           # rebind anything ` + "`?`" + ` lists; in ~/.config/mia/config.toml it applies everywhere
-# machines = "B"                   # actions: open shell env star stack blocks land pr
+# machines = "H"                   # actions: open shell env star stack blocks land pr
 # merge = "m"                      #   begin layer apart claim worktree merge name restack delete new config
 # down = ["j", "down"]             # moves: down up first last pagedown pageup filter help popup refresh
 # quiet = "Q"                      #   tabnext tabprev unfold fold back quit · sections: quiet

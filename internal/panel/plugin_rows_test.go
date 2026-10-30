@@ -129,7 +129,7 @@ func TestPluginTabsAndKeysReachTheRows(t *testing.T) {
 		Tabs:   []plugin.Tab{{ID: "pr", Label: "pull request"}, {ID: "ci", Label: "ci"}},
 		Keys: []plugin.Key{
 			{ID: "open", Key: "U", Label: "open the PR", Verb: "gh-open", Args: []string{"{row}"}},
-			{ID: "prs", Key: "B", Label: "every PR", Panel: "prs", Global: true},
+			{ID: "prs", Key: "H", Label: "every PR", Panel: "prs", Global: true},
 			{ID: "dup", Key: "D", Label: "steals delete", Verb: "gh-x"},
 			{ID: "nav", Key: "J", Label: "steals a move", Verb: "gh-y"},
 			{ID: "lend", Key: "v", Label: "steals the sides legend", Verb: "gh-z"},
@@ -155,15 +155,15 @@ func TestPluginTabsAndKeysReachTheRows(t *testing.T) {
 	if p.Actions["gh.dup"].Key != "" || p.Actions["delete"].Key != "D" {
 		t.Errorf("core keeps its key: %+v", p.Actions["gh.dup"])
 	}
-	if !slices.Contains(rowOf(p, "app").Facts, "plugin  gh: D is already delete; bind gh.dup in [keys]") {
+	if !slices.Contains(rowOf(p, "app").Facts, "plugin  gh: D is already delete; mia config --global keys.gh.dup <key>") {
 		t.Errorf("the clash is told: %v", rowOf(p, "app").Facts)
 	}
-	if p.Actions["gh.nav"].Key != "" || !slices.Contains(rowOf(p, "app").Facts, "plugin  gh: J is already scrolldown; bind gh.nav in [keys]") {
+	if p.Actions["gh.nav"].Key != "" || !slices.Contains(rowOf(p, "app").Facts, "plugin  gh: J is already scrolldown; mia config --global keys.gh.nav <key>") {
 		t.Errorf("a move keeps its key: %+v", p.Actions["gh.nav"])
 	}
-	for _, told := range []string{"v is already the room's; bind gh.lend", "2 is already the room's; bind gh.side",
-		"tab is already tabnext; bind gh.cycle", "f is already popup; bind gh.pop"} {
-		if !slices.Contains(rowOf(p, "app").Facts, "plugin  gh: "+told+" in [keys]") {
+	for _, told := range []string{"v is already the room's; mia config --global keys.gh.lend", "2 is already the room's; mia config --global keys.gh.side",
+		"tab is already tabnext; mia config --global keys.gh.cycle", "f is already popup; mia config --global keys.gh.pop"} {
+		if !slices.Contains(rowOf(p, "app").Facts, "plugin  gh: "+told+" <key>") {
 			t.Errorf("the room's keys and tab and f stay the dash's: %q not in %v", told, rowOf(p, "app").Facts)
 		}
 	}

@@ -56,16 +56,22 @@ uses every key.
 ## Keys, popups, plugins
 
 ```toml
+plugins = ["gh"]
+
 [keys]
-machines = "B"
+machines = "H"
 down = ["j", "down"]
+"quizzicle.quiz" = "K"   # a plugin's key, by plugin.id
 
 [popup]
 width = "80%"
 height = "75%"
 
-plugins = ["gh"]
-
 [plugin.gh]
 # that plugin's own settings
 ```
+
+`mia config <key> [<value>]` says or sets one of these without an editor —
+`mia config --global keys.quizzicle.quiz K` — editing that line only and
+refusing what mia would not load. When two keys clash the dashboard says
+the command that settles it.

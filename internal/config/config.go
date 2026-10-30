@@ -133,15 +133,28 @@ func mergeFile(path string, into *Config) error {
 	if err != nil {
 		return err
 	}
-	meta, err := toml.Decode(string(data), into)
-	if err != nil {
+	if err := decode(string(data), into); err != nil {
 		return fmt.Errorf("%s: %w", path, err)
+	}
+	return nil
+}
+
+// Check says whether text is a config mia would load, as Load reads one.
+func Check(text string) error {
+	var c Config
+	return decode(text, &c)
+}
+
+func decode(text string, into *Config) error {
+	meta, err := toml.Decode(text, into)
+	if err != nil {
+		return err
 	}
 	for _, key := range meta.Undecoded() {
 		if len(key) > 2 && key[0] == "plugin" {
 			continue
 		}
-		return fmt.Errorf("%s: unknown setting %q — mia would have ignored it silently", path, key.String())
+		return fmt.Errorf("unknown setting %q — mia would have ignored it silently", key.String())
 	}
 	return nil
 }
