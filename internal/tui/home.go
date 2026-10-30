@@ -121,17 +121,15 @@ func (m model) home() string {
 	if m.mode == browsing && m.problem == "" && m.notice == "" {
 		foot = homeKey("j k", "move") + "    " + homeKey(m.shown("filter"), "find") + "    " + homeKey("?", "keys")
 		if m.viewing {
-			foot = homeKey("tab", "next view") + "    " + homeKey("j k", "move") + "    " + homeKey("⏎", "open") + "    " + homeKey("v", "back")
+			foot = homeKey("j k", "move") + "    " + homeKey("⏎", "open") + "    " + homeKey("esc", "back")
 		}
 	}
-	views := m.viewsText()
-	if m.viewing {
-		views = ""
+	// two lines, both centred: where tab goes, then the keys
+	bottom = append(bottom, "")
+	if views := m.viewsText(); views != "" {
+		bottom = append(bottom, centred(fit(views, width), width))
 	}
-	if views != "" {
-		foot += "        " + views
-	}
-	bottom = append(bottom, "", centred(foot, width))
+	bottom = append(bottom, centred(foot, width))
 
 	// home is a page of a fixed size, centred both ways: on a tall terminal
 	// the keys sit under the page, not on the terminal's last row
@@ -371,22 +369,27 @@ func (m model) showView(i int) model {
 	return m
 }
 
-// viewList is the shown side: every view's name along the top, the shown
-// one in ink, and its lines under them.
+// ring moves one stop round the worktrees and the plugins' views.
+func (m model) ring(step int) model {
+	at, n := -1, len(m.panel.Room.Sides)
+	if m.viewing {
+		at = m.view
+	}
+	at += step
+	if at < -1 {
+		at = n - 1
+	}
+	if at == -1 || at == n {
+		m.viewing, m.sideSel = false, ""
+		return m
+	}
+	return m.showView(at)
+}
+
+// viewList is the shown side's lines; the foot names every view.
 func (m model) viewList(width, room int) []string {
 	sides := m.panel.Room.Sides
-	var names []string
-	for i, tab := range sides {
-		name := faint.Render(tab.Label)
-		if i == m.view {
-			name = inkB.Render(tab.Label)
-		}
-		if tab.Count != "" {
-			name += " " + faint.Render(tab.Count)
-		}
-		names = append(names, name)
-	}
-	lines := []string{strings.Join(names, faint.Render("   ·   ")), ""}
+	var lines []string
 	tab := sides[min(m.view, len(sides)-1)]
 	cursorAt := 0
 	switch {
@@ -450,16 +453,26 @@ func (m model) cornerText() string {
 	return strings.Join(append(parts, clock().Format("15:04")), "   ·   ")
 }
 
-// viewsText names the plugins' sides; v opens them as the room draws them.
+// viewsText is the ring tab walks: the worktrees and every plugin's view,
+// with its count, the one showing in ink.
 func (m model) viewsText() string {
-	var names []string
-	for _, tab := range m.panel.Room.Sides {
-		names = append(names, tab.Label)
-	}
-	if len(names) == 0 {
+	if len(m.panel.Room.Sides) == 0 {
 		return ""
 	}
-	return homeKey("v", strings.Join(names, " · "))
+	stop := func(label, count string, on bool) string {
+		if count != "" {
+			label += " " + count
+		}
+		if on {
+			return inkB.Render(label)
+		}
+		return faint.Render(label)
+	}
+	names := []string{stop("worktrees", "", !m.viewing)}
+	for i, tab := range m.panel.Room.Sides {
+		names = append(names, stop(tab.Label, tab.Count, m.viewing && i == m.view))
+	}
+	return inkB.Render("tab") + "  " + strings.Join(names, faint.Render(" · "))
 }
 
 // homeKey is a key and what it does: the key in ink, the words faint.

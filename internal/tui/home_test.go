@@ -74,6 +74,18 @@ func TestVShowsThePluginsViewsInHome(t *testing.T) {
 	if !strings.Contains(press(m, "l").View(), "$43.42 today") {
 		t.Error("l shows the next view")
 	}
+	tab := func(m model) model {
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+		return next.(model)
+	}
+	home := newModel(p)
+	home.width, home.height = 180, 45
+	if one := tab(home); !one.viewing || one.view != 0 {
+		t.Error("tab from the worktrees goes to the first view")
+	}
+	if round := tab(tab(tab(home))); round.viewing {
+		t.Error("tab past the last view comes back to the worktrees")
+	}
 	if back := press(m, "v"); back.viewing || !strings.Contains(back.View(), "Add separate Filevine OAuth credentials") {
 		t.Error("v again comes back to the list")
 	}

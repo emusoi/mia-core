@@ -1022,19 +1022,20 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.legend && key != "ctrl+c" {
 		return m.legendKey(key), nil
 	}
-	if m.viewing && m.homes() {
-		switch key {
-		case "v", "esc":
+	if m.homes() && m.mode == browsing && len(m.panel.Room.Sides) > 0 {
+		// tab walks the ring: the worktrees, then each plugin's view, then
+		// the worktrees again; v and esc go straight back to the worktrees
+		switch {
+		case key == "tab" || (m.viewing && (key == "l" || key == "right")):
+			return m.ring(1), nil
+		case key == "shift+tab" || (m.viewing && (key == "h" || key == "left")):
+			return m.ring(-1), nil
+		case key == "v" && !m.viewing:
+			return m.showView(m.view), nil
+		case m.viewing && (key == "v" || key == "esc"):
 			m.viewing, m.sideSel = false, ""
 			return m, nil
-		case "tab", "l", "right":
-			return m.showView(m.view + 1), nil
-		case "shift+tab", "h", "left":
-			return m.showView(m.view - 1), nil
 		}
-	}
-	if key == "v" && m.homes() && m.mode == browsing && len(m.panel.Room.Sides) > 0 {
-		return m.showView(m.view), nil
 	}
 	if key == "v" && m.roomed() {
 		m.legend = true
