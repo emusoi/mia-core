@@ -188,10 +188,11 @@ func shownCommand(argv []string, interactive bool) string {
 	return command
 }
 
-// ShowHere is a popup's command for a terminal without tmux: it takes the
-// whole screen until it ends (q, for less), then the dashboard comes back.
-func ShowHere(argv []string, dir string, interactive bool) *exec.Cmd {
-	cmd := exec.Command("sh", "-c", shownCommand(argv, interactive))
+// ShowHere is a popup's command for a terminal without tmux, run in the
+// repository: an interactive one takes the screen until it ends; the dash
+// reads what any other prints and shows it as a page of its own.
+func ShowHere(argv []string, dir string) *exec.Cmd {
+	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = dir
 	return cmd
 }

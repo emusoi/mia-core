@@ -141,9 +141,11 @@ type model struct {
 	legend   bool
 	sideSel  string
 	sideRow  int
-	classic  bool // the dashboard in the room, for mia side's popups
-	viewing  bool // home shows a plugin's side in place of the list
-	view     int  // which of the room's sides home shows
+	classic  bool  // the dashboard in the room, for mia side's popups
+	viewing  bool  // home shows a plugin's side in place of the list
+	reading  *read // home shows a popup's page over everything under the header
+	readAt   int   // the page's first line shown
+	view     int   // which of the room's sides home shows
 	stack    []model
 }
 
@@ -173,6 +175,13 @@ type spinTick struct{}
 type landing struct{ chosen Chosen }
 
 type showFailed struct{ err error }
+
+// read is what a popup's command printed, for home to show as a page
+// when there is no tmux to show it in.
+type read struct {
+	title string
+	lines []string
+}
 
 type performed struct {
 	chosen  Chosen
@@ -666,6 +675,10 @@ func (m model) update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.problem = msg.err.Error()
 		return m, nil
 
+	case read:
+		m.reading, m.readAt = &msg, 0
+		return m, nil
+
 	case loaded:
 		m.mode, m.label = browsing, ""
 		if msg.err != nil {
@@ -744,13 +757,23 @@ func (m model) openSide() (tea.Model, tea.Cmd) {
 		return m, nil
 	case len(open.Popup) > 0:
 		show := m.hooks.Show
-		if show == nil && m.hooks.ShowIn != nil {
+		if show == nil && m.hooks.ShowIn != nil && open.Interactive {
 			return m, tea.ExecProcess(m.hooks.ShowIn(*open), func(err error) tea.Msg {
 				if err != nil {
 					return showFailed{err}
 				}
 				return nil
 			})
+		}
+		if show == nil && m.hooks.ShowIn != nil {
+			cmd, title := m.hooks.ShowIn(*open), open.Title
+			return m, func() tea.Msg {
+				out, err := cmd.CombinedOutput()
+				if err != nil && len(out) == 0 {
+					return showFailed{err}
+				}
+				return read{title: title, lines: strings.Split(strings.TrimRight(string(out), "\n"), "\n")}
+			}
 		}
 		if show == nil {
 			m.problem = "a popup needs tmux"
@@ -1031,6 +1054,24 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.legend && key != "ctrl+c" {
 		return m.legendKey(key), nil
+	}
+	if m.reading != nil {
+		switch m.nav(key) {
+		case "down", "scrolldown":
+			m.readAt = min(m.readAt+1, max(len(m.reading.lines)-1, 0))
+		case "up", "scrollup":
+			m.readAt = max(m.readAt-1, 0)
+		case "pagedown", "next":
+			m.readAt = min(m.readAt+m.height/2, max(len(m.reading.lines)-1, 0))
+		case "pageup":
+			m.readAt = max(m.readAt-m.height/2, 0)
+		case "back", "quit":
+			m.reading = nil
+		}
+		if key == "ctrl+c" {
+			return m, tea.Quit
+		}
+		return m, nil
 	}
 	if m.homes() && m.mode == browsing && len(m.panel.Room.Sides) > 0 {
 		// tab walks the ring: the worktrees, then each plugin's view, then

@@ -110,6 +110,9 @@ func (m model) home() string {
 	top = append(top, "")
 	marks, label := m.marks(width, sel)
 	top = append(top, marks, label, "")
+	if m.reading != nil {
+		return m.page(top[:1], width)
+	}
 	top = append(top, m.headword(sel, width)...)
 
 	bottom := []string{}
@@ -367,6 +370,41 @@ func (m model) showView(i int) model {
 	m.viewing, m.view, m.sideSel = true, i, tab.Where
 	m.sideRow = m.nextItem(-1, 1)
 	return m
+}
+
+// page is what a popup's command printed, shown under home's header when
+// there is no tmux: its title, its lines, the keys to read and close it.
+func (m model) page(top []string, width int) string {
+	height := min(m.height, homeTallest)
+	lines := append(append([]string{}, top...), "", muted.Bold(true).Render(m.reading.title), "")
+	room := height - len(lines) - 2
+	body := m.reading.lines[min(m.readAt, len(m.reading.lines)):]
+	for i, line := range body {
+		style := ink
+		if i == 0 && m.readAt == 0 {
+			style = head
+		}
+		for _, part := range wrap(strings.ReplaceAll(line, "\t", "    "), width) {
+			if len(lines) >= height-2 {
+				break
+			}
+			lines = append(lines, style.Render(part))
+		}
+	}
+	for len(lines) < height-1 {
+		lines = append(lines, "")
+	}
+	shown := fmt.Sprintf("%d–%d of %d", m.readAt+1, min(m.readAt+room, len(m.reading.lines)), len(m.reading.lines))
+	lines = append(lines, centred(homeKey("j k", "read")+"    "+homeKey("q", "close")+"    "+faint.Render(shown), width))
+	left := strings.Repeat(" ", max((m.width-width)/2, 0))
+	for i, line := range lines {
+		lines[i] = left + fit(line, width)
+	}
+	page := append(make([]string, (m.height-height)/2), lines...)
+	for len(page) < m.height {
+		page = append(page, "")
+	}
+	return strings.Join(page, "\n")
 }
 
 // ring moves one stop round the worktrees and the plugins' views.

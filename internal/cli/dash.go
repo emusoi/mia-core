@@ -343,7 +343,7 @@ func hooksFor(a *app.App, name, target string) tui.Hooks {
 		}
 	}
 	hooks.ShowIn = func(open plugin.Open) *exec.Cmd {
-		return session.ShowHere(open.Popup, a.Root, open.Interactive)
+		return session.ShowHere(open.Popup, a.Root)
 	}
 	hooks.Load = func(name, target string) (panel.Panel, tui.Reload, tui.Hooks, error) {
 		p, err := panelNamed(a, name, target)

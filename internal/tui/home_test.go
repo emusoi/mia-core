@@ -188,11 +188,22 @@ func TestAPopupWithoutTmuxRunsInTheTerminal(t *testing.T) {
 	p.Room.Sides = []plugin.SideTab{{Plugin: "issue", Side: plugin.Side{ID: "issues", Where: "left", Label: "issues"},
 		SideAnswer: plugin.SideAnswer{Lines: []plugin.Item{{Cells: plugin.Line{{Text: "WL-55"}}, Open: &plugin.Open{Popup: []string{"echo", "hi"}}}}}}}
 	m := newModel(p)
-	ran := false
-	m.hooks.ShowIn = func(open plugin.Open) *exec.Cmd { ran = true; return exec.Command("true") }
+	m.width, m.height = 180, 45
+	m.hooks.ShowIn = func(open plugin.Open) *exec.Cmd {
+		return exec.Command("printf", "WL-55  A provider emails a filing\n  state  todo\n")
+	}
 	m = m.showView(0)
 	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if !ran || cmd == nil || next.(model).problem != "" {
-		t.Errorf("⏎ hands the terminal to the popup's command: ran %v, problem %q", ran, next.(model).problem)
+	if cmd == nil || next.(model).problem != "" {
+		t.Fatalf("⏎ runs the popup's command: problem %q", next.(model).problem)
+	}
+	shown, _ := next.(model).Update(cmd())
+	view := stripANSI(shown.(model).View())
+	if !strings.Contains(view, "WL-55  A provider emails a filing") || !strings.Contains(view, "q close") {
+		t.Errorf("home shows what it printed as a page:\n%s", view)
+	}
+	closed, _ := shown.(model).Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	if closed.(model).reading != nil {
+		t.Error("q closes the page")
 	}
 }
