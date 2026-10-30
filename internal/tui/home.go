@@ -53,10 +53,24 @@ func shape(section string) (string, lipgloss.Style) {
 	return "·", dotS
 }
 
+// dashRoom is the dashboard's room: its own, or for a panel opened from the
+// dashboard, the dashboard's under it; nil outside the dashboard.
+func (m model) dashRoom() *panel.Room {
+	if m.panel.Room != nil {
+		return m.panel.Room
+	}
+	for i := len(m.stack) - 1; i >= 0; i-- {
+		if r := m.stack[i].panel.Room; r != nil && !m.stack[i].classic {
+			return r
+		}
+	}
+	return nil
+}
+
 // homes says whether the dashboard draws as home now; help, reports, the
 // composer and the details pane keep the box.
 func (m model) homes() bool {
-	if m.panel.Room == nil || m.classic || m.inPopup || m.fill || m.hooks.Only != "" {
+	if m.dashRoom() == nil || m.classic || m.inPopup || m.fill || m.hooks.Only != "" {
 		return false
 	}
 	switch m.mode {
@@ -105,10 +119,20 @@ func (m model) home() string {
 	}
 
 	var top []string
-	top = append(top, between(inkB.Render("mia")+"   "+muted.Render(m.panel.Room.Repo), faint.Render(m.cornerText()), width))
+	where := inkB.Render("mia") + "   " + muted.Render(m.dashRoom().Repo)
+	if m.panel.Room == nil {
+		// a panel opened from the dashboard: where it is, no dots, no views
+		title, _, _ := strings.Cut(m.panel.Title, "  —  ")
+		where += faint.Render("  ›  ") + ink.Render(title)
+	}
+	top = append(top, between(where, faint.Render(m.cornerText()), width))
 	top = append(top, "")
-	marks, label := m.marks(width, sel)
-	top = append(top, marks, label, "")
+	if m.panel.Room != nil {
+		marks, label := m.marks(width, sel)
+		top = append(top, marks, label, "")
+	} else {
+		top = append(top, "", "", "")
+	}
 	switch {
 	case m.reading != nil:
 		return m.page(top[:1], width)
@@ -144,6 +168,9 @@ func (m model) home() string {
 	foot := strings.TrimLeft(m.footer(), " ")
 	if m.mode == browsing && m.notice == "" {
 		foot = homeKey("j k", "move") + "    " + homeKey(m.shown("filter"), "find") + "    " + homeKey("?", "keys")
+		if len(m.stack) > 0 {
+			foot += "    " + homeKey("esc", "back")
+		}
 		if m.viewing {
 			foot = homeKey("j k", "move") + "    " + homeKey("⏎", "open") + "    " + homeKey("esc", "back")
 		}
@@ -323,6 +350,13 @@ func (m model) others(walk []homeRow, width, room int) []string {
 	var lines []string
 	cursorAt := 0
 	last := ""
+	// the name column fits the longest name, between 24 and 40
+	nameW := 24
+	for _, h := range walk {
+		if len(h.row.Cells) > 0 {
+			nameW = max(nameW, min(lipgloss.Width(strings.TrimRight(h.row.Cells[0], " ")), 40))
+		}
+	}
 	for _, h := range walk {
 		if h.section.ID != last {
 			if last != "" {
@@ -344,13 +378,13 @@ func (m model) others(walk []homeRow, width, room int) []string {
 		}
 		cells := append(append([]string{}, h.row.Cells...), "", "", "")
 		mark := "  "
-		name := ink.Render(fmt.Sprintf("%-24s", fit(strings.TrimRight(cells[0], " "), 24)))
+		name := ink.Render(fmt.Sprintf("%-*s", nameW, fit(strings.TrimRight(cells[0], " "), nameW)))
 		if h.index == m.cursor {
 			mark, cursorAt = inkB.Render("›")+" ", len(lines)
-			name = inkB.Render(fmt.Sprintf("%-24s", fit(strings.TrimRight(cells[0], " "), 24)))
+			name = inkB.Render(fmt.Sprintf("%-*s", nameW, fit(strings.TrimRight(cells[0], " "), nameW)))
 		}
 		if h.row.Dim {
-			name = faint.Render(fmt.Sprintf("%-24s", fit(cells[0], 24)))
+			name = faint.Render(fmt.Sprintf("%-*s", nameW, fit(cells[0], nameW)))
 		}
 		state := muted.Italic(true)
 		if h.section.ID == "needs" || h.section.ID == "waiting" {
@@ -664,7 +698,7 @@ func viewStyle(spec string) lipgloss.Style {
 // cornerText is the plugins' corners and the time, for the top line.
 func (m model) cornerText() string {
 	var parts []string
-	for _, corner := range m.panel.Room.Corners {
+	for _, corner := range m.dashRoom().Corners {
 		if corner.Problem != "" {
 			continue
 		}
@@ -676,7 +710,7 @@ func (m model) cornerText() string {
 // viewsText is the ring tab walks: the worktrees and every plugin's view,
 // with its count, the one showing in ink.
 func (m model) viewsText() string {
-	if len(m.panel.Room.Sides) == 0 {
+	if m.panel.Room == nil || len(m.panel.Room.Sides) == 0 {
 		return ""
 	}
 	stop := func(label, count string, on bool) string {

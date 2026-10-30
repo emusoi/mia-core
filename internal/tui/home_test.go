@@ -265,3 +265,19 @@ func TestTheComposerAndDetailsAreHomesPages(t *testing.T) {
 		t.Errorf("details is a page:\n%s", view)
 	}
 }
+
+func TestAPanelOpenedFromTheDashboardIsAHomePage(t *testing.T) {
+	parent := newModel(homePanel())
+	m := newModel(panel.Panel{ID: "stack-panel", Title: "Stack / docs-base  —  147 layers", Sections: []panel.Section{{ID: "layers", Label: "layers", Rows: []panel.Row{
+		{ID: "docs-shared", Title: "Docs: shared contract", Cells: []string{"docs-shared", "", "+2", "3d"}}}}}})
+	m.width, m.height, m.stack = 180, 45, []model{parent}
+	view := stripANSI(m.View())
+	for _, want := range []string{"lido-app  ›  Stack / docs-base", "Docs: shared contract", "esc back"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("lacks %q:\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "╭") || strings.Contains(view, "tab  worktrees") {
+		t.Errorf("no box, and no dashboard views in a panel:\n%s", view)
+	}
+}

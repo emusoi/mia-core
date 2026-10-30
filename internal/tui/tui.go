@@ -1076,7 +1076,7 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if m.homes() && m.mode == browsing && len(m.panel.Room.Sides) > 0 {
+	if m.homes() && m.mode == browsing && m.panel.Room != nil && len(m.panel.Room.Sides) > 0 {
 		// tab walks the ring: the worktrees, then each plugin's view, then
 		// the worktrees again; v and esc go straight back to the worktrees
 		switch {
