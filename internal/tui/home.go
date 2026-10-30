@@ -497,8 +497,8 @@ func viewCells(cells plugin.Line, width int, grow bool) string {
 			w = max(width-used-1, c.Width, 1)
 		}
 		if c.Meter != nil {
-			if w <= 0 {
-				w = 40
+			if w <= 0 || w > 40 {
+				w = 40 // a bar longer than this says no more
 			}
 			n := c.Meter.Filled(w)
 			fill := ink
