@@ -56,14 +56,12 @@ func shape(section string) (string, lipgloss.Style) {
 // homes says whether the dashboard draws as home now; help, reports, the
 // composer and the details pane keep the box.
 func (m model) homes() bool {
-	if m.panel.Room == nil || m.classic || m.inPopup || m.fill || m.details || m.hooks.Only != "" || m.loading() {
+	if m.panel.Room == nil || m.classic || m.inPopup || m.fill || m.hooks.Only != "" {
 		return false
 	}
 	switch m.mode {
-	case browsing, filtering, working, confirming, helping, reporting:
+	case browsing, filtering, working, confirming, helping, reporting, typing:
 		return true
-	case typing:
-		return !m.pending.action.Lines
 	}
 	return false
 }
@@ -114,6 +112,15 @@ func (m model) home() string {
 	switch {
 	case m.reading != nil:
 		return m.page(top[:1], width)
+	case m.mode == typing && m.pending.action.Lines:
+		body := m.composer()
+		if m.picking {
+			body = m.picker()
+		}
+		return m.sheet(top[:1], "", body, 0, strings.TrimLeft(m.footer(), " "), false)
+	case m.details && m.mode == browsing && m.cursor < len(m.rows):
+		return m.sheet(top[:1], nameOf(m.rows[m.cursor]), m.paneOf(m.cursor, width, homeTallest-8), 0,
+			homeKey("j k", "scroll")+"    "+homeKey(m.shown("tabprev", "tabnext"), "tabs")+"    "+homeKey("i", "close"), false)
 	case m.mode == helping:
 		return m.sheet(top[:1], "Keys", m.homeHelp(), m.scroll, homeKey("j k", "scroll")+"    "+homeKey("?", "close"), false)
 	case m.mode == reporting:
@@ -240,11 +247,11 @@ const (
 // headword is the selected worktree set like a dictionary entry: its name
 // and state, its task, its facts, and the keys that act on it.
 func (m model) headword(sel homeRow, width int) []string {
-	if sel.index < 0 {
+	if sel.index < 0 || m.loading() {
 		// before the first panel arrives Empty is unset: the worktrees are
 		// still being read, which a big repository takes seconds to do
 		line := faint.Render(m.panel.Empty)
-		if m.panel.Empty == "" {
+		if m.panel.Empty == "" || m.loading() {
 			line = muted.Render("Reading the worktrees…")
 		}
 		return pad([]string{line}, headwordRows)

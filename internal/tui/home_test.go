@@ -249,3 +249,19 @@ func TestHelpAndReportsAreHomesPages(t *testing.T) {
 		t.Errorf("a report is a page titled with its command:\n%s", view)
 	}
 }
+
+func TestTheComposerAndDetailsAreHomesPages(t *testing.T) {
+	m := newModel(homePanel())
+	m.width, m.height = 180, 45
+	m.mode = typing
+	m.pending = &pending{action: panel.Action{Label: "message the agent", Lines: true, Input: "message"}, row: m.rows[0]}
+	view := stripANSI(m.View())
+	if !strings.Contains(view, "message the agent") || !strings.Contains(view, "^s send") || strings.Contains(view, "╭") {
+		t.Errorf("the composer is a page with its keys:\n%s", view)
+	}
+	m.mode, m.pending, m.details = browsing, nil, true
+	view = stripANSI(m.View())
+	if !strings.Contains(view, "i close") || strings.Contains(view, "╭") {
+		t.Errorf("details is a page:\n%s", view)
+	}
+}
