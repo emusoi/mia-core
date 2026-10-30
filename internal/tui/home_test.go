@@ -229,3 +229,23 @@ func TestAViewDrawsItsHeadSectionsMetersAndChart(t *testing.T) {
 		t.Error("the view's head takes the entry's place")
 	}
 }
+
+func TestHelpAndReportsAreHomesPages(t *testing.T) {
+	m := newModel(homePanel())
+	m.width, m.height = 180, 45
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+	view := stripANSI(next.(model).View())
+	for _, want := range []string{"Keys", "the next view", "the dots", "? close"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("help lacks %q:\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "╭") || strings.Contains(view, "of the room") {
+		t.Errorf("help is home's page, about home:\n%s", view)
+	}
+	m.mode, m.report, m.reportOf = reporting, []string{"restacked 3 layers"}, "mia stack restack"
+	view = stripANSI(m.View())
+	if !strings.Contains(view, "mia stack restack") || !strings.Contains(view, "restacked 3 layers") || strings.Contains(view, "╭") {
+		t.Errorf("a report is a page titled with its command:\n%s", view)
+	}
+}

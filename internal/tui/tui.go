@@ -141,11 +141,12 @@ type model struct {
 	legend   bool
 	sideSel  string
 	sideRow  int
-	classic  bool  // the dashboard in the room, for mia side's popups
-	viewing  bool  // home shows a plugin's side in place of the list
-	reading  *read // home shows a popup's page over everything under the header
-	readAt   int   // the page's first line shown
-	view     int   // which of the room's sides home shows
+	classic  bool   // the dashboard in the room, for mia side's popups
+	viewing  bool   // home shows a plugin's side in place of the list
+	reading  *read  // home shows a popup's page over everything under the header
+	readAt   int    // the page's first line shown
+	reportOf string // what the report shows the output of: mia restack …
+	view     int    // which of the room's sides home shows
 	stack    []model
 }
 
@@ -644,6 +645,7 @@ func (m model) update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if msg.chosen.Action.Report && !busy && strings.TrimSpace(msg.outcome.Output) != "" {
 				m.mode, m.report = reporting, strings.Split(strings.TrimRight(msg.outcome.Output, "\n"), "\n")
+				m.reportOf = "mia " + strings.Join(msg.chosen.Argv, " ")
 				return m, again
 			}
 			m.problem = lastLine(msg.outcome.Output, msg.outcome.Err.Error())
@@ -654,6 +656,7 @@ func (m model) update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.chosen.Action.Report && !busy {
 			m.mode, m.report = reporting, strings.Split(strings.TrimRight(msg.outcome.Output, "\n"), "\n")
+			m.reportOf = "mia " + strings.Join(msg.chosen.Argv, " ")
 			return m, again
 		}
 		if msg.chosen.Action.Lines {
@@ -890,7 +893,7 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.hooks.Do != "" {
 				return m, tea.Quit
 			}
-			m.mode, m.report = browsing, nil
+			m.mode, m.report, m.reportOf = browsing, nil, ""
 		}
 		return m, nil
 

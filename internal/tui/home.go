@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"maps"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -59,7 +60,7 @@ func (m model) homes() bool {
 		return false
 	}
 	switch m.mode {
-	case browsing, filtering, working, confirming:
+	case browsing, filtering, working, confirming, helping, reporting:
 		return true
 	case typing:
 		return !m.pending.action.Lines
@@ -110,8 +111,17 @@ func (m model) home() string {
 	top = append(top, "")
 	marks, label := m.marks(width, sel)
 	top = append(top, marks, label, "")
-	if m.reading != nil {
+	switch {
+	case m.reading != nil:
 		return m.page(top[:1], width)
+	case m.mode == helping:
+		return m.sheet(top[:1], "Keys", m.homeHelp(), m.scroll, homeKey("j k", "scroll")+"    "+homeKey("?", "close"), false)
+	case m.mode == reporting:
+		title := m.reportOf
+		if title == "" {
+			title = "mia"
+		}
+		return m.sheet(top[:1], title, m.report, 0, strings.TrimLeft(m.footer(), " "), false)
 	}
 	if m.viewing {
 		top = append(top, m.viewHead(width)...)
@@ -379,27 +389,40 @@ func (m model) showView(i int) model {
 // page is what a popup's command printed, shown under home's header when
 // there is no tmux: its title, its lines, the keys to read and close it.
 func (m model) page(top []string, width int) string {
+	keys := homeKey("j k", "read") + "    " + homeKey("q", "close")
+	return m.sheet(top, m.reading.title, m.reading.lines, m.readAt, keys, true)
+}
+
+// sheet is a page of text under home's header — a popup's output, the
+// keys, a report — its title, its lines wrapped from at, the keys under it.
+func (m model) sheet(top []string, title string, body []string, at int, keys string, boldFirst bool) string {
+	width := min(m.width-4, homeWidest)
 	height := min(m.height, homeTallest)
-	lines := append(append([]string{}, top...), "", muted.Bold(true).Render(m.reading.title), "")
+	lines := append(append([]string{}, top...), "", muted.Bold(true).Render(title), "")
 	room := height - len(lines) - 2
-	body := m.reading.lines[min(m.readAt, len(m.reading.lines)):]
-	for i, line := range body {
+	at = min(at, max(len(body)-1, 0))
+	for i, line := range body[at:] {
 		style := ink
-		if i == 0 && m.readAt == 0 {
+		if boldFirst && i == 0 && at == 0 {
 			style = head
 		}
 		for _, part := range wrap(strings.ReplaceAll(line, "\t", "    "), width) {
 			if len(lines) >= height-2 {
 				break
 			}
-			lines = append(lines, style.Render(part))
+			if ansi := strings.Contains(part, "\x1b["); !ansi {
+				part = style.Render(part)
+			}
+			lines = append(lines, part)
 		}
 	}
 	for len(lines) < height-1 {
 		lines = append(lines, "")
 	}
-	shown := fmt.Sprintf("%d–%d of %d", m.readAt+1, min(m.readAt+room, len(m.reading.lines)), len(m.reading.lines))
-	lines = append(lines, centred(homeKey("j k", "read")+"    "+homeKey("q", "close")+"    "+faint.Render(shown), width))
+	if len(body) > room {
+		keys += "    " + faint.Render(fmt.Sprintf("%d–%d of %d", at+1, min(at+room, len(body)), len(body)))
+	}
+	lines = append(lines, centred(keys, width))
 	left := strings.Repeat(" ", max((m.width-width)/2, 0))
 	for i, line := range lines {
 		lines[i] = left + fit(line, width)
@@ -409,6 +432,65 @@ func (m model) page(top []string, width int) string {
 		page = append(page, "")
 	}
 	return strings.Join(page, "\n")
+}
+
+// homeHelp is every key home answers to: moving, the selected worktree's,
+// the ones that work anywhere, and what the dots say.
+func (m model) homeHelp() []string {
+	entry := func(key, what, more string) string {
+		return inkB.Render(fmt.Sprintf("%-9s", key)) + ink.Render(fmt.Sprintf("%-34s", fit(what, 34))) + faint.Render(more)
+	}
+	group := func(name string) string { return muted.Italic(true).Render(name) }
+	lines := []string{group("moving"),
+		entry(m.shown("down", "up"), "the next, the previous worktree", m.shown("first", "last")+" the first and last"),
+		entry(m.shown("filter"), "find a worktree", "by name or branch · esc clears"),
+		entry("space", "the next that needs you", ""),
+		entry("tab", "the next view", "round the worktrees and the plugins' views · shift+tab back"),
+		entry("⏎", "unfold a stack, open a view's line", ""),
+		entry(m.shown("back"), "back, or quit", ""),
+	}
+	for _, section := range m.panel.Sections {
+		if section.ToggleKey != "" {
+			lines = append(lines, entry(section.ToggleKey, "show or hide "+section.Label, ""))
+		}
+	}
+	var row panel.Row
+	if m.cursor < len(m.rows) {
+		row = m.rows[m.cursor]
+	}
+	type item struct {
+		rank int
+		line string
+	}
+	var onRow, anywhere []item
+	for id, action := range m.panel.Actions {
+		if action.Key == "" {
+			continue
+		}
+		it := item{m.panel.Rank(id), entry(action.Key, action.Label, action.CLI())}
+		switch {
+		case !action.NeedsRow():
+			anywhere = append(anywhere, it)
+		case offers(row, id):
+			onRow = append(onRow, it)
+		}
+	}
+	add := func(title string, items []item) {
+		if len(items) == 0 {
+			return
+		}
+		sort.SliceStable(items, func(i, j int) bool { return items[i].rank < items[j].rank })
+		lines = append(lines, "", title)
+		for _, it := range items {
+			lines = append(lines, it.line)
+		}
+	}
+	add(group("on ")+inkB.Render(nameOf(row)), onRow)
+	add(group("anywhere"), anywhere)
+	return append(lines, "", group("the dots"),
+		inkB.Render("●")+muted.Render(" needs you    ")+ink.Render("•")+muted.Render(" an agent works    ")+
+			muted.Render("◦ in progress    ")+faint.Render("· rests"),
+		faint.Render("one dot per worktree, in the list's order; ▔ marks the one selected"))
 }
 
 // ring moves one stop round the worktrees and the plugins' views.
