@@ -174,7 +174,7 @@ func TestAViewsTitleTakesHomesWidth(t *testing.T) {
 	p := homePanel()
 	long := "A provider emails a filing and Lido sorts it into the client's folder"
 	p.Room.Sides = []plugin.SideTab{{Plugin: "issue", Side: plugin.Side{ID: "issues", Where: "left", Label: "issues"},
-		SideAnswer: plugin.SideAnswer{Lines: []plugin.Item{{Cells: plugin.Line{{Text: "○", Width: 2}, {Text: "WL-55", Width: 7}, {Text: long, Width: 22}}}}}}}
+		SideAnswer: plugin.SideAnswer{Lines: []plugin.Item{{Cells: plugin.Line{{Text: "○", Width: 2}, {Text: "WL-55", Width: 7}, {Text: long, Width: 22, Grow: true}}}}}}}
 	m := newModel(p)
 	m.width, m.height = 180, 45
 	m = m.showView(0)
@@ -205,5 +205,27 @@ func TestAPopupWithoutTmuxRunsInTheTerminal(t *testing.T) {
 	closed, _ := shown.(model).Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	if closed.(model).reading != nil {
 		t.Error("q closes the page")
+	}
+}
+
+func TestAViewDrawsItsHeadSectionsMetersAndChart(t *testing.T) {
+	p := homePanel()
+	answer := plugin.SideAnswer{Head: "$22.59 spent today", Note: "$882.63 this week", Lines: []plugin.Item{
+		{Label: "this week"},
+		{Chart: []plugin.Bar{{Label: "mon", Value: 52}, {Label: "today", Value: 22.59, On: true}}},
+		{Label: "today by worktree", Cells: plugin.Line{{Text: "1"}}},
+		{Cells: plugin.Line{{Text: "lemara", Width: 16}, {Meter: &plugin.Meter{Value: 1, Max: 2}, Width: 10}, {Text: "$22.59"}}},
+	}}
+	p.Room.Sides = []plugin.SideTab{{Plugin: "cost", Side: plugin.Side{ID: "cost", Where: "right", Label: "cost"}, SideAnswer: answer}}
+	m := newModel(p)
+	m.width, m.height = 180, 45
+	view := stripANSI(m.showView(0).View())
+	for _, want := range []string{"$22.59 spent today", "$882.63 this week", "this week", "████", "today", "today by worktree  1", "lemara", "━━━━━━━━━━", "$22.59"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the view lacks %q:\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "Add separate Filevine") {
+		t.Error("the view's head takes the entry's place")
 	}
 }

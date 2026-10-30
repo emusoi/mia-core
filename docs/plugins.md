@@ -98,7 +98,35 @@ A line can also be an object, so the cursor can stop on it and `⏎` open it:
 | `{"verb": "issue", "args": [...]}` | runs the plugin's verb, as a key does; `"report": true` shows its output |
 | `{"lands": "<worktree>[:<window>]"}` | lands in that worktree's session, on that window, as the dashboard's `⏎` does |
 
-Lines without `open` are information; the cursor skips them.
+Lines without `open` are information; the cursor skips them. Without tmux,
+a popup's output shows as a page in the dashboard (`j` `k` read, `q` closes);
+an interactive one takes the terminal until it ends.
+
+### Views
+
+The dashboard's home shows each side as a view, `tab` going round them at
+full width. A side can say more for that:
+
+```json
+{"count": "$22.59", "head": "$22.59 spent today", "note": "$882.63 this week",
+ "lines": [
+   {"label": "this week"},
+   {"chart": [{"label": "mon", "value": 52.1}, {"label": "today", "value": 22.59, "on": true}]},
+   {"label": "today by worktree", "cells": [{"text": "1"}]},
+   {"cells": [{"text": "lemara", "width": 16}, {"meter": {"value": 22.59, "max": 22.59}, "width": 40}, {"text": "$22.59"}]},
+   {"cells": [{"text": "WL-55", "width": 9}, {"text": "A provider emails…", "grow": true}], "open": {"lands": "lemara"}}]}
+```
+
+| field | the view draws |
+|---|---|
+| `head`, `note` | the one thing the view says, bold, where home's entry sits, and a faint line under it |
+| `"label"` on a line | a section's heading, in italic, its cells after it as the count |
+| `"chart"` on a line | bars six rows high, each `label` under its bar, the one `on` in ink |
+| `"grow"` on a cell | the cell takes the width the others leave, a title most often |
+| `"meter"` on a cell | a bar `width` wide filled `value` of `max`; `red` in its style for a bad one |
+
+Every field is optional, and the room's narrow sides flatten them: a label
+leads its line, a chart is a row of blocks, a meter a short bar.
 
 ## Keys and panels
 

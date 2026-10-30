@@ -442,9 +442,9 @@ func (m model) paintSide(c canvas, place string, a area) {
 		}
 		at := x
 		if align == "right" {
-			at = max(x+wide-lineWidth(item.Cells), x)
+			at = max(x+wide-lineWidth(item.Flat()), x)
 		}
-		c.line(at, a.linesY+i, item.Cells, x+wide)
+		c.line(at, a.linesY+i, item.Flat(), x+wide)
 		if m.sideSel == place && i == m.sideRow {
 			c.highlight(x, a.linesY+i, x+wide)
 		}

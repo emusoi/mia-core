@@ -113,7 +113,11 @@ func (m model) home() string {
 	if m.reading != nil {
 		return m.page(top[:1], width)
 	}
-	top = append(top, m.headword(sel, width)...)
+	if m.viewing {
+		top = append(top, m.viewHead(width)...)
+	} else {
+		top = append(top, m.headword(sel, width)...)
+	}
 
 	bottom := []string{}
 	if m.problem != "" && m.mode != typing && m.mode != confirming {
@@ -424,41 +428,51 @@ func (m model) ring(step int) model {
 	return m.showView(at)
 }
 
-// viewList is the shown side's lines; the foot names every view.
-func (m model) viewList(width, room int) []string {
-	sides := m.panel.Room.Sides
+// viewHead is the shown view's summary where the entry sits on home, the
+// same height, so tab between them moves nothing under it.
+func (m model) viewHead(width int) []string {
+	tab := m.panel.Room.Sides[min(m.view, len(m.panel.Room.Sides)-1)]
 	var lines []string
-	tab := sides[min(m.view, len(sides)-1)]
-	cursorAt := 0
 	switch {
 	case tab.Problem != "":
-		lines = append(lines, danger.Render(fit(tab.Plugin+": "+tab.Problem, width)))
-	case len(tab.Lines) == 0:
+		lines = []string{danger.Render(fit(tab.Plugin+": "+tab.Problem, width))}
+	case tab.Head != "":
+		lines = []string{head.Render(fit(tab.Head, width))}
+	default:
+		lines = []string{muted.Bold(true).Render(tab.Label)}
+	}
+	if tab.Note != "" {
+		lines = append(lines, faint.Render(fit(tab.Note, width)))
+	}
+	return pad(lines, headwordRows)
+}
+
+// viewList is the shown view's lines: section labels, lines of cells — the
+// growing one takes what the others leave — meters and charts.
+func (m model) viewList(width, room int) []string {
+	tab := m.panel.Room.Sides[min(m.view, len(m.panel.Room.Sides)-1)]
+	var lines []string
+	cursorAt := 0
+	if len(tab.Lines) == 0 && tab.Problem == "" {
 		lines = append(lines, faint.Render("Nothing here."))
 	}
 	for i, item := range tab.Lines {
+		switch {
+		case item.Label != "":
+			if len(lines) > 0 {
+				lines = append(lines, "")
+			}
+			lines = append(lines, muted.Italic(true).Render(item.Label)+"  "+faint.Render(viewCells(item.Cells, width, false)))
+			continue
+		case len(item.Chart) > 0:
+			lines = append(lines, chart(item.Chart)...)
+			continue
+		}
 		mark := "  "
 		if i == m.sideRow && item.Open != nil {
 			mark, cursorAt = inkB.Render("›")+" ", len(lines)
 		}
-		var b strings.Builder
-		for i, c := range item.Cells {
-			text, w := c.Text, c.Width
-			if i == wideCell(item.Cells) {
-				// the room's sides are narrow; home is not, so the line's
-				// longest cell, its title, takes what the others leave
-				w = max(width-2-lineWidthBut(item.Cells, i), w)
-			}
-			if w > 0 {
-				if c.Align == "right" {
-					text = fmt.Sprintf("%*s", w, fit(text, w))
-				} else {
-					text = fmt.Sprintf("%-*s", w, fit(text, w))
-				}
-			}
-			b.WriteString(viewStyle(c.Style).Render(text) + " ")
-		}
-		lines = append(lines, fit(mark+b.String(), width))
+		lines = append(lines, fit(mark+viewCells(item.Cells, width-2, true), width))
 	}
 	if room <= 0 || len(lines) <= room {
 		return lines
@@ -467,31 +481,78 @@ func (m model) viewList(width, room int) []string {
 	return lines[start : start+room]
 }
 
-// wideCell is the cell with the most text, or -1 for a line of one cell.
-func wideCell(cells plugin.Line) int {
-	if len(cells) < 2 {
-		return -1
-	}
-	at := 0
-	for i, c := range cells {
-		if len([]rune(c.Text)) > len([]rune(cells[at].Text)) {
-			at = i
+// viewCells draws a line's cells: each at its width, a meter as a bar, and
+// (when grow) the cell marked to grow taking the width the others leave.
+func viewCells(cells plugin.Line, width int, grow bool) string {
+	used := 0
+	for _, c := range cells {
+		if !c.Grow || !grow {
+			used += max(c.Width, lipgloss.Width(c.Text)) + 1
 		}
 	}
-	return at
-}
-
-// lineWidthBut is how wide the line's cells are without cell skip, with the
-// space after each.
-func lineWidthBut(cells plugin.Line, skip int) int {
-	w := 0
-	for i, c := range cells {
-		if i == skip {
+	var b strings.Builder
+	for _, c := range cells {
+		w := c.Width
+		if c.Grow && grow {
+			w = max(width-used-1, c.Width, 1)
+		}
+		if c.Meter != nil {
+			if w <= 0 {
+				w = 40
+			}
+			n := c.Meter.Filled(w)
+			fill := ink
+			if strings.Contains(c.Style, "red") {
+				fill = danger
+			}
+			b.WriteString(fill.Render(strings.Repeat("━", n)) + dotS.Render(strings.Repeat("━", w-n)) + "   ")
 			continue
 		}
-		w += max(c.Width, lipgloss.Width(c.Text)) + 1
+		text := c.Text
+		if w > 0 {
+			if c.Align == "right" {
+				text = fmt.Sprintf("%*s", w, fit(text, w))
+			} else {
+				text = fmt.Sprintf("%-*s", w, fit(text, w))
+			}
+		}
+		b.WriteString(viewStyle(c.Style).Render(text) + " ")
 	}
-	return w + 1
+	return b.String()
+}
+
+// chart is a few values as bars six rows high, their labels under them;
+// the one marked on is in ink.
+func chart(bars []plugin.Bar) []string {
+	const tall = 6
+	top := 0.0
+	for _, b := range bars {
+		top = max(top, b.Value)
+	}
+	rows := make([]string, tall+1)
+	for _, b := range bars {
+		h := 0
+		if top > 0 {
+			h = max(int(b.Value/top*tall+0.5), 1)
+		}
+		style := muted
+		if b.On {
+			style = ink
+		}
+		for r := 0; r < tall; r++ {
+			cell := "    "
+			if tall-r <= h {
+				cell = "████"
+			}
+			rows[r] += style.Render(cell) + "    "
+		}
+		label := style.Render(fmt.Sprintf("%-8s", fit(b.Label, 7)))
+		if !b.On {
+			label = faint.Render(fmt.Sprintf("%-8s", fit(b.Label, 7)))
+		}
+		rows[tall] += label
+	}
+	return rows
 }
 
 // viewStyle is a plugin's cell style in home's palette: red stays danger,

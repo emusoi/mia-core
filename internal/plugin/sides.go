@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -36,15 +37,80 @@ type Cell struct {
 	Width int    `json:"width,omitempty"`
 	Align string `json:"align,omitempty"`
 	Style string `json:"style,omitempty"`
+	// Grow lets the cell take the width a wide view has spare: a title.
+	Grow bool `json:"grow,omitempty"`
+	// Meter draws the cell as a bar, Value of Max, Width wide.
+	Meter *Meter `json:"meter,omitempty"`
+}
+
+type Meter struct {
+	Value float64 `json:"value"`
+	Max   float64 `json:"max"`
+}
+
+// Filled is how many of width a meter's bar fills.
+func (m Meter) Filled(width int) int {
+	if m.Max <= 0 {
+		return 0
+	}
+	return min(max(int(m.Value/m.Max*float64(width)+0.5), 0), width)
+}
+
+// Bar is one value of a chart.
+type Bar struct {
+	Label string  `json:"label"`
+	Value float64 `json:"value"`
+	On    bool    `json:"on,omitempty"` // drawn in ink: today, the one that matters
 }
 
 type Line []Cell
 
 // Item is one line of a side: its cells, and what ⏎ does on it. A plugin
 // may answer a bare array of cells (nothing to open) or {"cells", "open"}.
+// A Label makes the line a section's heading, its cells the count; a Chart
+// makes it a small bar chart.
 type Item struct {
-	Cells Line  `json:"cells"`
-	Open  *Open `json:"open,omitempty"`
+	Cells Line   `json:"cells"`
+	Open  *Open  `json:"open,omitempty"`
+	Label string `json:"label,omitempty"`
+	Chart []Bar  `json:"chart,omitempty"`
+}
+
+// Flat is the item as one line of plain cells, for the room's narrow sides:
+// a label leads its cells, a chart is a row of block heights, a meter a bar.
+func (it Item) Flat() Line {
+	var line Line
+	if it.Label != "" {
+		line = append(line, Cell{Text: it.Label + "  ", Style: "dim"})
+	}
+	if len(it.Chart) > 0 {
+		top := 0.0
+		for _, b := range it.Chart {
+			top = max(top, b.Value)
+		}
+		blocks := []rune("▁▂▃▄▅▆▇█")
+		var spark []rune
+		for _, b := range it.Chart {
+			i := 0
+			if top > 0 {
+				i = min(int(b.Value/top*float64(len(blocks)-1)+0.5), len(blocks)-1)
+			}
+			spark = append(spark, blocks[i])
+		}
+		line = append(line, Cell{Text: string(spark)})
+	}
+	for _, c := range it.Cells {
+		if c.Meter != nil {
+			w := c.Width
+			if w <= 0 {
+				w = 10
+			}
+			n := c.Meter.Filled(w)
+			c = Cell{Text: strings.Repeat("━", n) + strings.Repeat("╌", w-n), Width: w, Style: c.Style}
+		}
+		line = append(line, c)
+	}
+	return line
 }
 
 // Open is what ⏎ on an item does: exactly one of a command in a tmux
@@ -65,8 +131,10 @@ func (it *Item) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 	var object struct {
-		Cells Line  `json:"cells"`
-		Open  *Open `json:"open"`
+		Cells Line   `json:"cells"`
+		Open  *Open  `json:"open"`
+		Label string `json:"label"`
+		Chart []Bar  `json:"chart"`
 	}
 	if err := json.Unmarshal(data, &object); err != nil {
 		return err
@@ -82,7 +150,7 @@ func (it *Item) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("open needs exactly one of popup, verb or lands")
 		}
 	}
-	it.Cells, it.Open = object.Cells, object.Open
+	it.Cells, it.Open, it.Label, it.Chart = object.Cells, object.Open, object.Label, object.Chart
 	return nil
 }
 
@@ -93,6 +161,10 @@ type Segment struct {
 
 type SideAnswer struct {
 	Count string `json:"count"`
+	// Head and Note sit above the lines when the dash shows the side as a
+	// view: the one thing it says, in bold, and a faint line under it.
+	Head  string `json:"head,omitempty"`
+	Note  string `json:"note,omitempty"`
 	Lines []Item `json:"lines"`
 }
 

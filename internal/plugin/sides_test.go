@@ -139,3 +139,33 @@ func TestATimedOutPluginTakesItsChildrenWithIt(t *testing.T) {
 		t.Fatal("the plugin's child outlived the timeout")
 	}
 }
+
+func TestAViewsNewKindsOfLineParseAndFlatten(t *testing.T) {
+	var answer SideAnswer
+	raw := `{"count":"3","head":"3 to do","note":"in WL","lines":[
+		{"label":"to do","cells":[{"text":"3"}]},
+		{"chart":[{"label":"mon","value":1},{"label":"today","value":4,"on":true}]},
+		{"cells":[{"text":"WL-55","width":7},{"text":"A title","grow":true},{"meter":{"value":1,"max":2},"width":4}],"open":{"lands":"lemara"}}]}`
+	if err := json.Unmarshal([]byte(raw), &answer); err != nil {
+		t.Fatal(err)
+	}
+	if answer.Head != "3 to do" || answer.Lines[0].Label != "to do" || len(answer.Lines[1].Chart) != 2 || !answer.Lines[2].Cells[1].Grow {
+		t.Fatalf("parsed %+v", answer)
+	}
+	flat := func(it Item) string {
+		var s string
+		for _, c := range it.Flat() {
+			s += c.Text
+		}
+		return s
+	}
+	if got := flat(answer.Lines[0]); got != "to do  3" {
+		t.Errorf("a label leads its count: %q", got)
+	}
+	if got := flat(answer.Lines[1]); got != "▃█" {
+		t.Errorf("a chart is a row of blocks for the room: %q", got)
+	}
+	if got := flat(answer.Lines[2]); got != "WL-55A title━━╌╌" {
+		t.Errorf("a meter is a bar of its width: %q", got)
+	}
+}
