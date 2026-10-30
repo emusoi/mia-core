@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
@@ -97,21 +99,19 @@ const listingTTL = 10 * time.Second
 
 func browse(a *app.App, name, target, pickTo string, switching bool) int {
 	session.UseControl()
-	var cached []app.Listing
-	var fetched time.Time
+	var listing listingCache
 	reload := func() (panel.Panel, error) {
 		if name != "dashboard" {
 			return panelNamed(a, name, target)
 		}
-		if cached == nil || time.Since(fetched) > listingTTL {
+		cached, err := listing.get(func() ([]app.Listing, error) {
 			if cfg, err := config.Load(a.MiaDir); err == nil {
 				a.Config = cfg
 			}
-			listings, err := a.List()
-			if err != nil {
-				return panel.Panel{}, err
-			}
-			cached, fetched = listings, time.Now()
+			return a.List()
+		})
+		if err != nil {
+			return panel.Panel{}, err
 		}
 		plugins, _ := enabledPlugins(a)
 		if onlySide != "" {
@@ -138,7 +138,7 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 	}
 	hooks.Watch = watchNudge
 	hooks.Refresh = func() {
-		cached = nil
+		listing.forget()
 		a.ForgetDirtiness()
 	}
 	title := "Worktrees / " + filepath.Base(a.Root)
@@ -151,7 +151,7 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 		hooks.Sides = loadSides(a)
 		chosen, err := tui.Open(title, reload, hooks, open)
 		open = chosen.Open
-		cached = nil
+		listing.forget()
 		trace("tui.Run returned argv=%v panel=%q err=%v", chosen.Argv, chosen.Panel, err)
 		if err != nil {
 			return fail(err)
@@ -355,6 +355,33 @@ func hooksFor(a *app.App, name, target string) tui.Hooks {
 	}
 	return hooks
 }
+
+// listingCache is the dashboard's listing between reloads. Reloads run off
+// the UI's goroutine, a tick's and a nudge's at once at times: one lists at
+// a time, each gets its own copy, and forget only marks the listing stale —
+// clearing it under a reload's feet once drew a dashboard of no worktrees.
+type listingCache struct {
+	mu       sync.Mutex
+	listings []app.Listing
+	at       time.Time
+	stale    atomic.Bool
+}
+
+func (c *listingCache) get(list func() ([]app.Listing, error)) ([]app.Listing, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.stale.Swap(false) || c.listings == nil || time.Since(c.at) > listingTTL {
+		listings, err := list()
+		if err != nil {
+			return nil, err
+		}
+		c.listings, c.at = listings, time.Now()
+	}
+	return c.listings, nil
+}
+
+// forget makes the next get list again; it never waits on one listing.
+func (c *listingCache) forget() { c.stale.Store(true) }
 
 func quietly(chosen tui.Chosen) tui.Outcome {
 	self, err := os.Executable()
