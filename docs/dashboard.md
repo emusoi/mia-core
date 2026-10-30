@@ -8,12 +8,14 @@ Every worktree of the repository, grouped:
 
 | section | holds |
 |---|---|
+| needs you | a stack that fell behind its parent, and whatever a plugin says needs you |
 | main / starred | the repository's checkout and starred worktrees |
 | in progress | uncommitted changes, or commits ahead |
-| quiet | everything else; `e` shows it |
+| resting | everything else; `e` shows it |
 | not mia's | worktrees mia has not adopted |
 
-A stack is one row; `⏎` unfolds it. The right side shows the selected row's
+Each row has a title: the task a plugin gives it (an agent's prompt), or
+else its last commit's subject. A stack is one row; `⏎` unfolds it. The right side shows the selected row's
 facts and session windows when the terminal is wide enough.
 
 `?` lists every key and the command it runs.

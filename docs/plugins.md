@@ -51,12 +51,14 @@ Plugins read mia with `mia api <query>`.
 `mia-<name> rows` gets the worktrees as JSON on stdin and answers:
 
 ```json
-{"rows": {"monduli": {"status": "#12 open", "facts": ["pr      #12"], "section": "review", "tabs": {"pr": ["#12 Fix it"]}}}}
+{"rows": {"monduli": {"title": "Fix the login redirect", "status": "#12 open", "facts": ["pr      #12"], "section": "review", "tabs": {"pr": ["#12 Fix it"]}}}}
 ```
 
 The answer is cached for `rows.every` (default 10s). Core sections rank
-starred 10, in progress 30, quiet 80, not mia's 90; a plugin section moves a
-row only if it ranks higher.
+needs you 5, starred 10, in progress 30, resting 80 (id `quiet`), not mia's 90;
+a plugin section moves a row only if it ranks higher. A plugin puts a row in
+needs you with `"section": "needs"`, without declaring it. `title` names the
+row's task; the first plugin to give one wins over the last commit's subject.
 
 ## Sides and corners
 

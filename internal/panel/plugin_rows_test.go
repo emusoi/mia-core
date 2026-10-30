@@ -186,3 +186,54 @@ func TestAStackWithWorkInItIsInProgress(t *testing.T) {
 		t.Errorf("a stack two commits ahead is in %q, want in progress", got)
 	}
 }
+
+func TestARowIsTitledByItsTaskOrElseItsLastCommit(t *testing.T) {
+	listings := []app.Listing{
+		{Name: "lemara", Branch: "subfolders", Adopted: true, LastSubject: "Intake: routes under subfolders"},
+		{Name: "temeke", Branch: "auth", Adopted: true, LastSubject: "Filevine auth"},
+	}
+	extras := []plugin.Rows{
+		{Plugin: "agent", Rows: map[string]plugin.RowInfo{"lemara": {Title: "Merge the intake form's two date fields?"}}},
+		{Plugin: "issue", Rows: map[string]plugin.RowInfo{"lemara": {Title: "LB-212 subfolders"}}},
+	}
+	p := panel.Dashboard(listings, "", extras)
+	if got := rowOf(p, "lemara").Title; got != "Merge the intake form's two date fields?" {
+		t.Errorf("the first plugin's title wins: %q", got)
+	}
+	if got := rowOf(p, "temeke").Title; got != "Filevine auth" {
+		t.Errorf("no plugin title: the last commit's subject, %q", got)
+	}
+}
+
+func TestAStackBehindItsParentNeedsYou(t *testing.T) {
+	layers := []stack.Layer{
+		{Branch: "layer-a", Parent: "main", Ahead: 1, Worktree: "longido"},
+		{Branch: "layer-b", Parent: "layer-a", Ahead: 1, Worktree: "monduli", NeedsRestack: true},
+	}
+	listings := []app.Listing{
+		{Name: "monduli", Branch: "layer-b", Adopted: true, Layers: layers, LastSubject: "Docs: shared contract"},
+		{Name: "longido", Branch: "layer-a", Adopted: true, Layers: layers, LastSubject: "Docs: base"},
+		{Name: "busy", Branch: "b", Adopted: true, Dirty: true},
+	}
+	extras := []plugin.Rows{{Plugin: "helper", Sections: []plugin.Section{{ID: "waiting", Label: "waiting", Rank: 3}}, Rows: map[string]plugin.RowInfo{
+		"longido": {Section: "waiting", Status: "asks"},
+	}}}
+	p := panel.Dashboard(listings, "", extras)
+	if got := ids(p); !slices.Equal(got, []string{"needs", "active"}) {
+		t.Fatalf("needs you comes first: %v", got)
+	}
+	if p.Sections[0].Label != "needs you" || sectionOf(p, "stack:layer-a") != "needs" {
+		t.Errorf("the stack that must be restacked needs you, whatever a plugin says: %+v", p.Sections[0])
+	}
+	if got := rowOf(p, "stack:layer-a").Title; got != "Docs: shared contract" {
+		t.Errorf("a stack is titled by its top layer: %q", got)
+	}
+}
+
+func TestAPluginCanSayARowNeedsYou(t *testing.T) {
+	extras := []plugin.Rows{{Plugin: "agent", Rows: map[string]plugin.RowInfo{"quiet-one": {Section: "needs", Status: "asks you"}}}}
+	p := panel.Dashboard(fleet, "", extras)
+	if sectionOf(p, "quiet-one") != "needs" || rowOf(p, "quiet-one").Cells[2] != "asks you" {
+		t.Errorf("needs is a core section a plugin may place in: %s %v", sectionOf(p, "quiet-one"), ids(p))
+	}
+}

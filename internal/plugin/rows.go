@@ -40,6 +40,7 @@ type Section struct {
 }
 
 type RowInfo struct {
+	Title   string              `json:"title,omitempty"`
 	Facts   []string            `json:"facts,omitempty"`
 	Status  string              `json:"status,omitempty"`
 	Note    string              `json:"note,omitempty"`

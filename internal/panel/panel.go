@@ -80,6 +80,7 @@ type Section struct {
 
 type Row struct {
 	ID       string              `json:"id"`
+	Title    string              `json:"title,omitempty"`
 	Glyph    string              `json:"glyph,omitempty"`
 	Cells    []string            `json:"cells"`
 	Note     string              `json:"note,omitempty"`

@@ -46,7 +46,7 @@ func Dashboard(listings []app.Listing, prefix string, extras []plugin.Rows) Pane
 		}
 		return listings[i].LastWork.After(listings[j].LastWork)
 	})
-	ranks := map[string]int{"starred": 10, "active": 30, "quiet": 80, "unadopted": 90}
+	ranks := map[string]int{"needs": 5, "starred": 10, "active": 30, "quiet": 80, "unadopted": 90}
 	declared := map[string]plugin.Section{}
 	for _, extra := range extras {
 		for _, section := range extra.Sections {
@@ -73,7 +73,7 @@ func Dashboard(listings []app.Listing, prefix string, extras []plugin.Rows) Pane
 		byName[listing.Name] = listing
 	}
 	mainOnTop := false
-	place := func(row Row, listing app.Listing, names []string) {
+	place := func(row Row, listing app.Listing, names []string, needs bool) {
 		id := "quiet"
 		switch {
 		case !listing.Adopted && !listing.Main:
@@ -82,6 +82,8 @@ func Dashboard(listings []app.Listing, prefix string, extras []plugin.Rows) Pane
 			buckets["starred"] = append([]Row{row}, buckets["starred"]...)
 			mainOnTop = !listing.Starred
 			return
+		case needs:
+			id = "needs"
 		case listing.Starred:
 			id = "starred"
 		case listing.Dirty || listing.Ahead > 0:
@@ -91,7 +93,7 @@ func Dashboard(listings []app.Listing, prefix string, extras []plugin.Rows) Pane
 		for _, name := range names {
 			all = append(all, claims(name)...)
 		}
-		if won, ok := winner(all, ranks[id]); ok && id != "starred" && id != "unadopted" {
+		if won, ok := winner(all, ranks[id]); ok && id != "starred" && id != "unadopted" && id != "needs" {
 			id = won.info.Section
 			if won.info.Status != "" {
 				row.Cells[2] = won.info.Status
@@ -99,11 +101,16 @@ func Dashboard(listings []app.Listing, prefix string, extras []plugin.Rows) Pane
 		}
 		buckets[id] = append(buckets[id], row)
 	}
+	// a plugin's title (an agent's task) wins over the last commit's subject
+	titled := map[string]bool{}
 	decorate := func(row *Row, ownsStatus bool) {
 		all := claims(row.ID)
 		won, placed := winner(all, int(^uint(0)>>1))
 		placed = placed && ownsStatus
 		for _, c := range all {
+			if c.info.Title != "" && !titled[row.ID] {
+				row.Title, titled[row.ID] = c.info.Title, true
+			}
 			row.Facts = append(row.Facts, c.info.Facts...)
 			for _, tab := range c.tabs {
 				if lines := c.info.Tabs[tab.ID]; len(lines) > 0 {
@@ -128,7 +135,7 @@ func Dashboard(listings []app.Listing, prefix string, extras []plugin.Rows) Pane
 		if len(listing.Layers) == 0 {
 			row := dashboardRow(listing, prefix)
 			decorate(&row, false)
-			place(row, listing, []string{listing.Name})
+			place(row, listing, []string{listing.Name}, false)
 			continue
 		}
 		bottom := listing.Layers[0].Branch
@@ -136,35 +143,39 @@ func Dashboard(listings []app.Listing, prefix string, extras []plugin.Rows) Pane
 			continue
 		}
 		grouped[bottom] = true
-		row, summary := stackRow(listing, byName, prefix)
+		row, summary, behind := stackRow(listing, byName, prefix)
 		var members []string
 		for i := range row.Children {
 			shown[row.Children[i].ID] = true
 			if _, ok := byName[row.Children[i].ID]; ok {
 				decorate(&row.Children[i], true)
 				members = append(members, row.Children[i].ID)
+				if row.Title == "" {
+					row.Title = row.Children[i].Title
+				}
 			}
 		}
-		place(row, summary, members)
+		place(row, summary, members, behind)
 	}
 	for _, listing := range listings {
 		if len(listing.Layers) > 0 && !shown[listing.Name] {
 			row := dashboardRow(listing, prefix)
 			row.Facts = append(row.Facts, "stack  a fork off "+listing.Layers[0].Branch+" — not on the stack's main line")
 			decorate(&row, false)
-			place(row, listing, []string{listing.Name})
+			place(row, listing, []string{listing.Name}, false)
 		}
 	}
-	onlyQuiet := len(buckets["starred"])+len(buckets["active"])+len(buckets["unadopted"]) == 0
+	onlyQuiet := len(buckets["needs"])+len(buckets["starred"])+len(buckets["active"])+len(buckets["unadopted"]) == 0
 	for id, section := range declared {
 		if !section.Collapsed {
 			onlyQuiet = onlyQuiet && len(buckets[id]) == 0
 		}
 	}
 	sections := []Section{
+		{ID: "needs", Label: "needs you"},
 		{ID: "starred", Label: starredLabel(mainOnTop, len(buckets["starred"]))},
 		{ID: "active", Label: "in progress"},
-		{ID: "quiet", Label: "quiet", Collapsed: !onlyQuiet, ToggleKey: "e"},
+		{ID: "quiet", Label: "resting", Collapsed: !onlyQuiet, ToggleKey: "e"},
 		{ID: "unadopted", Label: "not mia's"},
 	}
 	for _, section := range declared {
@@ -199,7 +210,7 @@ func Dashboard(listings []app.Listing, prefix string, extras []plugin.Rows) Pane
 	return p
 }
 
-func stackRow(first app.Listing, byName map[string]app.Listing, prefix string) (Row, app.Listing) {
+func stackRow(first app.Listing, byName map[string]app.Listing, prefix string) (Row, app.Listing, bool) {
 	var children []Row
 	var members []app.Listing
 	summary := app.Listing{Adopted: true}
@@ -325,7 +336,7 @@ func stackRow(first app.Listing, byName map[string]app.Listing, prefix string) (
 		Actions:  actions,
 		Facts:    facts,
 		Children: children,
-	}, summary
+	}, summary, restack != ""
 }
 
 func layerState(layer stack.Layer) string {
@@ -424,6 +435,7 @@ func dashboardRow(listing app.Listing, prefix string) Row {
 	}
 	return Row{
 		ID:      listing.Name,
+		Title:   listing.LastSubject,
 		Glyph:   glyph,
 		Cells:   []string{listing.Name, branch, status(listing), ageCell(listing.LastWork)},
 		Actions: actions,
