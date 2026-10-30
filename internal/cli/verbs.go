@@ -31,7 +31,7 @@ var verbs = []Verb{
 	{"gc", "mia gc [--apply] [--days N]", "worktrees nobody has touched: clean, no session, not starred, quiet for N days", false, ""},
 	{"adopt", "mia adopt <worktree>", "take over a worktree created by hand", false, ""},
 	{"rm", "mia rm [--force] [--stop-running] <worktree>", "remove a worktree, its session and its name", false, ""},
-	{"window", "mia window [ls|open|select|new|close|read|send] [worktree] [window] [--editor] [-- command|text]", "the windows of a worktree's session: land in one, pick one without landing, add a shell, close one, read or type into one", false, ""},
+	{"window", "mia window [ls|open|select|new|close|read|send|press] [worktree] [window] [--editor] [-- command|text|keys]", "the windows of a worktree's session: land in one, pick one without landing, add a shell, close one, read or type into one, press keys in one without Enter", false, ""},
 	{"shell", "mia shell [--popup] [worktree]", "attach to a worktree's session", false, ""},
 	{"run", "mia run <worktree> <cmd…>", "run a command once in a worktree", false, ""},
 	{"dev", "mia dev [<worktree> [--follow]|off]", "lend the main checkout's running dev server a worktree's files; the one time mia writes into a working tree", false, ""},

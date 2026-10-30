@@ -105,6 +105,15 @@ func (a *App) SendToWindow(record model.Record, window, text string) error {
 	return host.Send(record.Name, window, text)
 }
 
+// PressInWindow presses keys in a window without Enter after them.
+func (a *App) PressInWindow(record model.Record, window, keys string) error {
+	host, window, err := a.windowNamed(record, window)
+	if err != nil {
+		return err
+	}
+	return host.Press(record.Name, window, keys)
+}
+
 func (a *App) WindowText(record model.Record, window string) string {
 	text, _ := a.ReadWindow(record, window)
 	return text

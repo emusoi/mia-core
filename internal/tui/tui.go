@@ -141,12 +141,13 @@ type model struct {
 	legend   bool
 	sideSel  string
 	sideRow  int
-	classic  bool   // the dashboard in the room, for mia side's popups
-	viewing  bool   // home shows a plugin's side in place of the list
-	reading  *read  // home shows a popup's page over everything under the header
-	readAt   int    // the page's first line shown
-	reportOf string // what the report shows the output of: mia restack …
-	view     int    // which of the room's sides home shows
+	classic  bool       // the dashboard in the room, for mia side's popups
+	viewing  bool       // home shows a plugin's side in place of the list
+	reading  *read      // home shows a popup's page over everything under the header
+	readAt   int        // the page's first line shown
+	reportOf string     // what the report shows the output of: mia restack …
+	answer   *answering // an answer picked on the entry, waiting out its undo
+	view     int        // which of the room's sides home shows
 	stack    []model
 }
 
@@ -176,6 +177,18 @@ type spinTick struct{}
 type landing struct{ chosen Chosen }
 
 type showFailed struct{ err error }
+
+// answering is an answer picked with 1, 2…, held for answerHold before it
+// goes, so u can take it back.
+type answering struct {
+	id     int64
+	row    string
+	choice plugin.Answer
+}
+
+type answerDue struct{ id int64 }
+
+const answerHold = 5 * time.Second
 
 // read is what a popup's command printed, for home to show as a page
 // when there is no tmux to show it in.
@@ -682,6 +695,14 @@ func (m model) update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.reading, m.readAt = &msg, 0
 		return m, nil
 
+	case answerDue:
+		if m.answer == nil || m.answer.id != msg.id {
+			return m, nil // taken back
+		}
+		open := m.answer.choice.Open
+		m.answer = nil
+		return m.openWith(&open)
+
 	case loaded:
 		m.mode, m.label = browsing, ""
 		if msg.err != nil {
@@ -1079,6 +1100,19 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		return m, nil
+	}
+	if m.homes() && m.mode == browsing && !m.viewing {
+		if m.answer != nil && key == "u" {
+			m.answer = nil
+			return m, nil
+		}
+		if n := strings.Index("123456789", key); len(key) == 1 && n >= 0 && m.cursor < len(m.rows) {
+			if answers := m.rows[m.cursor].Answers; n < len(answers) {
+				id := generations.Add(1)
+				m.answer = &answering{id: id, row: nameOf(m.rows[m.cursor]), choice: answers[n]}
+				return m, tea.Tick(answerHold, func(time.Time) tea.Msg { return answerDue{id} })
+			}
+		}
 	}
 	if m.homes() && m.mode == browsing && m.panel.Room != nil && len(m.panel.Room.Sides) > 0 {
 		// tab walks the ring: the worktrees, then each plugin's view, then

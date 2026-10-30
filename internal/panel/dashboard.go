@@ -111,6 +111,9 @@ func Dashboard(listings []app.Listing, prefix string, extras []plugin.Rows) Pane
 			if c.info.Title != "" && !titled[row.ID] {
 				row.Title, titled[row.ID] = c.info.Title, true
 			}
+			if len(c.info.Answers) > 0 && len(row.Answers) == 0 {
+				row.Answers = c.info.Answers
+			}
 			row.Facts = append(row.Facts, c.info.Facts...)
 			for _, tab := range c.tabs {
 				if lines := c.info.Tabs[tab.ID]; len(lines) > 0 {
@@ -152,6 +155,9 @@ func Dashboard(listings []app.Listing, prefix string, extras []plugin.Rows) Pane
 				members = append(members, row.Children[i].ID)
 				if row.Title == "" {
 					row.Title = row.Children[i].Title
+				}
+				if len(row.Answers) == 0 {
+					row.Answers = row.Children[i].Answers
 				}
 			}
 		}

@@ -56,7 +56,11 @@ Plugins read mia with `mia api <query>`.
 
 The answer is cached for `rows.every` (default 10s). Core sections rank
 needs you 5, starred 10, in progress 30, resting 80 (id `quiet`), not mia's 90;
-a plugin section moves a row only if it ranks higher. A plugin puts a row in
+a plugin section moves a row only if it ranks higher. `answers` — `[{"label": "Yes", "open": {"verb":
+"window", "args": ["press", "monduli", "claude", "--", "1"]}}]` — are the
+choices of a question the row waits on: the dashboard numbers them on its
+entry, `1`, `2`… picks one, and it goes five seconds later unless `u` takes
+it back. A plugin puts a row in
 needs you with `"section": "needs"`, without declaring it. `title` names the
 row's task; the first plugin to give one wins over the last commit's subject.
 

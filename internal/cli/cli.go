@@ -957,7 +957,7 @@ func subject(a *app.App, args []string, fallback string, subs ...string) (sub st
 }
 
 func cmdWindow(a *app.App, args []string, asJSON bool) int {
-	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close", "read", "send")
+	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close", "read", "send", "press")
 	if err != nil {
 		return fail(err)
 	}
@@ -1048,6 +1048,11 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 			return usageErr("mia window send [worktree] <window> -- <text>")
 		}
 		return exitFor(a.SendToWindow(record, name, strings.Join(argv, " ")))
+	case "press":
+		if name == "" || len(argv) == 0 {
+			return usageErr("mia window press [worktree] <window> -- <keys>")
+		}
+		return exitFor(a.PressInWindow(record, name, strings.Join(argv, " ")))
 	case "close":
 		if name == "" {
 			return usageErr("mia window close [worktree] <window>")

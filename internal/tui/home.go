@@ -361,6 +361,13 @@ func (m model) headword(sel homeRow, width int) []string {
 	}
 	lines = append(append(lines, pad(titled, titleN)...), "")
 	var facts []string
+	// a question's answers come first, numbered as the keys that pick them
+	for i, a := range row.Answers {
+		if i == 9 || len(facts) == factN {
+			break
+		}
+		facts = append(facts, muted.Render(fmt.Sprintf("%d.   ", i+1))+ink.Render(fit(a.Label, width-5)))
+	}
 	// a problem comes first: when there is room for two facts, it is one
 	ordered := append([]string{}, row.Facts...)
 	sort.SliceStable(ordered, func(i, j int) bool { return problemFact(ordered[i]) && !problemFact(ordered[j]) })
@@ -379,6 +386,17 @@ func (m model) headword(sel homeRow, width int) []string {
 		facts = append(facts, fit(faint.Render(fmt.Sprintf("%-10s", strings.TrimSpace(key)))+style.Render(strings.TrimSpace(value)), width))
 	}
 	lines = append(append(lines, pad(facts, factN)...), "")
+	switch {
+	case m.answer != nil && m.answer.row == nameOf(row):
+		return append(lines, inkB.Render("✓")+muted.Render(" Sending ")+ink.Render(m.answer.choice.Label)+
+			muted.Render(" to "+m.answer.row+" in a few seconds")+"      "+homeKey("u", "undo"))
+	case len(row.Answers) > 0:
+		keys := "1"
+		if n := min(len(row.Answers), 9); n > 1 {
+			keys = fmt.Sprintf("1–%d", n)
+		}
+		return append(lines, homeKey(keys, "answer")+"    "+strings.Join(m.hints(), "    "))
+	}
 	return append(lines, strings.Join(m.hints(), "    "))
 }
 

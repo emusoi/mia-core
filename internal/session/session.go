@@ -352,6 +352,15 @@ func (h Host) Send(worktree, window, text string) error {
 	return nil
 }
 
+// Press types text into a window as keys, with no Enter after it: a digit
+// that picks an agent's answer from its menu.
+func (h Host) Press(worktree, window, text string) error {
+	if out, err := h.run("send-keys", "-t", Target(worktree, window), "-l", text); err != nil {
+		return fmt.Errorf("press in %s: %s", worktree, strings.TrimSpace(out))
+	}
+	return nil
+}
+
 func (h Host) CaptureBack(worktree, window string, withEscapes bool, back int) (string, error) {
 	args := []string{"capture-pane", "-p", "-t", Target(worktree, window)}
 	if withEscapes {

@@ -346,3 +346,49 @@ func TestNOnAStackSaysItAddsALayer(t *testing.T) {
 		t.Errorf("while the name is typed, what it will make:\n%s", view)
 	}
 }
+
+func TestAnAnswerIsPickedHeldAndSentOrTakenBack(t *testing.T) {
+	p := homePanel()
+	p.Sections[0].Rows[0].Answers = []plugin.Answer{
+		{Label: "Yes", Open: plugin.Open{Verb: "window", Args: []string{"press", "docs-base", "claude", "--", "1"}}},
+		{Label: "No", Open: plugin.Open{Verb: "window", Args: []string{"press", "docs-base", "claude", "--", "2"}}},
+	}
+	m := newModel(p)
+	m.width, m.height = 180, 45
+	var sent []string
+	m.hooks.Perform = func(c Chosen) Outcome { sent = c.Argv; return Outcome{} }
+	if view := stripANSI(m.View()); !strings.Contains(view, "1.   Yes") || !strings.Contains(view, "1–2 answer") {
+		t.Fatalf("the entry numbers the answers:\n%s", view)
+	}
+	press := func(m model, key string) model {
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
+		return next.(model)
+	}
+	picked := press(m, "2")
+	if picked.answer == nil || !strings.Contains(stripANSI(picked.View()), "Sending No to docs-base") {
+		t.Fatalf("2 picks No and holds it:\n%s", stripANSI(picked.View()))
+	}
+	// the hold passes: it goes
+	next, cmd := picked.Update(answerDue{picked.answer.id})
+	for cmd != nil {
+		msg := cmd()
+		if batch, ok := msg.(tea.BatchMsg); ok {
+			for _, c := range batch {
+				if c != nil {
+					c()
+				}
+			}
+			break
+		}
+		next, cmd = next.(model).Update(msg)
+	}
+	if strings.Join(sent, " ") != "window press docs-base claude -- 2" {
+		t.Errorf("the answer is sent when the hold passes: %q", sent)
+	}
+	// u takes it back: nothing goes
+	sent = nil
+	undone := press(press(m, "1"), "u")
+	if _, cmd := undone.Update(answerDue{1}); cmd != nil || undone.answer != nil || sent != nil {
+		t.Errorf("u takes the answer back")
+	}
+}

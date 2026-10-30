@@ -40,12 +40,20 @@ type Section struct {
 }
 
 type RowInfo struct {
-	Title   string              `json:"title,omitempty"`
+	Title string `json:"title,omitempty"`
+	// Answers are the choices of a question the row waits on: 1, 2… on the
+	// dashboard's entry pick one, sent a few seconds later unless undone.
+	Answers []Answer            `json:"answers,omitempty"`
 	Facts   []string            `json:"facts,omitempty"`
 	Status  string              `json:"status,omitempty"`
 	Note    string              `json:"note,omitempty"`
 	Section string              `json:"section,omitempty"`
 	Tabs    map[string][]string `json:"tabs,omitempty"`
+}
+
+type Answer struct {
+	Label string `json:"label"`
+	Open  Open   `json:"open"`
 }
 
 type Rows struct {
