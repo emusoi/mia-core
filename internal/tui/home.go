@@ -33,7 +33,10 @@ var (
 	head   = lipgloss.NewStyle().Foreground(hiC).Bold(true)
 )
 
-const homeWidest = 124
+const (
+	homeWidest  = 124
+	homeTallest = 44
+)
 
 // shape says how a section's worktrees look as dots: big needs you, small
 // bright is working, a ring is in progress, faint rests.
@@ -127,21 +130,29 @@ func (m model) home() string {
 	}
 	bottom = append(bottom, "", between(foot, views, width))
 
-	room := m.height - len(top) - len(bottom) - 2
+	// home is a page of a fixed size, centred both ways: on a tall terminal
+	// the keys sit under the page, not on the terminal's last row
+	height := min(m.height, homeTallest)
+	room := height - len(top) - len(bottom) - 2
 	list := m.others(walk, width, room)
 	if m.viewing {
 		list = m.viewList(width, room)
 	}
 	lines := append(append(top, "", ""), list...)
-	for len(lines) < m.height-len(bottom) {
+	for len(lines) < height-len(bottom) {
 		lines = append(lines, "")
 	}
-	lines = append(lines[:m.height-len(bottom)], bottom...)
+	lines = append(lines[:height-len(bottom)], bottom...)
 	left := strings.Repeat(" ", max((m.width-width)/2, 0))
 	for i, line := range lines {
 		lines[i] = left + fit(line, width)
 	}
-	return strings.Join(lines, "\n")
+	above := (m.height - height) / 2
+	page := append(make([]string, above), lines...)
+	for len(page) < m.height {
+		page = append(page, "")
+	}
+	return strings.Join(page, "\n")
 }
 
 // marks is one dot per worktree, in the list's order, the selected one

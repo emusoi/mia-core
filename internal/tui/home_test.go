@@ -119,3 +119,27 @@ func TestTheListStaysPutWhileTheEntryMoves(t *testing.T) {
 		t.Errorf("an entry with fewer facts moved the list from row %d to %d", first, got)
 	}
 }
+
+func TestHomeIsAPageCentredInATallTerminal(t *testing.T) {
+	m := newModel(homePanel())
+	m.width, m.height = 200, 80
+	lines := strings.Split(stripANSI(m.View()), "\n")
+	if len(lines) != 80 {
+		t.Fatalf("home fills the terminal: %d lines", len(lines))
+	}
+	first, last := -1, -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			if first < 0 {
+				first = i
+			}
+			last = i
+		}
+	}
+	if first < 15 || 80-1-last < 15 {
+		t.Errorf("the page sits in the middle, not stretched: rows %d to %d of 80", first, last)
+	}
+	if !strings.HasPrefix(lines[first], strings.Repeat(" ", 38)) {
+		t.Errorf("and centred across: %q", lines[first])
+	}
+}
