@@ -139,6 +139,7 @@ type model struct {
 	legend   bool
 	sideSel  string
 	sideRow  int
+	classic  bool // the dashboard in its old room, not home; v switches
 	stack    []model
 }
 
@@ -435,6 +436,7 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	m = next.(model)
 	m.fill = m.inPopup && !m.unfilled().roomed()
 	if m.hooks.Side != "" && m.panel.Room != nil && m.width > 0 {
+		m.classic = true
 		m = m.sideKey(m.hooks.Side)
 		m.hooks.Side = ""
 	}
@@ -1017,6 +1019,10 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.legend && key != "ctrl+c" {
 		return m.legendKey(key), nil
+	}
+	if key == "v" && m.homes() && m.mode == browsing {
+		m.classic = true
+		return m, nil
 	}
 	if key == "v" && m.roomed() {
 		m.legend = true
@@ -2006,6 +2012,9 @@ func (m model) problemLines() []string {
 func (m model) View() string {
 	if m.hooks.Only != "" {
 		return m.widget()
+	}
+	if m.homes() {
+		return m.home()
 	}
 	boxed := m.boxed()
 	if room, ok := m.room(boxed); ok {

@@ -36,6 +36,7 @@ func popupRoom() *panel.Room {
 func sideModel(t *testing.T) model {
 	t.Helper()
 	m := newModel(panel.Panel{Room: popupRoom()})
+	m.classic = true // the room is the classic view; home is tested in home_test.go
 	m.hooks.Only = "right"
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 64, Height: 18})
 	return next.(model)
@@ -95,6 +96,7 @@ func TestASideAloneTakesItsKeys(t *testing.T) {
 
 func TestASideAloneShowsEvenWhenTheRoomHasItOff(t *testing.T) {
 	m := newModel(panel.Panel{Room: popupRoom()})
+	m.classic = true // the room is the classic view; home is tested in home_test.go
 	m.hooks.Only, m.sides.Off = "right", []string{"right"}
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 64, Height: 18})
 	if got := plain(next.(model).View()); !strings.Contains(got, "kinondoni") {

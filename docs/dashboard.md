@@ -20,9 +20,19 @@ facts and session windows when the terminal is wide enough.
 
 `?` lists every key and the command it runs.
 
+## Home
+
+The dashboard opens as home. A dot for every worktree runs along the top —
+big when it needs you, small when an agent works in it, a ring when it is in
+progress, faint when it rests — with the selected one marked `▔` and named.
+Under it the selected worktree is set like a dictionary entry: its name and
+state, its title, its facts and the keys that act on it. Every worktree is
+listed below, by section; `j` and `k` move the entry. `v` shows the room.
+
 ## The room
 
-When the terminal has space, the box sits in a room. Dotted lines run from
+`v` on home, and `mia side`'s popups, show the box in a room; `v` twice
+goes back home. When the terminal has space, the box sits in a room. Dotted lines run from
 each terminal corner to the box's corner, and each corner carries one line:
 `mia` and the repository top left, the date and time top right, and what
 plugins put in the bottom corners (agents waiting, today's spend).

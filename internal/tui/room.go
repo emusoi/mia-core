@@ -290,7 +290,7 @@ func (m model) boxIn(lines []string) box {
 // terminal's corners, a status line in each corner and the plugins' sides
 // where they fit — or says no when not one side fits.
 func (m model) room(boxed string) (string, bool) {
-	if m.panel.Room == nil || m.fill {
+	if m.panel.Room == nil || m.fill || m.homes() {
 		return "", false
 	}
 	lines := strings.Split(boxed, "\n")
@@ -563,7 +563,8 @@ func (m model) save() {
 // or off, esc or v closes.
 func (m model) legendKey(key string) model {
 	if key == "esc" || key == "v" {
-		m.legend = false
+		// v twice from the room goes back home
+		m.legend, m.classic = false, m.classic && key == "esc"
 		return m
 	}
 	i := slices.Index(SideKeys, key)

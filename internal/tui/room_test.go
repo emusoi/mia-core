@@ -122,6 +122,7 @@ func designModel(t *testing.T) model {
 	clock = func() time.Time { return time.Date(2025, 10, 9, 8, 41, 0, 0, time.Local) }
 	t.Cleanup(func() { clock = was })
 	m := newModel(panel.Panel{Room: designRoom()})
+	m.classic = true // the room is the classic view; home is tested in home_test.go
 	m.width, m.height = 212, 48
 	return m
 }
@@ -162,7 +163,7 @@ func TestTooSmallForAnySideIsTodaysDash(t *testing.T) {
 	if plainDash := m.View(); roomed != plainDash {
 		t.Errorf("80×24 should be exactly today's dash:\n%s\n---\n%s", plain(roomed), plain(plainDash))
 	}
-	m.panel.Room = designRoom()
+	m.panel.Room, m.classic = designRoom(), true
 	m.width, m.height = 212, 48
 	if got := plain(m.View()); !strings.Contains(got, "v sides") || !strings.Contains(got, "waiting 2") || !strings.Contains(got, "iringa") {
 		t.Errorf("212×48 draws the room around the box:\n%s", got)
