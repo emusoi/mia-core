@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -336,8 +337,13 @@ func hooksFor(a *app.App, name, target string) tui.Hooks {
 			return session.Popup(chosen.Argv, os.Getenv("TMUX_PANE"), title, width, height, x, y)
 		}
 	}
-	hooks.Show = func(open plugin.Open) error {
-		return session.Show(open.Popup, os.Getenv("TMUX_PANE"), a.Root, open.Title, open.Interactive)
+	if os.Getenv("TMUX_PANE") != "" {
+		hooks.Show = func(open plugin.Open) error {
+			return session.Show(open.Popup, os.Getenv("TMUX_PANE"), a.Root, open.Title, open.Interactive)
+		}
+	}
+	hooks.ShowIn = func(open plugin.Open) *exec.Cmd {
+		return session.ShowHere(open.Popup, a.Root, open.Interactive)
 	}
 	hooks.Load = func(name, target string) (panel.Panel, tui.Reload, tui.Hooks, error) {
 		p, err := panelNamed(a, name, target)

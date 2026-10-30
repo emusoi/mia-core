@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"os/exec"
 	"slices"
 	"sort"
 	"strings"
@@ -66,8 +67,9 @@ type Hooks struct {
 	Sides   SideState
 	Save    func(SideState)
 	Show    func(plugin.Open) error
-	Side    string // a SideKeys digit: open with the cursor in that side
-	Only    string // a plugin.Places side: show that side alone, as `mia side` does
+	ShowIn  func(plugin.Open) *exec.Cmd // without tmux: the popup's command, run in this terminal
+	Side    string                      // a SideKeys digit: open with the cursor in that side
+	Only    string                      // a plugin.Places side: show that side alone, as `mia side` does
 }
 
 type nudged struct{}
@@ -742,6 +744,14 @@ func (m model) openSide() (tea.Model, tea.Cmd) {
 		return m, nil
 	case len(open.Popup) > 0:
 		show := m.hooks.Show
+		if show == nil && m.hooks.ShowIn != nil {
+			return m, tea.ExecProcess(m.hooks.ShowIn(*open), func(err error) tea.Msg {
+				if err != nil {
+					return showFailed{err}
+				}
+				return nil
+			})
+		}
 		if show == nil {
 			m.problem = "a popup needs tmux"
 			return m, nil

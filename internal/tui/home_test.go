@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -166,5 +167,32 @@ func TestTheKeysAreCentredUnderThePage(t *testing.T) {
 	right := 180 - left - len([]rune(text))
 	if !strings.HasPrefix(text, "j k move") || left-right > 2 || right-left > 2 {
 		t.Errorf("the keys sit in the middle: %d left, %d right: %q", left, right, foot)
+	}
+}
+
+func TestAViewsTitleTakesHomesWidth(t *testing.T) {
+	p := homePanel()
+	long := "A provider emails a filing and Lido sorts it into the client's folder"
+	p.Room.Sides = []plugin.SideTab{{Plugin: "issue", Side: plugin.Side{ID: "issues", Where: "left", Label: "issues"},
+		SideAnswer: plugin.SideAnswer{Lines: []plugin.Item{{Cells: plugin.Line{{Text: "○", Width: 2}, {Text: "WL-55", Width: 7}, {Text: long, Width: 22}}}}}}}
+	m := newModel(p)
+	m.width, m.height = 180, 45
+	m = m.showView(0)
+	if !strings.Contains(stripANSI(m.View()), long) {
+		t.Errorf("the title is cut to the side's 22 columns:\n%s", stripANSI(m.View()))
+	}
+}
+
+func TestAPopupWithoutTmuxRunsInTheTerminal(t *testing.T) {
+	p := homePanel()
+	p.Room.Sides = []plugin.SideTab{{Plugin: "issue", Side: plugin.Side{ID: "issues", Where: "left", Label: "issues"},
+		SideAnswer: plugin.SideAnswer{Lines: []plugin.Item{{Cells: plugin.Line{{Text: "WL-55"}}, Open: &plugin.Open{Popup: []string{"echo", "hi"}}}}}}}
+	m := newModel(p)
+	ran := false
+	m.hooks.ShowIn = func(open plugin.Open) *exec.Cmd { ran = true; return exec.Command("true") }
+	m = m.showView(0)
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !ran || cmd == nil || next.(model).problem != "" {
+		t.Errorf("⏎ hands the terminal to the popup's command: ran %v, problem %q", ran, next.(model).problem)
 	}
 }

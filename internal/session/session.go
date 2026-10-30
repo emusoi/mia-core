@@ -173,12 +173,27 @@ func Show(argv []string, beside, dir, title string, interactive bool) error {
 }
 
 func showArgs(argv []string, beside, dir, title string, interactive bool) []string {
+	command := shownCommand(argv, interactive)
+	return []string{"display-popup", "-E", "-t", beside, "-d", dir, "-x", "C", "-y", "C", "-w", "110", "-h", "16",
+		"-b", "rounded", "-S", "fg=green", "-T", title, command}
+}
+
+// shownCommand is what a popup runs: the command, read through less
+// unless it is interactive and owns the screen itself.
+func shownCommand(argv []string, interactive bool) string {
 	command := run.ShellJoin(argv)
 	if !interactive {
 		command += ` 2>&1 | less -R -P' q close'`
 	}
-	return []string{"display-popup", "-E", "-t", beside, "-d", dir, "-x", "C", "-y", "C", "-w", "110", "-h", "16",
-		"-b", "rounded", "-S", "fg=green", "-T", title, command}
+	return command
+}
+
+// ShowHere is a popup's command for a terminal without tmux: it takes the
+// whole screen until it ends (q, for less), then the dashboard comes back.
+func ShowHere(argv []string, dir string, interactive bool) *exec.Cmd {
+	cmd := exec.Command("sh", "-c", shownCommand(argv, interactive))
+	cmd.Dir = dir
+	return cmd
 }
 
 func (h Host) CloseHover(beside string) {

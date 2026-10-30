@@ -118,7 +118,7 @@ func (m model) home() string {
 	}
 	// the headword carries the row's keys; the foot the ones that work anywhere
 	foot := strings.TrimLeft(m.footer(), " ")
-	if m.mode == browsing && m.problem == "" && m.notice == "" {
+	if m.mode == browsing && m.notice == "" {
 		foot = homeKey("j k", "move") + "    " + homeKey(m.shown("filter"), "find") + "    " + homeKey("?", "keys")
 		if m.viewing {
 			foot = homeKey("j k", "move") + "    " + homeKey("⏎", "open") + "    " + homeKey("esc", "back")
@@ -404,13 +404,18 @@ func (m model) viewList(width, room int) []string {
 			mark, cursorAt = inkB.Render("›")+" ", len(lines)
 		}
 		var b strings.Builder
-		for _, c := range item.Cells {
-			text := c.Text
-			if c.Width > 0 {
+		for i, c := range item.Cells {
+			text, w := c.Text, c.Width
+			if i == wideCell(item.Cells) {
+				// the room's sides are narrow; home is not, so the line's
+				// longest cell, its title, takes what the others leave
+				w = max(width-2-lineWidthBut(item.Cells, i), w)
+			}
+			if w > 0 {
 				if c.Align == "right" {
-					text = fmt.Sprintf("%*s", c.Width, fit(text, c.Width))
+					text = fmt.Sprintf("%*s", w, fit(text, w))
 				} else {
-					text = fmt.Sprintf("%-*s", c.Width, fit(text, c.Width))
+					text = fmt.Sprintf("%-*s", w, fit(text, w))
 				}
 			}
 			b.WriteString(viewStyle(c.Style).Render(text) + " ")
@@ -422,6 +427,33 @@ func (m model) viewList(width, room int) []string {
 	}
 	start := min(max(cursorAt-room+2, 0), len(lines)-room)
 	return lines[start : start+room]
+}
+
+// wideCell is the cell with the most text, or -1 for a line of one cell.
+func wideCell(cells plugin.Line) int {
+	if len(cells) < 2 {
+		return -1
+	}
+	at := 0
+	for i, c := range cells {
+		if len([]rune(c.Text)) > len([]rune(cells[at].Text)) {
+			at = i
+		}
+	}
+	return at
+}
+
+// lineWidthBut is how wide the line's cells are without cell skip, with the
+// space after each.
+func lineWidthBut(cells plugin.Line, skip int) int {
+	w := 0
+	for i, c := range cells {
+		if i == skip {
+			continue
+		}
+		w += max(c.Width, lipgloss.Width(c.Text)) + 1
+	}
+	return w + 1
 }
 
 // viewStyle is a plugin's cell style in home's palette: red stays danger,
