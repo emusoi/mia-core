@@ -281,3 +281,14 @@ func TestAPanelOpenedFromTheDashboardIsAHomePage(t *testing.T) {
 		t.Errorf("no box, and no dashboard views in a panel:\n%s", view)
 	}
 }
+
+func TestAShortTerminalKeepsRoomForTheList(t *testing.T) {
+	m := newModel(homePanel())
+	m.width, m.height = 80, 24
+	view := stripANSI(m.View())
+	for _, want := range []string{"needs you  1", "› ", "in progress  1", "restack   docs-shared"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("80×24 lacks %q:\n%s", want, view)
+		}
+	}
+}

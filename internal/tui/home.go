@@ -186,11 +186,18 @@ func (m model) home() string {
 	// the keys sit under the page, not on the terminal's last row
 	height := min(m.height, homeTallest)
 	room := height - len(top) - len(bottom) - 2
+	if m.height < shortTall {
+		room++
+	}
 	list := m.others(walk, width, room)
 	if m.viewing {
 		list = m.viewList(width, room)
 	}
-	lines := append(append(top, "", ""), list...)
+	gap := []string{"", ""}
+	if m.height < shortTall {
+		gap = gap[:1]
+	}
+	lines := append(append(top, gap...), list...)
 	for len(lines) < height-len(bottom) {
 		lines = append(lines, "")
 	}
@@ -269,7 +276,18 @@ const (
 	titleRows    = 2
 	factRows     = 5
 	headwordRows = 1 + 1 + titleRows + 1 + factRows + 1 + 1
+	// a short terminal gives the entry one line of title and two of facts,
+	// so the list keeps room; the height is still fixed for that terminal
+	shortTall = 34
 )
+
+// sizes is the entry's title and fact rows, and its whole height.
+func (m model) sizes() (title, facts, all int) {
+	if m.height < shortTall {
+		return 1, 2, 1 + 1 + 1 + 1 + 2 + 1 + 1
+	}
+	return titleRows, factRows, headwordRows
+}
 
 // headword is the selected worktree set like a dictionary entry: its name
 // and state, its task, its facts, and the keys that act on it.
@@ -281,7 +299,8 @@ func (m model) headword(sel homeRow, width int) []string {
 		if m.panel.Empty == "" || m.loading() {
 			line = muted.Render("Reading the worktrees…")
 		}
-		return pad([]string{line}, headwordRows)
+		_, _, all := m.sizes()
+		return pad([]string{line}, all)
 	}
 	row := sel.row
 	cells := append(append([]string{}, row.Cells...), "", "", "", "")
@@ -309,18 +328,23 @@ func (m model) headword(sel homeRow, width int) []string {
 	if title == "" {
 		title = strings.TrimSpace(cells[1])
 	}
+	titleN, factN, _ := m.sizes()
 	parts := wrap(title, width)
-	if len(parts) > titleRows {
-		parts = append(parts[:titleRows-1], fit(strings.Join(parts[titleRows-1:], " "), width))
+	if len(parts) > titleN {
+		rest := strings.Join(strings.Fields(strings.Join(parts[titleN-1:], " ")), " ")
+		parts = append(parts[:titleN-1], fit(rest, width))
 	}
 	var titled []string
 	for _, part := range parts {
 		titled = append(titled, head.Render(part))
 	}
-	lines = append(append(lines, pad(titled, titleRows)...), "")
+	lines = append(append(lines, pad(titled, titleN)...), "")
 	var facts []string
-	for _, fact := range row.Facts {
-		if len(facts) == factRows {
+	// a problem comes first: when there is room for two facts, it is one
+	ordered := append([]string{}, row.Facts...)
+	sort.SliceStable(ordered, func(i, j int) bool { return problemFact(ordered[i]) && !problemFact(ordered[j]) })
+	for _, fact := range ordered {
+		if len(facts) == factN {
 			break
 		}
 		key, value, ok := strings.Cut(fact, "  ")
@@ -328,13 +352,17 @@ func (m model) headword(sel homeRow, width int) []string {
 			key, value = "", fact
 		}
 		style := muted
-		if strings.HasPrefix(key, "plugin") || strings.HasPrefix(key, "restack") {
+		if problemFact(fact) {
 			style = danger
 		}
 		facts = append(facts, fit(faint.Render(fmt.Sprintf("%-10s", strings.TrimSpace(key)))+style.Render(strings.TrimSpace(value)), width))
 	}
-	lines = append(append(lines, pad(facts, factRows)...), "")
+	lines = append(append(lines, pad(facts, factN)...), "")
 	return append(lines, strings.Join(m.hints(), "    "))
+}
+
+func problemFact(fact string) bool {
+	return strings.HasPrefix(fact, "plugin") || strings.HasPrefix(fact, "restack")
 }
 
 func pad(lines []string, n int) []string {
@@ -567,7 +595,8 @@ func (m model) viewHead(width int) []string {
 	if tab.Note != "" {
 		lines = append(lines, faint.Render(fit(tab.Note, width)))
 	}
-	return pad(lines, headwordRows)
+	_, _, all := m.sizes()
+	return pad(lines, all)
 }
 
 // viewList is the shown view's lines: section labels, lines of cells — the
