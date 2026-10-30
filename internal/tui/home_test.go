@@ -292,3 +292,35 @@ func TestAShortTerminalKeepsRoomForTheList(t *testing.T) {
 		}
 	}
 }
+
+func TestALinesOwnKeyActsOnItInAView(t *testing.T) {
+	p := homePanel()
+	start := plugin.Open{Verb: "issue", Args: []string{"start", "WL-55"}, Report: true}
+	p.Room.Sides = []plugin.SideTab{{Plugin: "issue", Side: plugin.Side{ID: "issues", Where: "left", Label: "issues"},
+		SideAnswer: plugin.SideAnswer{Lines: []plugin.Item{{Cells: plugin.Line{{Text: "WL-55"}},
+			Keys: []plugin.ItemKey{{Key: "w", Label: "new worktree on it", Open: start}}}}}}}
+	m := newModel(p)
+	m.width, m.height = 180, 45
+	m = m.showView(0)
+	if view := stripANSI(m.View()); !strings.Contains(view, "w new worktree on it") || !strings.Contains(view, "› ") {
+		t.Fatalf("the selected line's key shows under the page:\n%s", view)
+	}
+	var ran []string
+	m.hooks.Perform = func(c Chosen) Outcome { ran = c.Argv; return Outcome{} }
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+	for cmd != nil {
+		msg := cmd()
+		if batch, ok := msg.(tea.BatchMsg); ok {
+			for _, c := range batch {
+				if c != nil {
+					c()
+				}
+			}
+			break
+		}
+		next, cmd = next.(model).Update(msg)
+	}
+	if strings.Join(ran, " ") != "issue start WL-55" {
+		t.Errorf("w runs the line's verb: %q", ran)
+	}
+}

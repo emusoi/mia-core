@@ -522,7 +522,7 @@ func (m model) items() []plugin.Item {
 func (m model) nextItem(from, step int) int {
 	items := m.items()
 	for i := from + step; i >= 0 && i < len(items); i += step {
-		if items[i].Open != nil {
+		if items[i].Open != nil || len(items[i].Keys) > 0 {
 			return i
 		}
 	}

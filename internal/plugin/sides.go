@@ -70,10 +70,19 @@ type Line []Cell
 // A Label makes the line a section's heading, its cells the count; a Chart
 // makes it a small bar chart.
 type Item struct {
-	Cells Line   `json:"cells"`
-	Open  *Open  `json:"open,omitempty"`
-	Label string `json:"label,omitempty"`
-	Chart []Bar  `json:"chart,omitempty"`
+	Cells Line      `json:"cells"`
+	Open  *Open     `json:"open,omitempty"`
+	Label string    `json:"label,omitempty"`
+	Chart []Bar     `json:"chart,omitempty"`
+	Keys  []ItemKey `json:"keys,omitempty"`
+}
+
+// ItemKey is a key that acts on its line when the line is selected in a
+// view: w on an issue starts a worktree for it.
+type ItemKey struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Open  Open   `json:"open"`
 }
 
 // Flat is the item as one line of plain cells, for the room's narrow sides:
@@ -131,15 +140,26 @@ func (it *Item) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 	var object struct {
-		Cells Line   `json:"cells"`
-		Open  *Open  `json:"open"`
-		Label string `json:"label"`
-		Chart []Bar  `json:"chart"`
+		Cells Line      `json:"cells"`
+		Open  *Open     `json:"open"`
+		Label string    `json:"label"`
+		Chart []Bar     `json:"chart"`
+		Keys  []ItemKey `json:"keys"`
 	}
 	if err := json.Unmarshal(data, &object); err != nil {
 		return err
 	}
-	if o := object.Open; o != nil {
+	opens := []*Open{object.Open}
+	for i := range object.Keys {
+		if object.Keys[i].Key == "" {
+			return fmt.Errorf("a line's key needs a key")
+		}
+		opens = append(opens, &object.Keys[i].Open)
+	}
+	for _, o := range opens {
+		if o == nil {
+			continue
+		}
 		ways := 0
 		for _, set := range []bool{len(o.Popup) > 0, o.Verb != "", o.Lands != ""} {
 			if set {
@@ -150,7 +170,7 @@ func (it *Item) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("open needs exactly one of popup, verb or lands")
 		}
 	}
-	it.Cells, it.Open, it.Label, it.Chart = object.Cells, object.Open, object.Label, object.Chart
+	it.Cells, it.Open, it.Label, it.Chart, it.Keys = object.Cells, object.Open, object.Label, object.Chart, object.Keys
 	return nil
 }
 

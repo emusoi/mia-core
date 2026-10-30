@@ -754,7 +754,11 @@ func (m model) start(chosen Chosen) (tea.Model, tea.Cmd) {
 // openSide runs the action of the side's line under the cursor: a command
 // in a tmux popup, the plugin's verb, or landing in a worktree[:window].
 func (m model) openSide() (tea.Model, tea.Cmd) {
-	open := m.openItem()
+	return m.openWith(m.openItem())
+}
+
+// openWith does what a side's line opens: a popup, a verb, or landing.
+func (m model) openWith(open *plugin.Open) (tea.Model, tea.Cmd) {
 	switch {
 	case open == nil:
 		return m, nil
@@ -1089,6 +1093,15 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case m.viewing && (key == "v" || key == "esc"):
 			m.viewing, m.sideSel = false, ""
 			return m, nil
+		case m.viewing:
+			if items := m.items(); m.sideRow >= 0 && m.sideRow < len(items) {
+				for _, k := range items[m.sideRow].Keys {
+					if k.Key == key {
+						open := k.Open
+						return m.openWith(&open)
+					}
+				}
+			}
 		}
 	}
 	if key == "v" && m.roomed() {

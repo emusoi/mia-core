@@ -124,6 +124,7 @@ full width. A side can say more for that:
 | `"chart"` on a line | bars six rows high, each `label` under its bar, the one `on` in ink |
 | `"grow"` on a cell | the cell takes the width the others leave, a title most often |
 | `"meter"` on a cell | a bar `width` wide filled `value` of `max`; `red` in its style for a bad one |
+| `"keys"` on a line | `[{"key": "w", "label": "new worktree on it", "open": {…}}]`: keys that act on the line while it is selected, shown under the page; `open` as `⏎`'s |
 
 Every field is optional, and the room's narrow sides flatten them: a label
 leads its line, a chart is a row of blocks, a meter a short bar.

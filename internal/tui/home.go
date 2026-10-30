@@ -172,7 +172,16 @@ func (m model) home() string {
 			foot += "    " + homeKey("esc", "back")
 		}
 		if m.viewing {
-			foot = homeKey("j k", "move") + "    " + homeKey("⏎", "open") + "    " + homeKey("esc", "back")
+			foot = homeKey("j k", "move")
+			if items := m.items(); m.sideRow >= 0 && m.sideRow < len(items) {
+				if items[m.sideRow].Open != nil {
+					foot += "    " + homeKey("⏎", "open")
+				}
+				for _, k := range items[m.sideRow].Keys {
+					foot += "    " + homeKey(k.Key, k.Label)
+				}
+			}
+			foot += "    " + homeKey("esc", "back")
 		}
 	}
 	// two lines, both centred: where tab goes, then the keys
@@ -621,7 +630,7 @@ func (m model) viewList(width, room int) []string {
 			continue
 		}
 		mark := "  "
-		if i == m.sideRow && item.Open != nil {
+		if i == m.sideRow && (item.Open != nil || len(item.Keys) > 0) {
 			mark, cursorAt = inkB.Render("›")+" ", len(lines)
 		}
 		lines = append(lines, fit(mark+viewCells(item.Cells, width-2, true), width))
