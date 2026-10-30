@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/emusoi/mia-core/internal/panel"
+	"github.com/emusoi/mia-core/internal/plugin"
 )
 
 func homePanel() panel.Panel {
@@ -51,20 +52,30 @@ func TestJMovesTheHeadword(t *testing.T) {
 	}
 }
 
-func TestVSwitchesToTheRoomAndBack(t *testing.T) {
-	m := newModel(homePanel())
-	m.width, m.height = 212, 48
+func TestVShowsThePluginsViewsInHome(t *testing.T) {
+	p := homePanel()
+	p.Room.Sides = []plugin.SideTab{
+		{Plugin: "agent", Side: plugin.Side{ID: "activity", Where: "bottom", Label: "activity"},
+			SideAnswer: plugin.SideAnswer{Lines: []plugin.Item{{Cells: plugin.Line{{Text: "13:24 lemara started"}}, Open: &plugin.Open{Lands: "lemara"}}}}},
+		{Plugin: "cost", Side: plugin.Side{ID: "cost", Where: "right", Label: "cost"},
+			SideAnswer: plugin.SideAnswer{Lines: []plugin.Item{{Cells: plugin.Line{{Text: "$43.42 today"}}}}}},
+	}
+	m := newModel(p)
+	m.width, m.height = 180, 45
 	press := func(m model, key string) model {
 		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
 		return next.(model)
 	}
 	m = press(m, "v")
-	if !m.classic || !strings.Contains(m.View(), "╭") {
-		t.Fatal("v shows the room, the box in it")
+	view := m.View()
+	if strings.Contains(view, "╭") || !strings.Contains(view, "13:24 lemara started") || !strings.Contains(view, "› ") {
+		t.Fatalf("v shows the first view in home, its line under the cursor:\n%s", view)
 	}
-	m = press(press(m, "v"), "v")
-	if m.classic || strings.Contains(m.View(), "╭") {
-		t.Error("v twice in the room, through its legend, comes back home")
+	if !strings.Contains(press(m, "l").View(), "$43.42 today") {
+		t.Error("l shows the next view")
+	}
+	if back := press(m, "v"); back.viewing || !strings.Contains(back.View(), "Add separate Filevine OAuth credentials") {
+		t.Error("v again comes back to the list")
 	}
 }
 
@@ -87,5 +98,24 @@ func TestHomeSaysItIsReadingBeforeThePanelArrives(t *testing.T) {
 	m.panel.Empty = "No worktrees yet."
 	if !strings.Contains(m.View(), "No worktrees yet.") {
 		t.Errorf("an empty repository says so:\n%s", m.View())
+	}
+}
+
+func TestTheListStaysPutWhileTheEntryMoves(t *testing.T) {
+	m := newModel(homePanel())
+	m.width, m.height = 180, 45
+	at := func(m model, word string) int {
+		for i, line := range strings.Split(stripANSI(m.View()), "\n") {
+			if strings.Contains(line, "in progress  1") {
+				return i
+			}
+		}
+		t.Fatalf("no %q", word)
+		return -1
+	}
+	first := at(m, "in progress")
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	if got := at(next.(model), "in progress"); got != first {
+		t.Errorf("an entry with fewer facts moved the list from row %d to %d", first, got)
 	}
 }

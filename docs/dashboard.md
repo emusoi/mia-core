@@ -27,12 +27,16 @@ big when it needs you, small when an agent works in it, a ring when it is in
 progress, faint when it rests — with the selected one marked `▔` and named.
 Under it the selected worktree is set like a dictionary entry: its name and
 state, its title, its facts and the keys that act on it. Every worktree is
-listed below, by section; `j` and `k` move the entry. `v` shows the room.
+listed below, by section; `j` and `k` move the entry. The entry keeps its
+height, so the list under it stays still.
+
+`v` shows the plugins' views — activity, issues, cost — in place of the
+list: `tab` the next view, `j` `k` and `⏎` on its lines, `v` back.
 
 ## The room
 
-`v` on home, and `mia side`'s popups, show the box in a room; `v` twice
-goes back home. When the terminal has space, the box sits in a room. Dotted lines run from
+`mia side`'s popups show the box in a room. When the terminal has space,
+the box sits in a room. Dotted lines run from
 each terminal corner to the box's corner, and each corner carries one line:
 `mia` and the repository top left, the date and time top right, and what
 plugins put in the bottom corners (agents waiting, today's spend).

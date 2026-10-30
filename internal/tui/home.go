@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -116,11 +117,21 @@ func (m model) home() string {
 	foot := strings.TrimLeft(m.footer(), " ")
 	if m.mode == browsing && m.problem == "" && m.notice == "" {
 		foot = homeKey("j k", "move") + "    " + homeKey(m.shown("filter"), "find") + "    " + homeKey("?", "keys")
+		if m.viewing {
+			foot = homeKey("tab", "next view") + "    " + homeKey("j k", "move") + "    " + homeKey("⏎", "open") + "    " + homeKey("v", "back")
+		}
 	}
-	bottom = append(bottom, "", between(foot, m.viewsText(), width))
+	views := m.viewsText()
+	if m.viewing {
+		views = ""
+	}
+	bottom = append(bottom, "", between(foot, views, width))
 
 	room := m.height - len(top) - len(bottom) - 2
 	list := m.others(walk, width, room)
+	if m.viewing {
+		list = m.viewList(width, room)
+	}
 	lines := append(append(top, "", ""), list...)
 	for len(lines) < m.height-len(bottom) {
 		lines = append(lines, "")
@@ -189,16 +200,25 @@ func hasChild(row panel.Row, id string) bool {
 	return false
 }
 
+// The headword always takes the same rows — two for the title, five for
+// facts — so the list under it stays put while j and k move the entry.
+const (
+	titleRows    = 2
+	factRows     = 5
+	headwordRows = 1 + 1 + titleRows + 1 + factRows + 1 + 1
+)
+
 // headword is the selected worktree set like a dictionary entry: its name
 // and state, its task, its facts, and the keys that act on it.
 func (m model) headword(sel homeRow, width int) []string {
 	if sel.index < 0 {
 		// before the first panel arrives Empty is unset: the worktrees are
 		// still being read, which a big repository takes seconds to do
+		line := faint.Render(m.panel.Empty)
 		if m.panel.Empty == "" {
-			return []string{muted.Render("Reading the worktrees…")}
+			line = muted.Render("Reading the worktrees…")
 		}
-		return []string{faint.Render(m.panel.Empty)}
+		return pad([]string{line}, headwordRows)
 	}
 	row := sel.row
 	cells := append(append([]string{}, row.Cells...), "", "", "", "")
@@ -226,13 +246,18 @@ func (m model) headword(sel homeRow, width int) []string {
 	if title == "" {
 		title = strings.TrimSpace(cells[1])
 	}
-	for _, part := range wrap(title, width) {
-		lines = append(lines, head.Render(part))
+	parts := wrap(title, width)
+	if len(parts) > titleRows {
+		parts = append(parts[:titleRows-1], fit(strings.Join(parts[titleRows-1:], " "), width))
 	}
-	lines = append(lines, "")
-	shown := 0
+	var titled []string
+	for _, part := range parts {
+		titled = append(titled, head.Render(part))
+	}
+	lines = append(append(lines, pad(titled, titleRows)...), "")
+	var facts []string
 	for _, fact := range row.Facts {
-		if shown == 5 {
+		if len(facts) == factRows {
 			break
 		}
 		key, value, ok := strings.Cut(fact, "  ")
@@ -243,13 +268,17 @@ func (m model) headword(sel homeRow, width int) []string {
 		if strings.HasPrefix(key, "plugin") || strings.HasPrefix(key, "restack") {
 			style = danger
 		}
-		lines = append(lines, fit(faint.Render(fmt.Sprintf("%-10s", strings.TrimSpace(key)))+style.Render(strings.TrimSpace(value)), width))
-		shown++
+		facts = append(facts, fit(faint.Render(fmt.Sprintf("%-10s", strings.TrimSpace(key)))+style.Render(strings.TrimSpace(value)), width))
 	}
-	if shown > 0 {
+	lines = append(append(lines, pad(facts, factRows)...), "")
+	return append(lines, strings.Join(m.hints(), "    "))
+}
+
+func pad(lines []string, n int) []string {
+	for len(lines) < n {
 		lines = append(lines, "")
 	}
-	return append(lines, strings.Join(m.hints(), "    "))
+	return lines
 }
 
 // others is every worktree under its section's label, the selected one
@@ -303,8 +332,96 @@ func (m model) others(walk []homeRow, width, room int) []string {
 	if room <= 0 || len(lines) <= room {
 		return lines
 	}
-	start := min(max(cursorAt-room/2, 0), len(lines)-room)
+	// scroll only as far as keeps the selection in view, so the list stays
+	// still while the selection moves inside it
+	start := min(max(cursorAt-room+2, 0), len(lines)-room)
 	return lines[start : start+room]
+}
+
+// showView shows the room's i-th side in place of the list, through the
+// room's own side state, so ⏎ and j k work on it as they do in the room.
+func (m model) showView(i int) model {
+	sides := m.panel.Room.Sides
+	if len(sides) == 0 {
+		return m
+	}
+	i = (i%len(sides) + len(sides)) % len(sides)
+	tab := sides[i]
+	m.sides.Tabs = maps.Clone(m.sides.Tabs)
+	if m.sides.Tabs == nil {
+		m.sides.Tabs = map[string]string{}
+	}
+	m.sides.Tabs[tab.Where] = tabKey(tab)
+	m.viewing, m.view, m.sideSel = true, i, tab.Where
+	m.sideRow = m.nextItem(-1, 1)
+	return m
+}
+
+// viewList is the shown side: every view's name along the top, the shown
+// one in ink, and its lines under them.
+func (m model) viewList(width, room int) []string {
+	sides := m.panel.Room.Sides
+	var names []string
+	for i, tab := range sides {
+		name := faint.Render(tab.Label)
+		if i == m.view {
+			name = inkB.Render(tab.Label)
+		}
+		if tab.Count != "" {
+			name += " " + faint.Render(tab.Count)
+		}
+		names = append(names, name)
+	}
+	lines := []string{strings.Join(names, faint.Render("   ·   ")), ""}
+	tab := sides[min(m.view, len(sides)-1)]
+	cursorAt := 0
+	switch {
+	case tab.Problem != "":
+		lines = append(lines, danger.Render(fit(tab.Plugin+": "+tab.Problem, width)))
+	case len(tab.Lines) == 0:
+		lines = append(lines, faint.Render("Nothing here."))
+	}
+	for i, item := range tab.Lines {
+		mark := "  "
+		if i == m.sideRow && item.Open != nil {
+			mark, cursorAt = inkB.Render("›")+" ", len(lines)
+		}
+		var b strings.Builder
+		for _, c := range item.Cells {
+			text := c.Text
+			if c.Width > 0 {
+				if c.Align == "right" {
+					text = fmt.Sprintf("%*s", c.Width, fit(text, c.Width))
+				} else {
+					text = fmt.Sprintf("%-*s", c.Width, fit(text, c.Width))
+				}
+			}
+			b.WriteString(viewStyle(c.Style).Render(text) + " ")
+		}
+		lines = append(lines, fit(mark+b.String(), width))
+	}
+	if room <= 0 || len(lines) <= room {
+		return lines
+	}
+	start := min(max(cursorAt-room+2, 0), len(lines)-room)
+	return lines[start : start+room]
+}
+
+// viewStyle is a plugin's cell style in home's palette: red stays danger,
+// bold is ink, dim is faint, every other colour is plain ink.
+func viewStyle(spec string) lipgloss.Style {
+	style := ink
+	for _, word := range strings.Fields(spec) {
+		switch word {
+		case "red":
+			style = danger
+		case "dim", "gray":
+			style = faint
+		case "bold":
+			style = style.Bold(true)
+		}
+	}
+	return style
 }
 
 // cornerText is the plugins' corners and the time, for the top line.

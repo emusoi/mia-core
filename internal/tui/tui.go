@@ -139,7 +139,9 @@ type model struct {
 	legend   bool
 	sideSel  string
 	sideRow  int
-	classic  bool // the dashboard in its old room, not home; v switches
+	classic  bool // the dashboard in the room, for mia side's popups
+	viewing  bool // home shows a plugin's side in place of the list
+	view     int  // which of the room's sides home shows
 	stack    []model
 }
 
@@ -1020,9 +1022,19 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.legend && key != "ctrl+c" {
 		return m.legendKey(key), nil
 	}
-	if key == "v" && m.homes() && m.mode == browsing {
-		m.classic = true
-		return m, nil
+	if m.viewing && m.homes() {
+		switch key {
+		case "v", "esc":
+			m.viewing, m.sideSel = false, ""
+			return m, nil
+		case "tab", "l", "right":
+			return m.showView(m.view + 1), nil
+		case "shift+tab", "h", "left":
+			return m.showView(m.view - 1), nil
+		}
+	}
+	if key == "v" && m.homes() && m.mode == browsing && len(m.panel.Room.Sides) > 0 {
+		return m.showView(m.view), nil
 	}
 	if key == "v" && m.roomed() {
 		m.legend = true

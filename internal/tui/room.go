@@ -563,8 +563,7 @@ func (m model) save() {
 // or off, esc or v closes.
 func (m model) legendKey(key string) model {
 	if key == "esc" || key == "v" {
-		// v twice from the room goes back home
-		m.legend, m.classic = false, m.classic && key == "esc"
+		m.legend = false
 		return m
 	}
 	i := slices.Index(SideKeys, key)
