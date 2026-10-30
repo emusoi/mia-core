@@ -116,6 +116,9 @@ func Run(args []string) int {
 	case "new":
 		return cmdNew(a, rest, asJSON)
 	case "config":
+		if len(rest) > 0 && rest[0] == "base" {
+			return cmdConfigBase(a, rest[1:])
+		}
 		return cmdConfig(a)
 	case "rename":
 		if len(rest) != 2 || strings.TrimSpace(rest[1]) == "" {
@@ -624,6 +627,58 @@ func cmdConfig(a *app.App) int {
 		return fail(err)
 	}
 	return exitOK
+}
+
+// cmdConfigBase prints, or sets, where a new branch starts: the base in
+// this repository's config. Unset, it is the branch the main checkout is on.
+func cmdConfigBase(a *app.App, args []string) int {
+	switch {
+	case len(args) == 0:
+		base := a.Config.Base
+		if base == "" {
+			base = git.CurrentBranch(a.Root) + "  (unset: the branch the main checkout is on)"
+		}
+		fmt.Println(base)
+		return exitOK
+	case len(args) > 1:
+		return usageErr("mia config base [<branch>]")
+	}
+	branch := args[0]
+	if !git.BranchExists(a.Root, branch) && git.RevParse(a.Root, branch) == "" {
+		return fail(fmt.Errorf("no branch %s here", branch))
+	}
+	path, err := configPath(a)
+	if err != nil {
+		return fail(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fail(err)
+	}
+	if err := os.WriteFile(path, []byte(withBase(string(data), branch)), 0o644); err != nil {
+		return fail(err)
+	}
+	fmt.Printf("new branches start from %s\n", branch)
+	return exitOK
+}
+
+// withBase is the config with base set to branch: its base line replaced,
+// or one put at the top level, before the first table; comments stay.
+func withBase(config, branch string) string {
+	line := fmt.Sprintf("base = %q", branch)
+	lines := strings.Split(config, "\n")
+	for i, l := range lines {
+		t := strings.TrimSpace(l)
+		if strings.HasPrefix(t, "[") {
+			lines = append(lines[:i], append([]string{line, ""}, lines[i:]...)...)
+			return strings.Join(lines, "\n")
+		}
+		if key, _, ok := strings.Cut(t, "="); ok && strings.TrimSpace(key) == "base" {
+			lines[i] = line
+			return strings.Join(lines, "\n")
+		}
+	}
+	return strings.TrimRight(config, "\n") + "\n" + line + "\n"
 }
 
 const starterConfig = `# mia — this repository's configuration. Every key is optional, and an

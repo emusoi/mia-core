@@ -12,7 +12,7 @@ uses every key.
 
 | key | meaning |
 |---|---|
-| `base` | the branch new branches start from |
+| `base` | the branch new branches start from; unset, the branch the main checkout is on. `mia config base <branch>` sets it |
 | `prefix` | added to new branch names, like `"you/"` |
 | `setup` | a command run in each new worktree |
 | `clone` | files copied from the main checkout into new worktrees |

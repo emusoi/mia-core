@@ -55,3 +55,21 @@ func TestNewSaysWhereANewBranchStarts(t *testing.T) {
 		t.Errorf("a configured base wins: %q", got)
 	}
 }
+
+func TestWithBaseSetsOneLineAndKeepsTheRest(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"# a comment\nbase = \"main\"\nprefix = \"you/\"\n", "# a comment\nbase = \"staging\"\nprefix = \"you/\"\n"},
+		{"prefix = \"you/\"\n\n[popup]\nwidth = \"100%\"\n", "prefix = \"you/\"\n\nbase = \"staging\"\n\n[popup]\nwidth = \"100%\"\n"},
+		{"# base = \"main\"  # what a new branch starts from\n", "# base = \"main\"  # what a new branch starts from\nbase = \"staging\"\n"},
+		{"[keys]\nbase = \"B\"\n", "base = \"staging\"\n\n[keys]\nbase = \"B\"\n"},
+	} {
+		if got := withBase(c.in, "staging"); got != c.want {
+			t.Errorf("withBase(%q)\n got %q\nwant %q", c.in, got, c.want)
+		}
+	}
+	p := panel.Panel{Actions: map[string]panel.Action{"base": {Key: "B"}}}
+	namesBase(p, "", []app.Listing{{Branch: "dash-needs-you", Main: true}})
+	if got := p.Actions["base"].Choices; len(got) != 1 || got[0] != "dash-needs-you" {
+		t.Errorf("base offers what is there: %v", got)
+	}
+}

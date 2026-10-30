@@ -49,7 +49,7 @@ var verbs = []Verb{
 	{"rename", "mia rename <worktree> <name>", "give a worktree the name you want; its session follows now, its container on its next start", false, ""},
 	{"open", "mia open [worktree] [--in <cursor|code|zed|idea|subl|xcode|finder|terminal>]", "open the worktree in your editor, IDE, Finder or a terminal", false, ""},
 	{"star", "mia star [worktree]", "mark the worktree you are on right now, or unmark it", false, ""},
-	{"config", "mia config", "this repository's configuration, in your editor", false, ""},
+	{"config", "mia config [base [<branch>]]", "this repository's configuration, in your editor; base says or sets where a new branch starts", false, ""},
 }
 
 func Verbs() []Verb {

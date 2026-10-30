@@ -35,7 +35,7 @@ func Dashboard(listings []app.Listing, prefix string, extras []plugin.Rows) Pane
 			"open", "shell", "editor", "blocks",
 			"env", "dev", "land", "star",
 			"stack", "begin", "layer", "apart", "claim", "worktree", "merge", "name", "restack", "forget",
-			"adopt", "delete", "abandoned", "tidy", "new", "branch", "pr", "machines", "config",
+			"adopt", "delete", "abandoned", "tidy", "new", "branch", "pr", "machines", "config", "base",
 		},
 	}
 
@@ -524,6 +524,10 @@ func dashboardActions() map[string]Action {
 		"pr": {
 			Lands: true, Key: "P", Label: "open a pull request", Verb: "new", Args: []string{"--shell", "--pr", "{input}"}, Input: "pull request number", Global: true,
 			Help: "fetch a pull request's head into a worktree of its own (pr-<number>) and go there",
+		},
+		"base": {
+			Key: "B", Label: "where new branches start", Verb: "config", Args: []string{"base", "{input}"}, Input: "branch", Report: true, Global: true,
+			Help: "the branch a new worktree's new branch starts from; unset, it is the branch the main checkout is on",
 		},
 		"branch": {
 			Lands: true, Key: "+", Label: "new worktree", Verb: "new", Args: []string{"--shell", "{input}"}, Input: "branch",

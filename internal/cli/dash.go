@@ -360,12 +360,18 @@ func hooksFor(a *app.App, name, target string) tui.Hooks {
 // namesBase says in new's and + 's labels where a new branch starts: the
 // configured base, else the branch the main checkout is on, as mia new does.
 func namesBase(p panel.Panel, base string, listings []app.Listing) {
-	if base == "" {
-		for _, l := range listings {
-			if l.Main {
-				base = l.Branch
-			}
+	main := ""
+	for _, l := range listings {
+		if l.Main {
+			main = l.Branch
 		}
+	}
+	if action, ok := p.Actions["base"]; ok {
+		action.Choices = slices.Compact(slices.DeleteFunc([]string{base, main}, func(b string) bool { return b == "" }))
+		p.Actions["base"] = action
+	}
+	if base == "" {
+		base = main
 	}
 	if base == "" {
 		return
