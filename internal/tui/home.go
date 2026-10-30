@@ -128,7 +128,10 @@ func (m model) home() string {
 	if m.viewing {
 		views = ""
 	}
-	bottom = append(bottom, "", between(foot, views, width))
+	if views != "" {
+		foot += "        " + views
+	}
+	bottom = append(bottom, "", centred(foot, width))
 
 	// home is a page of a fixed size, centred both ways: on a tall terminal
 	// the keys sit under the page, not on the terminal's last row
@@ -470,6 +473,11 @@ func plainSegments(segs []plugin.Segment) string {
 		b.WriteString(s.Text)
 	}
 	return b.String()
+}
+
+// centred puts line in the middle of width.
+func centred(line string, width int) string {
+	return strings.Repeat(" ", max((width-lipgloss.Width(line))/2, 0)) + line
 }
 
 // between puts left at the start of width and right at its end.

@@ -143,3 +143,16 @@ func TestHomeIsAPageCentredInATallTerminal(t *testing.T) {
 		t.Errorf("and centred across: %q", lines[first])
 	}
 }
+
+func TestTheKeysAreCentredUnderThePage(t *testing.T) {
+	m := newModel(homePanel())
+	m.width, m.height = 180, 45
+	lines := strings.Split(strings.TrimRight(stripANSI(m.View()), "\n "), "\n")
+	foot := strings.TrimRight(lines[len(lines)-1], " ")
+	text := strings.TrimSpace(foot)
+	left := len([]rune(foot)) - len([]rune(strings.TrimLeft(foot, " ")))
+	right := 180 - left - len([]rune(text))
+	if !strings.HasPrefix(text, "j k move") || left-right > 2 || right-left > 2 {
+		t.Errorf("the keys sit in the middle: %d left, %d right: %q", left, right, foot)
+	}
+}
