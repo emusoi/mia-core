@@ -122,6 +122,7 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 		room := make(chan *panel.Room, 1)
 		go func() { room <- pluginRoom(a, plugins, cached) }()
 		p := withChoices(panel.Dashboard(cached, a.Config.Prefix, pluginRows(a, plugins, cached)))
+		namesBase(p, a.Config.Base, cached)
 		p.Room = <-room
 		p.Bind(a.Config.KeyMap())
 		return p, nil
@@ -354,6 +355,28 @@ func hooksFor(a *app.App, name, target string) tui.Hooks {
 		return p, reload, hooksFor(a, name, target), nil
 	}
 	return hooks
+}
+
+// namesBase says in new's and + 's labels where a new branch starts: the
+// configured base, else the branch the main checkout is on, as mia new does.
+func namesBase(p panel.Panel, base string, listings []app.Listing) {
+	if base == "" {
+		for _, l := range listings {
+			if l.Main {
+				base = l.Branch
+			}
+		}
+	}
+	if base == "" {
+		return
+	}
+	for id, label := range map[string]string{"new": "new worktree from " + base, "branch": "new worktree from " + base + ", and go there"} {
+		if action, ok := p.Actions[id]; ok {
+			action.Label = label
+			action.Help = "a new branch from " + base + ", or a branch that exists, in a worktree of its own with its setup run"
+			p.Actions[id] = action
+		}
+	}
 }
 
 // listingCache is the dashboard's listing between reloads. Reloads run off

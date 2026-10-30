@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/panel"
 )
 
 func TestAReloadNeverSeesTheListingForgottenUnderIt(t *testing.T) {
@@ -41,4 +42,16 @@ func TestAReloadNeverSeesTheListingForgottenUnderIt(t *testing.T) {
 	}
 	wg.Wait()
 	close(stop)
+}
+
+func TestNewSaysWhereANewBranchStarts(t *testing.T) {
+	p := panel.Panel{Actions: map[string]panel.Action{"new": {Key: "n", Label: "new"}, "branch": {Key: "+", Label: "new worktree"}}}
+	namesBase(p, "", []app.Listing{{Name: "lido-app", Branch: "staging", Main: true}, {Name: "temeke", Branch: "auth"}})
+	if got := p.Actions["new"].Label; got != "new worktree from staging" {
+		t.Errorf("the main checkout's branch, as mia new starts from it: %q", got)
+	}
+	namesBase(p, "production", nil)
+	if got := p.Actions["branch"].Label; got != "new worktree from production, and go there" {
+		t.Errorf("a configured base wins: %q", got)
+	}
 }

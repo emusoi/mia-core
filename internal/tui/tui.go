@@ -2352,7 +2352,15 @@ func (m model) hints() []string {
 		}
 	}
 	if action, ok := m.panel.Actions["new"]; ok && action.Key != "" && !action.NeedsRow() {
-		hints = append(hints, keycap(action.Key+" new"))
+		// the row may take the key for itself: n on a stack adds a layer, so
+		// the hint says what n does here, not what it does elsewhere
+		label := action.Label
+		if m.cursor < len(m.rows) {
+			if ids := m.bound(action.Key, m.rows[m.cursor]); len(ids) > 0 {
+				label = m.panel.Actions[ids[0]].Label
+			}
+		}
+		hints = append(hints, keycap(action.Key+" "+label))
 	}
 	if len(m.rows) > 0 {
 		hints = append(hints, keycap(m.shown("filter")+" find"))

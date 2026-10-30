@@ -324,3 +324,25 @@ func TestALinesOwnKeyActsOnItInAView(t *testing.T) {
 		t.Errorf("w runs the line's verb: %q", ran)
 	}
 }
+
+func TestNOnAStackSaysItAddsALayer(t *testing.T) {
+	p := homePanel()
+	p.Actions = map[string]panel.Action{
+		"new":   {Key: "n", Label: "new worktree from staging", Verb: "new", Args: []string{"{input}"}, Input: "branch"},
+		"layer": {Key: "n", Label: "new layer on top", Verb: "new", Args: []string{"--stack", "--in", "{row}", "{input}"}, Input: "layer name", Help: "a branch on top of the stack's top layer"},
+	}
+	p.Sections[0].Rows[0].Actions = []string{"layer"}
+	m := newModel(p)
+	m.width, m.height = 180, 45
+	if view := stripANSI(m.View()); !strings.Contains(view, "n new layer on top") {
+		t.Errorf("on a stack n says it adds a layer:\n%s", view)
+	}
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	if view := stripANSI(next.(model).View()); !strings.Contains(view, "n new worktree from staging") {
+		t.Errorf("elsewhere n says where the new branch starts:\n%s", view)
+	}
+	typed, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	if view := stripANSI(typed.(model).View()); !strings.Contains(view, "new layer on top  docs-base  —  a branch on top of the stack's top layer") {
+		t.Errorf("while the name is typed, what it will make:\n%s", view)
+	}
+}

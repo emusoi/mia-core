@@ -184,6 +184,18 @@ func (m model) home() string {
 			foot += "    " + homeKey("esc", "back")
 		}
 	}
+	// while a name is typed, what it will make: the action, what it acts on,
+	// and its help — n new and n on a stack must not read the same
+	if m.mode == typing && m.pending != nil && !m.pending.action.Lines {
+		what := inkB.Render(m.pending.action.Label)
+		if m.pending.action.NeedsRow() {
+			what += "  " + muted.Render(nameOf(m.pending.row))
+		}
+		if help := m.pending.action.Help; help != "" {
+			what += faint.Render("  —  " + help)
+		}
+		bottom = append(bottom, "", fit(what, width))
+	}
 	// two lines, both centred: where tab goes, then the keys
 	bottom = append(bottom, "")
 	if views := m.viewsText(); views != "" {
