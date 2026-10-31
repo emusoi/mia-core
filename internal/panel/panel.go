@@ -29,6 +29,13 @@ type Room struct {
 	Repo    string
 	Sides   []plugin.SideTab
 	Corners []plugin.CornerText
+	// Machines are the header's dots: this computer and each added machine.
+	Machines []MachineMark
+}
+
+type MachineMark struct {
+	Name string
+	Up   bool
 }
 
 func (p *Panel) Bind(keys map[string][]string) {
@@ -96,7 +103,9 @@ type Row struct {
 	Target   string              `json:"target,omitempty"`
 	Dim      bool                `json:"dim,omitempty"`
 	Options  []string            `json:"options,omitempty"`
-	Depth    int                 `json:"-"`
+	// Machine is the machine that keeps the worktree; empty is this one.
+	Machine string `json:"machine,omitempty"`
+	Depth   int    `json:"-"`
 }
 
 func (r Row) TargetID() string {

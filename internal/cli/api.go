@@ -120,7 +120,7 @@ func buildPanel(a *app.App, name, target string) (panel.Panel, error) {
 		}
 		plugins, _ := enabledPlugins(a)
 		machines, _ := a.Runtimes.All()
-		return withChoices(panel.Dashboard(append(listings, a.RemoteListings()...), a.Config.Prefix, pluginRows(a, plugins, listings)), machines), nil
+		return withChoices(panel.Dashboard(append(listings, app.RemoteWorktrees(a.Machines())...), a.Config.Prefix, pluginRows(a, plugins, listings)), machines), nil
 
 	case "env-panel":
 		record, err := a.RecordOrHere(target)

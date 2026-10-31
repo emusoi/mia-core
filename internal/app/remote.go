@@ -9,8 +9,10 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/git"
+	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/runtime"
 )
 
@@ -101,58 +103,93 @@ func (a *App) NewOn(machine runtime.Machine, branch string) error {
 	return runtime.Interactive(machine.SSH, "sh", "-lc", `cd "$1" && `+remoteMia+` new "$2"`, "sh", dir, branch).Run()
 }
 
-// RemoteListings are the worktrees each machine linked to this repository
-// keeps, as its own mia reports them. Asking also fetches the machine's
-// branches. A machine that does not answer gives its last answer, marked
-// unreachable.
-func (a *App) RemoteListings() []Listing {
-	machines, err := a.Runtimes.All()
-	if err != nil || len(machines) == 0 {
-		return nil
-	}
-	dir, err := a.RemoteDir()
-	if err != nil {
-		return nil
-	}
-	var (
-		mu  sync.Mutex
-		wg  sync.WaitGroup
-		all []Listing
-	)
-	for _, machine := range machines {
-		if !git.HasRemote(a.Root, machine.Name) {
-			continue
+// MachineState is one machine as the dash shows it: whether it answers,
+// how busy it is, and the worktrees its own mia keeps.
+type MachineState struct {
+	runtime.Machine
+	Answers bool
+	Detail  string  // why it did not answer
+	Health  *Health // nil when it did not answer
+	// Worktrees another machine keeps, as it last reported them; none for
+	// this computer, whose worktrees the dash lists itself.
+	Worktrees []Listing
+}
+
+const worktreesMark = "@@worktrees"
+
+// Machines is this computer and every added machine, asked at once. A
+// machine linked to this repository also reports its worktrees, and its
+// branches are fetched. One that does not answer keeps the worktrees it
+// last reported, marked unreachable.
+func (a *App) Machines() []MachineState {
+	machines, _ := a.Runtimes.All()
+	states := make([]MachineState, len(machines)+1)
+	dir, dirErr := a.RemoteDir()
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		out, err := runtime.Run("", "sh", "-c", probeScript, "sh", a.Root)
+		states[0] = MachineState{Machine: runtime.Machine{Name: runtime.Local}, Answers: err == nil}
+		if err == nil {
+			health := parseHealth(out)
+			states[0].Health = &health
 		}
+	})
+	for i, machine := range machines {
 		wg.Go(func() {
-			got := a.remoteListings(machine, dir)
-			mu.Lock()
-			all = append(all, got...)
-			mu.Unlock()
+			linked := dirErr == nil && git.HasRemote(a.Root, machine.Name)
+			states[i+1] = a.askMachine(machine, dir, linked)
 		})
 	}
 	wg.Wait()
-	sort.Slice(all, func(i, j int) bool { return all[i].Machine+all[i].Name < all[j].Machine+all[j].Name })
-	return all
+	return states
 }
 
-func (a *App) remoteListings(machine runtime.Machine, dir string) []Listing {
+func (a *App) askMachine(machine runtime.Machine, dir string, linked bool) MachineState {
+	state := MachineState{Machine: machine}
 	cache := filepath.Join(a.MiaDir, "remote", machine.Name+".json")
-	var out string
-	// ponytail: an unanswering machine costs one ssh timeout per 30s of
-	// Reachable's memory; ask in the background if that stalls the dash.
-	ok, _ := a.Reachable(machine)
-	if ok {
-		out, ok = a.askRemote(machine, dir, cache)
+	script, at := probeScript, "."
+	if linked {
+		script = "(" + probeScript + ")\necho " + worktreesMark + "\ncd \"$1\" && " + remoteMia + " api worktrees"
+		at = dir
 	}
-	if !ok {
-		data, err := os.ReadFile(cache)
-		if err != nil {
-			return nil
+	// a machine that did not answer is not asked again for 30s, so one that
+	// is off costs one ssh timeout per 30s rather than every refresh
+	if got, ok := a.reach.Load(machine.Name); ok {
+		if r := got.(reachability); !r.ok && time.Since(r.at) < 30*time.Second {
+			state.Detail = r.detail
+			state.Worktrees = cachedWorktrees(cache, machine.Name, false)
+			return state
 		}
-		out = string(data)
+	}
+	out, err := runtime.Run(machine.SSH, "sh", "-c", script, "sh", at)
+	if err != nil {
+		state.Detail = run.FirstLine(err.Error())
+		a.reach.Store(machine.Name, reachability{false, state.Detail, time.Now()})
+		state.Worktrees = cachedWorktrees(cache, machine.Name, false)
+		return state
+	}
+	a.reach.Store(machine.Name, reachability{true, "", time.Now()})
+	probe, worktrees, _ := strings.Cut(out, worktreesMark+"\n")
+	health := parseHealth(probe)
+	state.Answers, state.Health = true, &health
+	if linked && strings.TrimSpace(worktrees) != "" {
+		if err := os.MkdirAll(filepath.Dir(cache), 0o755); err == nil {
+			_ = os.WriteFile(cache, []byte(worktrees), 0o644)
+		}
+		_ = git.Fetch(a.Root, machine.Name)
+		state.Worktrees = cachedWorktrees(cache, machine.Name, true)
+	}
+	return state
+}
+
+// cachedWorktrees are the worktrees a machine last reported, as rows here.
+func cachedWorktrees(cache, machine string, answers bool) []Listing {
+	data, err := os.ReadFile(cache)
+	if err != nil {
+		return nil
 	}
 	var listings []Listing
-	if err := json.Unmarshal([]byte(out), &listings); err != nil {
+	if err := json.Unmarshal(data, &listings); err != nil {
 		return nil
 	}
 	kept := listings[:0]
@@ -160,23 +197,21 @@ func (a *App) remoteListings(machine runtime.Machine, dir string) []Listing {
 		if listing.Main {
 			continue
 		}
-		listing.Machine, listing.Unreachable = machine.Name, !ok
+		listing.Machine, listing.Unreachable = machine, !answers
 		listing.Layers, listing.Stack = nil, ""
 		kept = append(kept, listing)
 	}
+	sort.Slice(kept, func(i, j int) bool { return kept[i].Name < kept[j].Name })
 	return kept
 }
 
-func (a *App) askRemote(machine runtime.Machine, dir, cache string) (string, bool) {
-	out, err := runtime.Run(machine.SSH, "sh", "-c", `cd "$1" && `+remoteMia+` api worktrees`, "sh", dir)
-	if err != nil {
-		return "", false
+// RemoteWorktrees are every machine's worktrees, in one list.
+func RemoteWorktrees(states []MachineState) []Listing {
+	var all []Listing
+	for _, state := range states {
+		all = append(all, state.Worktrees...)
 	}
-	if err := os.MkdirAll(filepath.Dir(cache), 0o755); err == nil {
-		_ = os.WriteFile(cache, []byte(out), 0o644)
-	}
-	_ = git.Fetch(a.Root, machine.Name)
-	return out, true
+	return all
 }
 
 // AttachOn opens the worktree's session on the machine, through its own mia.

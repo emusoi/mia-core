@@ -12,9 +12,9 @@ import (
 
 func TestAReloadNeverSeesTheListingForgottenUnderIt(t *testing.T) {
 	var c listingCache
-	list := func() ([]app.Listing, error) {
+	list := func() ([]app.Listing, []app.MachineState, error) {
 		time.Sleep(time.Millisecond)
-		return []app.Listing{{Name: "main", Main: true}}, nil
+		return []app.Listing{{Name: "main", Main: true}}, nil, nil
 	}
 	var wg sync.WaitGroup
 	stop := make(chan struct{})
@@ -33,7 +33,7 @@ func TestAReloadNeverSeesTheListingForgottenUnderIt(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for range 25 {
-				got, err := c.get(list)
+				got, _, err := c.get(list)
 				if err != nil || len(got) != 1 {
 					t.Errorf("a reload saw %d worktrees, %v", len(got), err)
 					return

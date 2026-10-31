@@ -104,23 +104,22 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 		if name != "dashboard" {
 			return panelNamed(a, name, target)
 		}
-		cached, err := listing.get(func() ([]app.Listing, error) {
+		cached, states, err := listing.get(func() ([]app.Listing, []app.MachineState, error) {
 			if cfg, err := config.Load(a.MiaDir); err == nil {
 				a.Config = cfg
 			}
-			others := make(chan []app.Listing, 1)
-			go func() { others <- a.RemoteListings() }()
+			asked := make(chan []app.MachineState, 1)
+			go func() { asked <- a.Machines() }()
 			listings, err := a.List()
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
-			return append(listings, <-others...), nil
+			return listings, <-asked, nil
 		})
 		if err != nil {
 			return panel.Panel{}, err
 		}
-		all := cached
-		cached = slices.DeleteFunc(slices.Clone(all), func(l app.Listing) bool { return l.Machine != "" })
+		all := append(slices.Clip(cached), app.RemoteWorktrees(states)...)
 		plugins, _ := enabledPlugins(a)
 		if onlySide != "" {
 			p := panel.Panel{Version: panel.Version, Room: pluginRoom(a, plugins, cached)}
@@ -133,8 +132,9 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 		p := withChoices(panel.Dashboard(all, a.Config.Prefix, pluginRows(a, plugins, cached)), machines)
 		namesBase(p, a.Config.Base, cached)
 		p.Room = <-room
-		if tab, ok := machinesSide(a, cached, all); ok {
-			p.Room.Sides = append(p.Room.Sides, tab)
+		if len(states) > 1 {
+			p.Room.Sides = append(p.Room.Sides, machinesView(states, cached))
+			p.Room.Machines = machineMarks(states)
 		}
 		p.Bind(a.Config.KeyMap())
 		return p, nil
@@ -404,21 +404,22 @@ func namesBase(p panel.Panel, base string, listings []app.Listing) {
 type listingCache struct {
 	mu       sync.Mutex
 	listings []app.Listing
+	machines []app.MachineState
 	at       time.Time
 	stale    atomic.Bool
 }
 
-func (c *listingCache) get(list func() ([]app.Listing, error)) ([]app.Listing, error) {
+func (c *listingCache) get(list func() ([]app.Listing, []app.MachineState, error)) ([]app.Listing, []app.MachineState, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.stale.Swap(false) || c.listings == nil || time.Since(c.at) > listingTTL {
-		listings, err := list()
+		listings, machines, err := list()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		c.listings, c.at = listings, time.Now()
+		c.listings, c.machines, c.at = listings, machines, time.Now()
 	}
-	return c.listings, nil
+	return c.listings, c.machines, nil
 }
 
 // forget makes the next get list again; it never waits on one listing.
