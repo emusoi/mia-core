@@ -49,6 +49,10 @@ rows (and the side's width) above or below — and too small for any side,
 the dash is just the box. In a tmux popup the same holds; the box fills the
 popup only when no side fits.
 
+With a machine added (`mia machine add`), mia itself puts a `machines` tab
+on the right side: each machine, whether it answers, and the branches of
+the worktrees it keeps. `⏎` on a machine is a shell there.
+
 | key | does |
 |---|---|
 | `1`–`4` | move the cursor into the top, left, right or bottom side; the same digit brings it back |

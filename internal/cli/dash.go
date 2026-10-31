@@ -132,6 +132,9 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 		p := withChoices(panel.Dashboard(all, a.Config.Prefix, pluginRows(a, plugins, cached)))
 		namesBase(p, a.Config.Base, cached)
 		p.Room = <-room
+		if tab, ok := machinesSide(a, cached, all); ok {
+			p.Room.Sides = append(p.Room.Sides, tab)
+		}
 		p.Bind(a.Config.KeyMap())
 		return p, nil
 	}
