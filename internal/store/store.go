@@ -38,7 +38,7 @@ func (s Store) Load() ([]model.Record, error) {
 }
 
 func (s Store) Update(change func([]model.Record) ([]model.Record, error)) error {
-	unlock, err := lock(s.Dir)
+	unlock, err := Lock(s.Dir, "worktrees.lock")
 	if err != nil {
 		return err
 	}

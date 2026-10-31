@@ -22,6 +22,7 @@ import (
 	"github.com/emusoi/mia-core/internal/resolve"
 	"github.com/emusoi/mia-core/internal/runtime"
 	"github.com/emusoi/mia-core/internal/session"
+	"github.com/emusoi/mia-core/internal/signal"
 	"github.com/emusoi/mia-core/internal/stack"
 	"github.com/emusoi/mia-core/internal/store"
 
@@ -35,6 +36,7 @@ type App struct {
 	Store      store.Store
 	Names      *names.Store
 	Runtimes   runtime.Store
+	Signals    signal.Store
 	commits    sync.Map
 	factsOnce  sync.Once
 	factsDirty atomic.Bool
@@ -208,6 +210,7 @@ func Open(dir string) (*App, error) {
 		Store:    store.Store{Dir: miaDir},
 		Names:    nameStore,
 		Runtimes: runtime.Store{Path: config.RuntimesPath()},
+		Signals:  signal.Store{Dir: miaDir},
 	}, nil
 }
 
@@ -418,6 +421,8 @@ type Listing struct {
 	Machine string `json:"machine,omitempty"`
 	// Unreachable: the machine did not answer, and this is its last answer.
 	Unreachable bool `json:"unreachable,omitempty"`
+	// Signals are what anything outside mia last said about it, best first.
+	Signals []signal.Signal `json:"signals,omitempty"`
 }
 
 type listing struct {
@@ -459,6 +464,11 @@ func (a *App) List(names ...string) ([]Listing, error) {
 		}(i, tree)
 	}
 	wg.Wait()
+	if signals, err := a.Signals.Load(); err == nil {
+		for i := range listings {
+			listings[i].Signals = signal.Of(signals, listings[i].Name)
+		}
+	}
 	return listings, nil
 }
 
@@ -613,6 +623,9 @@ func (a *App) Remove(removal Removal, force, stopRunning bool) error {
 	if err := a.Names.Release(removal.Record.Path); err != nil {
 		return err
 	}
+	if err := a.Signals.Clear(removal.Record.Name, ""); err != nil {
+		return err
+	}
 	a.Emit("worktree.removed", removal.Record, nil)
 	return nil
 }
@@ -652,6 +665,9 @@ func (a *App) Shell(query string, popup bool) error {
 		return fmt.Errorf("tmux not found — sessions need it: https://github.com/tmux/tmux/wiki/Installing")
 	}
 	if err := a.ensureSession(host, record, dir); err != nil {
+		return err
+	}
+	if err := a.Signals.Seen(record.Name); err != nil {
 		return err
 	}
 	if popup {
@@ -719,6 +735,9 @@ func (a *App) MarkSeen(query string) error {
 		return err
 	}
 	record.Seen = time.Now()
+	if err := a.Signals.Seen(record.Name); err != nil {
+		return err
+	}
 	return a.Store.Put(record)
 }
 

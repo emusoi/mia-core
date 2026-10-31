@@ -117,6 +117,8 @@ func Run(args []string) int {
 	a.Events = func(e app.Event) { sendEvent(a, e) }
 
 	switch verb {
+	case "signal", "signals":
+		return cmdSignal(a, rest, asJSON)
 	case "machine", "machines", "runtime":
 		return cmdAttachOn(a, rest[1:])
 	case "new":
