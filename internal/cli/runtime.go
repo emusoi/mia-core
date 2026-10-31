@@ -140,16 +140,13 @@ func machinesSide(a *app.App, local, remote []app.Listing) (plugin.SideTab, bool
 	for _, l := range remote {
 		kept[l.Machine] = append(kept[l.Machine], l.Branch)
 	}
-	// The right side sets each line flush right, so every line is as wide
-	// as the widest to keep the block's left edge straight.
-	const width = 28
 	text := func(t, style string) plugin.Line {
-		return plugin.Line{{Text: "  " + t, Width: width, Style: style}}
+		return plugin.Line{{Text: "  " + t, Style: style}}
 	}
 	var lines []plugin.Item
 	add := func(dot, dotStyle, name, where, note string, open *plugin.Open) {
 		lines = append(lines,
-			plugin.Item{Cells: plugin.Line{{Text: dot, Width: 2, Style: dotStyle}, {Text: name, Width: 12, Style: "bold"}, {Text: where, Width: width - 14, Align: "right", Style: "dim"}}, Open: open},
+			plugin.Item{Cells: plugin.Line{{Text: dot, Width: 2, Style: dotStyle}, {Text: name, Width: 12, Style: "bold"}, {Text: where, Style: "dim"}}, Open: open},
 			plugin.Item{Cells: text(note, "dim"), Open: open})
 		branches := kept[name]
 		for i, branch := range branches {
