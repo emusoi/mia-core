@@ -2379,11 +2379,14 @@ func (m model) hints() []string {
 			}
 			hints = append(hints, keycap("⏎ "+word))
 		} else {
-			for _, id := range []string{"open", "adopt", "claim", "go", "shell"} {
+			for _, id := range []string{"open", "there", "adopt", "claim", "go", "shell"} {
 				if action, ok := m.panel.Actions[id]; ok && offers(row, id) && action.Key != "" {
 					label := id
 					if words := strings.Fields(action.Label); len(words) > 0 {
 						label = words[0]
+					}
+					if row.Machine != "" {
+						label = "attach on " + row.Machine
 					}
 					hints = append(hints, keycap(action.Key+" "+label))
 					break

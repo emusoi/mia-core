@@ -457,21 +457,19 @@ func dashboardRow(listing app.Listing, prefix string) Row {
 // there, and nothing else here acts on it.
 func remoteRow(listing app.Listing, prefix string) Row {
 	state := status(listing)
-	facts := []string{"machine  " + listing.Machine + " — its own mia keeps this worktree", "branch  " + listing.Branch}
+	facts := []string{"branch  " + listing.Branch, "runs on  " + listing.Machine + " — its own mia keeps this worktree; this computer can sleep"}
 	if listing.Unreachable {
 		state = "unreachable"
 		facts = append(facts, "answer  "+listing.Machine+" is not answering; this is what it said last")
 	}
-	where := "@" + listing.Machine
-	if state != "" {
-		where += " · " + state
-	}
 	return Row{
 		ID:      listing.Name + "@" + listing.Machine,
-		Cells:   []string{listing.Name, strings.TrimPrefix(listing.Branch, prefix), where, ageCell(listing.LastWork)},
+		Cells:   []string{listing.Name, strings.TrimPrefix(listing.Branch, prefix), state, ageCell(listing.LastWork)},
+		Title:   listing.LastSubject,
 		Actions: []string{"there"},
 		Facts:   facts,
 		Dim:     listing.Unreachable,
+		Machine: listing.Machine,
 	}
 }
 

@@ -125,7 +125,7 @@ func (m model) home() string {
 		title, _, _ := strings.Cut(m.panel.Title, "  —  ")
 		where += faint.Render("  ›  ") + ink.Render(title)
 	}
-	top = append(top, between(where, faint.Render(m.cornerText()), width))
+	top = append(top, between(where, m.machineDots()+faint.Render(m.cornerText()), width))
 	top = append(top, "")
 	if m.panel.Room != nil {
 		marks, label := m.marks(width, sel)
@@ -458,10 +458,26 @@ func (m model) others(walk []homeRow, width, room int) []string {
 			state = ink.Italic(true)
 		}
 		title := h.row.Title
-		if title == "" {
+		branch := ""
+		if width >= branchesFrom {
+			branch = muted.Render(fmt.Sprintf("%-24s", fit(cells[1], 24))) + "  "
+		} else if title == "" {
 			title = cells[1]
 		}
-		lines = append(lines, fit(mark+name+"  "+state.Render(fmt.Sprintf("%-16s", fit(cells[2], 16)))+"  "+faint.Render(title), width))
+		tag := ""
+		if h.row.Machine != "" {
+			tag = muted.Render("@" + h.row.Machine)
+			if h.row.Dim {
+				name = danger.Render(fmt.Sprintf("%-*s", nameW, fit(cells[0], nameW)))
+				state, tag = danger, danger.Render("@"+h.row.Machine)
+			}
+		}
+		line := mark + name + "  " + branch + state.Render(fmt.Sprintf("%-16s", fit(cells[2], 16))) + "  " + faint.Render(title)
+		if tag != "" {
+			line = fit(line, width-lipgloss.Width(tag)-2)
+			line += strings.Repeat(" ", max(width-lipgloss.Width(line)-lipgloss.Width(tag), 2)) + tag
+		}
+		lines = append(lines, fit(line, width))
 	}
 	if m.query != "" && len(m.rows) == 0 {
 		lines = append(lines, faint.Render("nothing matches "+m.query+" — esc clears the filter"))
@@ -799,6 +815,8 @@ func viewStyle(spec string) lipgloss.Style {
 		switch word {
 		case "red":
 			style = danger
+		case "green":
+			style = good
 		case "dim", "gray":
 			style = faint
 		case "bold":
@@ -806,6 +824,27 @@ func viewStyle(spec string) lipgloss.Style {
 		}
 	}
 	return style
+}
+
+// branchesFrom is the page width from which rows give the branch a column.
+const branchesFrom = 100
+
+// machineDots are the header's machines: a green dot for one that answers,
+// a red ring for one that does not; none when no machine is added.
+func (m model) machineDots() string {
+	room := m.dashRoom()
+	if room == nil || len(room.Machines) < 2 {
+		return ""
+	}
+	var parts []string
+	for _, mark := range room.Machines {
+		if mark.Up {
+			parts = append(parts, good.Render("●")+" "+muted.Render(mark.Name))
+		} else {
+			parts = append(parts, danger.Render("○ "+mark.Name))
+		}
+	}
+	return strings.Join(parts, "  ") + faint.Render("   ·   ")
 }
 
 // cornerText is the plugins' corners and the time, for the top line.

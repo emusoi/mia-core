@@ -367,11 +367,11 @@ func TestAWorktreeOnAnotherMachineOnlyAttachesThere(t *testing.T) {
 		rows[row.ID] = row
 	}
 	there, ok := rows["kisongo@fedora"]
-	if !ok || there.Cells[1] != "retries" || there.Cells[2] != "@fedora" || !slices.Equal(there.Actions, []string{"there"}) {
+	if !ok || there.Cells[1] != "retries" || there.Machine != "fedora" || !slices.Equal(there.Actions, []string{"there"}) {
 		t.Errorf("remote row = %+v", there)
 	}
 	gone := rows["njiro@build"]
-	if gone.Cells[2] != "@build · unreachable" || !gone.Dim {
+	if gone.Cells[2] != "unreachable" || !gone.Dim {
 		t.Errorf("unreachable row = %+v", gone)
 	}
 }
