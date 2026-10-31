@@ -46,7 +46,7 @@ func (a *App) Link(machine runtime.Machine) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := a.Ship(machine); err != nil {
+	if err := Ship(machine); err != nil {
 		return "", err
 	}
 	base := a.BaseBranch(a.Root)

@@ -51,6 +51,9 @@ func cmdRuntime(args []string, asJSON bool) int {
 		if err := store.Add(machine); err != nil {
 			return fail(err)
 		}
+		if err := app.Ship(machine); err != nil {
+			return fail(err)
+		}
 		fmt.Printf("%s  %s  %s\n", machine.Name, machine.SSH, machine.Engine)
 		return exitOK
 
@@ -67,6 +70,23 @@ func cmdRuntime(args []string, asJSON bool) int {
 		}
 		return exitFor(runtime.Interactive(machine.SSH).Run())
 
+	case "ship":
+		if len(args) != 2 {
+			return usageErr("mia machine ship <name>")
+		}
+		machine, err := store.Get(args[1])
+		if err != nil {
+			return fail(err)
+		}
+		if machine.Name == runtime.Local {
+			return fail(fmt.Errorf("local is this computer — it runs this mia already"))
+		}
+		if err := app.Ship(machine); err != nil {
+			return fail(err)
+		}
+		fmt.Printf("%s runs this mia\n", machine.Name)
+		return exitOK
+
 	case "rm", "remove":
 		if len(args) != 2 {
 			return usageErr("mia machine rm <name>")
@@ -78,7 +98,7 @@ func cmdRuntime(args []string, asJSON bool) int {
 		return exitOK
 
 	default:
-		return usageErr("mia machine <list|add|shell|attach|rm>")
+		return usageErr("mia machine <list|add|shell|ship|attach|rm>")
 	}
 }
 

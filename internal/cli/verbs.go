@@ -40,7 +40,7 @@ var verbs = []Verb{
 	{"up", "mia up", "move to the layer above, in place", false, ""},
 	{"down", "mia down", "move to the layer below, in place", false, ""},
 	{"pr", "mia pr [worktree] [show|draft [--branch <branch>] [--title <title>] [--body-stdin] [--remove-after-merge <true|false>]]", "draft a pull request and print the commands you run yourself", false, ""},
-	{"machine", "mia machine <list|add <name> <ssh-target>|shell <name>|rm <name>>", "the machines an environment can run on", false, ""},
+	{"machine", "mia machine <list|add <name> <ssh-target>|shell <name>|ship <name>|attach <worktree>@<name>|rm <name>>", "the machines worktrees and environments run on", false, ""},
 	{"gateway", "mia gateway <status|start|stop|install|uninstall|setup|trust|untrust>", "what makes <name>.mia reach an environment", false, ""},
 	{"api", "mia api <query>", "structured state, for clients and scripts", true, ""},
 	{"plugin", "mia plugin [ls|enable <name>|disable <name>]", "programs named mia-<name> that add verbs; installed on PATH, run once enabled", true, ""},

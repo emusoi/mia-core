@@ -21,7 +21,7 @@ mv ~/.local/bin/mia.new ~/.local/bin/mia && printf %s "$1" > ` + shippedStamp
 // Ship makes the machine run this build of mia, built for its platform, so
 // a worktree there is run by the same mia as here. It does nothing when the
 // machine already has this build.
-func (a *App) Ship(machine runtime.Machine) error {
+func Ship(machine runtime.Machine) error {
 	stamp, err := buildStamp()
 	if err != nil {
 		return err
