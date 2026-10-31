@@ -1,6 +1,7 @@
 package panel
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/plugin"
@@ -200,6 +201,10 @@ func (p Panel) Rows() []Row {
 	}
 	return rows
 }
+
+// Chooses: the action takes typed input and, beside it, one of its choices,
+// which ⇥ cycles; without it a choice is the input.
+func (a Action) Chooses() bool { return slices.Contains(a.Args, "{choice}") }
 
 func (a Action) Command(rowID string) []string {
 	return a.CommandWith(rowID, "")

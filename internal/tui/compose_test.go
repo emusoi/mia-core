@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -239,5 +240,21 @@ func TestTheComposerDeletesAWordAndALine(t *testing.T) {
 	}
 	if got := edited("one", key(tea.KeyCtrlU)); got != "" {
 		t.Errorf("ctrl+u on one line left %q", got)
+	}
+}
+
+func TestNewTypesABranchAndTabPicksTheMachine(t *testing.T) {
+	p := replyPanel()
+	p.Actions["new"] = panel.Action{Key: "n", Label: "new", Verb: "new", Args: []string{"--on", "{choice}", "{input}"}, Input: "branch", Choices: []string{"local", "fedora"}}
+	m := newModel(panel.Panel{}).replace(p)
+	m = press(m, runes("n"))
+	if m.input != "" || m.choice != "local" {
+		t.Fatalf("n began with input %q choice %q, want an empty branch on local", m.input, m.choice)
+	}
+	m = press(m, runes("fix-2"))
+	m = press(m, tea.KeyMsg{Type: tea.KeyTab})
+	got := m.argvFor(m.pending.action, m.pending.row)
+	if want := []string{"new", "--on", "fedora", "fix-2"}; !slices.Equal(got, want) {
+		t.Errorf("argv = %v, want %v: a digit is part of the branch, ⇥ picks the machine", got, want)
 	}
 }

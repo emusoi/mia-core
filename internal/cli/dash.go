@@ -129,7 +129,8 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 		}
 		room := make(chan *panel.Room, 1)
 		go func() { room <- pluginRoom(a, plugins, cached) }()
-		p := withChoices(panel.Dashboard(all, a.Config.Prefix, pluginRows(a, plugins, cached)))
+		machines, _ := a.Runtimes.All()
+		p := withChoices(panel.Dashboard(all, a.Config.Prefix, pluginRows(a, plugins, cached)), machines)
 		namesBase(p, a.Config.Base, cached)
 		p.Room = <-room
 		if tab, ok := machinesSide(a, cached, all); ok {

@@ -92,10 +92,18 @@ func panelNamed(a *app.App, name, target string) (panel.Panel, error) {
 	return p, nil
 }
 
-func withChoices(p panel.Panel) panel.Panel {
+func withChoices(p panel.Panel, machines []runtime.Machine) panel.Panel {
 	if editor, ok := p.Actions["editor"]; ok {
 		editor.Choices = Openers()
 		p.Actions["editor"] = editor
+	}
+	if made, ok := p.Actions["new"]; ok && len(machines) > 0 {
+		made.Choices = []string{runtime.Local}
+		for _, machine := range machines {
+			made.Choices = append(made.Choices, machine.Name)
+		}
+		made.Args = []string{"--on", "{choice}", "{input}"}
+		p.Actions["new"] = made
 	}
 	return p
 }
@@ -111,7 +119,8 @@ func buildPanel(a *app.App, name, target string) (panel.Panel, error) {
 			return panel.Panel{}, err
 		}
 		plugins, _ := enabledPlugins(a)
-		return withChoices(panel.Dashboard(append(listings, a.RemoteListings()...), a.Config.Prefix, pluginRows(a, plugins, listings))), nil
+		machines, _ := a.Runtimes.All()
+		return withChoices(panel.Dashboard(append(listings, a.RemoteListings()...), a.Config.Prefix, pluginRows(a, plugins, listings)), machines), nil
 
 	case "env-panel":
 		record, err := a.RecordOrHere(target)

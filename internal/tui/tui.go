@@ -992,7 +992,10 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		switch key {
 		case "tab":
-			if len(choices) > 0 {
+			switch {
+			case m.pending.action.Chooses() && len(choices) > 0:
+				m.choice = choices[(slices.Index(choices, m.choice)+1)%len(choices)]
+			case len(choices) > 0:
 				m.input = choices[(slices.Index(choices, m.input)+1)%len(choices)]
 			}
 		case "enter":
@@ -1005,11 +1008,15 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.keepDraft()
-			if !action.Lines && len(choices) > 0 && slices.Contains(choices, strings.TrimSpace(m.input)) {
+			picked := strings.TrimSpace(m.input)
+			if action.Chooses() {
+				picked = m.choice
+			}
+			if !action.Lines && len(choices) > 0 && slices.Contains(choices, picked) {
 				if m.hooks.Drafts == nil {
 					m.hooks.Drafts = map[string]string{}
 				}
-				m.hooks.Drafts["choice:"+action.Input] = strings.TrimSpace(m.input)
+				m.hooks.Drafts["choice:"+action.Input] = picked
 				if m.hooks.Keep != nil {
 					m.hooks.Keep(m.hooks.Drafts)
 				}
@@ -1023,7 +1030,7 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 		default:
-			if !m.pending.action.Lines && len(choices) > 0 && len(key) == 1 && key[0] >= '1' && key[0] <= '9' && int(key[0]-'1') < len(choices) {
+			if !m.pending.action.Lines && !m.pending.action.Chooses() && len(choices) > 0 && len(key) == 1 && key[0] >= '1' && key[0] <= '9' && int(key[0]-'1') < len(choices) {
 				m.input = choices[key[0]-'1']
 				return m, nil
 			}
@@ -1347,7 +1354,13 @@ func (m model) run(id string, row panel.Row) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-			if choices := m.choices(); !action.Lines && !action.Prefill && len(choices) > 0 {
+			if choices := m.choices(); action.Chooses() && len(choices) > 0 {
+				m.choice = choices[0]
+				if last := m.hooks.Drafts["choice:"+action.Input]; slices.Contains(choices, last) {
+					m.choice = last
+				}
+			}
+			if choices := m.choices(); !action.Lines && !action.Prefill && !action.Chooses() && len(choices) > 0 {
 				m.input = choices[0]
 				if last := m.hooks.Drafts["choice:"+action.Input]; slices.Contains(choices, last) {
 					m.input = last
@@ -2320,7 +2333,9 @@ func (m model) footer() string {
 			return line + "   " + keycap("esc keep draft")
 		}
 		line := hot.Render("  "+m.pending.action.Input+": ") + m.input + "█"
-		if choices := m.choices(); len(choices) > 0 {
+		if choices := m.choices(); m.pending.action.Chooses() && len(choices) > 0 {
+			line += "   →  " + m.choice + dimmed.Render("   ⇥ next")
+		} else if len(choices) > 0 {
 			var offered []string
 			for i, choice := range choices {
 				offered = append(offered, keyCap.Render(fmt.Sprint(i+1))+" "+choice)
