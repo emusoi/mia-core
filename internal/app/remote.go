@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -53,6 +54,9 @@ func (a *App) Link(machine runtime.Machine) (string, error) {
 	if _, err := runtime.Run(machine.SSH, "sh", "-lc", linkScript, "sh", dir, base); err != nil {
 		return "", err
 	}
+	if err := a.copyConfig(machine, dir); err != nil {
+		return "", err
+	}
 	if !git.HasRemote(a.Root, machine.Name) {
 		if err := git.AddRemote(a.Root, machine.Name, machine.SSH+":"+dir); err != nil {
 			return "", err
@@ -62,6 +66,24 @@ func (a *App) Link(machine runtime.Machine) (string, error) {
 		return "", fmt.Errorf("push %s to %s: %w", base, machine.Name, err)
 	}
 	return dir, nil
+}
+
+// copyConfig gives the machine's repository this one's configuration, so
+// setup, checks and agents are the same there. This computer's copy wins.
+func (a *App) copyConfig(machine runtime.Machine, dir string) error {
+	data, err := os.ReadFile(filepath.Join(a.MiaDir, "config.toml"))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	put := runtime.Command(machine.SSH, "sh", "-c", `mkdir -p "$1/.git/mia" && cat > "$1/.git/mia/config.toml"`, "sh", dir)
+	put.Stdin = bytes.NewReader(data)
+	if out, err := put.CombinedOutput(); err != nil {
+		return fmt.Errorf("copy the configuration to %s: %v %s", machine.Name, err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // NewOn makes the worktree on the machine, with its own mia: the worktree,
