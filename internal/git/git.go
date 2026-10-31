@@ -421,6 +421,7 @@ func DiffStat(dir, base, head string) (files, added, deleted int) {
 type Commit struct {
 	SHA     string
 	Subject string
+	When    time.Time
 }
 
 func HasBranch(dir, branch string) bool {
@@ -537,6 +538,24 @@ func MergeBase(dir, a, b string) string {
 func UpdateRef(dir, ref, sha string) error {
 	_, err := runCombined(dir, "update-ref", ref, sha)
 	return err
+}
+
+// Recent is the last n commits on HEAD, newest first.
+func Recent(dir string, n int) []Commit {
+	out, err := run(dir, "log", fmt.Sprintf("-%d", n), "--format=%h%x00%ct%x00%s", "HEAD")
+	if err != nil {
+		return nil
+	}
+	var commits []Commit
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		parts := strings.SplitN(line, "\x00", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		secs, _ := strconv.ParseInt(parts[1], 10, 64)
+		commits = append(commits, Commit{SHA: parts[0], Subject: parts[2], When: time.Unix(secs, 0)})
+	}
+	return commits
 }
 
 func LastCommit(dir string) (time.Time, string) {

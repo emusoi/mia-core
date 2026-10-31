@@ -5,6 +5,7 @@ package radar
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/git"
 	"github.com/emusoi/mia-core/internal/signal"
 	"github.com/emusoi/mia-core/internal/stack"
 )
@@ -72,6 +74,8 @@ type row struct {
 	layers  []stack.Layer
 	layer   string
 	act     func(m model) (model, tea.Cmd)
+	listing *app.Listing
+	last    bool // the worktree switched to last, other than here
 }
 
 var (
@@ -129,12 +133,31 @@ type model struct {
 	confirm string // a question waiting on y
 	pending func(m model) (model, tea.Cmd)
 	form    form
+	commits map[string][]git.Commit // the preview's, by worktree, fetched as the cursor reaches it
+}
+
+type previewed struct {
+	dir     string
+	commits []git.Commit
+}
+
+// fetch asks for the selected worktree's recent commits, once.
+func (m model) fetch() tea.Cmd {
+	r := m.selected()
+	if r.dir == "" || r.machine != "" {
+		return nil
+	}
+	if _, ok := m.commits[r.dir]; ok {
+		return nil
+	}
+	dir := r.dir
+	return func() tea.Msg { return previewed{dir, git.Recent(dir, 5)} }
 }
 
 // Run opens the radar, or the new-worktree popup when newOnly, and returns
 // what was picked, nil when nothing was.
 func Run(data Data, newOnly bool) (*Choice, error) {
-	m := model{data: data, open: map[string]bool{}, form: newForm(data)}
+	m := model{data: data, open: map[string]bool{}, form: newForm(data), commits: map[string][]git.Commit{}}
 	if newOnly {
 		m.mode = making
 	}
@@ -147,7 +170,7 @@ func Run(data Data, newOnly bool) (*Choice, error) {
 	return final.(model).chosen, nil
 }
 
-func (m model) Init() tea.Cmd { return nil }
+func (m model) Init() tea.Cmd { return m.fetch() }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -156,6 +179,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tick, finished:
 		return m.follow(msg)
+	case previewed:
+		m.commits[msg.dir] = msg.commits
+		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -163,7 +189,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.mode == making {
 			return m.formKey(msg)
 		}
-		return m.browseKey(msg)
+		next, cmd := m.browseKey(msg)
+		if nm, ok := next.(model); ok && cmd == nil {
+			return nm, nm.fetch()
+		}
+		return next, cmd
 	}
 	return m, nil
 }
@@ -239,6 +269,11 @@ func (m model) browseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m model) opening() int {
 	for i, r := range m.rows {
 		if len(r.signals) > 0 {
+			return i
+		}
+	}
+	for i, r := range m.rows {
+		if r.last {
 			return i
 		}
 	}
@@ -366,11 +401,19 @@ func layerDetail(l stack.Layer) string {
 func (m model) worktrees() []row {
 	var rows []row
 	seenStack := map[string]bool{}
+	last := ""
+	var lastSeen time.Time
+	for _, l := range m.data.Local {
+		if l.Name != m.data.Here && !l.Main && l.Seen.After(lastSeen) {
+			last, lastSeen = l.Name, l.Seen
+		}
+	}
 	for _, l := range m.data.Local {
 		if l.Main && !l.Adopted {
 			continue
 		}
-		r := row{kind: worktree, label: l.Name, branch: l.Branch, name: l.Name, dir: l.Path, signals: l.Signals}
+		l := l
+		r := row{kind: worktree, label: l.Name, branch: l.Branch, name: l.Name, dir: l.Path, signals: l.Signals, listing: &l, last: l.Name == last}
 		if len(l.Layers) > 1 {
 			key := l.Layers[0].Branch
 			if seenStack[key] {
@@ -385,8 +428,9 @@ func (m model) worktrees() []row {
 	}
 	for _, state := range m.data.Machines {
 		for _, l := range state.Worktrees {
+			l := l
 			rows = append(rows, row{kind: worktree, label: l.Name, branch: l.Branch, name: l.Name + "@" + state.Name,
-				machine: state.Name, signals: l.Signals, detail: listingDetail(l)})
+				machine: state.Name, signals: l.Signals, detail: listingDetail(l), listing: &l})
 		}
 	}
 	return rows
@@ -482,25 +526,41 @@ func (m model) View() string {
 	if m.mode == making {
 		return m.formView()
 	}
-	width := max(m.width-1, 40)
+	full := max(m.width-1, 40)
+	width := full
+	var preview []string
+	if full >= 96 {
+		width = full * 55 / 100
+		preview = m.preview(full - width - 3)
+	}
 	var b strings.Builder
 	head := accent.Render("› ") + ink.Render(m.query) + accent.Render("█")
-	b.WriteString(between(head, m.machinesLine(), width) + "\n\n")
-	shown := 0
+	b.WriteString(between(head, m.machinesLine(), full) + "\n\n")
 	room := max(m.height-3, 3)
 	start := 0
 	if m.cursor >= room {
 		start = m.cursor - room + 1
 	}
-	for i := start; i < len(m.rows) && shown < room; i++ {
-		b.WriteString(m.line(m.rows[i], i == m.cursor, width) + "\n")
-		shown++
+	var list []string
+	for i := start; i < len(m.rows) && len(list) < room; i++ {
+		list = append(list, m.line(m.rows[i], i == m.cursor, width))
 	}
 	if len(m.rows) == 0 {
-		b.WriteString(faint.Render("nothing called "+m.query+" — esc clears") + "\n")
+		list = append(list, faint.Render("nothing called "+m.query+" — esc clears"))
 	}
-	for ; shown < room; shown++ {
-		b.WriteString("\n")
+	for i := 0; i < room; i++ {
+		left := ""
+		if i < len(list) {
+			left = list[i]
+		}
+		if preview != nil {
+			right := ""
+			if i < len(preview) {
+				right = preview[i]
+			}
+			left = left + strings.Repeat(" ", max(width-lipgloss.Width(left), 0)) + muted.Render(" │ ") + right
+		}
+		b.WriteString(left + "\n")
 	}
 	foot := keys("⏎", "switch") + keys("→", "layers") + keys("^x", "clear signal") + keys("esc", "close")
 	if m.confirm != "" {
@@ -508,6 +568,78 @@ func (m model) View() string {
 	}
 	b.WriteString(between(cut(foot, width), faint.Render("type to find"), width))
 	return b.String()
+}
+
+// preview is the selected worktree in a few lines: where it is, what was
+// said about it, its last commits, its session's windows.
+func (m model) preview(width int) []string {
+	r := m.selected()
+	if r.kind != worktree && r.kind != layer {
+		return nil
+	}
+	var out []string
+	add := func(s string) { out = append(out, cut(s, width)) }
+	where := soft.Render("this computer")
+	if r.machine != "" {
+		where = soft.Render("on " + r.machine)
+	}
+	add(inkB.Render(strings.TrimPrefix(r.label, "▸ ")) + "  " + where)
+	if r.kind == layer {
+		for _, l := range r.layers {
+			if l.Branch == r.layer {
+				add(soft.Render(l.Branch) + muted.Render("  on "+l.Parent))
+				add(muted.Render(layerDetail(l)))
+			}
+		}
+		add("")
+		add(faint.Render("⏎ moves this worktree to this layer"))
+		return out
+	}
+	add(soft.Render(r.branch))
+	if r.dir != "" {
+		add(muted.Render(shortPath(r.dir)))
+	}
+	if len(r.signals) > 0 {
+		add("")
+		for _, s := range r.signals {
+			add(Style(s.Style).Render(s.Kind) + "  " + ink.Render(s.Text))
+			add(muted.Render("  from " + s.From + " · " + ago(time.Since(s.At))))
+		}
+	}
+	if commits, ok := m.commits[r.dir]; ok && len(commits) > 0 {
+		add("")
+		add(italic.Render("last commits"))
+		for _, c := range commits {
+			add(muted.Render(c.SHA+" ") + ink.Render(c.Subject) + muted.Render("  "+ago(time.Since(c.When))))
+		}
+	} else if r.listing != nil && r.listing.LastSubject != "" {
+		add("")
+		add(italic.Render("last commit"))
+		add(ink.Render(r.listing.LastSubject))
+	}
+	if r.listing != nil {
+		add("")
+		if len(r.listing.Windows) == 0 {
+			add(muted.Render("no session yet — ⏎ starts one"))
+		} else {
+			add(italic.Render("session"))
+			for _, w := range r.listing.Windows {
+				still := ""
+				if w.Still != "" {
+					still = muted.Render("  quiet " + w.Still)
+				}
+				add(soft.Render(fmt.Sprintf("%d  %s", w.Index, w.Name)) + still)
+			}
+		}
+	}
+	return out
+}
+
+func shortPath(path string) string {
+	if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(path, home) {
+		return "~" + strings.TrimPrefix(path, home)
+	}
+	return path
 }
 
 func keys(key, label string) string {
@@ -565,8 +697,11 @@ func (m model) line(r row, on bool, width int) string {
 		} else {
 			text += soft.Render(r.detail)
 		}
-		if r.kind == worktree && r.machine == "" && r.name == m.data.Here {
+		switch {
+		case r.kind == worktree && r.machine == "" && r.name == m.data.Here:
 			text = between(text, accent.Render("● here"), width)
+		case r.last:
+			text = between(text, soft.Render("↩ last"), width)
 		}
 		if r.machine != "" {
 			text = between(text, muted.Render("@"+r.machine), width)

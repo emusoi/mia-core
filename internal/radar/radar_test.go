@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/runtime"
@@ -128,5 +129,26 @@ func TestTheMachineIsAlwaysOneLineAway(t *testing.T) {
 	}
 	if !slices.Equal(f.on, []string{"local", "fedora"}) {
 		t.Errorf("on offers this computer and each machine: %v", f.on)
+	}
+}
+
+func TestWithNothingSignalledItOpensOnTheWorktreeYouWereLastIn(t *testing.T) {
+	d := data()
+	d.Here = "temeke"
+	for i := range d.Local {
+		d.Local[i].Signals = nil
+		switch d.Local[i].Name {
+		case "temeke":
+			d.Local[i].Seen = time.Now()
+		case "lemara":
+			d.Local[i].Seen = time.Now().Add(-time.Hour)
+			d.Local[i].Ahead = 2
+		}
+	}
+	d.Machines = nil
+	m := model{data: d, open: map[string]bool{}}
+	m.rows = m.build()
+	if got := m.rows[m.opening()]; got.name != "lemara" || !got.last {
+		t.Errorf("opens on %q; want lemara, last switched to, so ⏎ flips back", got.name)
 	}
 }
