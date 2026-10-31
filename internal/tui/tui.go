@@ -138,7 +138,6 @@ type model struct {
 	choice   string
 	details  bool
 	sides    SideState
-	legend   bool
 	sideSel  string
 	sideRow  int
 	classic  bool       // the dashboard in the room, for mia side's popups
@@ -461,10 +460,15 @@ func (m model) matchesOne(row panel.Row) bool {
 func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(message)
 	m = next.(model)
-	m.fill = m.inPopup && !m.unfilled().roomed()
+	// a popup of a panel other than the dashboard's fills it
+	m.fill = m.inPopup && m.dashRoom() == nil
 	if m.hooks.Side != "" && m.panel.Room != nil && m.width > 0 {
-		m.classic = true
-		m = m.sideKey(m.hooks.Side)
+		// --side N: open on that side's view
+		if i := slices.Index(SideKeys, m.hooks.Side); i >= 0 {
+			if v := m.viewAt(plugin.Places[i]); v >= 0 {
+				m = m.showView(v)
+			}
+		}
 		m.hooks.Side = ""
 	}
 	if m.hooks.Only != "" && m.panel.Room != nil && m.sideSel == "" {
@@ -1087,9 +1091,6 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.hooks.Only != "" {
 		return m.widgetKey(key)
 	}
-	if m.legend && key != "ctrl+c" {
-		return m.legendKey(key), nil
-	}
 	if m.reading != nil {
 		switch m.nav(key) {
 		case "down", "scrolldown":
@@ -1144,13 +1145,6 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-	}
-	if key == "v" && m.roomed() {
-		m.legend = true
-		return m, nil
-	}
-	if slices.Contains(SideKeys, key) && m.roomed() {
-		return m.sideKey(key), nil
 	}
 	if m.sideSel != "" {
 		switch {
@@ -1236,13 +1230,6 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "tabnext", "tabprev":
-		// [ and ] stay the detail pane's even while a side is selected.
-		if m.sideSel != "" && key != "[" && key != "]" {
-			if name == "tabnext" {
-				return m.cycleSide(1), nil
-			}
-			return m.cycleSide(-1), nil
-		}
 		tabs := m.tabs()
 		if len(tabs) > 1 {
 			if name == "tabnext" {
@@ -2151,11 +2138,7 @@ func (m model) View() string {
 	if m.homes() {
 		return m.home()
 	}
-	boxed := m.boxed()
-	if room, ok := m.room(boxed); ok {
-		return room
-	}
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, boxed)
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.boxed())
 }
 
 func (m model) boxed() string {

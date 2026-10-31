@@ -60,7 +60,7 @@ func (m model) dashRoom() *panel.Room {
 		return m.panel.Room
 	}
 	for i := len(m.stack) - 1; i >= 0; i-- {
-		if r := m.stack[i].panel.Room; r != nil && !m.stack[i].classic {
+		if r := m.stack[i].panel.Room; r != nil {
 			return r
 		}
 	}
@@ -70,7 +70,7 @@ func (m model) dashRoom() *panel.Room {
 // homes says whether the dashboard draws as home now; help, reports, the
 // composer and the details pane keep the box.
 func (m model) homes() bool {
-	if m.dashRoom() == nil || m.classic || m.inPopup || m.fill || m.hooks.Only != "" {
+	if m.dashRoom() == nil || m.hooks.Only != "" {
 		return false
 	}
 	switch m.mode {
