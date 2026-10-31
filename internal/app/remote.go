@@ -180,10 +180,12 @@ func (a *App) askMachine(machine runtime.Machine, dir string, linked bool) Machi
 	if err != nil {
 		state.Detail = run.FirstLine(err.Error())
 		a.reach.Store(machine.Name, reachability{false, state.Detail, time.Now()})
+		a.keepAnswer(machine.Name, false, state.Detail)
 		state.Worktrees = cachedWorktrees(cache, machine.Name, false)
 		return state
 	}
 	a.reach.Store(machine.Name, reachability{true, "", time.Now()})
+	a.keepAnswer(machine.Name, true, "")
 	probe, worktrees, _ := strings.Cut(out, worktreesMark+"\n")
 	health := parseHealth(probe)
 	state.Answers, state.Health = true, &health
@@ -195,6 +197,61 @@ func (a *App) askMachine(machine runtime.Machine, dir string, linked bool) Machi
 		state.Worktrees = cachedWorktrees(cache, machine.Name, true)
 	}
 	return state
+}
+
+type answer struct {
+	Answers bool      `json:"answers"`
+	Detail  string    `json:"detail,omitempty"`
+	At      time.Time `json:"at"`
+}
+
+func (a *App) answerPath(machine string) string {
+	return filepath.Join(a.MiaDir, "remote", machine+".answer.json")
+}
+
+// keepAnswer remembers whether the machine answered, for what has to know
+// without asking it: the status line.
+func (a *App) keepAnswer(machine string, answers bool, detail string) {
+	data, err := json.Marshal(answer{answers, detail, time.Now()})
+	if err != nil {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(a.answerPath(machine)), 0o755); err == nil {
+		_ = os.WriteFile(a.answerPath(machine), data, 0o644)
+	}
+}
+
+// KnownMachines is every machine as it last answered, without asking any:
+// its worktrees as it last reported them. One never asked counts as
+// answering until it is.
+func (a *App) KnownMachines() []MachineState {
+	machines, _ := a.Runtimes.All()
+	states := []MachineState{{Machine: runtime.Machine{Name: runtime.Local}, Answers: true}}
+	for _, machine := range machines {
+		state := MachineState{Machine: machine, Answers: true}
+		if data, err := os.ReadFile(a.answerPath(machine.Name)); err == nil {
+			var last answer
+			if json.Unmarshal(data, &last) == nil {
+				state.Answers, state.Detail = last.Answers, last.Detail
+			}
+		}
+		state.Worktrees = cachedWorktrees(filepath.Join(a.MiaDir, "remote", machine.Name+".json"), machine.Name, state.Answers)
+		states = append(states, state)
+	}
+	return states
+}
+
+// PollDue says whether the machines were last asked long enough ago to ask
+// again, and if so claims the asking, so only one caller starts it.
+func (a *App) PollDue(every time.Duration) bool {
+	claim := filepath.Join(a.MiaDir, "remote", ".asked")
+	if info, err := os.Stat(claim); err == nil && time.Since(info.ModTime()) < every {
+		return false
+	}
+	if err := os.MkdirAll(filepath.Dir(claim), 0o755); err != nil {
+		return false
+	}
+	return os.WriteFile(claim, nil, 0o644) == nil
 }
 
 // cachedWorktrees are the worktrees a machine last reported, as rows here.

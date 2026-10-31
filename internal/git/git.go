@@ -205,6 +205,15 @@ func Dirty(dir string) (bool, error) {
 	return out != "", nil
 }
 
+// Changes is how many files git status lists: changed, added or untracked.
+func Changes(dir string) int {
+	out, err := run(dir, "status", "--porcelain")
+	if err != nil || out == "" {
+		return 0
+	}
+	return strings.Count(out, "\n") + 1
+}
+
 func DirtyTracked(dir string) (bool, error) {
 	out, err := run(dir, "status", "--porcelain", "-uno")
 	if err != nil {
