@@ -27,6 +27,7 @@ import (
 	"github.com/emusoi/mia-core/internal/tui"
 
 	"github.com/emusoi/mia-core/internal/run"
+	"github.com/emusoi/mia-core/internal/runtime"
 )
 
 var version = "dev"
@@ -266,6 +267,13 @@ func cmdNew(a *app.App, args []string, asJSON bool) int {
 		}
 		return code
 	}
+	if on != "" && on != "-" && on != runtime.Local {
+		machine, err := a.Runtimes.Get(on)
+		if err != nil {
+			return fail(err)
+		}
+		return exitFor(a.NewOn(machine, args[0]))
+	}
 	before, _ := a.Store.Load()
 	record, err := a.New(args[0])
 	if err != nil {
@@ -282,13 +290,6 @@ func cmdNew(a *app.App, args []string, asJSON bool) int {
 		where = "is already checked out there"
 	}
 	fmt.Printf("%s — %s %s\n%s\n", record.Name, git.CurrentBranch(record.Path), where, record.Path)
-	if on != "" && on != "-" && on != "local" {
-		placed, code := placeOn(a, record, on)
-		if code != exitOK {
-			return code
-		}
-		record = placed
-	}
 	if andShell {
 		return exitFor(a.Shell(record.Name, false))
 	}

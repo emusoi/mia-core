@@ -426,19 +426,6 @@ func namesAWorktree(a *app.App, word string) bool {
 	return err == nil
 }
 
-func placeOn(a *app.App, record model.Record, on string) (model.Record, int) {
-	machine, err := (runtime.Store{Path: config.RuntimesPath()}).Get(on)
-	if err != nil {
-		return record, fail(err)
-	}
-	placed, err := a.Host(record, machine)
-	if err != nil {
-		return record, fail(err)
-	}
-	fmt.Printf("%s runs on %s\n", placed.Name, machine.Name)
-	return placed, cmdEnv(a, []string{"up", placed.Name}, false)
-}
-
 type envGone struct {
 	Removed bool `json:"removed"`
 }

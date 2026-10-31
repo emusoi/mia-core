@@ -360,6 +360,21 @@ func HasRemote(dir, name string) bool {
 	return err == nil && slices.Contains(strings.Fields(out), name)
 }
 
+func AddRemote(dir, name, url string) error {
+	_, err := run(dir, "remote", "add", name, url)
+	return err
+}
+
+func Push(dir, remote string, refs ...string) error {
+	_, err := run(dir, append([]string{"push", "--quiet", remote}, refs...)...)
+	return err
+}
+
+func Fetch(dir, remote string) error {
+	_, err := run(dir, "fetch", "--quiet", remote)
+	return err
+}
+
 func FetchPR(dir string, number int, branch string) error {
 	out, err := run(dir, "remote")
 	if err != nil {

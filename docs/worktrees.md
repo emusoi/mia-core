@@ -14,7 +14,7 @@ you get that worktree.
 | flag | does |
 |---|---|
 | `--shell` | attach to its session after |
-| `--on <machine>` | start its environment on that machine |
+| `--on <machine>` | make the whole worktree on that machine: its git, session and agent live there |
 | `--pr <number>` | check out a pull request |
 | `--stack` | a [stack](stacks.md) layer instead |
 
@@ -98,3 +98,17 @@ you to run:
 mia pr monduli             # preview
 mia pr monduli draft       # save to .git/mia/pr/<branch>.md
 ```
+
+## On another machine
+
+```bash
+mia new fix-retries --on fedora
+```
+
+The worktree lives on fedora, made by fedora's own mia, so its session and
+agent keep working while this computer sleeps. The repository sits at the
+same path under fedora's home as under yours, and fedora becomes a git
+remote of this one: mia pushes the base branch (and the branch, if it
+exists here) before making the worktree. fedora never needs GitHub;
+`git fetch fedora` brings its commits back. mia ships itself there first,
+built for fedora, whenever this mia is a build fedora has not had.
