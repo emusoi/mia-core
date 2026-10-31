@@ -37,6 +37,13 @@ func (a *App) RemoteDir() (string, error) {
 const linkScript = `mkdir -p "$1" && cd "$1" && { [ -e .git ] || git init -q -b "$2"; } &&
 git config receive.denyCurrentBranch updateInstead`
 
+// utf8 gives a command on a machine a UTF-8 locale when ssh brought none,
+// and the machine's tmux server too, so what runs there draws its symbols
+// rather than underscores.
+const utf8 = `[ -n "${LANG:-}" ] || export LANG=C.UTF-8
+tmux set-environment -g LANG "$LANG" 2>/dev/null
+`
+
 // remoteMia is the mia Ship installs, named in full so an older one earlier
 // on the machine's PATH cannot answer instead.
 const remoteMia = "$HOME/.local/bin/mia"
@@ -102,7 +109,7 @@ func (a *App) NewOn(machine runtime.Machine, branch string) error {
 		}
 	}
 	var said bytes.Buffer
-	create := runtime.Interactive(machine.SSH, "sh", "-lc", `cd "$1" && `+remoteMia+` new "$2"`, "sh", dir, branch)
+	create := runtime.Interactive(machine.SSH, "sh", "-lc", utf8+`cd "$1" && `+remoteMia+` new "$2"`, "sh", dir, branch)
 	create.Stdout = io.MultiWriter(os.Stdout, &said)
 	if err := create.Run(); err != nil {
 		return err
@@ -292,5 +299,5 @@ func (a *App) AttachOn(machine runtime.Machine, name string) error {
 	if err != nil {
 		return err
 	}
-	return runtime.Interactive(machine.SSH, "sh", "-c", `cd "$1" && exec `+remoteMia+` shell "$2"`, "sh", dir, name).Run()
+	return runtime.Interactive(machine.SSH, "sh", "-c", utf8+`cd "$1" && exec `+remoteMia+` shell "$2"`, "sh", dir, name).Run()
 }
