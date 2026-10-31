@@ -338,7 +338,7 @@ func stackRow(first app.Listing, byName map[string]app.Listing, prefix string) (
 		ID:       "stack:" + first.Layers[0].Branch,
 		Target:   top.Name,
 		Glyph:    glyph,
-		Cells:    []string{name, shape, strings.TrimSpace(stackStatus(summary, top)), ageCell(summary.LastWork)},
+		Cells:    []string{name, fmt.Sprintf("%s · %d layers", strings.TrimPrefix(top.Branch, prefix), len(first.Layers)), strings.TrimSpace(stackStatus(summary, top)), ageCell(summary.LastWork)},
 		Actions:  actions,
 		Facts:    facts,
 		Children: children,

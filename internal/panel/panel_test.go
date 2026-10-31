@@ -271,7 +271,7 @@ func TestLayersInWorktreesBecomeOneStackRow(t *testing.T) {
 	if stackRow.ID == "" {
 		t.Fatalf("no stack row: %v", p.Rows())
 	}
-	if stackRow.Cells[0] != "payments" || stackRow.Cells[1] != "3 layers · 1 landed" || stackRow.Target != "monduli" {
+	if stackRow.Cells[0] != "payments" || stackRow.Cells[1] != "layer-b · 3 layers" || stackRow.Target != "monduli" {
 		t.Errorf("stack row = %v target %q", stackRow.Cells, stackRow.Target)
 	}
 	if len(stackRow.Children) != 3 || stackRow.Children[0].ID != "monduli" || stackRow.Children[1].ID != "longido" || stackRow.Children[2].ID != "base" || !stackRow.Children[2].Dim {
