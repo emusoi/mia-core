@@ -374,6 +374,9 @@ func ageCell(t time.Time) string {
 }
 
 func dashboardRow(listing app.Listing, prefix string) Row {
+	if listing.Machine != "" {
+		return remoteRow(listing, prefix)
+	}
 	branch := strings.TrimPrefix(listing.Branch, prefix)
 	glyph := ""
 	if listing.Dirty {
@@ -450,6 +453,28 @@ func dashboardRow(listing app.Listing, prefix string) Row {
 	}
 }
 
+// remoteRow is a worktree another machine's mia keeps: ⏎ opens its session
+// there, and nothing else here acts on it.
+func remoteRow(listing app.Listing, prefix string) Row {
+	state := status(listing)
+	facts := []string{"machine  " + listing.Machine + " — its own mia keeps this worktree", "branch  " + listing.Branch}
+	if listing.Unreachable {
+		state = "unreachable"
+		facts = append(facts, "answer  "+listing.Machine+" is not answering; this is what it said last")
+	}
+	where := "@" + listing.Machine
+	if state != "" {
+		where += " · " + state
+	}
+	return Row{
+		ID:      listing.Name + "@" + listing.Machine,
+		Cells:   []string{listing.Name, strings.TrimPrefix(listing.Branch, prefix), where, ageCell(listing.LastWork)},
+		Actions: []string{"there"},
+		Facts:   facts,
+		Dim:     listing.Unreachable,
+	}
+}
+
 func status(listing app.Listing) string {
 	if listing.Dirty {
 		return "uncommitted"
@@ -493,6 +518,10 @@ func dashboardActions() map[string]Action {
 		"open": {
 			Lands: true, Key: "⏎", Label: "attach", Verb: "shell", Args: []string{"{row}"},
 			Help: "attach to the worktree's tmux session; in the editor, switch to it",
+		},
+		"there": {
+			Lands: true, Popup: true, Key: "⏎", Label: "attach there", Verb: "machine", Args: []string{"attach", "{row}"},
+			Help: "the worktree's session on the machine that keeps it, over ssh",
 		},
 		"shell": {
 			Lands: true, Key: "s", Label: "shell", Verb: "shell", Args: []string{"{row}"},

@@ -112,3 +112,8 @@ remote of this one: mia pushes the base branch (and the branch, if it
 exists here) before making the worktree. fedora never needs GitHub;
 `git fetch fedora` brings its commits back. mia ships itself there first,
 built for fedora, whenever this mia is a build fedora has not had.
+
+The dashboard lists fedora's worktrees beside yours as `@fedora`, asking
+fedora's mia each time it refreshes and fetching fedora's branches as it
+does; ⏎ on one opens its session there. When fedora does not answer, its
+rows stay, dimmed and marked unreachable, as it last reported them.

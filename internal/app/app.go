@@ -434,6 +434,10 @@ type Listing struct {
 	Layers      []stack.Layer    `json:"layers,omitempty"`
 	Stack       string           `json:"stack,omitempty"`
 	Dev         string           `json:"dev,omitempty"`
+	// Machine is the machine whose own mia keeps this worktree; empty is here.
+	Machine string `json:"machine,omitempty"`
+	// Unreachable: the machine did not answer, and this is its last answer.
+	Unreachable bool `json:"unreachable,omitempty"`
 }
 
 type listing struct {

@@ -99,7 +99,9 @@ func Run(args []string) int {
 	case "gateway":
 		return cmdGateway(rest)
 	case "machine", "machines", "runtime":
-		return cmdRuntime(rest, asJSON)
+		if len(rest) == 0 || rest[0] != "attach" {
+			return cmdRuntime(rest, asJSON)
+		}
 	case "plugin", "plugins":
 		return cmdPlugin(configHere(), rest, asJSON)
 	}
@@ -115,6 +117,8 @@ func Run(args []string) int {
 	a.Events = func(e app.Event) { sendEvent(a, e) }
 
 	switch verb {
+	case "machine", "machines", "runtime":
+		return cmdAttachOn(a, rest[1:])
 	case "new":
 		return cmdNew(a, rest, asJSON)
 	case "config":

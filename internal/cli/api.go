@@ -111,7 +111,7 @@ func buildPanel(a *app.App, name, target string) (panel.Panel, error) {
 			return panel.Panel{}, err
 		}
 		plugins, _ := enabledPlugins(a)
-		return withChoices(panel.Dashboard(listings, a.Config.Prefix, pluginRows(a, plugins, listings))), nil
+		return withChoices(panel.Dashboard(append(listings, a.RemoteListings()...), a.Config.Prefix, pluginRows(a, plugins, listings))), nil
 
 	case "env-panel":
 		record, err := a.RecordOrHere(target)

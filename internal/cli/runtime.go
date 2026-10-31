@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/config"
 	"github.com/emusoi/mia-core/internal/runtime"
 )
@@ -76,6 +77,23 @@ func cmdRuntime(args []string, asJSON bool) int {
 		return exitOK
 
 	default:
-		return usageErr("mia machine <list|add|shell|rm>")
+		return usageErr("mia machine <list|add|shell|attach|rm>")
 	}
+}
+
+// cmdAttachOn is `mia machine attach <worktree>@<machine>`: the session of a
+// worktree another machine's mia keeps.
+func cmdAttachOn(a *app.App, args []string) int {
+	if len(args) != 1 {
+		return usageErr("mia machine attach <worktree>@<machine>")
+	}
+	name, on, ok := strings.Cut(args[0], "@")
+	if !ok || name == "" {
+		return usageErr("mia machine attach <worktree>@<machine>")
+	}
+	machine, err := a.Runtimes.Get(on)
+	if err != nil {
+		return fail(err)
+	}
+	return exitFor(a.AttachOn(machine, name))
 }

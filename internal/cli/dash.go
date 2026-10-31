@@ -108,11 +108,19 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 			if cfg, err := config.Load(a.MiaDir); err == nil {
 				a.Config = cfg
 			}
-			return a.List()
+			others := make(chan []app.Listing, 1)
+			go func() { others <- a.RemoteListings() }()
+			listings, err := a.List()
+			if err != nil {
+				return nil, err
+			}
+			return append(listings, <-others...), nil
 		})
 		if err != nil {
 			return panel.Panel{}, err
 		}
+		all := cached
+		cached = slices.DeleteFunc(slices.Clone(all), func(l app.Listing) bool { return l.Machine != "" })
 		plugins, _ := enabledPlugins(a)
 		if onlySide != "" {
 			p := panel.Panel{Version: panel.Version, Room: pluginRoom(a, plugins, cached)}
@@ -121,7 +129,7 @@ func browse(a *app.App, name, target, pickTo string, switching bool) int {
 		}
 		room := make(chan *panel.Room, 1)
 		go func() { room <- pluginRoom(a, plugins, cached) }()
-		p := withChoices(panel.Dashboard(cached, a.Config.Prefix, pluginRows(a, plugins, cached)))
+		p := withChoices(panel.Dashboard(all, a.Config.Prefix, pluginRows(a, plugins, cached)))
 		namesBase(p, a.Config.Base, cached)
 		p.Room = <-room
 		p.Bind(a.Config.KeyMap())

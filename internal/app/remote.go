@@ -1,10 +1,13 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/emusoi/mia-core/internal/git"
 	"github.com/emusoi/mia-core/internal/runtime"
@@ -74,4 +77,91 @@ func (a *App) NewOn(machine runtime.Machine, branch string) error {
 		}
 	}
 	return runtime.Interactive(machine.SSH, "sh", "-lc", `cd "$1" && `+remoteMia+` new "$2"`, "sh", dir, branch).Run()
+}
+
+// RemoteListings are the worktrees each machine linked to this repository
+// keeps, as its own mia reports them. Asking also fetches the machine's
+// branches. A machine that does not answer gives its last answer, marked
+// unreachable.
+func (a *App) RemoteListings() []Listing {
+	machines, err := a.Runtimes.All()
+	if err != nil || len(machines) == 0 {
+		return nil
+	}
+	dir, err := a.RemoteDir()
+	if err != nil {
+		return nil
+	}
+	var (
+		mu  sync.Mutex
+		wg  sync.WaitGroup
+		all []Listing
+	)
+	for _, machine := range machines {
+		if !git.HasRemote(a.Root, machine.Name) {
+			continue
+		}
+		wg.Go(func() {
+			got := a.remoteListings(machine, dir)
+			mu.Lock()
+			all = append(all, got...)
+			mu.Unlock()
+		})
+	}
+	wg.Wait()
+	sort.Slice(all, func(i, j int) bool { return all[i].Machine+all[i].Name < all[j].Machine+all[j].Name })
+	return all
+}
+
+func (a *App) remoteListings(machine runtime.Machine, dir string) []Listing {
+	cache := filepath.Join(a.MiaDir, "remote", machine.Name+".json")
+	var out string
+	// ponytail: an unanswering machine costs one ssh timeout per 30s of
+	// Reachable's memory; ask in the background if that stalls the dash.
+	ok, _ := a.Reachable(machine)
+	if ok {
+		out, ok = a.askRemote(machine, dir, cache)
+	}
+	if !ok {
+		data, err := os.ReadFile(cache)
+		if err != nil {
+			return nil
+		}
+		out = string(data)
+	}
+	var listings []Listing
+	if err := json.Unmarshal([]byte(out), &listings); err != nil {
+		return nil
+	}
+	kept := listings[:0]
+	for _, listing := range listings {
+		if listing.Main {
+			continue
+		}
+		listing.Machine, listing.Unreachable = machine.Name, !ok
+		listing.Layers, listing.Stack = nil, ""
+		kept = append(kept, listing)
+	}
+	return kept
+}
+
+func (a *App) askRemote(machine runtime.Machine, dir, cache string) (string, bool) {
+	out, err := runtime.Run(machine.SSH, "sh", "-c", `cd "$1" && `+remoteMia+` api worktrees`, "sh", dir)
+	if err != nil {
+		return "", false
+	}
+	if err := os.MkdirAll(filepath.Dir(cache), 0o755); err == nil {
+		_ = os.WriteFile(cache, []byte(out), 0o644)
+	}
+	_ = git.Fetch(a.Root, machine.Name)
+	return out, true
+}
+
+// AttachOn opens the worktree's session on the machine, through its own mia.
+func (a *App) AttachOn(machine runtime.Machine, name string) error {
+	dir, err := a.RemoteDir()
+	if err != nil {
+		return err
+	}
+	return runtime.Interactive(machine.SSH, "sh", "-c", `cd "$1" && exec `+remoteMia+` shell "$2"`, "sh", dir, name).Run()
 }

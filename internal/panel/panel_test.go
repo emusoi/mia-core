@@ -356,3 +356,22 @@ func TestALentMainCheckoutSaysWhoseFilesItHasAndGivesThemBack(t *testing.T) {
 		t.Error("main offers V when nothing is lent")
 	}
 }
+
+func TestAWorktreeOnAnotherMachineOnlyAttachesThere(t *testing.T) {
+	listings := []app.Listing{
+		{Name: "kisongo", Branch: "jk/retries", Adopted: true, Machine: "fedora"},
+		{Name: "njiro", Branch: "jk/forms", Adopted: true, Machine: "build", Unreachable: true},
+	}
+	rows := map[string]panel.Row{}
+	for _, row := range panel.Dashboard(listings, "jk/", nil).Rows() {
+		rows[row.ID] = row
+	}
+	there, ok := rows["kisongo@fedora"]
+	if !ok || there.Cells[1] != "retries" || there.Cells[2] != "@fedora" || !slices.Equal(there.Actions, []string{"there"}) {
+		t.Errorf("remote row = %+v", there)
+	}
+	gone := rows["njiro@build"]
+	if gone.Cells[2] != "@build · unreachable" || !gone.Dim {
+		t.Errorf("unreachable row = %+v", gone)
+	}
+}
