@@ -16,6 +16,7 @@ import (
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/git"
+	"github.com/emusoi/mia-core/internal/session"
 	"github.com/emusoi/mia-core/internal/signal"
 	"github.com/emusoi/mia-core/internal/stack"
 )
@@ -134,30 +135,70 @@ type model struct {
 	pending func(m model) (model, tea.Cmd)
 	form    form
 	commits map[string][]git.Commit // the preview's, by worktree, fetched as the cursor reaches it
+	screens map[string]string       // each worktree's session as it looks, by row name
 }
+
+type screened struct {
+	name   string
+	screen string
+}
+
+type look struct{ name string }
 
 type previewed struct {
 	dir     string
 	commits []git.Commit
 }
 
-// fetch asks for the selected worktree's recent commits, once.
+// fetch asks for what the preview shows of the selected worktree: its
+// recent commits once, and its session's screen, again every second while
+// it stays selected.
 func (m model) fetch() tea.Cmd {
 	r := m.selected()
-	if r.dir == "" || r.machine != "" {
+	var cmds []tea.Cmd
+	if r.kind != worktree {
 		return nil
 	}
-	if _, ok := m.commits[r.dir]; ok {
+	if r.dir != "" && r.machine == "" {
+		if _, ok := m.commits[r.dir]; !ok {
+			dir := r.dir
+			cmds = append(cmds, func() tea.Msg { return previewed{dir, git.Recent(dir, 5)} })
+		}
+	}
+	if capture := m.capture(r); capture != nil {
+		cmds = append(cmds, capture)
+	}
+	return tea.Batch(cmds...)
+}
+
+// capture reads the worktree's session's active window, here or on its
+// machine; nothing when it has no session.
+func (m model) capture(r row) tea.Cmd {
+	host := session.Here()
+	if r.machine != "" {
+		found := false
+		for _, state := range m.data.Machines {
+			if state.Name == r.machine && state.Answers {
+				host, found = session.On(state.Machine), true
+			}
+		}
+		if !found {
+			return nil
+		}
+	} else if r.listing == nil || !r.listing.Session {
 		return nil
 	}
-	dir := r.dir
-	return func() tea.Msg { return previewed{dir, git.Recent(dir, 5)} }
+	name, worktree := r.name, r.label
+	return func() tea.Msg {
+		screen, _ := host.Capture(worktree, "", true)
+		return screened{name, screen}
+	}
 }
 
 // Run opens the radar, or the new-worktree popup when newOnly, and returns
 // what was picked, nil when nothing was.
 func Run(data Data, newOnly bool) (*Choice, error) {
-	m := model{data: data, open: map[string]bool{}, form: newForm(data), commits: map[string][]git.Commit{}}
+	m := model{data: data, open: map[string]bool{}, form: newForm(data), commits: map[string][]git.Commit{}, screens: map[string]string{}}
 	if newOnly {
 		m.mode = making
 	}
@@ -181,6 +222,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.follow(msg)
 	case previewed:
 		m.commits[msg.dir] = msg.commits
+		return m, nil
+	case screened:
+		m.screens[msg.name] = msg.screen
+		name := msg.name
+		return m, tea.Tick(time.Second, func(time.Time) tea.Msg { return look{name} })
+	case look:
+		if r := m.selected(); r.name == msg.name && m.mode == browsing {
+			return m, m.capture(r) // still selected: look again
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
@@ -531,7 +581,7 @@ func (m model) View() string {
 	var preview []string
 	if full >= 96 {
 		width = full * 55 / 100
-		preview = m.preview(full - width - 3)
+		preview = m.preview(full-width-3, max(m.height-3, 3))
 	}
 	var b strings.Builder
 	head := accent.Render("› ") + ink.Render(m.query) + accent.Render("█")
@@ -572,13 +622,32 @@ func (m model) View() string {
 
 // preview is the selected worktree in a few lines: where it is, what was
 // said about it, its last commits, its session's windows.
-func (m model) preview(width int) []string {
+func (m model) preview(width, height int) []string {
 	r := m.selected()
 	if r.kind != worktree && r.kind != layer {
 		return nil
 	}
 	var out []string
 	add := func(s string) { out = append(out, cut(s, width)) }
+	if screen := strings.TrimRight(m.screens[r.name], "\n "); r.kind == worktree && screen != "" {
+		where := "this computer"
+		if r.machine != "" {
+			where = "on " + r.machine
+		}
+		add(inkB.Render(strings.TrimPrefix(r.label, "▸ ")) + "  " + soft.Render(r.branch) + "  " + muted.Render(where))
+		for _, s := range r.signals {
+			add(Style(s.Style).Render(s.Kind) + "  " + ink.Render(s.Text) + muted.Render("  "+s.From))
+		}
+		add(muted.Render(strings.Repeat("─", width)))
+		lines := squeeze(strings.Split(screen, "\n"))
+		if room := height - len(out); len(lines) > room {
+			lines = lines[len(lines)-room:] // an agent's latest is at the bottom
+		}
+		for _, line := range lines {
+			add(line + "\x1b[0m")
+		}
+		return out
+	}
 	where := soft.Render("this computer")
 	if r.machine != "" {
 		where = soft.Render("on " + r.machine)
@@ -633,6 +702,22 @@ func (m model) preview(width int) []string {
 		}
 	}
 	return out
+}
+
+// squeeze keeps one blank line where a screen has several, so a window
+// whose middle is empty shows its top and its bottom both.
+func squeeze(lines []string) []string {
+	var kept []string
+	blank := false
+	for _, line := range lines {
+		empty := strings.TrimSpace(ansi.Strip(line)) == ""
+		if empty && blank {
+			continue
+		}
+		blank = empty
+		kept = append(kept, line)
+	}
+	return kept
 }
 
 func shortPath(path string) string {
