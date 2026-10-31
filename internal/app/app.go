@@ -227,26 +227,6 @@ func (a *App) Resolver() (resolve.Repo, error) {
 	return resolve.Repo{Root: a.Root, Records: records}, nil
 }
 
-func (a *App) NewFromPR(number int) (model.Record, error) {
-	branch := fmt.Sprintf("pr-%d", number)
-	if a.Config.Prefix != "" {
-		branch = a.Config.Prefix + branch
-	}
-	trees, err := git.Worktrees(a.Root)
-	if err != nil {
-		return model.Record{}, err
-	}
-	for _, tree := range trees {
-		if tree.Branch == branch {
-			return a.New(branch)
-		}
-	}
-	if err := git.FetchPR(a.Root, number, branch); err != nil {
-		return model.Record{}, err
-	}
-	return a.New(branch)
-}
-
 func (a *App) New(branch string) (model.Record, error) {
 	before, _ := a.Store.Load()
 	record, err := a.newWorktree(branch)

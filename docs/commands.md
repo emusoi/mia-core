@@ -22,14 +22,13 @@
 | `mia rm <worktree>` | remove it |
 | `mia gc [--apply]` | find, or remove, untouched worktrees |
 
-## Stacks and pull requests
+## Stacks
 
 | command | does |
 |---|---|
 | `mia up`, `mia down` | move between layers |
 | `mia stack` | show the stack |
-| `mia stack go\|name\|merge\|restack\|diff\|pr\|rm` | work on it |
-| `mia pr [worktree]` | draft a pull request |
+| `mia stack go\|name\|merge\|restack\|diff\|rm` | work on it |
 
 ## Environments
 

@@ -100,7 +100,6 @@ What you choose is kept per repository in `.git/mia/dash-sides.json`.
 | `v` | the sides legend, when the room is drawn |
 | `S` | stack |
 | `t` | session windows |
-| `Y` | draft a pull request |
 | `D` | delete |
 | `a` | adopt |
 | `c` | config |
@@ -121,7 +120,7 @@ are in:
 | key | opens |
 |---|---|
 | `g` `j` | the dashboard, the switch list |
-| `n` `b` `p` | a new worktree, a branch, a pull request |
+| `n` `b` | a new worktree, a branch |
 | `1`–`4` | that one side as a small centred popup (`mia side N`), named for the side's first tab (waiting, issues, cost, activity) |
 | a plugin's | what its manifest's `menu` names; one on a key above is left out and said on stderr |
 

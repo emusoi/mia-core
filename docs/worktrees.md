@@ -15,7 +15,6 @@ you get that worktree.
 |---|---|
 | `--shell` | attach to its session after |
 | `--on <machine>` | make the whole worktree on that machine: its git, session and agent live there |
-| `--pr <number>` | check out a pull request |
 | `--stack` | a [stack](stacks.md) layer instead |
 
 `mia adopt <path>` takes over a worktree you made with `git worktree add`.
@@ -89,16 +88,6 @@ mia gc             # worktrees untouched for 14 days
 mia gc --apply     # remove them
 ```
 
-## Pull requests
-
-mia never pushes. `mia pr` drafts a pull request and prints the commands for
-you to run:
-
-```bash
-mia pr monduli             # preview
-mia pr monduli draft       # save to .git/mia/pr/<branch>.md
-```
-
 ## On another machine
 
 ```bash
@@ -118,7 +107,5 @@ fedora's mia each time it refreshes and fetching fedora's branches as it
 does; ⏎ on one opens its session there. When fedora does not answer, its
 rows stay, dimmed and marked unreachable, as it last reported them.
 
-`Y` on a fedora row (or `mia pr <worktree>@fedora`) brings its branch home:
-fetched from fedora and made a branch here, or moved forward to fedora's,
-never over work that moved here too. It prints the push and `gh pr create`
-to run yourself. `mia shell <worktree>@fedora` is its session there.
+`mia shell <worktree>@fedora` is its session there. Its branches arrive
+here as `fedora/<branch>` on every refresh; pushing them anywhere is yours.

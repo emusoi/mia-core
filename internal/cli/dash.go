@@ -76,7 +76,7 @@ func cmdSide(a *app.App, args []string) int {
 // onlySide is `mia side`'s side: the dash shows it alone.
 var onlySide string
 
-var doable = []string{"new", "pr", "branch"}
+var doable = []string{"new", "branch"}
 
 func do(a *app.App, action, pickTo string) int {
 	if !slices.Contains(doable, action) {
@@ -221,7 +221,7 @@ func picks(chosen tui.Chosen) bool {
 		return true
 	case "new":
 		return !slices.ContainsFunc(chosen.Argv, func(arg string) bool {
-			return arg == "--stack" || arg == "--worktree" || arg == "--pr"
+			return arg == "--stack" || arg == "--worktree"
 		})
 	}
 	return false

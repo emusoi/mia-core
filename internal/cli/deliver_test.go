@@ -9,8 +9,8 @@ import (
 	"github.com/emusoi/mia-core/internal/tui"
 )
 
-func TestAPullRequestOrALayerIsNotPickedAsABranch(t *testing.T) {
-	for _, argv := range [][]string{{"new", "--shell", "--pr", "7"}, {"new", "--stack", "--in", "x", "layer"}} {
+func TestALayerIsNotPickedAsABranch(t *testing.T) {
+	for _, argv := range [][]string{{"new", "--stack", "--in", "x", "layer"}, {"new", "--worktree", "--stack", "layer"}} {
 		if picks(tui.Chosen{Argv: argv}) {
 			t.Errorf("%v would be handed to the editor as a branch", argv)
 		}

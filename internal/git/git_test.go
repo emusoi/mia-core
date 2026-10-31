@@ -198,22 +198,3 @@ func TestChangedFiles(t *testing.T) {
 		t.Fatalf("ChangedFiles = %+v", files)
 	}
 }
-
-func TestFetchPRBringsThePullRequestHeadIntoABranch(t *testing.T) {
-	repo := gittest.New(t)
-	origin := filepath.Join(t.TempDir(), "origin.git")
-	repo.Git("init", "-q", "--bare", origin)
-	repo.Git("remote", "add", "origin", origin)
-	repo.Git("checkout", "-qb", "contribution")
-	repo.Write("a.go", "one\n")
-	repo.Commit("their work")
-	head := repo.Git("rev-parse", "HEAD")
-	repo.Git("push", "-q", "origin", "contribution:refs/pull/7/head")
-	repo.Git("checkout", "-q", "main")
-	if err := git.FetchPR(repo.Root, 7, "pr-7"); err != nil {
-		t.Fatal(err)
-	}
-	if got := repo.Git("rev-parse", "pr-7"); got != head {
-		t.Errorf("pr-7 = %s, want %s", got, head)
-	}
-}

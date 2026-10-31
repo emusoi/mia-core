@@ -7,7 +7,6 @@ import (
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/git"
-	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/stack"
 )
 
@@ -151,26 +150,8 @@ func cmdStack(a *app.App, args []string, asJSON bool) (code int) {
 		}
 		return fail(fmt.Errorf("%s is not in a stack", branch))
 
-	case "pr":
-		layers, err := store.Of(record.Path, branch, base)
-		if err != nil {
-			return fail(err)
-		}
-		fmt.Println("# bottom-up; run these yourself")
-		for _, layer := range layers {
-			if layer.Landed {
-				continue
-			}
-			branch, parent := run.ShellJoin([]string{layer.Branch}), run.ShellJoin([]string{layer.Parent})
-			fmt.Printf("git push -u origin %s && gh pr create --base %s --head %s\n", branch, parent, branch)
-		}
-		if !git.HasRemote(record.Path, "origin") {
-			fmt.Println("\nthis repository has no remote called origin yet — `git remote add origin <url>` (or `gh repo create`) first")
-		}
-		return exitOK
-
 	default:
-		return usageErr("mia stack [--in <worktree>] [show|go <layer>|name <name>|restack|diff|pr]")
+		return usageErr("mia stack [--in <worktree>] [show|go <layer>|name <name>|restack|diff]")
 	}
 }
 

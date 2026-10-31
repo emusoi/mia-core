@@ -16,13 +16,13 @@ var groupOf = map[string]string{
 	"new": "Worktrees", "ls": "Worktrees", "path": "Worktrees", "adopt": "Worktrees", "rm": "Worktrees", "gc": "Worktrees",
 	"star": "Worktrees", "open": "Worktrees", "shell": "Worktrees", "window": "Worktrees", "rename": "Worktrees", "run": "Worktrees", "setup": "Worktrees", "switch": "Worktrees", "shell-init": "Worktrees",
 	"dash": "Working", "side": "Working", "stack": "Working", "up": "Working", "down": "Working",
-	"config": "Working", "pr": "Working",
-	"env": "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
+	"config": "Working",
+	"env":    "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
 	"api": "Records", "plugin": "Records",
 }
 
 var verbs = []Verb{
-	{"new", "mia new [--pr <number>] [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--shell] <branch>", "create a worktree and name it", false, ""},
+	{"new", "mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--shell] <branch>", "create a worktree and name it", false, ""},
 	{"ls", "mia ls", "what exists", true, ""},
 	{"setup", "mia setup [worktree]", "run the configured setup in a worktree again", false, ""},
 	{"path", "mia path [worktree|stack]", "print a worktree's path, for scripts; no argument is the main checkout", true, ""},
@@ -36,10 +36,9 @@ var verbs = []Verb{
 	{"run", "mia run <worktree> <cmd…>", "run a command once in a worktree", false, ""},
 	{"dev", "mia dev [<worktree> [--follow]|off]", "lend the main checkout's running dev server a worktree's files; the one time mia writes into a working tree", false, ""},
 	{"env", "mia env <up|down|setup|dotfiles|sync|shell|exec|run|ports|image|tools|host|browse|service|status|rm> [worktree]", "the environment a worktree's code runs in", false, ""},
-	{"stack", "mia stack [--in <worktree>] [show|go <layer>|name <name>|merge <layer> [onto <layer>]|rm [--worktrees] [--branches] [--force]|restack|diff|pr]", "a feature too large for one pull request", false, ""},
+	{"stack", "mia stack [--in <worktree>] [show|go <layer>|name <name>|merge <layer> [onto <layer>]|rm [--worktrees] [--branches] [--force]|restack|diff]", "a feature too large for one pull request", false, ""},
 	{"up", "mia up", "move to the layer above, in place", false, ""},
 	{"down", "mia down", "move to the layer below, in place", false, ""},
-	{"pr", "mia pr [worktree] [show|draft [--branch <branch>] [--title <title>] [--body-stdin] [--remove-after-merge <true|false>]]", "draft a pull request and print the commands you run yourself", false, ""},
 	{"machine", "mia machine <list|add <name> <ssh-target>|shell <name>|ship <name>|attach <worktree>@<name>|rm <name>>", "the machines worktrees and environments run on", false, ""},
 	{"gateway", "mia gateway <status|start|stop|install|uninstall|setup|trust|untrust>", "what makes <name>.mia reach an environment", false, ""},
 	{"api", "mia api <query>", "structured state, for clients and scripts", true, ""},

@@ -207,8 +207,6 @@ func Run(args []string) int {
 		return cmdUp(a)
 	case "down":
 		return cmdDown(a)
-	case "pr":
-		return cmdPR(a, rest, asJSON)
 	case "open":
 		return cmdOpen(a, rest)
 	default:
@@ -237,27 +235,9 @@ func cmdNew(a *app.App, args []string, asJSON bool) int {
 	in := takeValue(&args, "--in")
 	own := take(&args, "--worktree")
 	andShell := take(&args, "--shell")
-	if pr := takeValue(&args, "--pr"); pr != "" {
-		number, err := strconv.Atoi(strings.TrimPrefix(pr, "#"))
-		if err != nil || number <= 0 || len(args) > 0 {
-			return usageErr("mia new --pr <number> [--shell]")
-		}
-		record, err := a.NewFromPR(number)
-		if record.Path == "" {
-			return fail(err)
-		}
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "mia: %v\n", err)
-		}
-		fmt.Printf("%s — pull request #%d in a worktree of its own\n%s\n", record.Name, number, record.Path)
-		if andShell {
-			return exitFor(a.Shell(record.Name, false))
-		}
-		return exitOK
-	}
 	on := takeValue(&args, "--on")
 	if len(args) != 1 {
-		return usageErr("mia new [--pr <number>] [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--shell] <branch>")
+		return usageErr("mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--shell] <branch>")
 	}
 	if strings.HasPrefix(args[0], "-") {
 		return usageErr("mia new: unknown flag " + args[0])
@@ -822,7 +802,7 @@ const starterConfig = `# mia — this repository's configuration. Every key is o
 # logs = "tail -f log/dev.log"
 #
 # [keys]                           # rebind anything ` + "`?`" + ` lists; in ~/.config/mia/config.toml it applies everywhere
-# machines = "H"                   # actions: open shell env star stack blocks land pr
+# machines = "H"                   # actions: open shell env star stack blocks
 # merge = "m"                      #   begin layer apart claim worktree merge name restack delete new config
 # down = ["j", "down"]             # moves: down up first last pagedown pageup filter help popup refresh
 # quiet = "Q"                      #   tabnext tabprev unfold fold back quit · sections: quiet
@@ -888,7 +868,6 @@ func tmuxMenu(plugins []plugin.Plugin) (string, []string) {
 		{},
 		{"new", "n", popup("70%", "40%", "mia dash --do new")},
 		{"branch", "b", popup("70%", "40%", "mia dash --do branch")},
-		{"pull request", "p", popup("60%", "20%", "mia dash --do pr")},
 		{},
 	}
 	for i, label := range sideLabels(plugins) {

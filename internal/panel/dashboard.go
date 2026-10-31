@@ -33,9 +33,9 @@ func Dashboard(listings []app.Listing, prefix string, extras []plugin.Rows) Pane
 		Empty:   "No worktrees yet. `n` here, or `mia new <branch>`.",
 		Order: []string{
 			"open", "shell", "editor", "blocks",
-			"env", "dev", "land", "star",
+			"env", "dev", "star",
 			"stack", "begin", "layer", "apart", "claim", "worktree", "merge", "name", "restack", "forget",
-			"adopt", "delete", "abandoned", "tidy", "new", "branch", "pr", "machines", "config", "base",
+			"adopt", "delete", "abandoned", "tidy", "new", "branch", "machines", "config", "base",
 		},
 	}
 
@@ -428,7 +428,7 @@ func dashboardRow(listing app.Listing, prefix string) Row {
 	case !listing.Adopted:
 		actions = []string{"adopt"}
 	default:
-		actions = append(actions, "editor", "star", "env", "land", "stack", "delete")
+		actions = append(actions, "editor", "star", "env", "stack", "delete")
 	}
 	if listing.Adopted && listing.Branch != "" && len(listing.Layers) == 0 {
 		actions = append(actions, "begin")
@@ -437,7 +437,7 @@ func dashboardRow(listing app.Listing, prefix string) Row {
 		actions = append(actions, "dev")
 	}
 	if listing.Branch == "" {
-		actions = without(actions, "stack", "land")
+		actions = without(actions, "stack")
 	}
 	if listing.Session {
 		actions = append(actions, "blocks")
@@ -466,7 +466,7 @@ func remoteRow(listing app.Listing, prefix string) Row {
 		ID:      listing.Name + "@" + listing.Machine,
 		Cells:   []string{listing.Name, strings.TrimPrefix(listing.Branch, prefix), state, ageCell(listing.LastWork)},
 		Title:   listing.LastSubject,
-		Actions: []string{"there", "land"},
+		Actions: []string{"there"},
 		Facts:   facts,
 		Dim:     listing.Unreachable,
 		Machine: listing.Machine,
@@ -525,10 +525,6 @@ func dashboardActions() map[string]Action {
 			Lands: true, Key: "s", Label: "shell", Verb: "shell", Args: []string{"{row}"},
 			Help: "a shell in the worktree's session, even from the editor",
 		},
-		"land": {
-			Key: "Y", Label: "land", Verb: "pr", Args: []string{"{row}"}, Report: true,
-			Help: "the pull request mia would draft for this branch and the push and create commands to run yourself; mia never pushes",
-		},
 		"abandoned": {
 			Key: "z", Label: "what is abandoned", Verb: "gc", Report: true, Global: true,
 			Help: "worktrees nobody has touched in 14 days: clean, no session, not starred",
@@ -553,10 +549,6 @@ func dashboardActions() map[string]Action {
 		"new": {
 			Key: "n", Label: "new", Verb: "new", Args: []string{"{input}"}, Input: "branch", Report: true,
 			Help: "a new worktree for a branch, new or existing, with its setup run; you stay on the list",
-		},
-		"pr": {
-			Lands: true, Key: "P", Label: "open a pull request", Verb: "new", Args: []string{"--shell", "--pr", "{input}"}, Input: "pull request number", Global: true,
-			Help: "fetch a pull request's head into a worktree of its own (pr-<number>) and go there",
 		},
 		"base": {
 			Key: "B", Label: "where new branches start", Verb: "config", Args: []string{"base", "{input}"}, Input: "branch", Report: true, Global: true,

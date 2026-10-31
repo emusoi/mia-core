@@ -1,7 +1,7 @@
 # Stacks
 
 A stack is several branches in one worktree, each built on the one below.
-Each branch is a layer, and each layer becomes its own pull request.
+Each branch is a layer, built on the one below.
 
 ```
 main
@@ -46,15 +46,6 @@ mia stack merge ui onto api    # fold layers into a lower one
 ```
 
 mia never merges into your base branch.
-
-## Land
-
-```bash
-mia stack pr
-```
-
-prints `git push` and `gh pr create` for each layer, bottom first, for you to
-run.
 
 ## Forget
 

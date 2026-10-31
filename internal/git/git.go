@@ -375,23 +375,6 @@ func Fetch(dir, remote string) error {
 	return err
 }
 
-func FetchPR(dir string, number int, branch string) error {
-	out, err := run(dir, "remote")
-	if err != nil {
-		return err
-	}
-	remotes := strings.Fields(out)
-	if len(remotes) == 0 {
-		return fmt.Errorf("this repository has no remote to fetch pull request %d from", number)
-	}
-	remote := remotes[0]
-	if slices.Contains(remotes, "origin") {
-		remote = "origin"
-	}
-	_, err = run(dir, "fetch", remote, fmt.Sprintf("pull/%d/head:refs/heads/%s", number, branch))
-	return err
-}
-
 type FileStat struct {
 	Path    string
 	Added   int
