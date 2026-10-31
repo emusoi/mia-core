@@ -13,3 +13,14 @@ func TestASettersTextCannotBecomeTmuxFormatting(t *testing.T) {
 		t.Errorf("fit = %q", got)
 	}
 }
+
+func TestMiasTmuxBlockComesOutAndLeavesTheRest(t *testing.T) {
+	mine := "set -g mouse on\n"
+	with := mine + "\n" + tmuxSnippet("/bin/mia") + "bind r source-file ~/.tmux.conf\n"
+	if got := withoutBlock(with); got != "set -g mouse on\nbind r source-file ~/.tmux.conf\n" {
+		t.Errorf("without = %q", got)
+	}
+	if got := withoutBlock(mine); got != mine {
+		t.Errorf("a config without the block is left as it is: %q", got)
+	}
+}

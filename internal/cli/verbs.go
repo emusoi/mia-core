@@ -18,7 +18,7 @@ var groupOf = map[string]string{
 	"dash": "Working", "side": "Working", "stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working",
 	"env":    "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
-	"api": "Records", "signal": "Records", "plugin": "Records",
+	"api": "Records", "signal": "Records", "radar": "Working", "tmux": "Working", "plugin": "Records",
 }
 
 var verbs = []Verb{
@@ -41,6 +41,8 @@ var verbs = []Verb{
 	{"down", "mia down", "move to the layer below, in place", false, ""},
 	{"machine", "mia machine <list|add <name> <ssh-target>|shell <name>|ship <name>|attach <worktree>@<name>|rm <name>>", "the machines worktrees and environments run on", false, ""},
 	{"gateway", "mia gateway <status|start|stop|install|uninstall|setup|trust|untrust>", "what makes <name>.mia reach an environment", false, ""},
+	{"radar", "mia radar [--new]", "the popup that shows and finds everything; --new makes a worktree", false, ""},
+	{"tmux", "mia tmux [install|uninstall]", "mia's part of the tmux status line and its two popups, printed, added to ~/.tmux.conf, or taken out", true, ""},
 	{"signal", "mia signal <worktree> <kind> [text] [--style s] [--rank n] [--from source] [--for d|--until seen] · clear · ls", "what anything outside mia says about a worktree, shown as its setter asks", false, ""},
 	{"api", "mia api <query>", "structured state, for clients and scripts", true, ""},
 	{"plugin", "mia plugin [ls|enable <name>|disable <name>]", "programs named mia-<name> that add verbs; installed on PATH, run once enabled", true, ""},

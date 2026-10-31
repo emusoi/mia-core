@@ -100,6 +100,8 @@ func Run(args []string) int {
 		return cmdGateway(rest)
 	case "status-line":
 		return cmdStatusLine(rest)
+	case "tmux":
+		return cmdTmux(rest)
 	case "machine", "machines", "runtime":
 		if len(rest) == 0 || (rest[0] != "attach" && rest[0] != "poll") {
 			return cmdRuntime(rest, asJSON)
@@ -121,6 +123,8 @@ func Run(args []string) int {
 	switch verb {
 	case "signal", "signals":
 		return cmdSignal(a, rest, asJSON)
+	case "radar":
+		return cmdRadar(a, rest)
 	case "machine", "machines", "runtime":
 		if rest[0] == "poll" {
 			a.Machines() // asking leaves each machine's answer where the status line reads it
