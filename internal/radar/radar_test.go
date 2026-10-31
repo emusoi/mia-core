@@ -108,3 +108,25 @@ func TestTheSetupGuessComesFromTheLockfile(t *testing.T) {
 		t.Errorf("config = %s", got)
 	}
 }
+
+func TestTheMachineIsAlwaysOneLineAway(t *testing.T) {
+	d := data()
+	f := newForm(d)
+	if !f.layered() || f.offers(3) || !f.offers(2) {
+		t.Errorf("inside a stack it starts as a layer, and a layer has no machine to choose")
+	}
+	f.fromAt = 0
+	if f.layered() || !f.offers(3) || f.offers(2) {
+		t.Errorf("from main the machine is chosen and as is not")
+	}
+	f.focus = 0
+	if f.focus = f.move(1); f.focus != 1 {
+		t.Errorf("↓ from the branch goes to from: %d", f.focus)
+	}
+	if f.focus = f.move(1); f.focus != 3 {
+		t.Errorf("↓ from from skips as and lands on on: %d", f.focus)
+	}
+	if !slices.Equal(f.on, []string{"local", "fedora"}) {
+		t.Errorf("on offers this computer and each machine: %v", f.on)
+	}
+}

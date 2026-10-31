@@ -22,13 +22,14 @@ const (
 // what it is and where it runs, each one ⇥ away; then the making of it.
 type form struct {
 	branch string
-	focus  int // 0 the branch, 1 from, 2 as or on
+	focus  int // 0 the branch, 1 from, 2 as, 3 on
 	from   []string
 	fromAt int
 	as     []string
 	asAt   int
 	on     []string
 	onAt   int
+	down   map[string]bool // machines that did not answer last
 
 	started bool
 	log     string
@@ -39,9 +40,10 @@ type form struct {
 }
 
 func newForm(data Data) form {
-	f := form{branch: data.Prefix, from: []string{data.Base}, as: []string{inPlace, ownTree}, on: []string{thisHere}}
+	f := form{branch: data.Prefix, from: []string{data.Base}, as: []string{inPlace, ownTree}, on: []string{thisHere}, down: map[string]bool{}}
 	for _, state := range data.Machines[min(1, len(data.Machines)):] {
 		f.on = append(f.on, state.Name)
+		f.down[state.Name] = !state.Answers
 	}
 	if data.Here != "" && data.Branch != "" && data.Branch != data.Base {
 		f.from = append(f.from, data.Branch)
@@ -56,8 +58,30 @@ func newForm(data Data) form {
 
 func (f form) layered() bool { return f.fromAt > 0 }
 
-// parts is how many parts after the branch the popup offers now.
-func (f form) parts() int { return 2 }
+// offers says whether a line can be chosen on now: from when there is more
+// than one place to start, as for a layer, on for a worktree of its own.
+func (f form) offers(line int) bool {
+	switch line {
+	case 1:
+		return len(f.from) > 1
+	case 2:
+		return f.layered()
+	case 3:
+		return !f.layered() && len(f.on) > 1
+	}
+	return true
+}
+
+// move is the next line that can be chosen on, step away.
+func (f form) move(step int) int {
+	for i := 1; i <= 4; i++ {
+		next := (f.focus + step*i + 8) % 4
+		if f.offers(next) {
+			return next
+		}
+	}
+	return 0
+}
 
 // argv is the mia command the popup makes, and the directory it runs in.
 func (f form) argv(data Data) ([]string, string) {
@@ -95,27 +119,24 @@ func (m model) formKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		return m, tea.Quit
-	case "tab":
-		f.focus = (f.focus + 1) % (f.parts() + 1)
-	case "shift+tab":
-		f.focus = (f.focus + f.parts()) % (f.parts() + 1)
-	case "left", "right", " ":
+	case "tab", "down":
+		f.focus = f.move(1)
+	case "shift+tab", "up":
+		f.focus = f.move(-1)
+	case "left", "right":
 		if f.focus == 0 {
-			if msg.String() == " " {
-				f.branch += " "
-			}
 			break
 		}
 		step := 1
 		if msg.String() == "left" {
 			step = -1
 		}
-		switch {
-		case f.focus == 1:
+		switch f.focus {
+		case 1:
 			f.fromAt = (f.fromAt + step + len(f.from)) % len(f.from)
-		case f.layered():
+		case 2:
 			f.asAt = (f.asAt + step + len(f.as)) % len(f.as)
-		default:
+		case 3:
 			f.onAt = (f.onAt + step + len(f.on)) % len(f.on)
 		}
 	case "backspace":
@@ -129,7 +150,8 @@ func (m model) formKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.start()
 	default:
-		if f.focus == 0 && msg.Type == tea.KeyRunes {
+		if msg.Type == tea.KeyRunes {
+			f.focus = 0 // typing always goes to the branch
 			f.branch += string(msg.Runes)
 		}
 	}
@@ -245,21 +267,48 @@ func (m model) formView() string {
 	if f.focus == 0 {
 		cursor = accent.Render("█")
 	}
-	b.WriteString(accent.Render("› ") + inkB.Render(f.branch) + cursor + "\n\n")
-	part := func(i int, text string) string {
-		if f.focus == i {
-			return accent.Bold(true).Render(text)
+	prompt := "  "
+	if f.focus == 0 {
+		prompt = accent.Render("› ")
+	}
+	b.WriteString(prompt + inkB.Render(f.branch) + cursor + "\n\n")
+	choices := func(line int, label string, options []string, at int, note string) {
+		marker := "  "
+		if f.focus == line {
+			marker = accent.Render("› ")
 		}
-		return ink.Render(text)
+		text := marker + muted.Render(pad(label, 8))
+		if !f.offers(line) && note != "" {
+			b.WriteString(text + faint.Render(note) + "\n")
+			return
+		}
+		for i, option := range options {
+			shown := option
+			if f.down[option] {
+				shown = "○ " + option
+			}
+			switch {
+			case i == at && f.focus == line:
+				text += accent.Bold(true).Render("["+shown+"]") + "  "
+			case i == at:
+				text += inkB.Render(" "+shown+" ") + "  "
+			case f.down[option]:
+				text += Style("red").Render(" "+shown+" ") + "  "
+			default:
+				text += soft.Render(" "+shown+" ") + "  "
+			}
+		}
+		b.WriteString(text + "\n")
 	}
-	line := faint.Render("→ ") + part(1, "from "+f.from[f.fromAt])
+	choices(1, "from", f.from, f.fromAt, "")
 	if f.layered() {
-		line += faint.Render("  ·  ") + part(2, "as "+f.as[f.asAt])
+		choices(2, "as", f.as, f.asAt, "")
+		choices(3, "on", nil, 0, "local — a layer lives with its stack")
 	} else {
-		line += faint.Render("  ·  ") + part(2, "on "+f.on[f.onAt])
+		choices(2, "as", nil, 0, "a new worktree")
+		choices(3, "on", f.on, f.onAt, "local")
 	}
-	b.WriteString(line + "\n")
-	b.WriteString(faint.Render("  "+f.explain(m.data)) + "\n")
+	b.WriteString("\n" + faint.Render("  "+f.explain(m.data)) + "\n")
 	if m.data.First != nil {
 		g := m.data.First
 		setup := "none found"
@@ -272,7 +321,7 @@ func (m model) formView() string {
 	for used := strings.Count(b.String(), "\n"); used < m.height-2; used++ {
 		b.WriteString("\n")
 	}
-	b.WriteString(faint.Render("⏎ make it  ·  ⇥ next part  ·  ← → change it  ·  esc cancel"))
+	b.WriteString(keys("⏎", "make it") + keys("↑↓", "a line") + keys("←→", "choose") + keys("esc", "cancel"))
 	return b.String()
 }
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -77,6 +78,7 @@ var (
 	ink    = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
 	inkB   = ink.Bold(true)
 	muted  = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	soft   = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
 	faint  = lipgloss.NewStyle().Faint(true)
 	accent = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
 	sel    = lipgloss.NewStyle().Background(lipgloss.Color("236"))
@@ -137,7 +139,7 @@ func Run(data Data, newOnly bool) (*Choice, error) {
 		m.mode = making
 	}
 	m.rows = m.build()
-	m.cursor = m.next(0)
+	m.cursor = m.opening()
 	final, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
 	if err != nil {
 		return nil, err
@@ -230,6 +232,22 @@ func (m model) browseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// opening is where the cursor opens: on the top signal, else on the
+// worktree the radar was opened from, else on the first worktree.
+func (m model) opening() int {
+	for i, r := range m.rows {
+		if len(r.signals) > 0 {
+			return i
+		}
+	}
+	for i, r := range m.rows {
+		if r.kind == worktree && r.name == m.data.Here {
+			return i
+		}
+	}
+	return m.next(0)
 }
 
 func (m model) selected() row {
@@ -374,13 +392,15 @@ func (m model) worktrees() []row {
 	return rows
 }
 
+// listingDetail is what tells one worktree from another at a glance:
+// commits ahead, uncommitted work, a restack due, and how long ago it moved.
 func listingDetail(l app.Listing) string {
 	var parts []string
-	if l.Files > 0 || l.Dirty {
-		parts = append(parts, "uncommitted")
-	}
 	if l.Ahead > 0 {
 		parts = append(parts, fmt.Sprintf("+%d", l.Ahead))
+	}
+	if l.Dirty {
+		parts = append(parts, "✎")
 	}
 	for _, layer := range l.Layers {
 		if layer.NeedsRestack {
@@ -388,7 +408,22 @@ func listingDetail(l app.Listing) string {
 			break
 		}
 	}
+	if !l.LastWork.IsZero() {
+		parts = append(parts, ago(time.Since(l.LastWork)))
+	}
 	return strings.Join(parts, " · ")
+}
+
+func ago(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return "now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	case d < 48*time.Hour:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	}
+	return fmt.Sprintf("%dd", int(d.Hours()/24))
 }
 
 func actionsFor(r row) []row {
@@ -447,12 +482,12 @@ func (m model) View() string {
 	if m.mode == making {
 		return m.formView()
 	}
-	width := max(m.width-2, 40)
+	width := max(m.width-1, 40)
 	var b strings.Builder
 	head := accent.Render("› ") + ink.Render(m.query) + accent.Render("█")
 	b.WriteString(between(head, m.machinesLine(), width) + "\n\n")
 	shown := 0
-	room := max(m.height-6, 5)
+	room := max(m.height-3, 3)
 	start := 0
 	if m.cursor >= room {
 		start = m.cursor - room + 1
@@ -467,12 +502,16 @@ func (m model) View() string {
 	for ; shown < room; shown++ {
 		b.WriteString("\n")
 	}
-	foot := "type to find a worktree or an action  ·  ⏎ switch  ·  → open a stack  ·  ^x clear its signals  ·  esc close"
+	foot := keys("⏎", "switch") + keys("→", "layers") + keys("^x", "clear signal") + keys("esc", "close")
 	if m.confirm != "" {
-		foot = m.confirm
+		foot = Style("yellow").Render(m.confirm)
 	}
-	b.WriteString(faint.Render(cut(foot, width)))
+	b.WriteString(between(cut(foot, width), faint.Render("type to find"), width))
 	return b.String()
+}
+
+func keys(key, label string) string {
+	return inkB.Render(key) + " " + muted.Render(label) + "    "
 }
 
 func (m model) machinesLine() string {
@@ -482,7 +521,7 @@ func (m model) machinesLine() string {
 	var parts []string
 	for _, state := range m.data.Machines {
 		if state.Answers {
-			parts = append(parts, Style("green").Render("●")+" "+muted.Render(state.Name))
+			parts = append(parts, Style("green").Render("●")+" "+soft.Render(state.Name))
 		} else {
 			parts = append(parts, Style("red").Render("○ "+state.Name))
 		}
@@ -515,7 +554,7 @@ func (m model) line(r row, on bool, width int) string {
 				label = "▾ " + r.label
 			}
 		}
-		text = mark + indent + name.Render(pad(label, 22)) + muted.Render(pad(r.branch, 28))
+		text = mark + indent + name.Render(pad(label, 22)) + soft.Render(pad(r.branch, 28))
 		if len(r.signals) > 0 {
 			var said []string
 			for _, s := range r.signals {
@@ -524,7 +563,10 @@ func (m model) line(r row, on bool, width int) string {
 			}
 			text += strings.Join(said, faint.Render("  ·  "))
 		} else {
-			text += faint.Render(r.detail)
+			text += soft.Render(r.detail)
+		}
+		if r.kind == worktree && r.machine == "" && r.name == m.data.Here {
+			text = between(text, accent.Render("● here"), width)
 		}
 		if r.machine != "" {
 			text = between(text, muted.Render("@"+r.machine), width)
