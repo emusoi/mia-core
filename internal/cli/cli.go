@@ -453,6 +453,9 @@ func cmdShell(a *app.App, args []string) int {
 	} else if len(args) > 1 {
 		return usageErr("mia shell [--popup] [worktree]")
 	}
+	if name, on, ok := strings.Cut(target, "@"); ok && name != "" {
+		return cmdAttachOn(a, []string{name + "@" + on})
+	}
 	if target == "" {
 		here, err := os.Getwd()
 		if err != nil {

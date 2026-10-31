@@ -258,3 +258,14 @@ func TestNewTypesABranchAndTabPicksTheMachine(t *testing.T) {
 		t.Errorf("argv = %v, want %v: a digit is part of the branch, ⇥ picks the machine", got, want)
 	}
 }
+
+func TestNewOnAMachineIsMadeAsNameAtMachine(t *testing.T) {
+	chosen := Chosen{Action: panel.Action{Verb: "new"}}
+	out := "shipping this mia to fedora (linux/amd64)…\nkisongo — jk/fix in a worktree of its own\n/home/me/src/app.kisongo\nkisongo@fedora — jk/fix on fedora\n"
+	if got := made(chosen, out); got != "kisongo@fedora" {
+		t.Errorf("made = %q, want the name this computer reaches it by", got)
+	}
+	if got := made(chosen, "temeke — auth in a worktree of its own\n/path\n"); got != "temeke" {
+		t.Errorf("a local new is still its name: %q", got)
+	}
+}

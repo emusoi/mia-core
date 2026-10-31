@@ -466,7 +466,7 @@ func remoteRow(listing app.Listing, prefix string) Row {
 		ID:      listing.Name + "@" + listing.Machine,
 		Cells:   []string{listing.Name, strings.TrimPrefix(listing.Branch, prefix), state, ageCell(listing.LastWork)},
 		Title:   listing.LastSubject,
-		Actions: []string{"there"},
+		Actions: []string{"there", "land"},
 		Facts:   facts,
 		Dim:     listing.Unreachable,
 		Machine: listing.Machine,

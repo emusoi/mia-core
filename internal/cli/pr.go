@@ -2,10 +2,12 @@ package cli
 
 import (
 	"fmt"
+	"github.com/emusoi/mia-core/internal/run"
 	"io"
 	"os"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/git"
@@ -42,6 +44,12 @@ func cmdPR(a *app.App, args []string, asJSON bool) int {
 	target := ""
 	if len(args) == 1 {
 		target = args[0]
+	}
+	if name, machine, ok := strings.Cut(target, "@"); ok && name != "" {
+		if sub != "show" {
+			return usageErr("mia pr <worktree>@<machine> — a draft is saved once the branch is home: mia pr draft --branch <branch>")
+		}
+		return landFrom(a, machine, name)
 	}
 	record, err := a.RecordOrHere(target)
 	if err != nil {
@@ -84,5 +92,26 @@ func cmdPR(a *app.App, args []string, asJSON bool) int {
 	if draft.RemoveAfterMerge && draft.RemoveCommand != "" {
 		fmt.Printf("\nafter merge:\n%s\n", draft.RemoveCommand)
 	}
+	return exitOK
+}
+
+// landFrom brings a worktree's branch home from the machine that keeps it,
+// then says what to run to open its pull request from here.
+func landFrom(a *app.App, machine, name string) int {
+	listing, err := a.RemoteWorktree(machine, name)
+	if err != nil {
+		return fail(err)
+	}
+	if listing.Branch == "" {
+		return fail(fmt.Errorf("%s on %s has no branch checked out", name, machine))
+	}
+	head, err := a.BringHome(machine, listing.Branch)
+	if err != nil {
+		return fail(err)
+	}
+	base := a.BaseBranch(a.Root)
+	fmt.Printf("%s is here now, at %.7s, as %s has it\n\nrun these yourself:\n", listing.Branch, head, machine)
+	fmt.Printf("git -C %s push -u origin %s\n", run.ShellJoin([]string{a.Root}), run.ShellJoin([]string{listing.Branch}))
+	fmt.Printf("cd %s && gh pr create --base %s --head %s --fill\n", run.ShellJoin([]string{a.Root}), run.ShellJoin([]string{base}), run.ShellJoin([]string{listing.Branch}))
 	return exitOK
 }

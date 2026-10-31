@@ -1594,12 +1594,15 @@ func made(chosen Chosen, output string) string {
 	if chosen.Action.Verb != "new" {
 		return ""
 	}
-	first, _, _ := strings.Cut(strings.TrimSpace(output), "\n")
-	name, _, ok := strings.Cut(first, " — ")
-	if !ok || strings.ContainsAny(name, " \t") {
-		return ""
+	// the last "name — " line: a worktree made on another machine says what
+	// it is called there, then name@machine as this computer reaches it
+	made := ""
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		if name, _, ok := strings.Cut(line, " — "); ok && name != "" && !strings.ContainsAny(name, " \t") {
+			made = name
+		}
 	}
-	return name
+	return made
 }
 
 func (m model) answersOption() bool {

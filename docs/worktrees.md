@@ -117,3 +117,8 @@ The dashboard lists fedora's worktrees beside yours as `@fedora`, asking
 fedora's mia each time it refreshes and fetching fedora's branches as it
 does; ⏎ on one opens its session there. When fedora does not answer, its
 rows stay, dimmed and marked unreachable, as it last reported them.
+
+`Y` on a fedora row (or `mia pr <worktree>@fedora`) brings its branch home:
+fetched from fedora and made a branch here, or moved forward to fedora's,
+never over work that moved here too. It prints the push and `gh pr create`
+to run yourself. `mia shell <worktree>@fedora` is its session there.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -100,7 +101,55 @@ func (a *App) NewOn(machine runtime.Machine, branch string) error {
 			return fmt.Errorf("push %s to %s: %w", branch, machine.Name, err)
 		}
 	}
-	return runtime.Interactive(machine.SSH, "sh", "-lc", `cd "$1" && `+remoteMia+` new "$2"`, "sh", dir, branch).Run()
+	var said bytes.Buffer
+	create := runtime.Interactive(machine.SSH, "sh", "-lc", `cd "$1" && `+remoteMia+` new "$2"`, "sh", dir, branch)
+	create.Stdout = io.MultiWriter(os.Stdout, &said)
+	if err := create.Run(); err != nil {
+		return err
+	}
+	// the dash's n reads what it made off the last "name — " line: the
+	// worktree as this computer names it, name@machine
+	for _, line := range strings.Split(said.String(), "\n") {
+		if name, _, ok := strings.Cut(strings.TrimSpace(line), " — "); ok && !strings.ContainsAny(name, " \t") {
+			fmt.Printf("%s@%s — %s on %s\n", name, machine.Name, branch, machine.Name)
+			break
+		}
+	}
+	return nil
+}
+
+// RemoteWorktree is a worktree the machine keeps, as it last reported it.
+func (a *App) RemoteWorktree(machine, name string) (Listing, error) {
+	for _, listing := range cachedWorktrees(filepath.Join(a.MiaDir, "remote", machine+".json"), machine, true) {
+		if listing.Name == name {
+			return listing, nil
+		}
+	}
+	return Listing{}, fmt.Errorf("%s has no worktree called %s that this computer has heard of — open the dash to ask it", machine, name)
+}
+
+// BringHome makes the machine's branch a branch here, fetched from it: new
+// here, or moved forward to it. A branch that has moved here as well is left
+// alone, and the error says so.
+func (a *App) BringHome(machine, branch string) (string, error) {
+	if err := git.Fetch(a.Root, machine); err != nil {
+		return "", err
+	}
+	theirs := git.RevParse(a.Root, "refs/remotes/"+machine+"/"+branch)
+	if theirs == "" {
+		return "", fmt.Errorf("%s has no branch %s", machine, branch)
+	}
+	ours := git.RevParse(a.Root, "refs/heads/"+branch)
+	switch {
+	case ours == "", ours == theirs, git.IsAncestor(a.Root, ours, theirs):
+		if err := git.UpdateRef(a.Root, "refs/heads/"+branch, theirs); err != nil {
+			return "", err
+		}
+		return theirs, nil
+	case git.IsAncestor(a.Root, theirs, ours):
+		return ours, nil
+	}
+	return "", fmt.Errorf("%s has moved here and on %s since they parted — merge %s/%s into it by hand", branch, machine, machine, branch)
 }
 
 // MachineState is one machine as the dash shows it: whether it answers,
