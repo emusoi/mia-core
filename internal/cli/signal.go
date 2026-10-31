@@ -10,7 +10,7 @@ import (
 	"github.com/emusoi/mia-core/internal/signal"
 )
 
-const signalUsage = "mia signal <worktree> <kind> [text] [--style <style>] [--rank <n>] [--from <source>] [--for <duration>|--until seen]  ·  mia signal <worktree> clear [--from <source>]  ·  mia signal ls"
+const signalUsage = "mia signal <worktree|.> <kind> [text] [--style <style>] [--rank <n>] [--from <source>] [--for <duration>|--until seen]  ·  mia signal <worktree> clear [--from <source>]  ·  mia signal ls"
 
 // cmdSignal is mia signal: what anything outside mia says about a worktree,
 // kept and shown as its setter says, with no meaning of mia's own.
@@ -36,7 +36,11 @@ func cmdSignal(a *app.App, args []string, asJSON bool) int {
 	if len(args) < 2 {
 		return usageErr(signalUsage)
 	}
-	record, err := a.RecordOrHere(args[0])
+	worktree := args[0]
+	if worktree == "." {
+		worktree = "" // the worktree this runs in: what a hook started there means
+	}
+	record, err := a.RecordOrHere(worktree)
 	if err != nil {
 		return fail(err)
 	}

@@ -67,20 +67,39 @@ func carryOut(a *app.App, choice radar.Choice) error {
 	}
 	switch {
 	case choice.Remote != "":
-		// a session on another machine opens in a window of its own here,
-		// so it outlives the popup that asked for it
 		if os.Getenv("TMUX") == "" {
 			return cmdErr(cmdAttachOn(a, []string{choice.Remote}))
 		}
-		self, err := os.Executable()
-		if err != nil {
-			return err
-		}
-		_, err = run.Local("tmux").Combined("new-window", "-n", choice.Remote, run.ShellJoin([]string{self, "shell", choice.Remote}))
-		return err
+		return handOver(a, choice.Remote)
 	case choice.Name != "":
 		os.Unsetenv("TMUX_PANE") // from a popup, switch the client rather than nest
 		return a.Shell(choice.Name, false)
+	}
+	return nil
+}
+
+// handOver gives this terminal to the machine's tmux: the client here
+// detaches and ssh attaches the worktree's session there, so every tmux key
+// — a new window, a split — acts on that machine, as if it were this one.
+// Detaching there brings back the session this terminal was in.
+func handOver(a *app.App, target string) error {
+	name, on, _ := strings.Cut(target, "@")
+	machine, err := a.Runtimes.Get(on)
+	if err != nil {
+		return err
+	}
+	argv, err := a.AttachArgv(machine, name)
+	if err != nil {
+		return err
+	}
+	back, err := run.Local("tmux").Capture("display-message", "-p", "#{session_name}")
+	if err != nil {
+		return err
+	}
+	then := run.ShellJoin([]string{"tmux", "attach-session", "-t", "=" + strings.TrimSpace(back)})
+	out, err := run.Local("tmux").Combined("detach-client", "-E", run.ShellJoin(argv)+"; "+then)
+	if err != nil {
+		return fmt.Errorf("hand over to %s: %s", on, strings.TrimSpace(out))
 	}
 	return nil
 }

@@ -446,6 +446,9 @@ func cmdShell(a *app.App, args []string) int {
 		return usageErr("mia shell [--popup] [worktree]")
 	}
 	if name, on, ok := strings.Cut(target, "@"); ok && name != "" {
+		if os.Getenv("TMUX") != "" {
+			return exitFor(handOver(a, name+"@"+on))
+		}
 		return cmdAttachOn(a, []string{name + "@" + on})
 	}
 	if target == "" {

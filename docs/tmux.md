@@ -46,12 +46,13 @@ a test watcher, you. mia gives it no meaning; it shows it as its setter
 asks.
 
 ```bash
-mia signal <worktree> <kind> [text] [--style red] [--rank 10] [--from claude] [--for 10m | --until seen]
+mia signal <worktree|.> <kind> [text] [--style red] [--rank 10] [--from claude] [--for 10m | --until seen]
 mia signal <worktree> clear [--from claude]
 mia signal ls
 ```
 
-One signal per source per worktree. Lower ranks come first (50 if none is
+`.` is the worktree the command runs in, which is what a hook means. One
+signal per source per worktree. Lower ranks come first (50 if none is
 given). `--for` ends it after a while, `--until seen` when you next switch
 to the worktree. A machine's signals arrive with its worktrees.
 
@@ -59,7 +60,7 @@ A claude hook, in `~/.claude/settings.json`; it reads its event on stdin:
 
 ```json
 "Notification": [{"hooks": [{"type": "command", "command":
-  "mia signal \"$MIA_WORKTREE\" asks \"$(jq -r .message)\" --style red --rank 10 --from claude"}]}],
+  "mia signal . asks \"$(jq -r .message)\" --style red --rank 10 --from claude"}]}],
 "Stop": [{"hooks": [{"type": "command", "command":
-  "mia signal \"$MIA_WORKTREE\" done --style green --rank 30 --from claude --until seen"}]}]
+  "mia signal . done --style green --rank 30 --from claude --until seen"}]}]
 ```

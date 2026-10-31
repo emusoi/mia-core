@@ -301,3 +301,14 @@ func (a *App) AttachOn(machine runtime.Machine, name string) error {
 	}
 	return runtime.Interactive(machine.SSH, "sh", "-c", utf8+`cd "$1" && exec `+remoteMia+` shell "$2"`, "sh", dir, name).Run()
 }
+
+// AttachArgv is the command that opens the worktree's session on the
+// machine, in whatever terminal runs it: ssh, with a terminal, to its mia.
+func (a *App) AttachArgv(machine runtime.Machine, name string) ([]string, error) {
+	dir, err := a.RemoteDir()
+	if err != nil {
+		return nil, err
+	}
+	remote := run.ShellJoin([]string{"sh", "-c", utf8 + `cd "$1" && exec ` + remoteMia + ` shell "$2"`, "sh", dir, name})
+	return append(append([]string{run.SSHBinary()}, run.SSHOptions()...), "-t", machine.SSH, "--", remote), nil
+}
