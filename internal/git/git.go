@@ -291,23 +291,6 @@ func Head(dir string) string {
 	return strings.TrimSpace(out)
 }
 
-func SubjectsSince(dir, span string) []string {
-	if !strings.Contains(span, "..") {
-		span += "..HEAD"
-	}
-	out, err := run(dir, "log", "--format=%s", span)
-	if err != nil {
-		return nil
-	}
-	var subjects []string
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		if line = strings.TrimSpace(line); line != "" {
-			subjects = append(subjects, line)
-		}
-	}
-	return subjects
-}
-
 func DefaultBranch(dir string) string {
 	if out, err := run(dir, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"); err == nil {
 		if name := strings.TrimSpace(out); name != "" {

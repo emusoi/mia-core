@@ -300,15 +300,6 @@ func cachedWorktrees(cache, machine string, answers bool) []Listing {
 	return kept
 }
 
-// RemoteWorktrees are every machine's worktrees, in one list.
-func RemoteWorktrees(states []MachineState) []Listing {
-	var all []Listing
-	for _, state := range states {
-		all = append(all, state.Worktrees...)
-	}
-	return all
-}
-
 // AttachOn opens the worktree's session on the machine, through its own mia.
 func (a *App) AttachOn(machine runtime.Machine, name string) error {
 	dir, err := a.RemoteDir()

@@ -49,8 +49,7 @@
 
 | command | does |
 |---|---|
-| `mia dash` | the dashboard |
-| `mia side <1-4\|top\|left\|right\|bottom>` | one side of the room alone, in a small popup |
+| `mia radar [--new]` | find and switch to any worktree, or make one — `prefix space` and `prefix n` in tmux |
 | `mia config` | edit the repository's config |
 | `mia config [--global] <key> [<value>]` | say, or set, one setting: `base staging`, `keys.quizzicle.quiz K`, `plugin.agent.default codex`; one line edited, comments kept, and a setting mia would not load refused. `B` in the dashboard sets `base` |
 | `mia plugin ls\|enable\|disable` | plugins |

@@ -1,61 +1,10 @@
 package cli
 
 import (
-	"sync"
 	"testing"
-	"time"
 
-	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/config"
-	"github.com/emusoi/mia-core/internal/panel"
 )
-
-func TestAReloadNeverSeesTheListingForgottenUnderIt(t *testing.T) {
-	var c listingCache
-	list := func() ([]app.Listing, []app.MachineState, error) {
-		time.Sleep(time.Millisecond)
-		return []app.Listing{{Name: "main", Main: true}}, nil, nil
-	}
-	var wg sync.WaitGroup
-	stop := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-stop:
-				return
-			default:
-				c.forget()
-			}
-		}
-	}()
-	for range 8 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for range 25 {
-				got, _, err := c.get(list)
-				if err != nil || len(got) != 1 {
-					t.Errorf("a reload saw %d worktrees, %v", len(got), err)
-					return
-				}
-			}
-		}()
-	}
-	wg.Wait()
-	close(stop)
-}
-
-func TestNewSaysWhereANewBranchStarts(t *testing.T) {
-	p := panel.Panel{Actions: map[string]panel.Action{"new": {Key: "n", Label: "new"}, "branch": {Key: "+", Label: "new worktree"}}}
-	namesBase(p, "", []app.Listing{{Name: "lido-app", Branch: "staging", Main: true}, {Name: "temeke", Branch: "auth"}})
-	if got := p.Actions["new"].Label; got != "new worktree from staging" {
-		t.Errorf("the main checkout's branch, as mia new starts from it: %q", got)
-	}
-	namesBase(p, "production", nil)
-	if got := p.Actions["branch"].Label; got != "new worktree from production, and go there" {
-		t.Errorf("a configured base wins: %q", got)
-	}
-}
 
 func TestASettingEditsOneLineAndKeepsTheRest(t *testing.T) {
 	for _, c := range []struct{ in, table, key, value, want string }{
@@ -85,10 +34,5 @@ func TestASettingEditsOneLineAndKeepsTheRest(t *testing.T) {
 	}
 	if config.Check(setting("", "", "bsae", `"main"`)) == nil {
 		t.Error("a misspelt setting is refused before it is written")
-	}
-	p := panel.Panel{Actions: map[string]panel.Action{"base": {Key: "B"}}}
-	namesBase(p, "", []app.Listing{{Branch: "dash-needs-you", Main: true}})
-	if got := p.Actions["base"].Choices; len(got) != 1 || got[0] != "dash-needs-you" {
-		t.Errorf("base offers what is there: %v", got)
 	}
 }

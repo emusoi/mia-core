@@ -69,25 +69,12 @@ type reachability struct {
 	at     time.Time
 }
 
-func (a *App) Reachable(machine runtime.Machine) (bool, string) {
-	if got, ok := a.reach.Load(machine.Name); ok {
-		if r := got.(reachability); time.Since(r.at) < 30*time.Second {
-			return r.ok, r.detail
-		}
-	}
-	ok, detail := runtime.Reachable(machine)
-	a.reach.Store(machine.Name, reachability{ok, detail, time.Now()})
-	return ok, detail
-}
-
 type dirtiness struct {
 	dirty          bool
 	at             time.Time
 	untracked      time.Time
 	untrackedDirty bool
 }
-
-func (a *App) ForgetDirtiness() { a.dirtiness = sync.Map{} }
 
 func (a *App) dirtyOf(path string, worked bool) bool {
 	ttl := 30 * time.Second
@@ -672,7 +659,7 @@ func (a *App) Shell(query string, popup bool) error {
 	if err := a.ensureSession(host, record, dir); err != nil {
 		return err
 	}
-	if err := a.Signals.Seen(record.Name); err != nil {
+	if err := a.MarkSeen(record.Name); err != nil { // switched to: the visit, and signals that last until seen
 		return err
 	}
 	if popup {

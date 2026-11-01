@@ -135,14 +135,6 @@ func Probe(target string) (Machine, error) {
 	return machine, nil
 }
 
-func Reachable(machine Machine) (bool, string) {
-	out, err := Run(machine.SSH, "sh", "-c", "uname -sr; command -v podman || command -v docker")
-	if err != nil {
-		return false, run.FirstLine(err.Error())
-	}
-	return true, strings.ReplaceAll(strings.TrimSpace(out), "\n", " · ")
-}
-
 func Interactive(target string, argv ...string) *exec.Cmd {
 	if len(argv) == 0 {
 		return run.Shell(target)

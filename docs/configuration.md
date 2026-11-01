@@ -53,25 +53,18 @@ uses every key.
 | `[dotfiles] setup` | run in every environment |
 | `[dotfiles] machine` | files for other machines' home |
 
-## Keys, popups, plugins
+## Plugins
 
 ```toml
 plugins = ["gh"]
-
-[keys]
-machines = "H"
-down = ["j", "down"]
-"quizzicle.quiz" = "K"   # a plugin's key, by plugin.id
-
-[popup]
-width = "80%"
-height = "75%"
 
 [plugin.gh]
 # that plugin's own settings
 ```
 
 `mia config <key> [<value>]` says or sets one of these without an editor —
-`mia config --global keys.quizzicle.quiz K` — editing that line only and
-refusing what mia would not load. When two keys clash the dashboard says
-the command that settles it.
+`mia config --global plugin.gh.token …` — editing that line only and
+refusing what mia would not load.
+
+`[keys]` and `[popup]` set the dashboard's keys and popup size. mia has no
+dashboard any more; they are still read, so a config that has them loads.

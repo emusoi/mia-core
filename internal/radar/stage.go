@@ -2,7 +2,6 @@ package radar
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -393,13 +392,6 @@ func squeeze(lines []string) []string {
 		kept = append(kept, l)
 	}
 	return kept
-}
-
-func shortPath(path string) string {
-	if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(path, home) {
-		return "~" + strings.TrimPrefix(path, home)
-	}
-	return path
 }
 
 func keys(key, label string) string {

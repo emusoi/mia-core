@@ -234,8 +234,6 @@ func Run(args []string) int {
 		return cmdAPI(a, rest)
 	case "dash":
 		return cmdDash(a, rest)
-	case "side":
-		return cmdSide(a, rest)
 	case "stack":
 		return cmdStack(a, rest, asJSON)
 	case "up":
@@ -838,12 +836,6 @@ const starterConfig = `# mia — this repository's configuration. Every key is o
 # [launch]                         # named windows: n in the windows panel, or ` + "`mia window new <name>`" + `
 # test = "go test ./..."
 # logs = "tail -f log/dev.log"
-#
-# [keys]                           # rebind anything ` + "`?`" + ` lists; in ~/.config/mia/config.toml it applies everywhere
-# machines = "H"                   # actions: open shell env star stack blocks
-# merge = "m"                      #   begin layer apart claim worktree merge name restack delete new config
-# down = ["j", "down"]             # moves: down up first last pagedown pageup filter help popup refresh
-# quiet = "Q"                      #   tabnext tabprev unfold fold back quit · sections: quiet
 #
 # [env]                            # the container a worktree's code runs in
 # image = "node:22"                # else devcontainer.json, else picked for the language

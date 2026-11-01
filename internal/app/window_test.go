@@ -63,54 +63,6 @@ esac
 	t.Fatalf("no remote new-window call in %q", data)
 }
 
-func TestSameNamedWindowsKeepDistinctScreensAndTargets(t *testing.T) {
-	dir := t.TempDir()
-	tmux := `#!/bin/sh
-case "$1" in
-  list-panes) printf '1 zsh 101 sh 0 1\n3 zsh 103 sh 0 0\n' ;;
-  list-windows) printf 'zsh\nzsh\n' ;;
-  capture-pane)
-    case "$*" in
-      *:1*) printf 'first-marker\n' ;;
-      *:3*) printf 'second-marker\n' ;;
-      *) printf 'wrong-target\n' ;;
-    esac ;;
-  select-window|kill-window) printf '%s\n' "$*" >> "$MIA_TEST_TMUX_LOG" ;;
-esac
-`
-	if err := os.WriteFile(filepath.Join(dir, "tmux"), []byte(tmux), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	t.Setenv("MIA_TEST_TMUX_LOG", filepath.Join(dir, "killed"))
-
-	a := &app.App{}
-	record := model.Record{Name: "capture-test"}
-	windows := a.Windows(record)
-	if len(windows) != 2 {
-		t.Fatalf("windows = %+v, want both same-named windows", windows)
-	}
-	screens := a.WindowsWithScreens(record)
-	for i, want := range []string{"first-marker", "second-marker"} {
-		if !strings.Contains(screens[i].Screen, want) {
-			t.Errorf("window %d (%s) screen = %q, want %q", screens[i].Index, screens[i].Name, screens[i].Screen, want)
-		}
-	}
-	if err := a.OpenWindow(record, "3"); err == nil || !strings.Contains(err.Error(), "no terminal here") {
-		t.Fatalf("open without a TTY = %v, want selection followed by the terminal requirement", err)
-	}
-	if err := a.CloseWindow(record, "3"); err != nil {
-		t.Fatal(err)
-	}
-	killed, err := os.ReadFile(filepath.Join(dir, "killed"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := strings.TrimSpace(string(killed)); got != "select-window -t =mia-capture-test:3\nkill-window -t =mia-capture-test:3" {
-		t.Errorf("open/close targets = %q, want second zsh window", got)
-	}
-}
-
 func TestAShellInAWorktreeWithoutASessionIsTheSessionsOwnShell(t *testing.T) {
 	gittest.Isolate(t)
 	socket, err := os.MkdirTemp("/tmp", "mia-window-")

@@ -1,6 +1,8 @@
 package plugin
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,8 +12,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
-	"unicode/utf8"
 )
 
 const (
@@ -27,75 +29,14 @@ type Verb struct {
 	Help  string `json:"help,omitempty"`
 }
 
+// Manifest is what a plugin says it does: the commands it adds and the
+// events it wants to hear. Plugins draw nothing in mia; what they want
+// shown they say with mia signal.
 type Manifest struct {
-	Protocol int       `json:"protocol"`
-	Help     string    `json:"help,omitempty"`
-	Verbs    []Verb    `json:"verbs,omitempty"`
-	Rows     *Schedule `json:"rows,omitempty"`
-	Sections []Section `json:"sections,omitempty"`
-	Tabs     []Tab     `json:"tabs,omitempty"`
-	Keys     []Key     `json:"keys,omitempty"`
-	Events   []string  `json:"events,omitempty"`
-	Serve    bool      `json:"serve,omitempty"`
-	Sides    []Side    `json:"sides,omitempty"`
-	Corners  []Corner  `json:"corners,omitempty"`
-	Menu     []Entry   `json:"menu,omitempty"`
-}
-
-// Entry is one line of the tmux prefix-m menu `mia help tmux` prints:
-// key opens `mia <verb> [args]` in a width×height popup.
-type Entry struct {
-	Key   string   `json:"key"`
-	Label string   `json:"label"`
-	Verb  string   `json:"verb"`
-	Args  []string `json:"args,omitempty"`
-	Popup Place    `json:"popup"`
-}
-
-// Place is a plugin popup's size, in cells or a percentage, and where it
-// sits: x and y as tmux display-popup -x and -y take them ("R", "S", "C",
-// a number), centered when left out.
-type Place struct {
-	Width  string `json:"width"`
-	Height string `json:"height"`
-	X      string `json:"x,omitempty"`
-	Y      string `json:"y,omitempty"`
-}
-
-// KeyPopup is a key's "popup": true opens it in the dashboard's popup,
-// a Place opens it in that one.
-type KeyPopup struct {
-	On    bool
-	Place *Place
-}
-
-func (p *KeyPopup) UnmarshalJSON(raw []byte) error {
-	if json.Unmarshal(raw, &p.On) == nil {
-		return nil
-	}
-	p.On, p.Place = true, &Place{}
-	return json.Unmarshal(raw, p.Place)
-}
-
-type Tab struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
-}
-
-type Key struct {
-	ID      string   `json:"id"`
-	Key     string   `json:"key"`
-	Label   string   `json:"label"`
-	Help    string   `json:"help,omitempty"`
-	Verb    string   `json:"verb,omitempty"`
-	Args    []string `json:"args,omitempty"`
-	Panel   string   `json:"panel,omitempty"`
-	Input   string   `json:"input,omitempty"`
-	Confirm string   `json:"confirm,omitempty"`
-	Report  bool     `json:"report,omitempty"`
-	Lands   bool     `json:"lands,omitempty"`
-	Popup   KeyPopup `json:"popup,omitempty"`
-	Global  bool     `json:"global,omitempty"`
+	Protocol int      `json:"protocol"`
+	Help     string   `json:"help,omitempty"`
+	Verbs    []Verb   `json:"verbs,omitempty"`
+	Events   []string `json:"events,omitempty"`
 }
 
 type Plugin struct {
@@ -105,7 +46,6 @@ type Plugin struct {
 	ByConfig bool     `json:"by_config,omitempty"`
 	Manifest Manifest `json:"manifest"`
 	Problem  string   `json:"problem,omitempty"`
-	Server   *Server  `json:"-"`
 }
 
 type Host struct {
@@ -255,42 +195,32 @@ func ReadManifest(path string) (Manifest, error) {
 			return Manifest{}, fmt.Errorf("no event called %q; there are %s", event, strings.Join(Events, ", "))
 		}
 	}
-	for _, key := range m.Keys {
-		if key.ID == "" || (key.Verb == "") == (key.Panel == "") {
-			return Manifest{}, fmt.Errorf("key %q needs an id and exactly one of verb or panel", key.Label)
-		}
-		if key.Popup.Place != nil && (key.Popup.Place.Width == "" || key.Popup.Place.Height == "" || (key.Popup.Place.X == "") != (key.Popup.Place.Y == "")) {
-			return Manifest{}, fmt.Errorf("key %q needs a popup width and height, and x and y together or neither", key.Label)
-		}
-	}
-	for _, entry := range m.Menu {
-		if utf8.RuneCountInString(entry.Key) != 1 || entry.Label == "" || entry.Verb == "" || entry.Popup.Width == "" || entry.Popup.Height == "" ||
-			(entry.Popup.X == "") != (entry.Popup.Y == "") {
-			return Manifest{}, fmt.Errorf("menu entry %q needs a one-character key, a label, a verb and a popup width and height, and x and y together or neither", entry.Label)
-		}
-	}
-	if m.Rows != nil {
-		if _, err := m.Rows.Interval(); err != nil {
-			return Manifest{}, err
-		}
-	}
-	for _, side := range m.Sides {
-		if side.ID == "" || !slices.Contains(Places, side.Where) {
-			return Manifest{}, fmt.Errorf("side %q needs an id and a side of %s", side.Label, strings.Join(Places, ", "))
-		}
-		if _, err := side.Interval(); err != nil {
-			return Manifest{}, err
-		}
-	}
-	for _, corner := range m.Corners {
-		if corner.ID == "" || !slices.Contains(Ats, corner.At) {
-			return Manifest{}, fmt.Errorf("corner %q needs an id and an at of %s", corner.ID, strings.Join(Ats, ", "))
-		}
-		if _, err := corner.Interval(); err != nil {
-			return Manifest{}, err
-		}
-	}
 	return m, nil
+}
+
+func call(path string, env []string, args []string, stdin []byte, timeout time.Duration) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	var out, errOut bytes.Buffer
+	cmd := exec.CommandContext(ctx, path, args...)
+	cmd.Env = env
+	cmd.Stdin = bytes.NewReader(stdin)
+	cmd.Stdout, cmd.Stderr = &out, &errOut
+	// A plugin that runs out of time takes what it started with it: a shell
+	// plugin's `mia` and `podman` children would otherwise run on, orphaned.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	cmd.WaitDelay = 100 * time.Millisecond
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("%s took longer than %s", args[0], timeout)
+		}
+		if line := firstLine(errOut.String()); line != "" {
+			return nil, fmt.Errorf("%s failed: %s", args[0], line)
+		}
+		return nil, fmt.Errorf("%s failed: %w", args[0], err)
+	}
+	return out.Bytes(), nil
 }
 
 func firstLine(s string) string {

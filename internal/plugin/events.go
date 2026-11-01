@@ -29,9 +29,6 @@ func (p Plugin) Wants(event string) bool {
 }
 
 func (p Plugin) Send(c Context, e Event) error {
-	if p.Server != nil {
-		return p.Server.Notify("event", e)
-	}
 	env, err := p.Env(c)
 	if err != nil {
 		return err

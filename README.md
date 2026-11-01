@@ -22,7 +22,7 @@ eval "$(mia shell-init zsh)"     # in your shell's rc file
 ```bash
 mia new due-dates          # a worktree named for you, e.g. monduli
 mia shell monduli          # its tmux session
-mia dash                   # every worktree, and the keys to act on them
+mia radar                  # find any worktree, switch to it, or make one
 mia env up                 # its container, at https://monduli.mia:<port>
 mia new api --stack        # a branch on top of this one, same worktree
 ```

@@ -10,7 +10,6 @@
 | [Stacks](stacks.md) | several branches in one worktree |
 | [Environments](environments.md) | containers, other machines, `<name>.mia` |
 | [mia in tmux](tmux.md) | the status line, the radar, a new worktree, signals |
-| [The dashboard](dashboard.md) | the list and its keys |
 | [Configuration](configuration.md) | every setting |
 | [Commands](commands.md) | every command |
 | [Plugins](plugins.md) | adding commands and dashboard rows |

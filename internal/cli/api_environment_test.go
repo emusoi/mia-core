@@ -11,10 +11,9 @@ import (
 	"github.com/emusoi/mia-core/internal/env"
 	"github.com/emusoi/mia-core/internal/gittest"
 	"github.com/emusoi/mia-core/internal/model"
-	"github.com/emusoi/mia-core/internal/panel"
 )
 
-func TestEnvironmentAPIAndPanelShareOneStateAndPortRead(t *testing.T) {
+func TestEnvironmentAPIReadsStateAndPortsOnce(t *testing.T) {
 	gittest.Isolate(t)
 	repo := gittest.New(t)
 	a, err := app.Open(repo.Root)
@@ -44,7 +43,7 @@ esac
 	}
 	t.Setenv("MIA_ENVIRONMENT_API_CALLS", log)
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	for _, query := range []string{"env", "env-panel"} {
+	for _, query := range []string{"env"} {
 		t.Run(query, func(t *testing.T) {
 			if err := os.WriteFile(log, nil, 0o600); err != nil {
 				t.Fatal(err)
@@ -77,14 +76,6 @@ esac
 				}
 				if snapshot.Name != "longido" || snapshot.Worktree != repo.Root || snapshot.State != "running" || snapshot.Ports.Page != 3000 || len(snapshot.Services) != 1 || !snapshot.Services[0].Running || snapshot.Services[0].Healthy == nil || !*snapshot.Services[0].Healthy {
 					t.Fatalf("environment facts were lost: %+v", snapshot)
-				}
-			} else {
-				var view panel.Panel
-				if err := json.NewDecoder(output).Decode(&view); err != nil {
-					t.Fatal(err)
-				}
-				if view.ID != "env" || view.Title != "Environment / longido" || len(view.Sections) != 3 || view.Sections[1].Rows[0].ID != "port-3000" || view.Sections[2].Rows[0].Cells[1] != "running · healthy" {
-					t.Fatalf("environment panel facts were lost: %+v", view)
 				}
 			}
 		})

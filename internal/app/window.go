@@ -20,24 +20,6 @@ type shot struct {
 	text  string
 }
 
-func (a *App) WindowsWithScreens(record model.Record) []session.Window {
-	host := a.sessionOf(record)
-	windows := a.Windows(record)
-	for i, w := range windows {
-		key := record.Name + "\x00" + strconv.Itoa(w.Index)
-		if got, ok := a.shots.Load(key); ok {
-			if s := got.(shot); w.Quiet >= s.quiet && time.Since(s.at) < 30*time.Second {
-				windows[i].Screen = s.text
-				continue
-			}
-		}
-		text, _ := host.Capture(record.Name, strconv.Itoa(w.Index), true)
-		windows[i].Screen = text
-		a.shots.Store(key, shot{quiet: w.Quiet, at: time.Now(), text: text})
-	}
-	return windows
-}
-
 func (a *App) windowNamed(record model.Record, window string) (session.Host, string, error) {
 	host := a.sessionOf(record)
 	if index, err := strconv.Atoi(window); err == nil {

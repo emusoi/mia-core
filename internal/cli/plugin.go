@@ -1,18 +1,14 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
-	"sync"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/config"
 	"github.com/emusoi/mia-core/internal/git"
-	"github.com/emusoi/mia-core/internal/panel"
 	"github.com/emusoi/mia-core/internal/paths"
 	"github.com/emusoi/mia-core/internal/plugin"
 )
@@ -122,51 +118,6 @@ type pluginInput struct {
 	Worktrees []app.Listing `json:"worktrees"`
 }
 
-func pluginRows(a *app.App, plugins []plugin.Plugin, listings []app.Listing) []plugin.Rows {
-	if len(plugins) == 0 {
-		return nil
-	}
-	input := pluginInput{plugin.Protocol, a.Root, listings}
-	return plugin.AllRows(plugins, func(p plugin.Plugin) plugin.Context { return pluginContext(a, p.Name) }, input)
-}
-
-func pluginRoom(a *app.App, plugins []plugin.Plugin, listings []app.Listing) *panel.Room {
-	input := pluginInput{plugin.Protocol, a.Root, listings}
-	tabs, corners := plugin.AllSides(plugins, func(p plugin.Plugin) plugin.Context { return pluginContext(a, p.Name) }, input)
-	return &panel.Room{Repo: filepath.Base(a.Root), Sides: tabs, Corners: corners}
-}
-
-func pluginPanel(a *app.App, owner, id, target string) (panel.Panel, error) {
-	plugins, err := enabledPlugins(a)
-	if err != nil {
-		return panel.Panel{}, err
-	}
-	i := slices.IndexFunc(plugins, func(p plugin.Plugin) bool { return p.Name == owner })
-	if i < 0 {
-		return panel.Panel{}, fmt.Errorf("plugin %s is not enabled", owner)
-	}
-	input := struct {
-		Protocol int          `json:"protocol"`
-		Repo     string       `json:"repo"`
-		Worktree *app.Listing `json:"worktree,omitempty"`
-	}{Protocol: plugin.Protocol, Repo: a.Root}
-	if target != "" {
-		if listings, err := a.List(target); err == nil && len(listings) == 1 {
-			input.Worktree = &listings[0]
-		}
-	}
-	data, err := plugins[i].Panel(pluginContext(a, owner), id, input)
-	if err != nil {
-		return panel.Panel{}, err
-	}
-	var p panel.Panel
-	if err := json.Unmarshal(data, &p); err != nil {
-		return panel.Panel{}, fmt.Errorf("%s's panel %s is not panel JSON: %w", owner, id, err)
-	}
-	p.ID, p.Version = panel.PluginPanel(owner, id), panel.Version
-	return p, nil
-}
-
 func sendEvent(a *app.App, e app.Event) {
 	plugins, err := enabledPlugins(a)
 	if err != nil {
@@ -191,49 +142,6 @@ func sendEvent(a *app.App, e app.Event) {
 	}
 }
 
-var (
-	servers   = map[string]*plugin.Server{}
-	nudgeMu   sync.Mutex
-	nudgeOpen func()
-)
-
-func watchNudge(nudge func()) {
-	nudgeMu.Lock()
-	nudgeOpen = nudge
-	nudgeMu.Unlock()
-}
-
-func nudgeDashboard() {
-	nudgeMu.Lock()
-	nudge := nudgeOpen
-	nudgeMu.Unlock()
-	if nudge != nil {
-		go nudge()
-	}
-}
-
-func startServers(a *app.App) func() {
-	plugins, err := pluginHost(a.Config).Enabled()
-	if err != nil {
-		return func() {}
-	}
-	for _, p := range plugins {
-		if p.Manifest.Serve {
-			servers[p.Name] = p.Serve(pluginContext(a, p.Name), nudgeDashboard)
-		}
-	}
-	return func() {
-		for name, server := range servers {
-			server.Stop()
-			delete(servers, name)
-		}
-	}
-}
-
 func enabledPlugins(a *app.App) ([]plugin.Plugin, error) {
-	plugins, err := pluginHost(a.Config).Enabled()
-	for i := range plugins {
-		plugins[i].Server = servers[plugins[i].Name]
-	}
-	return plugins, err
+	return pluginHost(a.Config).Enabled()
 }
