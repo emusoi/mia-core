@@ -69,4 +69,4 @@ func cmdAPI(a *app.App, args []string) int {
 	}
 }
 
-const apiQueries = "worktrees|machines|here|env|stack|base"
+const apiQueries = "worktrees|machines|here|repos|env|stack|base"
