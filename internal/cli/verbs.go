@@ -39,7 +39,7 @@ var verbs = []Verb{
 	{"stack", "mia stack [--in <worktree>] [show|go <layer>|name <name>|merge <layer> [onto <layer>]|rm [--worktrees] [--branches] [--force]|restack|diff]", "a feature too large for one pull request", false, ""},
 	{"up", "mia up", "move to the layer above, in place", false, ""},
 	{"down", "mia down", "move to the layer below, in place", false, ""},
-	{"machine", "mia machine <list|add <name> <ssh-target>|shell <name>|ship <name>|attach <worktree>@<name>|rm <name>>", "the machines worktrees and environments run on", false, ""},
+	{"machine", "mia machine <list|add <name> <ssh-target>|shell <name>|ship <name>|link <name>|attach <worktree>@<name>|rm <name>>", "the machines worktrees and environments run on", false, ""},
 	{"gateway", "mia gateway <status|start|stop|install|uninstall|setup|trust|untrust>", "what makes <name>.mia reach an environment", false, ""},
 	{"radar", "mia radar [--new]", "the popup that shows and finds everything; --new makes a worktree", false, ""},
 	{"tmux", "mia tmux [install|uninstall]", "mia's part of the tmux status line and its two popups, printed, added to ~/.tmux.conf, or taken out", true, ""},

@@ -388,12 +388,19 @@ func (m model) build() []row {
 		return rows
 	}
 	var signalled, progress []row
+	elsewhere := map[string][]row{} // by machine: listed always, never resting
+	var machines []string
 	resting := 0
 	for _, r := range all {
 		switch {
 		case len(r.signals) > 0:
 			signalled = append(signalled, r)
-		case r.detail != "" || len(r.layers) > 1 || r.name == m.data.Here:
+		case r.machine != "":
+			if _, seen := elsewhere[r.machine]; !seen {
+				machines = append(machines, r.machine)
+			}
+			elsewhere[r.machine] = append(elsewhere[r.machine], r)
+		case r.detail != "" || len(r.layers) > 1 || r.name == m.data.Here || (r.listing != nil && r.listing.Session):
 			progress = append(progress, r)
 		default:
 			resting++
@@ -408,6 +415,16 @@ func (m model) build() []row {
 	if len(progress) > 0 {
 		rows = append(rows, row{kind: group, label: fmt.Sprintf("in progress  %d", len(progress))})
 		rows = m.withLayers(rows, progress)
+	}
+	for _, machine := range machines {
+		label := fmt.Sprintf("on %s  %d", machine, len(elsewhere[machine]))
+		for _, state := range m.data.Machines {
+			if state.Name == machine && !state.Answers {
+				label += "  ○ not answering — as it said last"
+			}
+		}
+		rows = append(rows, row{kind: group, label: label})
+		rows = m.withLayers(rows, elsewhere[machine])
 	}
 	if resting > 0 {
 		rows = append(rows, row{kind: group, label: fmt.Sprintf("resting  %d  — type to find one", resting)})

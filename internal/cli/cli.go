@@ -103,7 +103,7 @@ func Run(args []string) int {
 	case "tmux":
 		return cmdTmux(rest)
 	case "machine", "machines", "runtime":
-		if len(rest) == 0 || (rest[0] != "attach" && rest[0] != "poll") {
+		if len(rest) == 0 || (rest[0] != "attach" && rest[0] != "poll" && rest[0] != "link") {
 			return cmdRuntime(rest, asJSON)
 		}
 	case "plugin", "plugins":
@@ -128,6 +128,21 @@ func Run(args []string) int {
 	case "machine", "machines", "runtime":
 		if rest[0] == "poll" {
 			a.Machines() // asking leaves each machine's answer where the status line reads it
+			return exitOK
+		}
+		if rest[0] == "link" {
+			if len(rest) != 2 {
+				return usageErr("mia machine link <name>")
+			}
+			machine, err := a.Runtimes.Get(rest[1])
+			if err != nil {
+				return fail(err)
+			}
+			dir, err := a.Link(machine)
+			if err != nil {
+				return fail(err)
+			}
+			fmt.Printf("%s has this repository at ~/%s, its base branch pushed\n", machine.Name, dir)
 			return exitOK
 		}
 		return cmdAttachOn(a, rest[1:])

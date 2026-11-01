@@ -152,3 +152,17 @@ func TestWithNothingSignalledItOpensOnTheWorktreeYouWereLastIn(t *testing.T) {
 		t.Errorf("opens on %q; want lemara, last switched to, so ⏎ flips back", got.name)
 	}
 }
+
+func TestAMachinesWorktreesHaveTheirOwnPlaceAndNeverRest(t *testing.T) {
+	d := data()
+	d.Machines[1].Worktrees = append(d.Machines[1].Worktrees, app.Listing{Name: "moshono", Branch: "test2"})
+	m := model{data: d, open: map[string]bool{}}
+	got := labels(m.build())
+	at := slices.Index(got, "on fedora  1")
+	if at < 0 || got[at+1] != "moshono" {
+		t.Errorf("an idle worktree on fedora is listed under on fedora: %q", got)
+	}
+	if !slices.Contains(got, "elerai") || slices.Index(got, "elerai") > slices.Index(got, "in progress  1") {
+		t.Errorf("one with a signal still leads, under signals: %q", got)
+	}
+}

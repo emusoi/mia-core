@@ -35,6 +35,7 @@ func (a *App) RemoteDir() (string, error) {
 }
 
 const linkScript = `mkdir -p "$1" && cd "$1" && { [ -e .git ] || git init -q -b "$2"; } &&
+{ git rev-parse -q --verify HEAD >/dev/null || git symbolic-ref HEAD "refs/heads/$2"; } &&
 git config receive.denyCurrentBranch updateInstead`
 
 // utf8 gives a command on a machine a UTF-8 locale when ssh brought none,
@@ -60,8 +61,8 @@ func (a *App) Link(machine runtime.Machine) (string, error) {
 	if err := Ship(machine); err != nil {
 		return "", err
 	}
-	base := a.BaseBranch(a.Root)
-	if _, err := runtime.Run(machine.SSH, "sh", "-lc", linkScript, "sh", dir, base); err != nil {
+	branch, refs := baseRefs(a.Root, a.BaseBranch(a.Root))
+	if _, err := runtime.Run(machine.SSH, "sh", "-lc", linkScript, "sh", dir, branch); err != nil {
 		return "", err
 	}
 	if err := a.copyConfig(machine, dir); err != nil {
@@ -72,10 +73,25 @@ func (a *App) Link(machine runtime.Machine) (string, error) {
 			return "", err
 		}
 	}
-	if err := git.Push(a.Root, machine.Name, base); err != nil {
-		return "", fmt.Errorf("push %s to %s: %w", base, machine.Name, err)
+	if err := git.Push(a.Root, machine.Name, refs...); err != nil {
+		return "", fmt.Errorf("push %s to %s: %w", branch, machine.Name, err)
 	}
 	return dir, nil
+}
+
+// baseRefs is the branch a machine's repository starts on, and what to push
+// so it has it. A base that is a branch here goes as itself. One that only
+// tracks a remote here — origin/main — becomes the branch main there, and
+// goes as origin/main too, so a config that names origin/main still finds it.
+func baseRefs(root, base string) (string, []string) {
+	if git.BranchExists(root, base) {
+		return base, []string{"refs/heads/" + base + ":refs/heads/" + base}
+	}
+	tracking := "refs/remotes/" + base
+	if _, short, ok := strings.Cut(base, "/"); ok && git.RevParse(root, tracking) != "" {
+		return short, []string{tracking + ":refs/heads/" + short, tracking + ":" + tracking}
+	}
+	return base, []string{base}
 }
 
 // copyConfig gives the machine's repository this one's configuration, so
