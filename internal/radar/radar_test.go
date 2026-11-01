@@ -24,7 +24,7 @@ func data() Data {
 			{Name: "app", Branch: "main", Main: true, Adopted: true},
 			{Name: "nduruma", Branch: "c", Adopted: true, Layers: layers, Stack: "machines"},
 			{Name: "kijenge", Branch: "jk/retries", Adopted: true, Signals: []signal.Signal{{Kind: "asks", Rank: 10, From: "claude"}}},
-			{Name: "temeke", Branch: "auth", Adopted: true},
+			{Name: "temeke", Branch: "auth", Adopted: true, LastWork: time.Now().Add(-30 * 24 * time.Hour)},
 			{Name: "agent-a1", Path: "/r/.claude/worktrees/agent-a1", Branch: "worktree-agent-a1"},
 			{Name: "agent-b2", Path: "/r/.claude/worktrees/agent-b2", Branch: "worktree-agent-b2", Dirty: true},
 			{Name: "lemara", Branch: "jk/dates", Adopted: true, Signals: []signal.Signal{{Kind: "done", Rank: 30, From: "claude"}}},
@@ -44,8 +44,8 @@ func labels(rows []row) []string {
 func TestTheRadarPutsSignalsFirstByRankThenWhatIsInProgress(t *testing.T) {
 	m := model{data: data(), open: map[string]bool{}}
 	got := labels(m.build())
-	want := []string{"signals", "kijenge", "elerai", "lemara", "in progress  1", "nduruma",
-		"resting  2  — type to find one", "▸ not mia's  2 · 1 changed"}
+	want := []string{"signals", "kijenge", "elerai", "lemara", "in progress  2", "app", "nduruma",
+		"▸ idle  1", "▸ not mia's  2 · 1 changed"}
 	if !slices.Equal(got, want) {
 		t.Errorf("rows = %q\nwant  %q", got, want)
 	}
@@ -168,7 +168,7 @@ func TestAMachinesWorktreesHaveTheirOwnPlaceAndNeverRest(t *testing.T) {
 	if at < 0 || got[at+1] != "moshono" {
 		t.Errorf("an idle worktree on fedora is listed under on fedora: %q", got)
 	}
-	if !slices.Contains(got, "elerai") || slices.Index(got, "elerai") > slices.Index(got, "in progress  1") {
+	if !slices.Contains(got, "elerai") || slices.Index(got, "elerai") > slices.Index(got, "in progress  2") {
 		t.Errorf("one with a signal still leads, under signals: %q", got)
 	}
 }
@@ -284,7 +284,7 @@ func TestTypingFindsAPluginsCommandAndRunsItInThePopup(t *testing.T) {
 	t.Errorf("cost not offered: %q", labels(m.build()))
 }
 
-func TestNotMiasFoldAwayAndOpenToWhatCanGo(t *testing.T) {
+func TestIdleAndNotMiasFoldAwayAndOpenToWhatCanGo(t *testing.T) {
 	m := model{data: data(), open: map[string]bool{}}
 	m.rows = m.build()
 	at := slices.Index(labels(m.rows), "▸ not mia's  2 · 1 changed")
@@ -300,18 +300,22 @@ func TestNotMiasFoldAwayAndOpenToWhatCanGo(t *testing.T) {
 	}
 }
 
-func TestRemovingOneMiaDidNotMakeGoesOnlyWhenClean(t *testing.T) {
-	m := model{data: data(), open: map[string]bool{"·not mia's": true}}
-	press := func(r row) model {
-		next, _ := removal(r)(m)
-		return next
+func TestCtrlDRemovesTheSelectedWorktreeOnlyWhenNothingIsLost(t *testing.T) {
+	m := model{data: data(), open: map[string]bool{"·not mia's": true, "·idle": true}}
+	m.rows = m.build()
+	press := func(name string) model {
+		m.cursor = slices.Index(labels(m.rows), name)
+		next, _ := m.browseKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+		return next.(model)
 	}
-	clean := row{name: "agent-a1", dir: "/r/.claude/worktrees/agent-a1", other: true, listing: &app.Listing{}}
-	got := press(clean)
+	if got := press("temeke"); !strings.HasPrefix(got.confirm, "remove temeke?") {
+		t.Errorf("mia's own asks first: %q", got.confirm)
+	}
+	got := press("agent-a1")
 	if done, _ := got.browseKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")}); !slices.Equal(done.(model).chosen.Argv, []string{"gc", "--others", "--apply", "/r/.claude/worktrees/agent-a1"}) {
-		t.Errorf("a clean one goes through gc --others: %+v", done.(model).chosen)
+		t.Errorf("a clean other goes through gc --others: %+v", done.(model).chosen)
 	}
-	if got := press(row{name: "agent-b2", other: true, listing: &app.Listing{Dirty: true}}); !strings.Contains(got.confirm, "uncommitted") {
-		t.Errorf("one with changes is refused: %q", got.confirm)
+	if got := press("agent-b2"); !strings.Contains(got.confirm, "uncommitted") {
+		t.Errorf("an other with changes is refused: %q", got.confirm)
 	}
 }

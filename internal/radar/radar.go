@@ -325,6 +325,10 @@ func (m model) browseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			delete(m.screens, r.name)
 			return m, m.capture(r)
 		}
+	case "ctrl+d":
+		if r := m.selected(); r.kind == worktree && r.machine == "" && r.listing != nil && !r.listing.Main {
+			return removal(r)(m)
+		}
 	case "ctrl+x":
 		if r := m.selected(); r.kind == worktree && len(r.signals) > 0 {
 			return clearSignals(r)(m)
@@ -421,8 +425,7 @@ func (m model) next(step int) int {
 }
 
 // build is the rows: with nothing typed, worktrees with signals by rank,
-// then in progress, then a count of the resting and not mia's folded away;
-// with something typed, the
+// then in progress, then idle and not mia's folded away; with something typed, the
 // worktrees it finds and what can be done with the first.
 func (m model) build() []row {
 	all := m.worktrees()
@@ -480,10 +483,10 @@ func (m model) build() []row {
 		}
 		return rows
 	}
-	var signalled, progress, others []row
-	elsewhere := map[string][]row{} // by machine: listed always, never resting
+	var signalled, active, idle, others []row
+	elsewhere := map[string][]row{} // by machine: listed always, never idle
 	var machines []string
-	resting, changed := 0, 0
+	changed := 0
 	for _, r := range all {
 		switch {
 		case r.other:
@@ -498,10 +501,10 @@ func (m model) build() []row {
 				machines = append(machines, r.machine)
 			}
 			elsewhere[r.machine] = append(elsewhere[r.machine], r)
-		case r.detail != "" || len(r.layers) > 1 || r.name == m.data.Here || (r.listing != nil && r.listing.Session):
-			progress = append(progress, r)
+		case !isIdle(r, m.data.Here):
+			active = append(active, r)
 		default:
-			resting++
+			idle = append(idle, r)
 		}
 	}
 	sort.SliceStable(signalled, func(i, j int) bool { return signalled[i].signals[0].Rank < signalled[j].signals[0].Rank })
@@ -510,9 +513,9 @@ func (m model) build() []row {
 		rows = append(rows, row{kind: group, label: "signals"})
 		rows = m.withLayers(rows, signalled)
 	}
-	if len(progress) > 0 {
-		rows = append(rows, row{kind: group, label: fmt.Sprintf("in progress  %d", len(progress))})
-		rows = m.withLayers(rows, progress)
+	if len(active) > 0 {
+		rows = append(rows, row{kind: group, label: fmt.Sprintf("in progress  %d", len(active))})
+		rows = m.withLayers(rows, active)
 	}
 	for _, machine := range machines {
 		label := fmt.Sprintf("on %s  %d", machine, len(elsewhere[machine]))
@@ -527,8 +530,11 @@ func (m model) build() []row {
 		rows = append(rows, row{kind: group, label: label})
 		rows = m.withLayers(rows, elsewhere[machine])
 	}
-	if resting > 0 {
-		rows = append(rows, row{kind: group, label: fmt.Sprintf("resting  %d  — type to find one", resting)})
+	if len(idle) > 0 {
+		n := len(idle)
+		rows = m.fold(rows, "idle", fmt.Sprintf("idle  %d", n), idle,
+			row{kind: action, label: fmt.Sprintf("remove these %d — branches stay", n), act: confirmed(
+				fmt.Sprintf("remove %d idle worktrees? branches stay. y removes them", n), shown("gc", "--apply", "--days", fmt.Sprint(idleDays)))})
 	}
 	if len(others) > 0 {
 		clean := len(others) - changed
@@ -544,6 +550,20 @@ func (m model) build() []row {
 		rows = m.fold(rows, "not mia's", label, others, sweep...)
 	}
 	return rows
+}
+
+// idleDays is how long untouched before a worktree folds away, as mia gc
+// counts it.
+const idleDays = 14
+
+// isIdle: nothing would be lost removing it, and nobody has touched it in
+// idleDays — what mia gc collects.
+func isIdle(r row, here string) bool {
+	l := r.listing
+	if l == nil || l.Main || l.Dirty || l.Session || l.Starred || len(r.layers) > 1 || r.name == here {
+		return false
+	}
+	return !l.LastWork.IsZero() && time.Since(l.LastWork) > idleDays*24*time.Hour
 }
 
 // fold is a group shut to one line until opened: its worktrees, then what
