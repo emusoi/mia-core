@@ -22,9 +22,7 @@ import (
 	"github.com/emusoi/mia-core/internal/env"
 	"github.com/emusoi/mia-core/internal/git"
 	"github.com/emusoi/mia-core/internal/model"
-	"github.com/emusoi/mia-core/internal/plugin"
 	"github.com/emusoi/mia-core/internal/resolve"
-	"github.com/emusoi/mia-core/internal/tui"
 
 	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/runtime"
@@ -610,7 +608,7 @@ func usage(to *os.File) {
 	fmt.Fprintln(to)
 	fmt.Fprintln(to, "A worktree answers to its name, its path, or the branch checked out in it.")
 	fmt.Fprintln(to, "Every read command takes --json.")
-	fmt.Fprintln(to, "mia help vocabulary — what things are called.  mia help tmux — the key that pops the dashboard over tmux.")
+	fmt.Fprintln(to, "mia help vocabulary — what things are called.  mia help tmux — what mia adds to tmux: the radar, a new worktree, the status line.")
 }
 
 func usageOf(name string) string {
@@ -860,111 +858,13 @@ const starterConfig = `# mia — this repository's configuration. Every key is o
 `
 
 func printTmuxHelp() int {
-	plugins, _ := pluginHost(configHere()).Enabled()
-	menu, problems := tmuxMenu(plugins)
-	fmt.Print(`# In ~/.tmux.conf — prefix g opens the dashboard over the current window,
-# and it is gone again when you leave it:
-
-bind-key g ` + dashPopup("100%", "100%", "mia dash") + `
-
-# prefix j picks another worktree and switches to its session in place:
-bind-key j ` + dashPopup("60%", "50%", "mia dash --switch") + `
-
-# prefix m: a menu where each entry opens one thing in its own popup,
-# on the worktree of the pane you are in; 1–4 open that one side of the
-# room as a small widget, then come the plugins' entries:
-bind-key m display-menu -T " mia " \
-` + menu + `
-# Then: tmux source-file ~/.tmux.conf
-`)
-	for _, problem := range problems {
-		fmt.Fprintln(os.Stderr, "mia: "+problem)
+	self, err := os.Executable()
+	if err != nil {
+		return fail(err)
 	}
+	fmt.Print("# mia in tmux — `mia tmux install` adds this to ~/.tmux.conf:\n# prefix space the radar, prefix n a new worktree, mia's part of the status line.\n\n")
+	fmt.Print(tmuxSnippet(self))
 	return exitOK
-}
-
-func dashPopup(width, height, command string) string {
-	return "display-popup -B -E -e MIA_POPUP=1 -e \"MIA_TMUX_PANE=#{pane_id}\" -d \"#{pane_current_path}\" -w " + width + " -h " + height + " \"" + command + "\""
-}
-
-// tmuxMenu is the prefix-m menu's entries: mia's own, a small popup of
-// each side of the room alone (named for the side's default tab), and every
-// plugin's, less those whose key mia's already use.
-func tmuxMenu(plugins []plugin.Plugin) (string, []string) {
-	type item struct{ label, key, command string }
-	placed := func(at plugin.Place, command string) string {
-		spot := ""
-		if at.X != "" {
-			spot = " -x " + at.X + " -y " + at.Y
-		}
-		return "display-popup -B -E -e MIA_POPUP=1 -e 'MIA_TMUX_PANE=#{pane_id}' -d '#{pane_current_path}' -w " + at.Width + " -h " + at.Height + spot + " '" + command + "'"
-	}
-	popup := func(width, height, command string) string {
-		return placed(plugin.Place{Width: width, Height: height}, command)
-	}
-	items := []item{
-		{"dashboard", "g", popup("100%", "100%", "mia dash")},
-		{"switch", "j", popup("60%", "50%", "mia dash --switch")},
-		{},
-		{"new", "n", popup("70%", "40%", "mia dash --do new")},
-		{"branch", "b", popup("70%", "40%", "mia dash --do branch")},
-		{},
-	}
-	for i, label := range sideLabels(plugins) {
-		items = append(items, item{label, tui.SideKeys[i], popup("64", "18", "mia side "+tui.SideKeys[i])})
-	}
-	taken := map[string]string{}
-	for _, it := range items {
-		if it.key != "" {
-			taken[it.key] = it.label
-		}
-	}
-	var problems []string
-	plugged := false
-	for _, p := range plugins {
-		for _, entry := range p.Manifest.Menu {
-			if owner, clash := taken[entry.Key]; clash {
-				problems = append(problems, "plugin  "+p.Name+": "+entry.Key+" is already "+owner+" in the tmux menu; "+entry.Label+" is left out")
-				continue
-			}
-			if !plugged {
-				items, plugged = append(items, item{}), true
-			}
-			taken[entry.Key] = entry.Label
-			// ponytail: args are joined as words; one with a space or quote needs real quoting
-			command := strings.Join(append([]string{"mia", entry.Verb}, entry.Args...), " ")
-			items = append(items, item{entry.Label, entry.Key, placed(entry.Popup, command)})
-		}
-	}
-	var b strings.Builder
-	for i, it := range items {
-		line := `  ""`
-		if it.key != "" {
-			line = fmt.Sprintf("  %-15s %s %s", strconv.Quote(it.label), it.key, strconv.Quote(it.command))
-		}
-		if i < len(items)-1 {
-			line += " \\"
-		}
-		b.WriteString(line + "\n")
-	}
-	return b.String(), problems
-}
-
-// sideLabels names each side of the room for the menu: its lowest-ranked
-// tab's label, or the side itself when no plugin fills it.
-func sideLabels(plugins []plugin.Plugin) []string {
-	labels := slices.Clone(plugin.Places)
-	ranks := make([]int, len(labels))
-	filled := make([]bool, len(labels))
-	for _, p := range plugins {
-		for _, side := range p.Manifest.Sides {
-			i := slices.Index(plugin.Places, side.Where)
-			if !filled[i] || side.Rank < ranks[i] {
-				labels[i], ranks[i], filled[i] = side.Label, side.Rank, true
-			}
-		}
-	}
-	return labels
 }
 
 func subject(a *app.App, args []string, fallback string, subs ...string) (sub string, record model.Record, rest []string, err error) {

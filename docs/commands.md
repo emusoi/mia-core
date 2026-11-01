@@ -56,6 +56,6 @@
 | `mia plugin ls\|enable\|disable` | plugins |
 | `mia api <query>` | state as JSON |
 | `mia help vocabulary` | the words |
-| `mia help tmux` | tmux key bindings and the prefix-m menu, with the room's sides and plugins' entries |
+| `mia help tmux` | what `mia tmux install` adds: the radar, a new worktree, the status line |
 
 Reading commands take `--json`.
