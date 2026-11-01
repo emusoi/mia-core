@@ -495,9 +495,17 @@ func cmdShell(a *app.App, args []string) int {
 
 func cmdRun(a *app.App, args []string) int {
 	if len(args) < 2 {
-		return usageErr("mia run <worktree> <command...>")
+		return usageErr("mia run <worktree>[@machine] <command...>")
 	}
-	if err := a.Run(args[0], args[1:]); err != nil {
+	run := func() error { return a.Run(args[0], args[1:]) }
+	if name, on, ok := strings.Cut(args[0], "@"); ok && name != "" {
+		machine, err := a.Runtimes.Get(on)
+		if err != nil {
+			return fail(err)
+		}
+		run = func() error { return a.RunOn(machine, name, args[1:]) }
+	}
+	if err := run(); err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
 			fmt.Fprintln(os.Stderr, "mia:", err)

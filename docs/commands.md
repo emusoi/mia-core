@@ -18,7 +18,7 @@
 | `mia rename <worktree> <name>` | rename it |
 | `mia star [worktree]` | star or unstar it |
 | `mia setup [worktree]` | run setup again |
-| `mia run <worktree> <cmd…>` | run a command in it |
+| `mia run <worktree>[@machine] <cmd…>` | run a command in it, here or on a machine |
 | `mia rm <worktree>` | remove it |
 | `mia gc [--apply]` | find, or remove, untouched worktrees |
 

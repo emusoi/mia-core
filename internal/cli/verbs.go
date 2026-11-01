@@ -33,7 +33,7 @@ var verbs = []Verb{
 	{"rm", "mia rm [--force] [--stop-running] <worktree>", "remove a worktree, its session and its name", false, ""},
 	{"window", "mia window [ls|open|select|new|close|read|send|press] [worktree] [window] [--editor] [-- command|text|keys]", "the windows of a worktree's session: land in one, pick one without landing, add a shell, close one, read or type into one, press keys in one without Enter", false, ""},
 	{"shell", "mia shell [--popup] [worktree]", "attach to a worktree's session", false, ""},
-	{"run", "mia run <worktree> <cmd…>", "run a command once in a worktree", false, ""},
+	{"run", "mia run <worktree>[@machine] <cmd…>", "run a command once in a worktree, here or on a machine", false, ""},
 	{"dev", "mia dev [<worktree> [--follow]|off]", "lend the main checkout's running dev server a worktree's files; the one time mia writes into a working tree", false, ""},
 	{"env", "mia env <up|down|setup|dotfiles|sync|shell|exec|run|ports|image|tools|host|browse|service|status|rm> [worktree]", "the environment a worktree's code runs in", false, ""},
 	{"stack", "mia stack [--in <worktree>] [show|go <layer>|name <name>|merge <layer> [onto <layer>]|rm [--worktrees] [--branches] [--force]|restack|diff]", "a feature too large for one pull request", false, ""},

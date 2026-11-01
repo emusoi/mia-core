@@ -145,12 +145,12 @@ func (a *App) NewOn(machine runtime.Machine, branch string) error {
 // how busy it is, and the worktrees its own mia keeps.
 type MachineState struct {
 	runtime.Machine
-	Answers bool
-	Detail  string  // why it did not answer
-	Health  *Health // nil when it did not answer
+	Answers bool    `json:"answers"`
+	Detail  string  `json:"detail,omitempty"` // why it did not answer
+	Health  *Health `json:"health,omitempty"` // nil when it did not answer
 	// Worktrees another machine keeps, as it last reported them; none for
-	// this computer, whose worktrees the dash lists itself.
-	Worktrees []Listing
+	// this computer, whose worktrees the radar lists itself.
+	Worktrees []Listing `json:"worktrees,omitempty"`
 }
 
 const worktreesMark = "@@worktrees"
@@ -307,6 +307,17 @@ func (a *App) AttachOn(machine runtime.Machine, name string) error {
 		return err
 	}
 	return runtime.Interactive(machine.SSH, "sh", "-c", utf8+`cd "$1" && exec `+remoteMia+` shell "$2"`, "sh", dir, name).Run()
+}
+
+// RunOn runs a command in a worktree on a machine, through the machine's own
+// mia, with the terminal passed through.
+func (a *App) RunOn(machine runtime.Machine, name string, argv []string) error {
+	dir, err := a.RemoteDir()
+	if err != nil {
+		return err
+	}
+	script := utf8 + `cd "$1" && shift && exec ` + remoteMia + ` run "$@"`
+	return runtime.Interactive(machine.SSH, append([]string{"sh", "-c", script, "sh", dir, name}, argv...)...).Run()
 }
 
 // AttachArgv is the command that opens the worktree's session on the

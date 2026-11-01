@@ -7,13 +7,15 @@ import (
 
 // Health is how busy a machine is: what the dash's machines view draws.
 type Health struct {
-	Load                [3]float64
-	Cores               int
-	MemUsed, MemTotal   float64 // GB
-	DiskUsed, DiskTotal float64 // GB, of the disk the repository is on
+	Load      [3]float64 `json:"load"`
+	Cores     int        `json:"cores"`
+	MemUsed   float64    `json:"mem_used"`   // GB
+	MemTotal  float64    `json:"mem_total"`  // GB
+	DiskUsed  float64    `json:"disk_used"`  // GB, of the disk the repository is on
+	DiskTotal float64    `json:"disk_total"` // GB
 	// Ports are the TCP ports listened on, by the directory of the process
 	// that listens: matched to worktrees by whoever knows their paths.
-	Ports map[string][]int
+	Ports map[string][]int `json:"ports,omitempty"`
 }
 
 // probeScript measures the machine it runs on, in the directory $1, with
