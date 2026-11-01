@@ -1,0 +1,39 @@
+package cli
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/runtime"
+)
+
+// cmdMove is mia move <worktree>[@<machine>] <machine|local>: the worktree,
+// its uncommitted work and its windows, taken to the other side.
+func cmdMove(a *app.App, args []string) int {
+	if len(args) != 2 {
+		return usageErr("mia move <worktree>[@<machine>] <machine|local>")
+	}
+	name, from, _ := strings.Cut(args[0], "@")
+	if from == "" {
+		from = runtime.Local
+	}
+	moved, err := a.Move(name, from, args[1], os.Stdout)
+	if err != nil {
+		return fail(err)
+	}
+	where := args[1]
+	if where == runtime.Local {
+		where = "this computer"
+	}
+	fmt.Printf("%s — moved to %s, %d window(s) open there", moved.Name, where, len(moved.Windows))
+	if len(moved.Carried) > 0 {
+		fmt.Printf(", carrying %s", strings.Join(moved.Carried, ", "))
+	}
+	fmt.Println()
+	if args[1] != runtime.Local {
+		fmt.Printf("%s@%s — on %s\n", moved.Name, args[1], args[1])
+	}
+	return exitOK
+}

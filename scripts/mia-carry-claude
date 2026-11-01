@@ -1,0 +1,30 @@
+#!/bin/sh
+# mia-carry-claude: carries claude's conversation when mia moves a worktree.
+# An example mia extension; put it on PATH (as mia-carry-claude) to use it.
+#
+#   mia-carry-claude pack <from worktree> <to worktree>   a tar on stdout, under the home
+#   mia-carry-claude command                               how claude starts again there
+#
+# claude keeps a worktree's conversations in ~/.claude/projects/<its path,
+# with / and . as ->; the newest goes to the folder the new path names.
+set -eu
+case "${1:-}" in
+pack)
+	from=$(printf %s "$2" | tr '/.' '--')
+	to=$(printf %s "$3" | tr '/.' '--')
+	newest=$(ls -t "$HOME/.claude/projects/$from"/*.jsonl 2>/dev/null | head -1)
+	[ -n "$newest" ] || exit 0
+	tmp=$(mktemp -d)
+	trap 'rm -rf "$tmp"' EXIT
+	mkdir -p "$tmp/.claude/projects/$to"
+	cp "$newest" "$tmp/.claude/projects/$to/"
+	tar -cf - -C "$tmp" .claude
+	;;
+command)
+	echo "claude --continue"
+	;;
+*)
+	echo "usage: mia-carry-claude pack <from> <to> | command" >&2
+	exit 64
+	;;
+esac

@@ -393,7 +393,7 @@ func (m model) build() []row {
 			rows = append(rows, row{kind: group, label: "worktrees"})
 			rows = append(rows, found...)
 			rows = append(rows, row{kind: group, label: "do with " + found[0].label})
-			rows = append(rows, actionsFor(found[0])...)
+			rows = append(rows, m.actionsFor(found[0])...)
 		}
 		if strings.HasPrefix("new worktree", q) || strings.HasPrefix(q, "new") {
 			rows = append(rows, row{kind: group, label: "everything else"},
@@ -562,8 +562,19 @@ func ago(d time.Duration) string {
 	return fmt.Sprintf("%dd", int(d.Hours()/24))
 }
 
-func actionsFor(r row) []row {
+func (m model) actionsFor(r row) []row {
 	acts := []row{{kind: action, label: "switch there", act: switchTo(r)}}
+	if r.away == "" {
+		if r.machine != "" {
+			acts = append(acts, row{kind: action, label: "move here — its changes and windows too", act: run(r, "move", r.name, "local")})
+		} else {
+			for _, state := range m.data.Machines {
+				if state.Name != "" && state.Name != "local" && state.Answers {
+					acts = append(acts, row{kind: action, label: "move to " + state.Name + " — its changes and windows too", act: run(r, "move", r.name, state.Name)})
+				}
+			}
+		}
+	}
 	if r.machine == "" {
 		acts = append(acts,
 			row{kind: action, label: "open in an editor", act: run(r, "open", r.name)},

@@ -189,3 +189,14 @@ func TestFromAMachineTheComputerYouCameFromIsOneSwitchAway(t *testing.T) {
 		}
 	}
 }
+
+func TestTypingOffersToMoveAWorktreeToWhereItIsNot(t *testing.T) {
+	m := model{data: data(), open: map[string]bool{}, query: "temeke"}
+	if got := labels(m.build()); !slices.Contains(got, "move to fedora — its changes and windows too") {
+		t.Errorf("a worktree here can move to fedora: %q", got)
+	}
+	m.query = "elerai"
+	if got := labels(m.build()); !slices.Contains(got, "move here — its changes and windows too") {
+		t.Errorf("a worktree on fedora can come here: %q", got)
+	}
+}

@@ -109,3 +109,23 @@ rows stay, dimmed and marked unreachable, as it last reported them.
 
 `mia shell <worktree>@fedora` is its session there. Its branches arrive
 here as `fedora/<branch>` on every refresh; pushing them anywhere is yours.
+
+## Moving a worktree
+
+```bash
+mia move monduli fedora          # from here to fedora
+mia move monduli@fedora local    # and back
+```
+
+The branch goes across, and so does what is not committed: changed files
+as a patch, new files as they are. The session's windows open again
+there, in the same folders, each with the command that was running in it
+typed in again — claude, nvim, a dev server. Only once all of that is
+there is the worktree removed where it was; its branch stays.
+
+A running program starts again rather than continuing. One that keeps
+state can bring it along through an extension named `mia-carry-<program>`
+on your PATH: mia asks it to `pack <from> <to>` — a tar of files under the
+home, which is unpacked on the other side — and how to `command` it to
+start again. `scripts/mia-carry-claude` carries claude's conversation and
+restarts it with `claude --continue`.
