@@ -116,7 +116,7 @@ func (m model) View() string {
 		}
 		b.WriteString(left + "\n")
 	}
-	foot := keys("⏎", "switch") + keys("tab", "filter") + keys("←→", "windows") + keys("^x", "clear signal") + keys("esc", "close")
+	foot := keys("⏎", "switch") + keys("^n", "new") + keys("tab", "filter") + keys("←→", "windows") + keys("^x", "clear signal") + keys("esc", "close")
 	if m.confirm != "" {
 		foot = Style("yellow").Render(m.confirm)
 	}

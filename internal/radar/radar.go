@@ -288,8 +288,10 @@ func (m model) browseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "up", "ctrl+p":
 		m.cursor = m.next(-1)
-	case "down", "ctrl+n":
+	case "down":
 		m.cursor = m.next(1)
+	case "ctrl+n":
+		return m.newWorktree(strings.TrimSpace(m.query))
 	case "tab", "shift+tab":
 		step := 1
 		if msg.String() == "shift+tab" {
@@ -375,6 +377,16 @@ func (m model) opening() int {
 	return m.next(0)
 }
 
+// newWorktree turns the radar into the new-worktree form, the branch
+// started with what was typed.
+func (m model) newWorktree(branch string) (model, tea.Cmd) {
+	m.mode = making
+	if branch != "" && !strings.HasPrefix(branch, "new") {
+		m.form.branch = m.data.Prefix + strings.TrimPrefix(branch, m.data.Prefix)
+	}
+	return m, nil
+}
+
 func (m model) selected() row {
 	if m.cursor >= 0 && m.cursor < len(m.rows) {
 		return m.rows[m.cursor]
@@ -435,9 +447,14 @@ func (m model) build() []row {
 			rows = append(rows, row{kind: group, label: "do with " + found[0].label})
 			rows = append(rows, m.actionsFor(found[0])...)
 		}
-		if strings.HasPrefix("new worktree", q) || strings.HasPrefix(q, "new") {
+		typed := strings.TrimSpace(m.query)
+		switch {
+		case strings.HasPrefix("new worktree", q) || strings.HasPrefix(q, "new"):
 			rows = append(rows, row{kind: group, label: "everything else"},
-				row{kind: action, label: "new worktree", act: func(m model) (model, tea.Cmd) { m.mode = making; return m, nil }})
+				row{kind: action, label: "new worktree", act: func(m model) (model, tea.Cmd) { return m.newWorktree("") }})
+		case len(found) == 0 && !strings.ContainsAny(typed, " "):
+			rows = append(rows, row{kind: group, label: "nothing called " + typed},
+				row{kind: action, label: "new worktree  " + typed, act: func(m model) (model, tea.Cmd) { return m.newWorktree(typed) }})
 		}
 		return rows
 	}

@@ -200,3 +200,17 @@ func TestTypingOffersToMoveAWorktreeToWhereItIsNot(t *testing.T) {
 		t.Errorf("a worktree on fedora can come here: %q", got)
 	}
 }
+
+func TestTypingABranchThatIsNotThereOffersToMakeIt(t *testing.T) {
+	m := model{data: data(), open: map[string]bool{}, query: "payout-retries"}
+	m.data.Prefix = "jk/"
+	rows := m.build()
+	last := rows[len(rows)-1]
+	if last.label != "new worktree  payout-retries" {
+		t.Fatalf("offered %q", labels(rows))
+	}
+	next, _ := last.act(m)
+	if next.mode != making || next.form.branch != "jk/payout-retries" {
+		t.Errorf("⏎ opens the form with the branch, prefix and all: %q", next.form.branch)
+	}
+}
