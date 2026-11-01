@@ -5,14 +5,13 @@ package radar
 
 import (
 	"fmt"
-	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/git"
@@ -36,6 +35,9 @@ type Data struct {
 	// First is set the first time mia makes a worktree in this repository:
 	// what it guessed, shown once, saved when the worktree is made.
 	First *Guess
+	// Activity is how much each worktree here moved in the last 24 hours,
+	// by its folder: commits in each of eight three-hour spans, oldest first.
+	Activity map[string][]int
 	// Away is the computer that handed this terminal here, and what it has:
 	// picking one of its worktrees hands the terminal back.
 	Away *Away
@@ -150,6 +152,8 @@ type model struct {
 	form    form
 	commits map[string][]git.Commit // the preview's, by worktree, fetched as the cursor reaches it
 	screens map[string]string       // each worktree's session as it looks, by row name
+	filter  int                     // 0 all, 1 signals, 2 here, then one per machine
+	window  map[string]int          // the window the stage shows, by row name
 }
 
 type screened struct {
@@ -202,9 +206,12 @@ func (m model) capture(r row) tea.Cmd {
 	} else if r.listing == nil || !r.listing.Session {
 		return nil
 	}
-	name, worktree := r.name, r.label
+	name, worktree, window := r.name, r.label, ""
+	if w, ok := m.shownWindow(r); ok {
+		window = strconv.Itoa(w.Index)
+	}
 	return func() tea.Msg {
-		screen, _ := host.Capture(worktree, "", true)
+		screen, _ := host.Capture(worktree, window, true)
 		return screened{name, screen}
 	}
 }
@@ -212,7 +219,7 @@ func (m model) capture(r row) tea.Cmd {
 // Run opens the radar, or the new-worktree popup when newOnly, and returns
 // what was picked, nil when nothing was.
 func Run(data Data, newOnly bool) (*Choice, error) {
-	m := model{data: data, open: map[string]bool{}, form: newForm(data), commits: map[string][]git.Commit{}, screens: map[string]string{}}
+	m := model{data: data, open: map[string]bool{}, form: newForm(data), commits: map[string][]git.Commit{}, screens: map[string]string{}, window: map[string]int{}}
 	if newOnly {
 		m.mode = making
 	}
@@ -283,16 +290,35 @@ func (m model) browseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.cursor = m.next(-1)
 	case "down", "ctrl+n":
 		m.cursor = m.next(1)
-	case "right":
-		if r := m.selected(); r.kind == worktree && len(r.layers) > 1 {
+	case "tab", "shift+tab":
+		step := 1
+		if msg.String() == "shift+tab" {
+			step = -1
+		}
+		m.filter = (m.filter + step + len(m.filters())) % len(m.filters())
+		m.rows, m.cursor = m.build(), 0
+		m.cursor = m.next(0)
+	case "right", "left":
+		r := m.selected()
+		switch {
+		case msg.String() == "right" && r.kind == worktree && len(r.layers) > 1 && !m.open[r.name]:
 			m.open[r.name] = true
 			m.rows = m.build()
-		}
-	case "left":
-		if r := m.selected(); r.kind == worktree || r.kind == layer {
+		case msg.String() == "left" && (r.kind == layer || m.open[r.name]):
 			delete(m.open, r.name)
 			m.rows = m.build()
 			m.cursor = m.next(0)
+		case r.listing != nil && len(r.listing.Windows) > 1:
+			// ← → flip the stage between the session's windows
+			step := 1
+			if msg.String() == "left" {
+				step = -1
+			}
+			n := len(r.listing.Windows)
+			cur, _ := m.windowAt(r)
+			m.window[r.name] = (cur + step + n) % n
+			delete(m.screens, r.name)
+			return m, m.capture(r)
 		}
 	case "ctrl+x":
 		if r := m.selected(); r.kind == worktree && len(r.signals) > 0 {
@@ -381,6 +407,20 @@ func (m model) next(step int) int {
 // worktrees it finds and what can be done with the first.
 func (m model) build() []row {
 	all := m.worktrees()
+	if m.filter > 0 {
+		f := m.filters()[m.filter]
+		var kept []row
+		for _, r := range all {
+			if f.keep(r) {
+				kept = append(kept, r)
+			}
+		}
+		if strings.TrimSpace(m.query) == "" {
+			sort.SliceStable(kept, func(i, j int) bool { return rank(kept[i]) < rank(kept[j]) })
+			return m.withLayers(nil, kept)
+		}
+		all = kept
+	}
 	if q := strings.ToLower(strings.TrimSpace(m.query)); q != "" {
 		var found []row
 		for _, r := range all {
@@ -627,251 +667,4 @@ func run(r row, argv ...string) func(m model) (model, tea.Cmd) {
 		m.chosen = &Choice{Argv: argv, Dir: r.dir}
 		return m, tea.Quit
 	}
-}
-
-func (m model) View() string {
-	if m.mode == making {
-		return m.formView()
-	}
-	full := max(m.width-1, 40)
-	width := full
-	var preview []string
-	if full >= 96 {
-		width = full * 55 / 100
-		preview = m.preview(full-width-3, max(m.height-3, 3))
-	}
-	var b strings.Builder
-	head := accent.Render("› ") + ink.Render(m.query) + accent.Render("█")
-	b.WriteString(between(head, m.machinesLine(), full) + "\n\n")
-	room := max(m.height-3, 3)
-	start := 0
-	if m.cursor >= room {
-		start = m.cursor - room + 1
-	}
-	var list []string
-	for i := start; i < len(m.rows) && len(list) < room; i++ {
-		list = append(list, m.line(m.rows[i], i == m.cursor, width))
-	}
-	if len(m.rows) == 0 {
-		list = append(list, faint.Render("nothing called "+m.query+" — esc clears"))
-	}
-	for i := 0; i < room; i++ {
-		left := ""
-		if i < len(list) {
-			left = list[i]
-		}
-		if preview != nil {
-			right := ""
-			if i < len(preview) {
-				right = preview[i]
-			}
-			left = left + strings.Repeat(" ", max(width-lipgloss.Width(left), 0)) + muted.Render(" │ ") + right
-		}
-		b.WriteString(left + "\n")
-	}
-	foot := keys("⏎", "switch") + keys("→", "layers") + keys("^x", "clear signal") + keys("esc", "close")
-	if m.confirm != "" {
-		foot = Style("yellow").Render(m.confirm)
-	}
-	b.WriteString(between(cut(foot, width), faint.Render("type to find"), width))
-	return b.String()
-}
-
-// preview is the selected worktree in a few lines: where it is, what was
-// said about it, its last commits, its session's windows.
-func (m model) preview(width, height int) []string {
-	r := m.selected()
-	if r.kind != worktree && r.kind != layer {
-		return nil
-	}
-	var out []string
-	add := func(s string) { out = append(out, cut(s, width)) }
-	if screen := strings.TrimRight(m.screens[r.name], "\n "); r.kind == worktree && screen != "" {
-		where := "this computer"
-		if r.machine != "" {
-			where = "on " + r.machine
-		}
-		add(inkB.Render(strings.TrimPrefix(r.label, "▸ ")) + "  " + soft.Render(r.branch) + "  " + muted.Render(where))
-		for _, s := range r.signals {
-			add(Style(s.Style).Render(s.Kind) + "  " + ink.Render(s.Text) + muted.Render("  "+s.From))
-		}
-		add(muted.Render(strings.Repeat("─", width)))
-		lines := squeeze(strings.Split(screen, "\n"))
-		if room := height - len(out); len(lines) > room {
-			lines = lines[len(lines)-room:] // an agent's latest is at the bottom
-		}
-		for _, line := range lines {
-			add(line + "\x1b[0m")
-		}
-		return out
-	}
-	where := soft.Render("this computer")
-	if r.machine != "" {
-		where = soft.Render("on " + r.machine)
-	}
-	add(inkB.Render(strings.TrimPrefix(r.label, "▸ ")) + "  " + where)
-	if r.kind == layer {
-		for _, l := range r.layers {
-			if l.Branch == r.layer {
-				add(soft.Render(l.Branch) + muted.Render("  on "+l.Parent))
-				add(muted.Render(layerDetail(l)))
-			}
-		}
-		add("")
-		add(faint.Render("⏎ moves this worktree to this layer"))
-		return out
-	}
-	add(soft.Render(r.branch))
-	if r.dir != "" {
-		add(muted.Render(shortPath(r.dir)))
-	}
-	if len(r.signals) > 0 {
-		add("")
-		for _, s := range r.signals {
-			add(Style(s.Style).Render(s.Kind) + "  " + ink.Render(s.Text))
-			add(muted.Render("  from " + s.From + " · " + ago(time.Since(s.At))))
-		}
-	}
-	if commits, ok := m.commits[r.dir]; ok && len(commits) > 0 {
-		add("")
-		add(italic.Render("last commits"))
-		for _, c := range commits {
-			add(muted.Render(c.SHA+" ") + ink.Render(c.Subject) + muted.Render("  "+ago(time.Since(c.When))))
-		}
-	} else if r.listing != nil && r.listing.LastSubject != "" {
-		add("")
-		add(italic.Render("last commit"))
-		add(ink.Render(r.listing.LastSubject))
-	}
-	if r.listing != nil {
-		add("")
-		if len(r.listing.Windows) == 0 {
-			add(muted.Render("no session yet — ⏎ starts one"))
-		} else {
-			add(italic.Render("session"))
-			for _, w := range r.listing.Windows {
-				still := ""
-				if w.Still != "" {
-					still = muted.Render("  quiet " + w.Still)
-				}
-				add(soft.Render(fmt.Sprintf("%d  %s", w.Index, w.Name)) + still)
-			}
-		}
-	}
-	return out
-}
-
-// squeeze keeps one blank line where a screen has several, so a window
-// whose middle is empty shows its top and its bottom both.
-func squeeze(lines []string) []string {
-	var kept []string
-	blank := false
-	for _, line := range lines {
-		empty := strings.TrimSpace(ansi.Strip(line)) == ""
-		if empty && blank {
-			continue
-		}
-		blank = empty
-		kept = append(kept, line)
-	}
-	return kept
-}
-
-func shortPath(path string) string {
-	if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(path, home) {
-		return "~" + strings.TrimPrefix(path, home)
-	}
-	return path
-}
-
-func keys(key, label string) string {
-	return inkB.Render(key) + " " + muted.Render(label) + "    "
-}
-
-func (m model) machinesLine() string {
-	if len(m.data.Machines) < 2 {
-		return ""
-	}
-	var parts []string
-	for _, state := range m.data.Machines {
-		if state.Answers {
-			parts = append(parts, Style("green").Render("●")+" "+soft.Render(state.Name))
-		} else {
-			parts = append(parts, Style("red").Render("○ "+state.Name))
-		}
-	}
-	return strings.Join(parts, "  ")
-}
-
-func (m model) line(r row, on bool, width int) string {
-	if r.kind == group {
-		return italic.Render(r.label)
-	}
-	mark := "  "
-	name := ink
-	if on {
-		mark, name = inkB.Render("›")+" ", inkB
-	}
-	indent := "  "
-	if r.kind == layer {
-		indent = "      "
-	}
-	var text string
-	switch r.kind {
-	case action:
-		text = mark + indent + name.Render(r.label)
-	default:
-		label := r.label
-		if r.kind == worktree && len(r.layers) > 1 {
-			label = "▸ " + label
-			if m.open[r.name] {
-				label = "▾ " + r.label
-			}
-		}
-		text = mark + indent + name.Render(pad(label, 22)) + soft.Render(pad(r.branch, 28))
-		if len(r.signals) > 0 {
-			var said []string
-			for _, s := range r.signals {
-				one := Style(s.Style).Render(strings.TrimSpace(s.Kind+"  "+s.Text)) + faint.Render("  "+s.From)
-				said = append(said, one)
-			}
-			text += strings.Join(said, faint.Render("  ·  "))
-		} else {
-			text += soft.Render(r.detail)
-		}
-		switch {
-		case r.kind == worktree && r.machine == "" && r.name == m.data.Here:
-			text = between(text, accent.Render("● here"), width)
-		case r.last:
-			text = between(text, soft.Render("↩ last"), width)
-		}
-		if r.machine != "" {
-			text = between(text, muted.Render("@"+r.machine), width)
-		}
-	}
-	text = cut(text, width)
-	if on {
-		return sel.Render(text + strings.Repeat(" ", max(width-lipgloss.Width(text), 0)))
-	}
-	return text
-}
-
-func pad(s string, n int) string {
-	if lipgloss.Width(s) >= n {
-		return cut(s, n-1) + " "
-	}
-	return s + strings.Repeat(" ", n-lipgloss.Width(s))
-}
-
-// cut shortens s to n cells, styling and all.
-func cut(s string, n int) string {
-	return ansi.Truncate(s, n, "…")
-}
-
-func between(left, right string, width int) string {
-	gap := width - lipgloss.Width(left) - lipgloss.Width(right)
-	if gap < 2 {
-		return left
-	}
-	return left + strings.Repeat(" ", gap) + right
 }

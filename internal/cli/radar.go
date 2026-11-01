@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/git"
@@ -43,10 +45,38 @@ func radarData(a *app.App) (radar.Data, error) {
 		data.Branch = git.CurrentBranch(record.Path)
 	}
 	data.Away = readNote(a)
+	data.Activity = activity(local)
 	if _, err := os.Stat(filepath.Join(a.MiaDir, "config.toml")); os.IsNotExist(err) {
 		data.First = &radar.Guess{Base: data.Base, Setup: radar.GuessSetup(a.Root)}
 	}
 	return data, nil
+}
+
+// activity is how much each worktree moved in the last 24 hours: its
+// commits in eight three-hour spans, oldest first.
+func activity(listings []app.Listing) map[string][]int {
+	since := time.Now().Add(-24 * time.Hour)
+	out := map[string][]int{}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, l := range listings {
+		if l.Path == "" {
+			continue
+		}
+		wg.Go(func() {
+			spans := make([]int, 8)
+			for _, t := range git.Since(l.Path, since) {
+				if i := int(t.Sub(since) / (3 * time.Hour)); i >= 0 && i < 8 {
+					spans[i]++
+				}
+			}
+			mu.Lock()
+			out[l.Path] = spans
+			mu.Unlock()
+		})
+	}
+	wg.Wait()
+	return out
 }
 
 // carryOut does what the radar picked: a mia command, then the switch.
@@ -124,7 +154,7 @@ func tmuxSnippet(self string) string {
 set -g status-interval 5
 set -g status-right-length 160
 set -ga status-right ' #(` + mia + ` status-line "#{pane_current_path}") '
-bind Space display-popup -E -d "#{pane_current_path}" -w 110 -h 30 -T " mia " "` + mia + ` radar"
+bind Space display-popup -E -d "#{pane_current_path}" -w 90% -h 85% -T " mia " "` + mia + ` radar"
 bind n display-popup -E -d "#{pane_current_path}" -w 110 -h 14 -T " new worktree " "` + mia + ` radar --new"
 # mia: end
 `

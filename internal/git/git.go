@@ -540,6 +540,21 @@ func UpdateRef(dir, ref, sha string) error {
 	return err
 }
 
+// Since is when each commit on HEAD made after t was made.
+func Since(dir string, t time.Time) []time.Time {
+	out, err := run(dir, "log", "--since="+strconv.FormatInt(t.Unix(), 10), "--format=%ct", "HEAD")
+	if err != nil {
+		return nil
+	}
+	var times []time.Time
+	for _, line := range strings.Fields(out) {
+		if secs, err := strconv.ParseInt(line, 10, 64); err == nil {
+			times = append(times, time.Unix(secs, 0))
+		}
+	}
+	return times
+}
+
 // Recent is the last n commits on HEAD, newest first.
 func Recent(dir string, n int) []Commit {
 	out, err := run(dir, "log", fmt.Sprintf("-%d", n), "--format=%h%x00%ct%x00%s", "HEAD")
