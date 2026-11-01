@@ -53,9 +53,9 @@ type filter struct {
 // then each machine's.
 func (m model) filters() []filter {
 	fs := []filter{
-		{"all", func(row) bool { return true }},
+		{"all", func(r row) bool { return !r.other }},
 		{"signals", func(r row) bool { return len(r.signals) > 0 }},
-		{"here", func(r row) bool { return r.machine == "" }},
+		{"here", func(r row) bool { return r.machine == "" && !r.other }},
 	}
 	seen := map[string]bool{}
 	for _, r := range m.worktrees() {

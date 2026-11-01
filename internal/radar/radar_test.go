@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/runtime"
 	"github.com/emusoi/mia-core/internal/signal"
@@ -23,6 +25,8 @@ func data() Data {
 			{Name: "nduruma", Branch: "c", Adopted: true, Layers: layers, Stack: "machines"},
 			{Name: "kijenge", Branch: "jk/retries", Adopted: true, Signals: []signal.Signal{{Kind: "asks", Rank: 10, From: "claude"}}},
 			{Name: "temeke", Branch: "auth", Adopted: true},
+			{Name: "agent-a1", Path: "/r/.claude/worktrees/agent-a1", Branch: "worktree-agent-a1"},
+			{Name: "agent-b2", Path: "/r/.claude/worktrees/agent-b2", Branch: "worktree-agent-b2", Dirty: true},
 			{Name: "lemara", Branch: "jk/dates", Adopted: true, Signals: []signal.Signal{{Kind: "done", Rank: 30, From: "claude"}}},
 		},
 		Machines: []app.MachineState{{Answers: true}, {Machine: runtime.Machine{Name: "fedora"}, Answers: true, Worktrees: []app.Listing{{Name: "elerai", Branch: "jk/land", Signals: []signal.Signal{{Kind: "tests red", Rank: 20, From: "watch"}}}}}},
@@ -40,7 +44,8 @@ func labels(rows []row) []string {
 func TestTheRadarPutsSignalsFirstByRankThenWhatIsInProgress(t *testing.T) {
 	m := model{data: data(), open: map[string]bool{}}
 	got := labels(m.build())
-	want := []string{"signals", "kijenge", "elerai", "lemara", "in progress  1", "nduruma", "resting  2  — type to find one"}
+	want := []string{"signals", "kijenge", "elerai", "lemara", "in progress  1", "nduruma",
+		"resting  2  — type to find one", "▸ not mia's  2 · 1 changed"}
 	if !slices.Equal(got, want) {
 		t.Errorf("rows = %q\nwant  %q", got, want)
 	}
@@ -277,4 +282,36 @@ func TestTypingFindsAPluginsCommandAndRunsItInThePopup(t *testing.T) {
 		}
 	}
 	t.Errorf("cost not offered: %q", labels(m.build()))
+}
+
+func TestNotMiasFoldAwayAndOpenToWhatCanGo(t *testing.T) {
+	m := model{data: data(), open: map[string]bool{}}
+	m.rows = m.build()
+	at := slices.Index(labels(m.rows), "▸ not mia's  2 · 1 changed")
+	m.cursor = at
+	next, _ := m.browseKey(tea.KeyMsg{Type: tea.KeyEnter})
+	got := labels(next.(model).rows)
+	want := []string{"▾ not mia's  2 · 1 changed", "agent-a1", "agent-b2", "remove the 1 clean ones — branches stay"}
+	if !slices.Equal(got[at:], want) {
+		t.Errorf("opened others = %q\nwant %q", got[at:], want)
+	}
+	if m := (model{data: data()}); len(m.worktrees()) == 0 || m.filters()[0].keep(m.worktrees()[len(m.data.Local)-2]) {
+		t.Errorf("others are not counted in all")
+	}
+}
+
+func TestRemovingOneMiaDidNotMakeGoesOnlyWhenClean(t *testing.T) {
+	m := model{data: data(), open: map[string]bool{"·not mia's": true}}
+	press := func(r row) model {
+		next, _ := removal(r)(m)
+		return next
+	}
+	clean := row{name: "agent-a1", dir: "/r/.claude/worktrees/agent-a1", other: true, listing: &app.Listing{}}
+	got := press(clean)
+	if done, _ := got.browseKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")}); !slices.Equal(done.(model).chosen.Argv, []string{"gc", "--others", "--apply", "/r/.claude/worktrees/agent-a1"}) {
+		t.Errorf("a clean one goes through gc --others: %+v", done.(model).chosen)
+	}
+	if got := press(row{name: "agent-b2", other: true, listing: &app.Listing{Dirty: true}}); !strings.Contains(got.confirm, "uncommitted") {
+		t.Errorf("one with changes is refused: %q", got.confirm)
+	}
 }

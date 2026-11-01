@@ -385,12 +385,15 @@ func cmdGC(a *app.App, args []string, asJSON bool) int {
 	if value := takeValue(&args, "--days"); value != "" {
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
-			return usageErr("mia gc [--apply] [--days N]")
+			return usageErr("mia gc [--apply] [--days N] | mia gc --others [--apply] [path...]")
 		}
 		days = n
 	}
+	if take(&args, "--others") {
+		return gcOthers(a, args, apply)
+	}
 	if len(args) > 0 {
-		return usageErr("mia gc [--apply] [--days N]")
+		return usageErr("mia gc [--apply] [--days N] | mia gc --others [--apply] [path...]")
 	}
 	found, err := a.Abandoned(time.Duration(days)*24*time.Hour, time.Now())
 	if err != nil {
@@ -422,6 +425,47 @@ func cmdGC(a *app.App, args []string, asJSON bool) int {
 		fmt.Printf("removed %s\n", one.Record.Name)
 	}
 	return exitOK
+}
+
+// gcOthers removes the repository's worktrees mia did not make — an agent's,
+// another tool's — when nothing in them is uncommitted. Their branches stay.
+func gcOthers(a *app.App, paths []string, apply bool) int {
+	listings, err := a.List()
+	if err != nil {
+		return fail(err)
+	}
+	var found []app.Listing
+	for _, l := range listings {
+		if l.Main || l.Adopted || (len(paths) > 0 && !slices.Contains(paths, l.Path)) {
+			continue
+		}
+		if l.Dirty {
+			fmt.Printf("%-44s %-28s kept — uncommitted changes\n", l.Path, l.Branch)
+			continue
+		}
+		found = append(found, l)
+	}
+	for _, l := range found {
+		fmt.Printf("%-44s %-28s\n", l.Path, l.Branch)
+	}
+	if len(found) == 0 {
+		fmt.Println("nothing to remove")
+		return exitOK
+	}
+	if !apply {
+		fmt.Println("\nnothing was removed — `mia gc --others --apply` removes the above; branches stay")
+		return exitOK
+	}
+	code := exitOK
+	for _, l := range found {
+		if err := git.Remove(a.Root, l.Path, false); err != nil {
+			fmt.Fprintf(os.Stderr, "mia: %s: %v\n", l.Path, err)
+			code = exitFor(err)
+			continue
+		}
+		fmt.Printf("removed %s\n", l.Path)
+	}
+	return code
 }
 
 func cmdAdopt(a *app.App, args []string, asJSON bool) int {

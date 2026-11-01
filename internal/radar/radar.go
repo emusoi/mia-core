@@ -95,6 +95,7 @@ type row struct {
 	listing *app.Listing
 	last    bool   // the worktree switched to last, other than here
 	away    string // reached by going back: what to tell the computer that handed us over
+	other   bool   // a worktree of the repository mia did not make: an agent's, another tool's
 }
 
 var (
@@ -332,6 +333,9 @@ func (m model) browseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		r := m.selected()
 		switch r.kind {
 		case worktree:
+			if r.other {
+				return adopt(r)(m)
+			}
 			return switchTo(r)(m)
 		case layer:
 			return goLayer(r)(m)
@@ -417,7 +421,8 @@ func (m model) next(step int) int {
 }
 
 // build is the rows: with nothing typed, worktrees with signals by rank,
-// then in progress, then a count of the resting; with something typed, the
+// then in progress, then a count of the resting and not mia's folded away;
+// with something typed, the
 // worktrees it finds and what can be done with the first.
 func (m model) build() []row {
 	all := m.worktrees()
@@ -475,12 +480,17 @@ func (m model) build() []row {
 		}
 		return rows
 	}
-	var signalled, progress []row
+	var signalled, progress, others []row
 	elsewhere := map[string][]row{} // by machine: listed always, never resting
 	var machines []string
-	resting := 0
+	resting, changed := 0, 0
 	for _, r := range all {
 		switch {
+		case r.other:
+			others = append(others, r)
+			if r.listing.Dirty {
+				changed++
+			}
 		case len(r.signals) > 0:
 			signalled = append(signalled, r)
 		case r.machine != "":
@@ -520,7 +530,59 @@ func (m model) build() []row {
 	if resting > 0 {
 		rows = append(rows, row{kind: group, label: fmt.Sprintf("resting  %d  — type to find one", resting)})
 	}
+	if len(others) > 0 {
+		clean := len(others) - changed
+		label := fmt.Sprintf("not mia's  %d", len(others))
+		if changed > 0 {
+			label += fmt.Sprintf(" · %d changed", changed)
+		}
+		var sweep []row
+		if clean > 0 {
+			sweep = append(sweep, row{kind: action, label: fmt.Sprintf("remove the %d clean ones — branches stay", clean), act: confirmed(
+				fmt.Sprintf("remove %d clean worktrees mia did not make? branches stay. y removes them", clean), shown("gc", "--others", "--apply"))})
+		}
+		rows = m.fold(rows, "not mia's", label, others, sweep...)
+	}
 	return rows
+}
+
+// fold is a group shut to one line until opened: its worktrees, then what
+// can be done with all of them.
+func (m model) fold(rows []row, key, label string, worktrees []row, acts ...row) []row {
+	open := m.open["·"+key]
+	head := "▸ " + label
+	if open {
+		head = "▾ " + label
+	}
+	rows = append(rows, row{kind: action, label: head, act: func(m model) (model, tea.Cmd) {
+		m.open["·"+key] = !m.open["·"+key]
+		m.rows = m.build()
+		return m, nil
+	}})
+	if !open {
+		return rows
+	}
+	rows = m.withLayers(rows, worktrees)
+	return append(rows, acts...)
+}
+
+func confirmed(question string, act func(m model) (model, tea.Cmd)) func(m model) (model, tea.Cmd) {
+	return func(m model) (model, tea.Cmd) {
+		m.confirm, m.pending = question, act
+		return m, nil
+	}
+}
+
+// removal is what ^d does to a worktree here: mia's own go with mia rm; one
+// mia did not make goes only when clean, since git will not take its changes.
+func removal(r row) func(m model) (model, tea.Cmd) {
+	if r.other {
+		if r.listing != nil && r.listing.Dirty {
+			return confirmed(r.name+" has uncommitted changes — adopt it to look, or git worktree remove --force it. any key", func(m model) (model, tea.Cmd) { return m, nil })
+		}
+		return confirmed("remove "+r.name+"? its branch stays. y removes it", shown("gc", "--others", "--apply", r.dir))
+	}
+	return confirmed("remove "+r.name+"? its branch stays. y removes it", run(r, "rm", r.name))
 }
 
 // withLayers adds each worktree's row, and under an opened stack its
@@ -571,7 +633,7 @@ func (m model) worktrees() []row {
 			continue
 		}
 		l := l
-		r := row{kind: worktree, label: l.Name, branch: l.Branch, name: l.Name, dir: l.Path, signals: l.Signals, listing: &l, last: l.Name == last}
+		r := row{kind: worktree, label: l.Name, branch: l.Branch, name: l.Name, dir: l.Path, signals: l.Signals, listing: &l, last: l.Name == last, other: !l.Adopted}
 		if len(l.Layers) > 1 {
 			key := l.Layers[0].Branch
 			if seenStack[key] {
@@ -643,6 +705,12 @@ func ago(d time.Duration) string {
 }
 
 func (m model) actionsFor(r row) []row {
+	if r.other {
+		return []row{
+			{kind: action, label: "adopt it — make it mia's", act: adopt(r)},
+			{kind: action, label: "remove it", act: removal(r)},
+		}
+	}
 	acts := []row{{kind: action, label: "switch there", act: switchTo(r)}}
 	if r.away == "" {
 		if r.machine != "" {
@@ -667,11 +735,7 @@ func (m model) actionsFor(r row) []row {
 		acts = append(acts, row{kind: action, label: "clear its signals", act: clearSignals(r)})
 	}
 	if r.machine == "" {
-		acts = append(acts, row{kind: action, label: "remove it", act: func(m model) (model, tea.Cmd) {
-			m.confirm = "remove " + r.name + "? its branch stays. y removes it"
-			m.pending = run(r, "rm", r.name)
-			return m, nil
-		}})
+		acts = append(acts, row{kind: action, label: "remove it", act: removal(r)})
 	}
 	return acts
 }
@@ -696,6 +760,8 @@ func switchTo(r row) func(m model) (model, tea.Cmd) {
 	}
 }
 
+func adopt(r row) func(m model) (model, tea.Cmd) { return shown("adopt", r.dir) }
+
 func goLayer(r row) func(m model) (model, tea.Cmd) {
 	return func(m model) (model, tea.Cmd) {
 		m.chosen = &Choice{Argv: []string{"stack", "--in", r.name, "go", r.layer}, Name: r.name}
@@ -705,6 +771,15 @@ func goLayer(r row) func(m model) (model, tea.Cmd) {
 
 func clearSignals(r row) func(m model) (model, tea.Cmd) {
 	return run(r, "signal", r.name, "clear")
+}
+
+// shown runs a mia command from the main checkout and keeps its output up
+// until a key: what was removed, and what would not go.
+func shown(argv ...string) func(m model) (model, tea.Cmd) {
+	return func(m model) (model, tea.Cmd) {
+		m.chosen = &Choice{Argv: argv, Wait: true}
+		return m, tea.Quit
+	}
 }
 
 func run(r row, argv ...string) func(m model) (model, tea.Cmd) {
