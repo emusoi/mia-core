@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/run"
@@ -41,7 +42,9 @@ func cmdAway(a *app.App, args []string) int {
 		}
 		there := exec.Command(argv[0], argv[1:]...)
 		there.Stdin, there.Stdout, there.Stderr = os.Stdin, os.Stdout, os.Stderr
+		stop := keepNoting(a, machine)
 		_ = there.Run()
+		stop()
 		picked, _ := runtime.Run(machine.SSH, "sh", "-c", `f=`+awayReturn+`; [ -f $f ] && cat $f; rm -f $f "$HOME/$1"`, "sh", app.HerePath(dir))
 		picked = strings.TrimSpace(picked)
 		switch {
@@ -53,6 +56,27 @@ func cmdAway(a *app.App, args []string) int {
 			return exitFor(a.Shell(picked, false))
 		}
 	}
+}
+
+// keepNoting tells the machine again, every pollEvery while the terminal is
+// there, what this computer has: its status line, which would, is not
+// drawn while the terminal is away. stop waits for a note being left.
+func keepNoting(a *app.App, machine runtime.Machine) (stop func()) {
+	done, stopped := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(stopped)
+		tick := time.NewTicker(pollEvery)
+		defer tick.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-tick.C:
+				_ = a.LeaveNote(machine)
+			}
+		}
+	}()
+	return func() { close(done); <-stopped }
 }
 
 // goBack leaves the pick for the computer that handed this terminal over,
