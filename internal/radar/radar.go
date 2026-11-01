@@ -35,9 +35,6 @@ type Data struct {
 	// First is set the first time mia makes a worktree in this repository:
 	// what it guessed, shown once, saved when the worktree is made.
 	First *Guess
-	// Activity is how much each worktree here moved in the last 24 hours,
-	// by its folder: commits in each of eight three-hour spans, oldest first.
-	Activity map[string][]int
 	// Away is the computer that handed this terminal here, and what it has:
 	// picking one of its worktrees hands the terminal back.
 	Away *Away

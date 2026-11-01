@@ -217,68 +217,26 @@ func (m model) rowLines(r row, on bool, width int) []string {
 	}
 	left := mark + m.glyph(r) + " " + nameStyle.Render(pad(name, 15)) + soft.Render(pad(r.branch, 18))
 	var right []string
-	if r.machine != "" {
-		right = append(right, m.colour(r.machine).Render("◆"))
-	} else if !on {
-		switch {
-		case r.name == m.data.Here:
-			right = append(right, accent.Render("● here"))
-		case r.last:
-			right = append(right, soft.Render("↩ last"))
-		}
-	}
-	if act := m.data.Activity[r.dir]; r.machine == "" && busy(act) {
-		right = append(right, m.colour(r.machine).Render(spark(act)))
-	} else {
-		right = append(right, ghost.Render("·"))
+	switch {
+	case r.machine != "":
+		right = append(right, m.colour(r.machine).Render(r.machine))
+	case r.name == m.data.Here:
+		right = append(right, accent.Render("here"))
+	case r.last:
+		right = append(right, soft.Render("last"))
 	}
 	age := ""
 	if r.listing != nil && !r.listing.LastWork.IsZero() {
 		age = ago(time.Since(r.listing.LastWork))
 	}
 	right = append(right, muted.Render(fmt.Sprintf("%4s", age)))
-	lines := []string{paint(between(left, strings.Join(right, " "), width))}
+	lines := []string{paint(between(left, strings.Join(right, "  "), width))}
 	switch {
-	case on:
-		var facts []string
-		if l := r.listing; l != nil {
-			if l.Ahead > 0 {
-				facts = append(facts, muted.Render(fmt.Sprintf("+%d ahead", l.Ahead)))
-			}
-			if l.Dirty {
-				facts = append(facts, amber.Render("✎ uncommitted"))
-			}
-			if n := len(l.Windows); n > 0 {
-				facts = append(facts, muted.Render(fmt.Sprintf("%d window%s", n, map[bool]string{true: "", false: "s"}[n == 1])))
-			}
-		}
-		if r.machine != "" {
-			facts = append(facts, m.colour(r.machine).Render("on "+r.machine))
-		} else if r.name == m.data.Here {
-			facts = append(facts, accent.Render("● here"))
-		} else if r.last {
-			facts = append(facts, soft.Render("↩ last"))
-		}
-		if len(r.signals) > 0 {
-			s := r.signals[0]
-			facts = append([]string{Style(s.Style).Render(s.Kind) + " " + soft.Render(s.Text)}, facts...)
-		}
-		lines = append(lines, paint("      "+strings.Join(facts, muted.Render("  ·  "))))
 	case len(r.signals) > 0:
 		s := r.signals[0]
 		lines = append(lines, "      "+ghost.Render("└ ")+Style(s.Style).Bold(true).Render(s.Kind)+"  "+soft.Render(cut(s.Text, width-16)))
 	}
 	return lines
-}
-
-// busy says whether a worktree moved at all in its last day.
-func busy(activity []int) bool {
-	for _, n := range activity {
-		if n > 0 {
-			return true
-		}
-	}
-	return false
 }
 
 // glyph says the worktree's state before its name: a signal in its
@@ -291,24 +249,6 @@ func (m model) glyph(r row) string {
 		return m.colour(r.machine).Render("◐")
 	}
 	return muted.Render("○")
-}
-
-func spark(values []int) string {
-	ramp := []rune("▁▂▃▄▅▆▇█")
-	top := 0
-	for _, v := range values {
-		top = max(top, v)
-	}
-	var b strings.Builder
-	for _, v := range values {
-		switch {
-		case v == 0:
-			b.WriteRune('▁')
-		case top > 0:
-			b.WriteRune(ramp[min(1+v*6/top, 7)])
-		}
-	}
-	return b.String()
 }
 
 // stage is the selected worktree in full: where it is, its signal in a
