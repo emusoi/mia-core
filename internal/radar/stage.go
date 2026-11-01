@@ -54,8 +54,8 @@ type filter struct {
 func (m model) filters() []filter {
 	fs := []filter{
 		{"all", func(r row) bool { return !r.other }},
-		{"signals", func(r row) bool { return len(r.signals) > 0 }},
-		{"here", func(r row) bool { return r.machine == "" && !r.other }},
+		{"needs you", func(r row) bool { return len(r.signals) > 0 }},
+		{"local", func(r row) bool { return r.machine == "" && !r.other }},
 	}
 	seen := map[string]bool{}
 	for _, r := range m.worktrees() {
@@ -83,40 +83,39 @@ func (m model) View() string {
 	if m.mode == making {
 		return m.formView()
 	}
-	full := max(m.width-1, 40)
-	listW := full
-	var stage []string
-	room := max(m.height-6, 4)
-	if full >= 90 {
-		listW = min(max(full*42/100, 44), 64)
-		stage = m.stage(full-listW-3, room)
+	full := max(m.width-1, 30)
+	if m.data.Dash && full >= 110 {
+		return m.dashView(full)
 	}
+	room := max(m.height-2, 4)
 	var b strings.Builder
 	prompt := edge.Render("› ")
+	if f := m.filters()[m.filter]; m.filter > 0 {
+		prompt += m.colour(f.label).Render(f.label) + "  "
+	}
 	if m.query == "" {
-		prompt += accent.Render("█") + ghost.Render("  find a worktree, a branch, an action")
+		prompt += accent.Render("█") + ghost.Render(" find")
 	} else {
 		prompt += ink.Render(m.query) + accent.Render("█")
 	}
-	b.WriteString(between(prompt, m.machinesLine(), full) + "\n\n")
-	b.WriteString(m.tabsLine(full) + "\n\n")
-
-	list := m.listLines(listW, room)
-	for i := 0; i < room; i++ {
-		left := ""
-		if i < len(list) {
-			left = list[i]
+	b.WriteString(between(prompt, m.machinesLine(), full) + "\n")
+	body := m.listLines(full, room)
+	if m.look {
+		if stage := m.stage(full, room); stage != nil {
+			body = stage
 		}
-		if stage != nil {
-			right := ""
-			if i < len(stage) {
-				right = stage[i]
-			}
-			left = left + strings.Repeat(" ", max(listW-lipgloss.Width(left), 0)) + "   " + right
-		}
-		b.WriteString(left + "\n")
 	}
-	foot := keys("⏎", "switch") + keys("^n", "new") + keys("tab", "filter") + keys("←→", "windows") + keys("^x", "clear signal") + keys("^d", "remove") + keys("esc", "close")
+	for i := 0; i < room; i++ {
+		if i < len(body) {
+			b.WriteString(body[i])
+		}
+		b.WriteString("\n")
+	}
+	look := "look"
+	if m.look {
+		look = "back"
+	}
+	foot := keys("⏎", "switch") + keys("^n", "new") + keys("^d", "remove") + keys("?", look) + keys("tab", "filter") + keys("esc", "close")
 	if m.confirm != "" {
 		foot = Style("yellow").Render(m.confirm)
 	}
@@ -124,6 +123,41 @@ func (m model) View() string {
 	return b.String()
 }
 
+// dashView is the radar full-screen: the tabs counted out, the list on the
+// left and the selected worktree in full beside it.
+func (m model) dashView(full int) string {
+	room := max(m.height-6, 4)
+	listW := min(full*40/100, 68)
+	var b strings.Builder
+	prompt := edge.Render("› ")
+	if m.query == "" {
+		prompt += accent.Render("█") + ghost.Render(" find")
+	} else {
+		prompt += ink.Render(m.query) + accent.Render("█")
+	}
+	b.WriteString(between(prompt, m.machinesLine(), full) + "\n\n")
+	b.WriteString(m.tabsLine(full) + "\n\n")
+	list, stage := m.listLines(listW, room), m.stage(full-listW-3, room)
+	for i := 0; i < room; i++ {
+		left, right := "", ""
+		if i < len(list) {
+			left = list[i]
+		}
+		if i < len(stage) {
+			right = stage[i]
+		}
+		b.WriteString(left + strings.Repeat(" ", max(listW-lipgloss.Width(left), 0)) + "   " + right + "\n")
+	}
+	foot := keys("⏎", "switch") + keys("^n", "new") + keys("^d", "remove") + keys("←→", "windows") + keys("^x", "clear") + keys("tab", "filter") + keys("esc", "quit")
+	if m.confirm != "" {
+		foot = Style("yellow").Render(m.confirm)
+	}
+	b.WriteString(cut(foot, full))
+	return b.String()
+}
+
+// tabsLine is what tab walks, each with its count: everything, what needs
+// you, this computer's, then each machine's.
 func (m model) tabsLine(width int) string {
 	var parts []string
 	all := m.worktrees()
@@ -134,18 +168,16 @@ func (m model) tabsLine(width int) string {
 				n++
 			}
 		}
-		label := f.label + " " + fmt.Sprint(n)
 		style := muted
-		if i > 2 {
+		switch {
+		case i > 2:
 			style = m.colour(f.label)
+		case i == 1 && n > 0:
+			style = Style("yellow")
 		}
-		if i == 1 && n > 0 {
-			style = Style("red")
-		}
+		label := style.Render(f.label + " " + fmt.Sprint(n))
 		if i == m.filter {
 			label = inkB.Underline(true).Render(f.label) + " " + soft.Render(fmt.Sprint(n))
-		} else {
-			label = style.Render(label)
 		}
 		parts = append(parts, label)
 	}
@@ -159,9 +191,6 @@ func (m model) listLines(width, room int) []string {
 	cursorAt := 0
 	for i, r := range m.rows {
 		on := i == m.cursor
-		if r.kind == group && i > 0 {
-			lines = append(lines, "")
-		}
 		if on {
 			cursorAt = len(lines)
 		}
@@ -395,7 +424,7 @@ func squeeze(lines []string) []string {
 }
 
 func keys(key, label string) string {
-	return inkB.Render(key) + " " + muted.Render(label) + "    "
+	return inkB.Render(key) + " " + muted.Render(label) + "  "
 }
 
 func (m model) machinesLine() string {

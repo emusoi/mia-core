@@ -22,6 +22,7 @@ func cmdRadar(a *app.App, args []string) int {
 	if err != nil {
 		return fail(err)
 	}
+	data.Dash = take(&args, "--dash")
 	if a.PollDue(pollEvery) {
 		pollInBackground(a.Root)
 	}
@@ -145,7 +146,7 @@ func tmuxSnippet(self string) string {
 set -g status-interval 5
 set -g status-right-length 160
 set -ga status-right ' #(` + mia + ` status-line "#{pane_current_path}") '
-bind Space display-popup -E -d "#{pane_current_path}" -w 80% -h 75% -T " mia " "` + mia + ` radar"
+bind Space display-popup -E -d "#{pane_current_path}" -w 72 -h 60% -T " mia " "` + mia + ` radar"
 bind n display-popup -E -d "#{pane_current_path}" -w 110 -h 14 -T " new worktree " "` + mia + ` radar --new"
 # mia: end
 `

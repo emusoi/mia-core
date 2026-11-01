@@ -47,7 +47,7 @@ var verbs = []Verb{
 	{"signal", "mia signal <worktree> <kind> [text] [--style s] [--rank n] [--from source] [--for d|--until seen] · clear · ls", "what anything outside mia says about a worktree, shown as its setter asks", false, ""},
 	{"api", "mia api <query>", "structured state, for clients and scripts", true, ""},
 	{"plugin", "mia plugin [ls|enable <name>|disable <name>]", "programs named mia-<name> that add verbs; installed on PATH, run once enabled", true, ""},
-	{"dash", "mia dash", "the radar, under its old name", false, ""},
+	{"dash", "mia dash", "the radar full-screen: the same rows, the selected worktree beside them", false, ""},
 	{"rename", "mia rename <worktree> <name>", "give a worktree the name you want; its session follows now, its container on its next start", false, ""},
 	{"open", "mia open [worktree] [--in <cursor|code|zed|idea|subl|xcode|finder|terminal>]", "open the worktree in your editor, IDE, Finder or a terminal", false, ""},
 	{"star", "mia star [worktree]", "mark the worktree you are on right now, or unmark it", false, ""},

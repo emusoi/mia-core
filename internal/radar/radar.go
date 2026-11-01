@@ -40,6 +40,8 @@ type Data struct {
 	// Away is the computer that handed this terminal here, and what it has:
 	// picking one of its worktrees hands the terminal back.
 	Away *Away
+	// Dash: the same radar full-screen, the selected worktree beside the list.
+	Dash bool
 }
 
 // Away is the note a computer leaves on a machine about itself.
@@ -156,6 +158,7 @@ type model struct {
 	commits map[string][]git.Commit // the preview's, by worktree, fetched as the cursor reaches it
 	screens map[string]string       // each worktree's session as it looks, by row name
 	filter  int                     // 0 all, 1 signals, 2 here, then one per machine
+	look    bool                    // the selected worktree in full, in place of the list
 	window  map[string]int          // the window the stage shows, by row name
 }
 
@@ -325,6 +328,9 @@ func (m model) browseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			delete(m.screens, r.name)
 			return m, m.capture(r)
 		}
+	case "?":
+		m.look = !m.look
+		return m, nil
 	case "ctrl+d":
 		if r := m.selected(); r.kind == worktree && r.machine == "" && r.listing != nil && !r.listing.Main {
 			return removal(r)(m)
@@ -425,7 +431,7 @@ func (m model) next(step int) int {
 }
 
 // build is the rows: with nothing typed, worktrees with signals by rank,
-// then in progress, then idle and not mia's folded away; with something typed, the
+// then active, then idle and not mia's folded away; with something typed, the
 // worktrees it finds and what can be done with the first.
 func (m model) build() []row {
 	all := m.worktrees()
@@ -510,11 +516,11 @@ func (m model) build() []row {
 	sort.SliceStable(signalled, func(i, j int) bool { return signalled[i].signals[0].Rank < signalled[j].signals[0].Rank })
 	var rows []row
 	if len(signalled) > 0 {
-		rows = append(rows, row{kind: group, label: "signals"})
+		rows = append(rows, row{kind: group, label: "needs you  " + fmt.Sprint(len(signalled))})
 		rows = m.withLayers(rows, signalled)
 	}
 	if len(active) > 0 {
-		rows = append(rows, row{kind: group, label: fmt.Sprintf("in progress  %d", len(active))})
+		rows = append(rows, row{kind: group, label: fmt.Sprintf("active  %d", len(active))})
 		rows = m.withLayers(rows, active)
 	}
 	for _, machine := range machines {
