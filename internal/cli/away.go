@@ -1,25 +1,19 @@
 package cli
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/app"
-	"github.com/emusoi/mia-core/internal/radar"
 	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/runtime"
 )
 
 // Where a machine keeps the note of the computer that handed it this
 // terminal, and the worktree picked to go to from there.
-const (
-	awayNote   = "~/.local/share/mia/away.json"
-	awayReturn = "~/.local/share/mia/away.return"
-)
+const awayReturn = "~/.local/share/mia/away.return"
 
 // cmdAway is mia away <worktree>@<machine> --back <socket> <session>: this
 // terminal on the machine's tmux, until it is detached there. The machine
@@ -38,7 +32,9 @@ func cmdAway(a *app.App, args []string) int {
 		if err != nil {
 			return fail(err)
 		}
-		leaveNote(a, machine)
+		_ = a.LeaveNote(machine)
+		dir, _ := a.RemoteDir()
+		_, _ = runtime.Run(machine.SSH, "sh", "-c", `mkdir -p "$(dirname "$HOME/$1")" && touch "$HOME/$1"`, "sh", app.HerePath(dir))
 		argv, err := a.AttachArgv(machine, name)
 		if err != nil {
 			return fail(err)
@@ -46,7 +42,7 @@ func cmdAway(a *app.App, args []string) int {
 		there := exec.Command(argv[0], argv[1:]...)
 		there.Stdin, there.Stdout, there.Stderr = os.Stdin, os.Stdout, os.Stderr
 		_ = there.Run()
-		picked, _ := runtime.Run(machine.SSH, "sh", "-c", `f=`+awayReturn+`; [ -f $f ] && cat $f; rm -f $f `+awayNote)
+		picked, _ := runtime.Run(machine.SSH, "sh", "-c", `f=`+awayReturn+`; [ -f $f ] && cat $f; rm -f $f "$HOME/$1"`, "sh", app.HerePath(dir))
 		picked = strings.TrimSpace(picked)
 		switch {
 		case picked == "":
@@ -57,57 +53,6 @@ func cmdAway(a *app.App, args []string) int {
 			return exitFor(a.Shell(picked, false))
 		}
 	}
-}
-
-// leaveNote tells the machine this computer's worktrees, and the other
-// machines' as this computer last heard them, for its radar to offer.
-func leaveNote(a *app.App, machine runtime.Machine) {
-	dir, err := a.RemoteDir()
-	if err != nil {
-		return
-	}
-	note := radar.Away{From: shortHost(), Repo: dir}
-	if local, err := a.List(); err == nil {
-		for _, l := range local {
-			if l.Adopted && !l.Main {
-				note.Worktrees = append(note.Worktrees, l)
-			}
-		}
-	}
-	for _, state := range a.KnownMachines() {
-		if state.Name == runtime.Local || state.Name == machine.Name {
-			continue
-		}
-		note.Worktrees = append(note.Worktrees, state.Worktrees...)
-	}
-	data, err := json.Marshal(note)
-	if err != nil {
-		return
-	}
-	put := runtime.Command(machine.SSH, "sh", "-c", "mkdir -p ~/.local/share/mia && cat > "+awayNote)
-	put.Stdin = bytes.NewReader(data)
-	_ = put.Run()
-}
-
-// readNote is the note a computer left here when it handed this terminal
-// over, if it is about this repository.
-func readNote(a *app.App) *radar.Away {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil
-	}
-	data, err := os.ReadFile(strings.Replace(awayNote, "~", home, 1))
-	if err != nil {
-		return nil
-	}
-	var note radar.Away
-	if json.Unmarshal(data, &note) != nil {
-		return nil
-	}
-	if dir, err := a.RemoteDir(); err != nil || dir != note.Repo {
-		return nil
-	}
-	return &note
 }
 
 // goBack leaves the pick for the computer that handed this terminal over,
@@ -126,15 +71,6 @@ func goBack(picked string) error {
 		return fmt.Errorf("detach: %s", strings.TrimSpace(out))
 	}
 	return nil
-}
-
-func shortHost() string {
-	host, err := os.Hostname()
-	if err != nil {
-		return "the computer you came from"
-	}
-	host, _, _ = strings.Cut(host, ".")
-	return host
 }
 
 func syscallExec(argv ...string) error {

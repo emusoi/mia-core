@@ -40,12 +40,8 @@ type Data struct {
 	Away *Away
 }
 
-// Away is the note a computer leaves on a machine it hands a terminal to.
-type Away struct {
-	From      string        `json:"from"`
-	Repo      string        `json:"repo"`
-	Worktrees []app.Listing `json:"worktrees"` // its own, and other machines' as it heard them
-}
+// Away is the note a computer leaves on a machine about itself.
+type Away = app.Note
 
 type Guess struct {
 	Base  string
@@ -486,6 +482,9 @@ func (m model) build() []row {
 	}
 	for _, machine := range machines {
 		label := fmt.Sprintf("on %s  %d", machine, len(elsewhere[machine]))
+		if a := m.data.Away; a != nil && machine == a.From && !a.At.IsZero() {
+			label += "  · as it was " + ago(time.Since(a.At)) + " ago"
+		}
 		for _, state := range m.data.Machines {
 			if state.Name == machine && !state.Answers {
 				label += "  ○ not answering — as it said last"
@@ -567,6 +566,9 @@ func (m model) worktrees() []row {
 			machine, back := a.From, l.Name
 			if l.Machine != "" {
 				machine, back = l.Machine, l.Name+"@"+l.Machine
+			}
+			if !a.Here {
+				back = "!" + a.From // shown, but there is no way back from here
 			}
 			rows = append(rows, row{kind: worktree, label: l.Name, branch: l.Branch, name: l.Name + "@" + machine,
 				machine: machine, signals: l.Signals, detail: listingDetail(l), listing: &l, away: back})
@@ -652,6 +654,11 @@ func (m model) actionsFor(r row) []row {
 
 func switchTo(r row) func(m model) (model, tea.Cmd) {
 	return func(m model) (model, tea.Cmd) {
+		if strings.HasPrefix(r.away, "!") {
+			m.confirm = "you came to this machine another way — switch from " + strings.TrimPrefix(r.away, "!")
+			m.pending = func(m model) (model, tea.Cmd) { return m, nil }
+			return m, nil
+		}
 		if r.away != "" {
 			m.chosen = &Choice{Return: r.away}
 			return m, tea.Quit

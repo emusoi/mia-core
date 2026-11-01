@@ -42,7 +42,7 @@ func radarData(a *app.App) (radar.Data, error) {
 		data.Here, data.HereDir = record.Name, record.Path
 		data.Branch = git.CurrentBranch(record.Path)
 	}
-	data.Away = readNote(a)
+	data.Away = a.ReadNote()
 	if _, err := os.Stat(filepath.Join(a.MiaDir, "config.toml")); os.IsNotExist(err) {
 		data.First = &radar.Guess{Base: data.Base, Setup: radar.GuessSetup(a.Root)}
 	}

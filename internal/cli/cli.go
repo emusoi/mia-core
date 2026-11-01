@@ -131,7 +131,13 @@ func Run(args []string) int {
 		return cmdMove(a, rest)
 	case "machine", "machines", "runtime":
 		if rest[0] == "poll" {
-			a.Machines() // asking leaves each machine's answer where the status line reads it
+			// asking leaves each machine's answer where the status line reads
+			// it; each machine linked here is told, in turn, what this computer has
+			for _, state := range a.Machines() {
+				if state.Answers && state.Name != runtime.Local && git.HasRemote(a.Root, state.Name) {
+					_ = a.LeaveNote(state.Machine)
+				}
+			}
 			return exitOK
 		}
 		if rest[0] == "link" {

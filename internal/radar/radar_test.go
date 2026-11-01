@@ -170,7 +170,7 @@ func TestAMachinesWorktreesHaveTheirOwnPlaceAndNeverRest(t *testing.T) {
 
 func TestFromAMachineTheComputerYouCameFromIsOneSwitchAway(t *testing.T) {
 	d := data()
-	d.Away = &Away{From: "laptop", Worktrees: []app.Listing{{Name: "mianzini", Branch: "dash"}, {Name: "kisongo", Branch: "x", Machine: "box"}}}
+	d.Away = &Away{From: "laptop", Here: true, Worktrees: []app.Listing{{Name: "mianzini", Branch: "dash"}, {Name: "kisongo", Branch: "x", Machine: "box"}}}
 	m := model{data: d, open: map[string]bool{}}
 	rows := m.build()
 	got := labels(rows)
@@ -245,4 +245,20 @@ func TestTheMakingIsReadAsSteps(t *testing.T) {
 	if got := state(shipping.steps()); got != "ship mia:run worktree:run session:wait" {
 		t.Errorf("shipping first: %s", got)
 	}
+}
+
+func TestArrivingAnotherWayItShowsTheComputerButCannotGoBack(t *testing.T) {
+	d := data()
+	d.Away = &Away{From: "laptop", Worktrees: []app.Listing{{Name: "mianzini", Branch: "dash"}}}
+	m := model{data: d, open: map[string]bool{}}
+	for _, r := range m.build() {
+		if r.label == "mianzini" {
+			next, _ := switchTo(r)(m)
+			if next.chosen != nil || !strings.Contains(next.confirm, "switch from laptop") {
+				t.Errorf("no way back from here: chosen %+v, said %q", next.chosen, next.confirm)
+			}
+			return
+		}
+	}
+	t.Error("the laptop's worktrees are still listed")
 }
