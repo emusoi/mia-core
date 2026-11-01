@@ -262,3 +262,19 @@ func TestArrivingAnotherWayItShowsTheComputerButCannotGoBack(t *testing.T) {
 	}
 	t.Error("the laptop's worktrees are still listed")
 }
+
+func TestTypingFindsAPluginsCommandAndRunsItInThePopup(t *testing.T) {
+	d := data()
+	d.Verbs = []Verb{{Name: "cost", Help: "what each worktree's coding agents have cost"}}
+	m := model{data: d, open: map[string]bool{}, query: "cost"}
+	for _, r := range m.build() {
+		if strings.HasPrefix(r.label, "cost") {
+			next, _ := r.act(m)
+			if next.chosen == nil || !slices.Equal(next.chosen.Argv, []string{"cost"}) || !next.chosen.Wait {
+				t.Errorf("⏎ runs mia cost and keeps its output up: %+v", next.chosen)
+			}
+			return
+		}
+	}
+	t.Errorf("cost not offered: %q", labels(m.build()))
+}

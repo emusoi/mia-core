@@ -35,6 +35,8 @@ type Data struct {
 	// First is set the first time mia makes a worktree in this repository:
 	// what it guessed, shown once, saved when the worktree is made.
 	First *Guess
+	// Verbs are the plugins' commands, found by typing and run in the popup.
+	Verbs []Verb
 	// Away is the computer that handed this terminal here, and what it has:
 	// picking one of its worktrees hands the terminal back.
 	Away *Away
@@ -42,6 +44,11 @@ type Data struct {
 
 // Away is the note a computer leaves on a machine about itself.
 type Away = app.Note
+
+// Verb is a plugin's command, as the radar offers it.
+type Verb struct {
+	Name, Help string
+}
 
 type Guess struct {
 	Base  string
@@ -57,6 +64,8 @@ type Choice struct {
 	Name   string // a local worktree to switch to
 	Config *Guess // write this config first
 	Stream bool   // show its output while it runs (making a worktree)
+	// Wait: keep the popup open on the command's output until a key.
+	Wait bool
 	// Return: go back to the computer that handed this terminal here, to
 	// this worktree of its — name, or name@machine for another machine's.
 	Return string
@@ -441,6 +450,21 @@ func (m model) build() []row {
 			rows = append(rows, m.actionsFor(found[0])...)
 		}
 		typed := strings.TrimSpace(m.query)
+		var verbs []row
+		for _, v := range m.data.Verbs {
+			if strings.HasPrefix(v.Name, q) || strings.Contains(strings.ToLower(v.Help), q) {
+				argv := []string{v.Name}
+				verbs = append(verbs, row{kind: action, label: v.Name + "  —  " + v.Help, act: func(m model) (model, tea.Cmd) {
+					m.chosen = &Choice{Argv: argv, Wait: true}
+					return m, tea.Quit
+				}})
+			}
+		}
+		if len(verbs) > 0 {
+			rows = append(rows, row{kind: group, label: "plugins"})
+			rows = append(rows, verbs...)
+			found = append(found, verbs...) // a verb found is not "nothing called"
+		}
 		switch {
 		case strings.HasPrefix("new worktree", q) || strings.HasPrefix(q, "new"):
 			rows = append(rows, row{kind: group, label: "everything else"},

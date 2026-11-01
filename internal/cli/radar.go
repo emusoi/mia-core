@@ -17,6 +17,7 @@ import (
 // or straight to making a new worktree. What it picks runs once it closes.
 func cmdRadar(a *app.App, args []string) int {
 	newOnly := take(&args, "--new")
+	pickTo := takeValue(&args, "--pick-to")
 	data, err := radarData(a)
 	if err != nil {
 		return fail(err)
@@ -27,6 +28,14 @@ func cmdRadar(a *app.App, args []string) int {
 	choice, err := radar.Run(data, newOnly)
 	if err != nil || choice == nil {
 		return exitFor(err)
+	}
+	if pickTo != "" && choice.Name != "" && len(choice.Argv) == 0 {
+		// picked for someone else — an editor — to go to: say where, do not switch
+		path, err := a.RecordOrHere(choice.Name)
+		if err != nil {
+			return fail(err)
+		}
+		return exitFor(os.WriteFile(pickTo, []byte(path.Path+"\n"), 0o600))
 	}
 	return exitFor(carryOut(a, *choice))
 }
@@ -43,6 +52,13 @@ func radarData(a *app.App) (radar.Data, error) {
 		data.Branch = git.CurrentBranch(record.Path)
 	}
 	data.Away = a.ReadNote()
+	if plugins, err := enabledPlugins(a); err == nil {
+		for _, p := range plugins {
+			for _, v := range p.Manifest.Verbs {
+				data.Verbs = append(data.Verbs, radar.Verb{Name: v.Name, Help: v.Help})
+			}
+		}
+	}
 	if _, err := os.Stat(filepath.Join(a.MiaDir, "config.toml")); os.IsNotExist(err) {
 		data.First = &radar.Guess{Base: data.Base, Setup: radar.GuessSetup(a.Root)}
 	}
@@ -62,7 +78,12 @@ func carryOut(a *app.App, choice radar.Choice) error {
 			cmd.Dir = a.Root
 		}
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-		if err := cmd.Run(); err != nil {
+		err = cmd.Run()
+		if choice.Wait {
+			fmt.Print("\n⏎ back")
+			_, _ = fmt.Scanln()
+		}
+		if err != nil {
 			return err
 		}
 	}

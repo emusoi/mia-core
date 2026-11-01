@@ -25,34 +25,20 @@ import (
 	"github.com/emusoi/mia-core/internal/run"
 )
 
+// cmdDash is the radar now, under its old name: an editor that asks for a
+// worktree with --pick-to, a key bound to mia dash, both keep working.
 func cmdDash(a *app.App, args []string) int {
-	if n := takeValue(&args, "--side"); n != "" {
-		if !slices.Contains(tui.SideKeys, n) {
-			return usageErr("mia dash --side <1|2|3|4>")
-		}
-		startSide = n
+	takeValue(&args, "--side")
+	take(&args, "--popup")
+	take(&args, "--switch")
+	radarArgs := []string{}
+	if pick := takeValue(&args, "--pick-to"); pick != "" {
+		radarArgs = append(radarArgs, "--pick-to", pick)
 	}
-	if take(&args, "--popup") {
-		return popup(a)
+	if do := takeValue(&args, "--do"); do == "new" || do == "branch" {
+		radarArgs = append(radarArgs, "--new")
 	}
-	pickTo := takeValue(&args, "--pick-to")
-	switching := take(&args, "--switch")
-	doing := takeValue(&args, "--do")
-	name, target := "dashboard", ""
-	if len(args) > 0 {
-		name = args[0]
-		if !strings.HasSuffix(name, "-panel") && name != "dashboard" && !strings.HasPrefix(name, "plugin:") {
-			name += "-panel"
-		}
-	}
-	if len(args) > 1 {
-		target = args[1]
-	}
-	defer startServers(a)()
-	if doing != "" {
-		return do(a, doing, pickTo)
-	}
-	return browse(a, name, target, pickTo, switching)
+	return cmdRadar(a, radarArgs)
 }
 
 // cmdSide is `mia side N`: one side of the room alone, as the prefix-m
