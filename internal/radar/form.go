@@ -10,6 +10,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/emusoi/mia-core/internal/mark"
 )
 
 const (
@@ -32,6 +34,10 @@ type form struct {
 	down   map[string]bool // machines that did not answer last
 
 	started bool
+	began   time.Time
+	ticks   int
+	showLog bool
+	seen    map[string]time.Time // when each step was first seen running, and done
 	log     string
 	lines   []string
 	done    bool
@@ -102,6 +108,9 @@ func (m model) formKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	f := &m.form
 	if f.started {
 		switch msg.String() {
+		case "l":
+			f.showLog = !f.showLog
+			return m, nil
 		case "esc", "q":
 			return m, tea.Quit // what is being made keeps going
 		case "enter":
@@ -190,7 +199,7 @@ func (m model) start() (tea.Model, tea.Cmd) {
 		f.started, f.done, f.err = true, true, err
 		return m, nil
 	}
-	f.started, f.log = true, logFile.Name()
+	f.started, f.log, f.began, f.seen = true, logFile.Name(), time.Now(), map[string]time.Time{}
 	wait := func() tea.Msg {
 		err := cmd.Wait()
 		logFile.Close()
@@ -203,6 +212,7 @@ func (m model) follow(msg tea.Msg) (model, tea.Cmd) {
 	f := &m.form
 	switch msg := msg.(type) {
 	case tick:
+		f.ticks++
 		if data, err := os.ReadFile(f.log); err == nil {
 			f.lines = strings.Split(strings.TrimRight(string(data), "\n"), "\n")
 		}
@@ -237,30 +247,7 @@ func (m model) formView() string {
 	width := max(m.width-2, 40)
 	var b strings.Builder
 	if f.started {
-		branch := strings.TrimSpace(f.branch)
-		b.WriteString(inkB.Render("making "+branch) + "\n\n")
-		room := max(m.height-6, 4)
-		lines := f.lines
-		if len(lines) > room {
-			lines = lines[len(lines)-room:]
-		}
-		for _, line := range lines {
-			b.WriteString(muted.Render(cut(line, width)) + "\n")
-		}
-		for i := len(lines); i < room; i++ {
-			b.WriteString("\n")
-		}
-		switch {
-		case !f.done:
-			b.WriteString(faint.Render("esc  back to your window; it keeps going"))
-		case f.err != nil:
-			b.WriteString(Style("red").Render("✗ "+f.err.Error()) + faint.Render("   esc close"))
-		case f.made != "":
-			b.WriteString(Style("green").Render("✓ made "+f.made) + faint.Render("   ⏎ switch there  ·  esc close"))
-		default:
-			b.WriteString(Style("green").Render("✓ done") + faint.Render("   esc close"))
-		}
-		return b.String()
+		return m.makingView(width)
 	}
 	b.WriteString(italic.Render("branch") + "\n")
 	cursor := ""
@@ -379,4 +366,165 @@ func GuessSetup(root string) []string {
 		}
 	}
 	return nil
+}
+
+type step struct {
+	name, detail string
+	state        string // wait, run, done, fail
+	live         string // the last thing it printed, while it runs
+}
+
+// steps reads what mia new printed so far as the steps of making a
+// worktree: shipping mia to a machine, the worktree, its setup, its session.
+func (f form) steps() []step {
+	var steps []step
+	setupAt, setupWith, name := -1, "", madeName(f.lines)
+	shipping := false
+	for i, line := range f.lines {
+		if strings.HasPrefix(line, "shipping this mia to") {
+			shipping = true
+		}
+		if who, with, ok := strings.Cut(line, ": setting up with "); ok && setupAt < 0 {
+			setupAt, setupWith = i, with
+			if name == "" {
+				name = who
+			}
+		}
+	}
+	failed := f.done && f.err != nil
+	if shipping {
+		state := "done"
+		if setupAt < 0 && name == "" && !f.done {
+			state = "run"
+		}
+		steps = append(steps, step{name: "ship mia", detail: "this mia, built for that machine", state: state})
+	}
+	worktree := step{name: "worktree", state: "run"}
+	if setupAt >= 0 || name != "" {
+		worktree.state, worktree.detail = "done", strings.Split(name, "@")[0]
+	}
+	steps = append(steps, worktree)
+	if setupAt >= 0 {
+		setup := step{name: "setup", detail: setupWith, state: "run"}
+		if madeName(f.lines) != "" || (f.done && !failed) {
+			setup.state = "done"
+		}
+		for i := len(f.lines) - 1; i > setupAt; i-- {
+			if line := strings.TrimSpace(f.lines[i]); line != "" && !strings.Contains(line, " — ") {
+				setup.live = line
+				break
+			}
+		}
+		steps = append(steps, setup)
+	}
+	session := step{name: "session", detail: "opens when you switch there", state: "wait"}
+	if f.done && !failed {
+		session.state, session.detail = "done", "ready — ⏎ opens it"
+	}
+	steps = append(steps, session)
+	if failed {
+		for i := range steps {
+			if steps[i].state == "run" || (steps[i].state == "wait" && i == len(steps)-1 && worktree.state == "run") {
+				steps[i].state = "fail"
+				break
+			}
+		}
+	}
+	return steps
+}
+
+var spinner = []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
+
+// makingView is the making of a worktree: mia's mark at work on the left,
+// the steps on the right with how long each took, the keys on a line of
+// their own.
+func (m model) makingView(width int) string {
+	f := m.form
+	now := time.Now()
+	steps := f.steps()
+	for _, s := range steps {
+		if _, ok := f.seen[s.name]; !ok && s.state != "wait" {
+			f.seen[s.name] = now
+		}
+		if _, ok := f.seen[s.name+"/done"]; !ok && s.state == "done" {
+			f.seen[s.name+"/done"] = now
+		}
+	}
+	argv, _ := f.argv(m.data)
+	where := "this computer"
+	for i, a := range argv {
+		if a == "--on" && i+1 < len(argv) {
+			where = argv[i+1]
+		}
+	}
+	var right []string
+	right = append(right, muted.Render("making ")+inkB.Render(strings.TrimSpace(f.branch))+muted.Render("   from ")+ink.Render(f.from[f.fromAt])+"   "+m.colour(where).Render("◆ "+where), "")
+	for _, s := range steps {
+		glyph := ghost.Render("·")
+		nameStyle, detailStyle := ghost, ghost
+		switch s.state {
+		case "done":
+			glyph, nameStyle, detailStyle = Style("green").Render("✓"), inkB, ink
+		case "run":
+			glyph, nameStyle, detailStyle = accent.Render(spinner[f.ticks%len(spinner)]), inkB, ink
+		case "fail":
+			glyph, nameStyle, detailStyle = Style("red").Render("✗"), Style("red").Bold(true), Style("red")
+		}
+		took := ""
+		if began, ok := f.seen[s.name]; ok && s.name != "session" {
+			end, finished := f.seen[s.name+"/done"]
+			if !finished {
+				end = now
+			}
+			took = fmt.Sprintf("%.1fs", end.Sub(began).Seconds())
+		}
+		right = append(right, between(glyph+"  "+nameStyle.Render(pad(s.name, 11))+detailStyle.Render(s.detail), muted.Render(took), width-25))
+		if s.state == "run" && s.live != "" {
+			right = append(right, "   "+line_.Render("│ ")+ghost.Render(cut(s.live, width-32)))
+		}
+	}
+	right = append(right, "")
+	switch {
+	case f.done && f.err != nil:
+		right = append(right, Style("red").Render("✗ "+cut(f.err.Error(), width-28)))
+	case f.done && f.made != "":
+		right = append(right, Style("green").Render("✓ made ")+inkB.Render(f.made)+muted.Render(fmt.Sprintf("  —  ready in %.0fs", now.Sub(f.began).Seconds())))
+	}
+	grid := mark.Grid(float64(f.ticks) * 0.15)
+	var b strings.Builder
+	rows := max(len(grid), len(right))
+	if f.showLog {
+		rows = 0
+		lines := f.lines
+		if room := max(m.height-4, 4); len(lines) > room {
+			lines = lines[len(lines)-room:]
+		}
+		for _, l := range lines {
+			b.WriteString(muted.Render(cut(l, width)) + "\n")
+		}
+	}
+	for i := 0; i < rows; i++ {
+		left := strings.Repeat(" ", 19)
+		if i < len(grid) {
+			left = grid[i]
+		}
+		r := ""
+		if i < len(right) {
+			r = right[i]
+		}
+		b.WriteString(left + "    " + r + "\n")
+	}
+	for used := strings.Count(b.String(), "\n"); used < m.height-2; used++ {
+		b.WriteString("\n")
+	}
+	b.WriteString(line_.Render(strings.Repeat("─", width)) + "\n")
+	switch {
+	case !f.done:
+		b.WriteString(keys("esc", "back to your window — it keeps going") + keys("l", "the whole log"))
+	case f.made != "" && f.err == nil:
+		b.WriteString(keys("⏎", "switch there") + keys("l", "the whole log") + keys("esc", "close"))
+	default:
+		b.WriteString(keys("l", "the whole log") + keys("esc", "close"))
+	}
+	return b.String()
 }

@@ -290,6 +290,11 @@ func (a *App) newWorktree(branch string) (model.Record, error) {
 	if err := a.prepare(record.Path); err != nil {
 		return record, fmt.Errorf("%s created, but preparing it failed: %w", record.Name, err)
 	}
+	if len(a.Config.Setup) > 0 {
+		// what is watching — the radar's making view — knows the worktree is
+		// there and the setup has begun
+		fmt.Fprintf(os.Stderr, "%s: setting up with %s\n", record.Name, strings.Join(a.Config.Setup, " "))
+	}
 	if err := a.runSetup(record); err != nil {
 		return record, fmt.Errorf("%s created, but setup failed: %w", record.Name, err)
 	}

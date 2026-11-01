@@ -15,10 +15,11 @@ import (
 // shown window as it is now, framed.
 
 var (
-	edge  = lipgloss.NewStyle().Foreground(lipgloss.Color("75")).Bold(true)
-	ghost = lipgloss.NewStyle().Foreground(lipgloss.Color("239"))
-	line_ = lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
-	amber = lipgloss.NewStyle().Foreground(lipgloss.Color("179"))
+	edge    = lipgloss.NewStyle().Foreground(lipgloss.Color("75")).Bold(true)
+	selBand = lipgloss.NewStyle().Background(lipgloss.Color("237"))
+	ghost   = lipgloss.NewStyle().Foreground(lipgloss.Color("239"))
+	line_   = lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
+	amber   = lipgloss.NewStyle().Foreground(lipgloss.Color("179"))
 )
 
 // machineColours gives each machine its own colour, this computer first.
@@ -159,6 +160,9 @@ func (m model) listLines(width, room int) []string {
 	cursorAt := 0
 	for i, r := range m.rows {
 		on := i == m.cursor
+		if r.kind == group && i > 0 {
+			lines = append(lines, "")
+		}
 		if on {
 			cursorAt = len(lines)
 		}
@@ -174,6 +178,9 @@ func (m model) listLines(width, room int) []string {
 	return lines[start : start+room]
 }
 
+// rowLines is a worktree in one line — state, name, branch, where, its
+// last day and how long since it moved — and a second when it is selected
+// (what is going on in it) or signalled (what the signal says).
 func (m model) rowLines(r row, on bool, width int) []string {
 	mark := "  "
 	if on {
@@ -182,12 +189,15 @@ func (m model) rowLines(r row, on bool, width int) []string {
 	paint := func(s string) string {
 		s = cut(s, width)
 		if on {
-			return sel.Render(s + strings.Repeat(" ", max(width-lipgloss.Width(s), 0)))
+			return selBand.Render(s + strings.Repeat(" ", max(width-lipgloss.Width(s), 0)))
 		}
 		return s
 	}
 	switch r.kind {
 	case group:
+		if strings.HasPrefix(r.label, "on ") {
+			return []string{m.colour(strings.Fields(r.label)[1]).Italic(true).Render(r.label)}
+		}
 		return []string{italic.Render(r.label)}
 	case action:
 		return []string{paint(mark + ink.Render(r.label))}
@@ -205,40 +215,70 @@ func (m model) rowLines(r row, on bool, width int) []string {
 	if on {
 		nameStyle = inkB
 	}
-	top := mark + m.glyph(r) + " " + nameStyle.Render(name)
-	var where string
-	switch {
-	case r.away != "" || r.machine != "":
-		where = m.colour(r.machine).Render("◆ " + r.machine)
-	case r.name == m.data.Here:
-		where = accent.Render("● here")
-	case r.last:
-		where = soft.Render("↩ last")
-	}
-	first := between(top, where, width)
-
-	second := "    " + soft.Render(cut(r.branch, 26))
-	if l := r.listing; l != nil {
-		if l.Ahead > 0 {
-			second += muted.Render(fmt.Sprintf("  +%d", l.Ahead))
-		}
-		if l.Dirty {
-			second += amber.Render("  ✎")
+	left := mark + m.glyph(r) + " " + nameStyle.Render(pad(name, 15)) + soft.Render(pad(r.branch, 18))
+	var right []string
+	if r.machine != "" {
+		right = append(right, m.colour(r.machine).Render("◆"))
+	} else if !on {
+		switch {
+		case r.name == m.data.Here:
+			right = append(right, accent.Render("● here"))
+		case r.last:
+			right = append(right, soft.Render("↩ last"))
 		}
 	}
-	right := ""
-	if act := m.data.Activity[r.dir]; len(act) > 0 && r.machine == "" {
-		right = m.colour(r.machine).Render(spark(act)) + "  "
+	if act := m.data.Activity[r.dir]; r.machine == "" && busy(act) {
+		right = append(right, m.colour(r.machine).Render(spark(act)))
+	} else {
+		right = append(right, ghost.Render("·"))
 	}
+	age := ""
 	if r.listing != nil && !r.listing.LastWork.IsZero() {
-		right += muted.Render(fmt.Sprintf("%4s", ago(time.Since(r.listing.LastWork))))
+		age = ago(time.Since(r.listing.LastWork))
 	}
-	if len(r.signals) > 0 && !on {
+	right = append(right, muted.Render(fmt.Sprintf("%4s", age)))
+	lines := []string{paint(between(left, strings.Join(right, " "), width))}
+	switch {
+	case on:
+		var facts []string
+		if l := r.listing; l != nil {
+			if l.Ahead > 0 {
+				facts = append(facts, muted.Render(fmt.Sprintf("+%d ahead", l.Ahead)))
+			}
+			if l.Dirty {
+				facts = append(facts, amber.Render("✎ uncommitted"))
+			}
+			if n := len(l.Windows); n > 0 {
+				facts = append(facts, muted.Render(fmt.Sprintf("%d window%s", n, map[bool]string{true: "", false: "s"}[n == 1])))
+			}
+		}
+		if r.machine != "" {
+			facts = append(facts, m.colour(r.machine).Render("on "+r.machine))
+		} else if r.name == m.data.Here {
+			facts = append(facts, accent.Render("● here"))
+		} else if r.last {
+			facts = append(facts, soft.Render("↩ last"))
+		}
+		if len(r.signals) > 0 {
+			s := r.signals[0]
+			facts = append([]string{Style(s.Style).Render(s.Kind) + " " + soft.Render(s.Text)}, facts...)
+		}
+		lines = append(lines, paint("      "+strings.Join(facts, muted.Render("  ·  "))))
+	case len(r.signals) > 0:
 		s := r.signals[0]
-		second = "    " + Style(s.Style).Render(s.Kind) + "  " + soft.Render(cut(s.Text, width-14))
-		right = ""
+		lines = append(lines, "      "+ghost.Render("└ ")+Style(s.Style).Bold(true).Render(s.Kind)+"  "+soft.Render(cut(s.Text, width-16)))
 	}
-	return []string{paint(first), paint(between(second, right, width)), ""}
+	return lines
+}
+
+// busy says whether a worktree moved at all in its last day.
+func busy(activity []int) bool {
+	for _, n := range activity {
+		if n > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // glyph says the worktree's state before its name: a signal in its
@@ -287,15 +327,25 @@ func (m model) stage(width, height int) []string {
 	} else {
 		head += "  " + m.colour("").Render("◆ this computer")
 	}
-	if l := r.listing; l != nil {
+	add(head)
+	if l := r.listing; l != nil && r.kind == worktree {
+		var facts []string
 		if l.Ahead > 0 {
-			head += muted.Render(fmt.Sprintf("  +%d", l.Ahead))
+			facts = append(facts, ink.Render(fmt.Sprintf("+%d", l.Ahead))+muted.Render(" ahead"))
+		}
+		if l.Dirty {
+			facts = append(facts, amber.Render("✎ uncommitted"))
 		}
 		if !l.LastWork.IsZero() {
-			head += muted.Render("  ·  " + ago(time.Since(l.LastWork)))
+			facts = append(facts, muted.Render("last commit "+ago(time.Since(l.LastWork))))
+		}
+		if len(facts) > 0 {
+			add(strings.Join(facts, muted.Render("  ·  ")))
+		}
+		if l.LastSubject != "" {
+			add(muted.Render(l.LastSubject))
 		}
 	}
-	add(head)
 	add("")
 	if r.kind == layer {
 		for _, l := range r.layers {
@@ -354,9 +404,6 @@ func (m model) stage(width, height int) []string {
 	for _, l := range lines {
 		text := ansi.Truncate(l, inner, "…") + "\x1b[0m"
 		add(line_.Render("│ ") + text + strings.Repeat(" ", max(inner-lipgloss.Width(text), 0)) + line_.Render(" │"))
-	}
-	for i := len(lines); i < room; i++ {
-		add(line_.Render("│" + strings.Repeat(" ", width-2) + "│"))
 	}
 	add(line_.Render("╰" + strings.Repeat("─", width-2) + "╯"))
 	live := Style("green").Render("live") + ghost.Render(" · as it is now")

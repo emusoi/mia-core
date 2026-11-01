@@ -1,6 +1,7 @@
 package radar
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -212,5 +213,36 @@ func TestTypingABranchThatIsNotThereOffersToMakeIt(t *testing.T) {
 	next, _ := last.act(m)
 	if next.mode != making || next.form.branch != "jk/payout-retries" {
 		t.Errorf("⏎ opens the form with the branch, prefix and all: %q", next.form.branch)
+	}
+}
+
+func TestTheMakingIsReadAsSteps(t *testing.T) {
+	state := func(steps []step) string {
+		var out []string
+		for _, s := range steps {
+			out = append(out, s.name+":"+s.state)
+		}
+		return strings.Join(out, " ")
+	}
+	f := form{lines: []string{"kalenga: setting up with npm ci", "npm warn deprecated eslint@9", "added 812 packages"}}
+	steps := f.steps()
+	if got := state(steps); got != "worktree:done setup:run session:wait" {
+		t.Errorf("while setup runs: %s", got)
+	}
+	if steps[0].detail != "kalenga" || steps[1].detail != "npm ci" || steps[1].live != "added 812 packages" {
+		t.Errorf("details: %+v", steps)
+	}
+	f.lines = append(f.lines, "kalenga — jk/test2 in a worktree of its own", "/home/me/app.kalenga")
+	f.done = true
+	if got := state(f.steps()); got != "worktree:done setup:done session:done" {
+		t.Errorf("when made: %s", got)
+	}
+	failed := form{lines: []string{"kalenga: setting up with npm ci", "npm ERR! 404"}, done: true, err: errors.New("exit status 1")}
+	if got := state(failed.steps()); got != "worktree:done setup:fail session:wait" {
+		t.Errorf("a failed setup is the step that failed: %s", got)
+	}
+	shipping := form{lines: []string{"shipping this mia to fedora (linux/amd64)…"}}
+	if got := state(shipping.steps()); got != "ship mia:run worktree:run session:wait" {
+		t.Errorf("shipping first: %s", got)
 	}
 }
