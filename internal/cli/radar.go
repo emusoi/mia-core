@@ -42,6 +42,7 @@ func radarData(a *app.App) (radar.Data, error) {
 		data.Here, data.HereDir = record.Name, record.Path
 		data.Branch = git.CurrentBranch(record.Path)
 	}
+	data.Away = readNote(a)
 	if _, err := os.Stat(filepath.Join(a.MiaDir, "config.toml")); os.IsNotExist(err) {
 		data.First = &radar.Guess{Base: data.Base, Setup: radar.GuessSetup(a.Root)}
 	}
@@ -66,6 +67,8 @@ func carryOut(a *app.App, choice radar.Choice) error {
 		}
 	}
 	switch {
+	case choice.Return != "":
+		return goBack(choice.Return)
 	case choice.Remote != "":
 		if os.Getenv("TMUX") == "" {
 			return cmdErr(cmdAttachOn(a, []string{choice.Remote}))
@@ -83,13 +86,8 @@ func carryOut(a *app.App, choice radar.Choice) error {
 // — a new window, a split — acts on that machine, as if it were this one.
 // Detaching there brings back the session this terminal was in.
 func handOver(a *app.App, target string) error {
-	name, on, _ := strings.Cut(target, "@")
-	machine, err := a.Runtimes.Get(on)
-	if err != nil {
-		return err
-	}
-	argv, err := a.AttachArgv(machine, name)
-	if err != nil {
+	_, on, _ := strings.Cut(target, "@")
+	if _, err := a.Runtimes.Get(on); err != nil {
 		return err
 	}
 	back, err := run.Local("tmux").Capture("display-message", "-p", "#{socket_path}\t#{session_name}")
@@ -97,8 +95,12 @@ func handOver(a *app.App, target string) error {
 		return err
 	}
 	socket, session, _ := strings.Cut(strings.TrimSpace(back), "\t")
-	then := run.ShellJoin([]string{"tmux", "-S", socket, "attach-session", "-t", "=" + session})
-	out, err := run.Local("tmux").Combined("detach-client", "-E", run.ShellJoin(argv)+"; "+then)
+	self, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	away := "cd " + run.ShellJoin([]string{a.Root}) + " && " + run.ShellJoin([]string{self, "away", target, session, "--back", socket})
+	out, err := run.Local("tmux").Combined("detach-client", "-E", away)
 	if err != nil {
 		return fmt.Errorf("hand over to %s: %s", on, strings.TrimSpace(out))
 	}

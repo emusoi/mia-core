@@ -36,6 +36,16 @@ type Data struct {
 	// First is set the first time mia makes a worktree in this repository:
 	// what it guessed, shown once, saved when the worktree is made.
 	First *Guess
+	// Away is the computer that handed this terminal here, and what it has:
+	// picking one of its worktrees hands the terminal back.
+	Away *Away
+}
+
+// Away is the note a computer leaves on a machine it hands a terminal to.
+type Away struct {
+	From      string        `json:"from"`
+	Repo      string        `json:"repo"`
+	Worktrees []app.Listing `json:"worktrees"` // its own, and other machines' as it heard them
 }
 
 type Guess struct {
@@ -52,6 +62,9 @@ type Choice struct {
 	Name   string // a local worktree to switch to
 	Config *Guess // write this config first
 	Stream bool   // show its output while it runs (making a worktree)
+	// Return: go back to the computer that handed this terminal here, to
+	// this worktree of its — name, or name@machine for another machine's.
+	Return string
 }
 
 type kind int
@@ -76,7 +89,8 @@ type row struct {
 	layer   string
 	act     func(m model) (model, tea.Cmd)
 	listing *app.Listing
-	last    bool // the worktree switched to last, other than here
+	last    bool   // the worktree switched to last, other than here
+	away    string // reached by going back: what to tell the computer that handed us over
 }
 
 var (
@@ -493,6 +507,17 @@ func (m model) worktrees() []row {
 		r.detail = listingDetail(l)
 		rows = append(rows, r)
 	}
+	if a := m.data.Away; a != nil {
+		for _, l := range a.Worktrees {
+			l := l
+			machine, back := a.From, l.Name
+			if l.Machine != "" {
+				machine, back = l.Machine, l.Name+"@"+l.Machine
+			}
+			rows = append(rows, row{kind: worktree, label: l.Name, branch: l.Branch, name: l.Name + "@" + machine,
+				machine: machine, signals: l.Signals, detail: listingDetail(l), listing: &l, away: back})
+		}
+	}
 	for _, state := range m.data.Machines {
 		for _, l := range state.Worktrees {
 			l := l
@@ -562,6 +587,10 @@ func actionsFor(r row) []row {
 
 func switchTo(r row) func(m model) (model, tea.Cmd) {
 	return func(m model) (model, tea.Cmd) {
+		if r.away != "" {
+			m.chosen = &Choice{Return: r.away}
+			return m, tea.Quit
+		}
 		if r.machine != "" {
 			m.chosen = &Choice{Remote: r.name}
 		} else {

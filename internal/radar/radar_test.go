@@ -166,3 +166,26 @@ func TestAMachinesWorktreesHaveTheirOwnPlaceAndNeverRest(t *testing.T) {
 		t.Errorf("one with a signal still leads, under signals: %q", got)
 	}
 }
+
+func TestFromAMachineTheComputerYouCameFromIsOneSwitchAway(t *testing.T) {
+	d := data()
+	d.Away = &Away{From: "laptop", Worktrees: []app.Listing{{Name: "mianzini", Branch: "dash"}, {Name: "kisongo", Branch: "x", Machine: "box"}}}
+	m := model{data: d, open: map[string]bool{}}
+	rows := m.build()
+	got := labels(rows)
+	if !slices.Contains(got, "on laptop  1") || !slices.Contains(got, "on box  1") {
+		t.Fatalf("its worktrees listed by where they are: %q", got)
+	}
+	for _, r := range rows {
+		if r.label == "mianzini" {
+			if next, _ := switchTo(r)(m); next.chosen == nil || next.chosen.Return != "mianzini" {
+				t.Errorf("⏎ goes back for mianzini: %+v", next.chosen)
+			}
+		}
+		if r.label == "kisongo" {
+			if next, _ := switchTo(r)(m); next.chosen == nil || next.chosen.Return != "kisongo@box" {
+				t.Errorf("⏎ goes back, then on to box: %+v", next.chosen)
+			}
+		}
+	}
+}

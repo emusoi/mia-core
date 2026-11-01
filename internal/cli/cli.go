@@ -125,6 +125,8 @@ func Run(args []string) int {
 		return cmdSignal(a, rest, asJSON)
 	case "radar":
 		return cmdRadar(a, rest)
+	case "away":
+		return cmdAway(a, rest)
 	case "machine", "machines", "runtime":
 		if rest[0] == "poll" {
 			a.Machines() // asking leaves each machine's answer where the status line reads it
