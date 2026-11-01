@@ -92,11 +92,12 @@ func handOver(a *app.App, target string) error {
 	if err != nil {
 		return err
 	}
-	back, err := run.Local("tmux").Capture("display-message", "-p", "#{session_name}")
+	back, err := run.Local("tmux").Capture("display-message", "-p", "#{socket_path}\t#{session_name}")
 	if err != nil {
 		return err
 	}
-	then := run.ShellJoin([]string{"tmux", "attach-session", "-t", "=" + strings.TrimSpace(back)})
+	socket, session, _ := strings.Cut(strings.TrimSpace(back), "\t")
+	then := run.ShellJoin([]string{"tmux", "-S", socket, "attach-session", "-t", "=" + session})
 	out, err := run.Local("tmux").Combined("detach-client", "-E", run.ShellJoin(argv)+"; "+then)
 	if err != nil {
 		return fmt.Errorf("hand over to %s: %s", on, strings.TrimSpace(out))
