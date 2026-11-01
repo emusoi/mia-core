@@ -182,6 +182,27 @@ func (a *App) Machines() []MachineState {
 	return states
 }
 
+// HereState is this computer alone, for a client that asks each machine
+// itself: how busy it is and the machines it can move worktrees to. Nothing
+// is asked over ssh.
+type HereState struct {
+	Health   *Health  `json:"health,omitempty"` // nil when it could not be measured
+	Machines []string `json:"machines"`
+}
+
+func (a *App) Here() HereState {
+	machines, _ := a.Runtimes.All()
+	state := HereState{Machines: make([]string, 0, len(machines))}
+	for _, m := range machines {
+		state.Machines = append(state.Machines, m.Name)
+	}
+	if out, err := runtime.Run("", "sh", "-c", probeScript, "sh", a.Root); err == nil {
+		health := parseHealth(out)
+		state.Health = &health
+	}
+	return state
+}
+
 func (a *App) askMachine(machine runtime.Machine, dir string, linked bool) MachineState {
 	state := MachineState{Machine: machine}
 	cache := filepath.Join(a.MiaDir, "remote", machine.Name+".json")

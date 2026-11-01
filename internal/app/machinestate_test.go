@@ -20,3 +20,14 @@ func TestMachineStateJSON(t *testing.T) {
 		}
 	}
 }
+
+// `mia api here` lists no machines as [], never null, so clients can range over it.
+func TestHereStateJSON(t *testing.T) {
+	data, err := json.Marshal(HereState{Machines: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != `{"machines":[]}` {
+		t.Errorf("got %s", data)
+	}
+}

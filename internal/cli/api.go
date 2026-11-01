@@ -29,6 +29,9 @@ func cmdAPI(a *app.App, args []string) int {
 	case "machines":
 		return emit(a.Machines())
 
+	case "here":
+		return emit(a.Here())
+
 	case "env":
 		record, err := a.RecordOrHere(target)
 		if err != nil {
@@ -66,4 +69,4 @@ func cmdAPI(a *app.App, args []string) int {
 	}
 }
 
-const apiQueries = "worktrees|machines|env|stack|base"
+const apiQueries = "worktrees|machines|here|env|stack|base"
