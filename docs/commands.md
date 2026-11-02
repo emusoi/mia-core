@@ -20,6 +20,7 @@
 | `mia setup [worktree]` | run setup again |
 | `mia run <worktree>[@machine] <cmd…>` | run a command in it, here or on a machine |
 | `mia rm <worktree>` | remove it |
+| `mia resurrect [--dry-run]` | after tmux or the computer went down, open each session again: its windows in their folders, their programs restarted, claude with `--continue` |
 | `mia gc [--apply\|--ask] [--days N]` | find, or remove, idle worktrees: clean, no session, not starred, untouched for N days (14); `--ask` shows them and removes on `y` |
 | `mia gc --others [--apply\|--ask] [path…]` | find, or remove, the clean worktrees mia did not make; branches stay |
 

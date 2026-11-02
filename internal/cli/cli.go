@@ -142,8 +142,23 @@ func Run(args []string) int {
 		return cmdAway(a, rest)
 	case "move":
 		return cmdMove(a, rest)
+	case "resurrect":
+		dry := take(&rest, "--dry-run")
+		revived, err := a.Resurrect(dry)
+		for _, r := range revived {
+			var what []string
+			for _, w := range r.Windows {
+				what = append(what, strings.TrimSpace(w.Name+" "+w.Command))
+			}
+			fmt.Printf("%s: %s\n", r.Name, strings.Join(what, " · "))
+		}
+		if err == nil && len(revived) == 0 {
+			fmt.Println("nothing went down with tmux")
+		}
+		return exitFor(err)
 	case "machine", "machines", "runtime":
 		if rest[0] == "poll" {
+			_ = a.Remember() // what resurrect opens again after tmux goes down
 			// asking leaves each machine's answer where the status line reads
 			// it; each machine linked here is told, in turn, what this computer has
 			for _, state := range a.Machines() {
