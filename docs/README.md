@@ -13,3 +13,4 @@
 | [Configuration](configuration.md) | every setting |
 | [Commands](commands.md) | every command |
 | [Plugins](plugins.md) | adding commands and signals |
+| [Changes](changes.md) | what each release adds, changes and takes away |

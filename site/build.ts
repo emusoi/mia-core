@@ -19,6 +19,7 @@ const pages = [
   { file: "configuration.md", slug: "configuration", group: "Reference" },
   { file: "commands.md", slug: "commands", group: "Reference" },
   { file: "plugins.md", slug: "plugins", group: "Reference" },
+  { file: "changes.md", slug: "changes", group: "Reference" },
 ];
 
 const highlighter = await createHighlighter({
