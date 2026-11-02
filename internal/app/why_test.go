@@ -55,3 +55,36 @@ func TestWhyFindsTheConversationThatMadeALinesCommit(t *testing.T) {
 		t.Error("a target naming no commit is refused")
 	}
 }
+
+func TestRecallFindsTheConversationYouSaidItIn(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	claude := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", claude)
+	write := func(worktree, session, kind, content string) {
+		project := filepath.Join(claude, "projects", regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(repo.Root+worktree, "-"))
+		if err := os.MkdirAll(project, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		line := fmt.Sprintf(`{"type":%q,"sessionId":%q,"cwd":"/w","timestamp":"2026-11-02T10:00:00Z","message":{"content":%s}}`+"\n", kind, session, content)
+		if err := os.WriteFile(filepath.Join(project, session+".jsonl"), []byte(line), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(".kijenge", "mine", "user", `"fix the Retry loop in the poller"`)
+	write("", "theirs", "assistant", `[{"type":"text","text":"I changed the retry loop."}]`)
+	write(".temeke", "other", "user", `"nothing to see"`)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := a.Recall("retry loop", 10)
+	if len(got) != 2 {
+		t.Fatalf("two conversations mention it: %+v", got)
+	}
+	for _, r := range got {
+		if (r.Session == "mine") != r.Yours || !strings.Contains(strings.ToLower(r.Line), "retry loop") {
+			t.Errorf("who said it, and the words around it: %+v", r)
+		}
+	}
+}

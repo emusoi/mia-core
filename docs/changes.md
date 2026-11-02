@@ -9,6 +9,9 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **`mia recall <text…>`**: which conversation was that? The claude
+  conversations of the repository and its worktrees that mention it, newest
+  first, your own words over claude's, each with its `claude --resume` line.
 - **The diff in the radar's look**: `?` then `→` past the session's
   windows shows the worktree against where it left base, uncommitted work
   included, the stat first.

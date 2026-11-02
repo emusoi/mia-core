@@ -145,6 +145,28 @@ func Run(args []string) int {
 		return cmdAway(a, rest)
 	case "move":
 		return cmdMove(a, rest)
+	case "recall":
+		if len(rest) == 0 {
+			return usageErr("mia recall <text…>")
+		}
+		found := a.Recall(strings.Join(rest, " "), 10)
+		if asJSON {
+			return emit(found)
+		}
+		if len(found) == 0 {
+			fmt.Println("no conversation of claude's here mentions it")
+		}
+		for i, r := range found {
+			if i > 0 {
+				fmt.Println()
+			}
+			who := "claude"
+			if r.Yours {
+				who = "you"
+			}
+			fmt.Printf("%s  %s\n  %s: %s\n  cd %s && claude --resume %s\n", r.At.Local().Format("2006-01-02 15:04"), filepath.Base(r.Cwd), who, r.Line, r.Cwd, r.Session)
+		}
+		return exitOK
 	case "why":
 		if len(rest) != 1 {
 			return usageErr("mia why <file:line|commit>")

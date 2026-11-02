@@ -18,7 +18,7 @@ var groupOf = map[string]string{
 	"dash": "Working", "stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working",
 	"env":    "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
-	"api": "Records", "signal": "Records", "radar": "Working", "tmux": "Working", "move": "Worktrees", "resurrect": "Worktrees", "why": "Records", "plugin": "Records",
+	"api": "Records", "signal": "Records", "radar": "Working", "tmux": "Working", "move": "Worktrees", "resurrect": "Worktrees", "why": "Records", "recall": "Records", "plugin": "Records",
 }
 
 var verbs = []Verb{
@@ -43,6 +43,7 @@ var verbs = []Verb{
 	{"gateway", "mia gateway <status|start|stop|install|uninstall|setup|trust|untrust>", "what makes <name>.mia reach an environment", false, ""},
 	{"move", "mia move <worktree>[@<machine>] <machine|local>", "take a worktree to another machine or back: its branch, uncommitted work and windows", false, ""},
 	{"resurrect", "mia resurrect [--dry-run]", "after tmux or the computer went down, open each session again: its windows, their programs, an agent continuing its conversation", false, ""},
+	{"recall", "mia recall <text…>", "the claude conversations here that mention it, newest first, and how to resume each", true, ""},
 	{"why", "mia why <file:line|commit>", "the claude conversation that made a commit, or the line's last commit: what you asked, and how to resume it", true, ""},
 	{"radar", "mia radar [--new]", "the popup that shows and finds everything; --new makes a worktree", false, ""},
 	{"tmux", "mia tmux [install|uninstall|menu <client>]", "mia's part of the tmux status line, its two popups and its menu, printed, added to ~/.tmux.conf, or taken out; menu draws prefix m", true, ""},

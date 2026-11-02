@@ -99,19 +99,13 @@ func (a *App) commitOf(target string) (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
+var projectPrefix = regexp.MustCompile(`[^a-zA-Z0-9]`)
+
 // transcriptsMentioning is claude's transcripts, for the repository and its
 // worktrees, that hold the short hash; only those written to since the
 // commit was made can.
 func transcriptsMentioning(root, short string, since time.Time) []string {
-	dir := os.Getenv("CLAUDE_CONFIG_DIR")
-	if dir == "" {
-		home, _ := os.UserHomeDir()
-		dir = filepath.Join(home, ".claude")
-	}
-	// claude names a project's folder after its path, every other character a -;
-	// a worktree <root>.<name> starts the same
-	prefix := regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(root, "-")
-	dirs, _ := filepath.Glob(filepath.Join(dir, "projects", prefix+"*"))
+	dirs := transcriptDirs(root)
 	var recent []string
 	for _, d := range dirs {
 		_ = filepath.WalkDir(d, func(path string, entry os.DirEntry, err error) error {
@@ -124,17 +118,7 @@ func transcriptsMentioning(root, short string, since time.Time) []string {
 			return nil
 		})
 	}
-	if len(recent) == 0 {
-		return nil
-	}
-	out, _ := run.Local("grep").Capture(append([]string{"-lF", short}, recent...)...)
-	var files []string
-	for _, f := range strings.Split(strings.TrimSpace(out), "\n") {
-		if f != "" {
-			files = append(files, f)
-		}
-	}
-	return files
+	return holding(recent, short, false)
 }
 
 type entry struct {
