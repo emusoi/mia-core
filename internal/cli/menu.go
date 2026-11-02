@@ -5,15 +5,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/plugin"
 	"github.com/emusoi/mia-core/internal/radar"
 	"github.com/emusoi/mia-core/internal/run"
 )
 
 // cmdTmuxMenu is mia tmux menu <client>: prefix m. tmux's own menu, built
-// each time it is pressed, so its counts and plugins are as they are now.
+// each time it is pressed, so its counts are as they are now. The plugins'
+// verbs it offers are the config's menu, those of them that are on.
 func cmdTmuxMenu(a *app.App, args []string) int {
 	if len(args) != 1 {
 		return usageErr("mia tmux menu <client>")
@@ -32,9 +35,11 @@ func cmdTmuxMenu(a *app.App, args []string) int {
 	}
 	var plugins []string
 	if enabled, err := enabledPlugins(a); err == nil {
-		for _, p := range enabled {
-			if len(p.Manifest.Verbs) > 0 {
-				plugins = append(plugins, p.Manifest.Verbs[0].Name)
+		for _, verb := range a.Config.Menu {
+			if slices.ContainsFunc(enabled, func(p plugin.Plugin) bool {
+				return slices.ContainsFunc(p.Manifest.Verbs, func(v plugin.Verb) bool { return v.Name == verb })
+			}) {
+				plugins = append(plugins, verb)
 			}
 		}
 	}
@@ -99,8 +104,7 @@ func menuItems(mia, repo, here string, local []app.Listing, plugins []string) []
 				break
 			}
 		}
-		// shortcut: no -E, so a verb that prints and exits stays up to be read
-		items = append(items, verb, key, fmt.Sprintf(`display-popup -d "#{pane_current_path}" -w 80%% -h 70%% -T " %s " "%s %s"`, verb, mia, verb))
+		items = append(items, verb, key, popup("100", "30", verb, mia+" "+verb))
 	}
 	return items
 }

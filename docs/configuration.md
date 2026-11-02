@@ -57,6 +57,7 @@ uses every key.
 
 ```toml
 plugins = ["gh"]
+menu = ["type", "quiz"]     # the verbs prefix m offers
 
 [plugin.gh]
 # that plugin's own settings

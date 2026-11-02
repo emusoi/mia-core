@@ -62,8 +62,9 @@ beside the list. Below 110 columns it is the radar.
 
 `prefix m` is tmux's own menu, built when you press it: the radar (`space`),
 the dash (`g`), a new worktree (`n`), cleaning up what is idle (`c`) and
-what mia did not make (`o`) with how many of each there are, then one entry
-for each plugin that is on. Cleaning up shows what would go and asks `y`
+what mia did not make (`o`) with how many of each there are, then the
+plugins' verbs your config's `menu` names, such as `menu = ["type", "quiz"]`.
+Every verb is still one word away in the radar. Cleaning up shows what would go and asks `y`
 first (`mia gc --ask`); branches stay.
 
 ## A new worktree
