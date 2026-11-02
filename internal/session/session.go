@@ -99,9 +99,25 @@ func (h Host) AttachView(worktree, view string) error {
 		if out, err := h.run("new-session", "-d", "-s", own, "-t", exact(name)); err != nil {
 			return fmt.Errorf("open a %s view of %s: %s", view, worktree, strings.TrimSpace(out))
 		}
-		_, _ = h.run("set-option", "-t", exact(own), "destroy-unattached", "on")
+		_, _ = h.run("set-option", "-t", own, "destroy-unattached", "on") // a grouped session does not answer to =own
 	}
-	return h.attach(own)
+	// the client runs as a child, not in our place: the view is killed once it goes
+	defer func() { _, _ = h.run("kill-session", "-t", own) }()
+	if h.SSH != "" {
+		return runtime.Interactive(h.SSH, "tmux", "-u", "attach-session", "-t", exact(own)).Run()
+	}
+	path, err := exec.LookPath("tmux")
+	if err != nil {
+		return fmt.Errorf("tmux not found — sessions need it: https://github.com/tmux/tmux/wiki/Installing")
+	}
+	cmd := exec.Command(path, "-u", "attach-session", "-t", exact(own))
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	for _, entry := range os.Environ() {
+		if name, _, _ := strings.Cut(entry, "="); name != "TMUX" && name != "TMUX_PANE" {
+			cmd.Env = append(cmd.Env, entry)
+		}
+	}
+	return cmd.Run()
 }
 
 func (h Host) attach(name string) error {
