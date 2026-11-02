@@ -10,8 +10,11 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/git"
+	"github.com/emusoi/mia-core/internal/gittest"
 	"github.com/emusoi/mia-core/internal/runtime"
 	"github.com/emusoi/mia-core/internal/session"
 	"github.com/emusoi/mia-core/internal/signal"
@@ -389,5 +392,37 @@ func TestASignalIsAnsweredInThePaneItCameFrom(t *testing.T) {
 	m.cursor = slices.Index(labels(m.rows), "lemara")
 	if key(m, tea.KeyMsg{Type: tea.KeyCtrlY}); len(got) != 2 {
 		t.Errorf("a signal with no pane is not typed into: %+v", got)
+	}
+}
+
+func TestTheLookFlipsFromTheWindowsToTheDiff(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	repo.Write("a.txt", "one\n")
+	repo.Commit("one")
+	base := strings.TrimSpace(repo.Git("branch", "--show-current"))
+	dir := repo.Worktree("kijenge", "jk/two")
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("one\ntwo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	d := Data{Repo: "app", Root: repo.Root, Base: base, Local: []app.Listing{
+		{Name: "kijenge", Path: dir, Branch: "jk/two", Adopted: true, Session: true, Windows: []session.Window{{Index: 1, Name: "agent", Active: true}}},
+	}}
+	m := model{data: d, open: map[string]bool{}, look: true, width: 72, height: 30,
+		commits: map[string][]git.Commit{}, screens: map[string]string{}, window: map[string]int{}, diffs: map[string]string{}}
+	m.rows = m.build()
+	m.cursor = slices.Index(labels(m.rows), "kijenge")
+	if m.showingDiff(m.selected()) {
+		t.Fatal("the look opens on the session, not the diff")
+	}
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = next.(model)
+	if !m.showingDiff(m.selected()) || cmd == nil {
+		t.Fatal("→ from the last window is the diff")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(model)
+	if view := ansi.Strip(m.View()); !strings.Contains(view, "+two") || !strings.Contains(view, "uncommitted included") {
+		t.Errorf("the diff shows the uncommitted line:\n%s", view)
 	}
 }

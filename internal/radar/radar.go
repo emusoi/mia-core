@@ -159,6 +159,7 @@ type model struct {
 	filter  int                     // 0 all, 1 signals, 2 here, then one per machine
 	look    bool                    // the selected worktree in full, in place of the list
 	window  map[string]int          // the window the stage shows, by row name
+	diffs   map[string]string       // the diff tab's text, by worktree folder
 	reply   *row                    // the worktree whose signalling pane the reply line answers
 	typed   string                  // the reply so far
 	said    string                  // what the last answer did, or why it could not
@@ -181,6 +182,8 @@ type screened struct {
 }
 
 type look struct{ name string }
+
+type diffed struct{ dir, text string }
 
 type previewed struct {
 	dir     string
@@ -211,6 +214,10 @@ func (m model) fetch() tea.Cmd {
 // capture reads the worktree's session's active window, here or on its
 // machine; nothing when it has no session.
 func (m model) capture(r row) tea.Cmd {
+	if m.showingDiff(r) {
+		dir, base := r.dir, m.data.Base
+		return func() tea.Msg { return diffed{dir, git.DiffFrom(dir, base)} }
+	}
 	host, ok := m.hostOf(r)
 	if !ok || (r.machine == "" && (r.listing == nil || !r.listing.Session)) {
 		return nil
@@ -254,7 +261,7 @@ func (m model) answering(r row, text string, enter bool) (model, tea.Cmd) {
 // Run opens the radar, or the new-worktree popup when newOnly, and returns
 // what was picked, nil when nothing was.
 func Run(data Data, newOnly bool) (*Choice, error) {
-	m := model{data: data, open: map[string]bool{}, form: newForm(data), commits: map[string][]git.Commit{}, screens: map[string]string{}, window: map[string]int{}}
+	m := model{data: data, open: map[string]bool{}, form: newForm(data), commits: map[string][]git.Commit{}, screens: map[string]string{}, window: map[string]int{}, diffs: map[string]string{}}
 	if newOnly {
 		m.mode = making
 	}
@@ -278,6 +285,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.follow(msg)
 	case previewed:
 		m.commits[msg.dir] = msg.commits
+		return m, nil
+	case diffed:
+		m.diffs[msg.dir] = msg.text
 		return m, nil
 	case screened:
 		m.screens[msg.name] = msg.screen
@@ -359,13 +369,13 @@ func (m model) browseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			delete(m.open, r.name)
 			m.rows = m.build()
 			m.cursor = m.next(0)
-		case r.listing != nil && len(r.listing.Windows) > 1:
-			// ← → flip the stage between the session's windows
+		case m.tabs(r) > 1:
+			// ← → flip the stage between the session's windows and the diff
 			step := 1
 			if msg.String() == "left" {
 				step = -1
 			}
-			n := len(r.listing.Windows)
+			n := m.tabs(r)
 			cur, _ := m.windowAt(r)
 			m.window[r.name] = (cur + step + n) % n
 			delete(m.screens, r.name)

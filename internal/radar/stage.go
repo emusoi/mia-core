@@ -286,12 +286,22 @@ func (m model) stage(width, height int) []string {
 		add("")
 	}
 	screen := strings.TrimRight(m.screens[r.name], "\n ")
-	if r.listing != nil && len(r.listing.Windows) > 0 {
+	diff := m.showingDiff(r)
+	if diff {
+		screen = strings.TrimRight(m.diffs[r.dir], "\n ")
+	}
+	if m.tabs(r) > 1 || (r.listing != nil && len(r.listing.Windows) > 0) {
 		at, _ := m.windowAt(r)
 		var tabs []string
 		var under []string
-		for i, w := range r.listing.Windows {
-			label := fmt.Sprintf("%d %s", w.Index, w.Name)
+		var labels []string
+		for _, w := range r.listing.Windows {
+			labels = append(labels, fmt.Sprintf("%d %s", w.Index, w.Name))
+		}
+		if m.diffTab(r) {
+			labels = append(labels, "diff")
+		}
+		for i, label := range labels {
 			if i == at {
 				tabs = append(tabs, inkB.Render(label))
 				under = append(under, edge.Render(strings.Repeat("▔", lipgloss.Width(label))))
@@ -302,6 +312,10 @@ func (m model) stage(width, height int) []string {
 		}
 		add(strings.Join(tabs, "   "))
 		add(strings.Join(under, "   "))
+	}
+	if screen == "" && diff {
+		add(ghost.Render("nothing differs from " + m.data.Base))
+		return out
 	}
 	if screen == "" {
 		if commits := m.commits[r.dir]; len(commits) > 0 {
@@ -317,7 +331,11 @@ func (m model) stage(width, height int) []string {
 	inner := width - 4
 	room := max(height-len(out)-3, 3)
 	lines := squeeze(strings.Split(screen, "\n"))
-	if len(lines) > room {
+	switch {
+	case len(lines) <= room:
+	case diff:
+		lines = lines[:room] // a diff reads from its top: the stat first
+	default:
 		lines = lines[len(lines)-room:]
 	}
 	add(line_.Render("╭" + strings.Repeat("─", width-2) + "╮"))
@@ -327,7 +345,10 @@ func (m model) stage(width, height int) []string {
 	}
 	add(line_.Render("╰" + strings.Repeat("─", width-2) + "╯"))
 	live := Style("green").Render("live") + ghost.Render(" · as it is now")
-	if r.listing != nil && len(r.listing.Windows) > 1 {
+	if diff {
+		live = ghost.Render("against " + m.data.Base + ", uncommitted included")
+	}
+	if m.tabs(r) > 1 {
 		live += ghost.Render(" · ←→ its other windows")
 	}
 	add(live)
@@ -337,23 +358,48 @@ func (m model) stage(width, height int) []string {
 // windowAt is which of the worktree's windows the stage shows: the one
 // picked with ← →, else the active one.
 func (m model) windowAt(r row) (int, bool) {
-	if r.listing == nil || len(r.listing.Windows) == 0 {
+	if m.tabs(r) == 0 {
 		return 0, false
 	}
-	if i, ok := m.window[r.name]; ok && i < len(r.listing.Windows) {
+	if i, ok := m.window[r.name]; ok && i < m.tabs(r) {
 		return i, true
 	}
-	for i, w := range r.listing.Windows {
-		if w.Active {
-			return i, true
+	if r.listing != nil {
+		for i, w := range r.listing.Windows {
+			if w.Active {
+				return i, true
+			}
 		}
 	}
 	return 0, true
 }
 
+// diffTab is whether the stage offers the worktree's diff, after its
+// windows: one of this computer's, other than the main checkout.
+func (m model) diffTab(r row) bool {
+	return r.kind == worktree && r.machine == "" && r.dir != "" && r.listing != nil && !r.listing.Main
+}
+
+// tabs is how many things ← → flip between: the windows, then the diff.
+func (m model) tabs(r row) int {
+	n := 0
+	if r.listing != nil {
+		n = len(r.listing.Windows)
+	}
+	if m.diffTab(r) {
+		n++
+	}
+	return n
+}
+
+func (m model) showingDiff(r row) bool {
+	i, ok := m.windowAt(r)
+	return ok && m.diffTab(r) && i == m.tabs(r)-1
+}
+
 func (m model) shownWindow(r row) (struct{ Index int }, bool) {
 	i, ok := m.windowAt(r)
-	if !ok {
+	if !ok || m.showingDiff(r) {
 		return struct{ Index int }{}, false
 	}
 	return struct{ Index int }{r.listing.Windows[i].Index}, true

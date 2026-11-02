@@ -523,6 +523,17 @@ func UpdateRef(dir, ref, sha string) error {
 	return err
 }
 
+// DiffFrom is the worktree against where it left base, uncommitted work
+// included: the stat, then the patch, in colour. "" when nothing differs.
+func DiffFrom(dir, base string) string {
+	from := MergeBase(dir, base, "HEAD")
+	if from == "" {
+		from = "HEAD"
+	}
+	out, _ := run(dir, "-c", "color.ui=always", "diff", "--stat", "--patch", from)
+	return out
+}
+
 // Recent is the last n commits on HEAD, newest first.
 func Recent(dir string, n int) []Commit {
 	out, err := run(dir, "log", fmt.Sprintf("-%d", n), "--format=%h%x00%ct%x00%s", "HEAD")

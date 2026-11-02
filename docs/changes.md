@@ -9,6 +9,9 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **The diff in the radar's look**: `?` then `→` past the session's
+  windows shows the worktree against where it left base, uncommitted work
+  included, the stat first.
 - **`prefix a`**: straight to the next worktree that needs you, without
   opening the radar; again for the one after. Run `mia tmux install` once
   more to get the key.

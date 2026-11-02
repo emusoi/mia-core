@@ -46,7 +46,7 @@ there, in place. Type to find any worktree and what can be done with it.
 | key | does |
 |---|---|
 | `⏎` | switch there |
-| `?` | the selected worktree in full, its windows as they are now; `?` again for the list |
+| `?` | the selected worktree in full, its windows as they are now, `←` `→` between them and its diff; `?` again for the list |
 | `^d` | remove it, after a `y`; one mia did not make only when nothing in it is uncommitted |
 | `^n` | a new worktree |
 | `tab` | only what needs you, this computer's (`local`), or one machine's |
