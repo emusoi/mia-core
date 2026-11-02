@@ -67,22 +67,33 @@ func TestRecallFindsTheConversationYouSaidItIn(t *testing.T) {
 			t.Fatal(err)
 		}
 		line := fmt.Sprintf(`{"type":%q,"sessionId":%q,"cwd":"/w","timestamp":"2026-11-02T10:00:00Z","message":{"content":%s}}`+"\n", kind, session, content)
-		if err := os.WriteFile(filepath.Join(project, session+".jsonl"), []byte(line), 0o644); err != nil {
+		file := filepath.Join(project, session+".jsonl")
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(line), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 	write(".kijenge", "mine", "user", `"fix the Retry loop in the poller"`)
 	write("", "theirs", "assistant", `[{"type":"text","text":"I changed the retry loop."}]`)
 	write(".temeke", "other", "user", `"nothing to see"`)
+	write(".temeke", "sub/subagents/agent-1", "user", `"look into the retry loop for me"`)
 	a, err := app.Open(repo.Root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := a.Recall("retry loop", 10)
-	if len(got) != 2 {
+	if len(got) != 3 {
 		t.Fatalf("two conversations mention it: %+v", got)
 	}
 	for _, r := range got {
+		if r.Session == "sub/subagents/agent-1" && r.Yours {
+			t.Errorf("a subagent's prompt is claude's words, not yours: %+v", r)
+		}
+		if r.Session == "sub/subagents/agent-1" {
+			continue
+		}
 		if (r.Session == "mine") != r.Yours || !strings.Contains(strings.ToLower(r.Line), "retry loop") {
 			t.Errorf("who said it, and the words around it: %+v", r)
 		}

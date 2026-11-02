@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 	gutf8 "unicode/utf8"
 )
 
@@ -26,20 +27,23 @@ type Recalled struct {
 // your own words over claude's.
 func (a *App) Recall(text string, limit int) []Recalled {
 	needle := strings.ToLower(text)
-	var found []Recalled
-	for _, file := range transcriptsHolding(a.Root, text) {
-		if r, ok := recalledIn(file, needle); ok {
-			found = append(found, r)
-		}
-	}
-	// a subagent's transcript is its parent's session: keep the session once
+	// newest first, stopping once there are enough: a common word is in
+	// nearly every transcript, and the old ones would come last anyway
 	best := map[string]Recalled{}
-	for _, r := range found {
+	for _, file := range transcriptsHolding(a.Root, text) {
+		if limit > 0 && len(best) >= limit {
+			break
+		}
+		r, ok := recalledIn(file, needle)
+		if !ok {
+			continue
+		}
+		// a subagent's transcript is its parent's session: keep the session once
 		if b, ok := best[r.Session]; !ok || (r.Yours && !b.Yours) || (r.Yours == b.Yours && r.At.After(b.At)) {
 			best[r.Session] = r
 		}
 	}
-	found = found[:0]
+	var found []Recalled
 	for _, r := range best {
 		found = append(found, r)
 	}
@@ -50,17 +54,22 @@ func (a *App) Recall(text string, limit int) []Recalled {
 	return found
 }
 
-// transcriptsHolding is the repository's transcripts holding text, any case.
+// transcriptsHolding is the repository's transcripts holding text, any
+// case, the last written first.
 func transcriptsHolding(root, text string) []string {
 	var files []string
+	written := map[string]time.Time{}
 	for _, d := range transcriptDirs(root) {
 		_ = filepath.WalkDir(d, func(path string, e os.DirEntry, err error) error {
 			if err == nil && !e.IsDir() && strings.HasSuffix(path, ".jsonl") {
-				files = append(files, path)
+				if info, err := e.Info(); err == nil {
+					files, written[path] = append(files, path), info.ModTime()
+				}
 			}
 			return nil
 		})
 	}
+	sort.SliceStable(files, func(i, j int) bool { return written[files[i]].After(written[files[j]]) })
 	return holding(files, text, true)
 }
 
@@ -123,7 +132,9 @@ func recalledIn(file, needle string) (Recalled, bool) {
 	}
 	defer f.Close()
 	r := bufio.NewReaderSize(f, 1<<20)
-	var yours, theirs *Recalled
+	// in a subagent's transcript the "user" is the agent that sent it
+	subagent := strings.Contains(file, string(filepath.Separator)+"subagents"+string(filepath.Separator))
+	var theirs *Recalled
 	for {
 		line, err := r.ReadBytes('\n')
 		if len(line) > 0 && strings.Contains(strings.ToLower(string(line)), needle) {
@@ -131,7 +142,10 @@ func recalledIn(file, needle string) (Recalled, bool) {
 			if json.Unmarshal(line, &e) == nil {
 				at := Conversation{Session: e.SessionID, Cwd: e.Cwd, File: file, At: e.Timestamp}
 				if s := e.said(); strings.Contains(strings.ToLower(s), needle) {
-					yours = &Recalled{at, true, around(s, needle)}
+					if !subagent {
+						return Recalled{at, true, around(s, needle)}, true // your own words: enough
+					}
+					theirs = &Recalled{at, false, around(s, needle)}
 				} else if s := e.claudeSaid(); strings.Contains(strings.ToLower(s), needle) {
 					theirs = &Recalled{at, false, around(s, needle)}
 				}
@@ -140,9 +154,6 @@ func recalledIn(file, needle string) (Recalled, bool) {
 		if err == io.EOF || err != nil {
 			break
 		}
-	}
-	if yours != nil {
-		return *yours, true
 	}
 	if theirs != nil {
 		return *theirs, true
