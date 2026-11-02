@@ -93,4 +93,7 @@ func Isolate(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("TMUX_TMPDIR", t.TempDir())
 	t.Setenv("HOME", t.TempDir())
+	// a session's shell is sh: a login zsh, killed with tmux, writes its
+	// history into HOME as the test removes it
+	t.Setenv("SHELL", "/bin/sh")
 }

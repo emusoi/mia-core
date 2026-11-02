@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/emusoi/mia-core/internal/model"
 	"github.com/emusoi/mia-core/internal/session"
@@ -12,12 +11,6 @@ import (
 
 func (a *App) Windows(record model.Record) []session.Window {
 	return a.sessionOf(record).WindowsOf(record.Name)
-}
-
-type shot struct {
-	quiet time.Duration
-	at    time.Time
-	text  string
 }
 
 func (a *App) windowNamed(record model.Record, window string) (session.Host, string, error) {

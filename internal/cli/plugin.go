@@ -110,14 +110,6 @@ func runPluginVerb(a *app.App, verb string, args []string) (int, bool) {
 	return code, true
 }
 
-// pluginInput is what rows, sides and corners get on stdin: the worktrees
-// the dash already listed, so a plugin need not run `mia api worktrees`.
-type pluginInput struct {
-	Protocol  int           `json:"protocol"`
-	Repo      string        `json:"repo"`
-	Worktrees []app.Listing `json:"worktrees"`
-}
-
 func sendEvent(a *app.App, e app.Event) {
 	plugins, err := enabledPlugins(a)
 	if err != nil {

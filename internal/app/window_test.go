@@ -108,7 +108,7 @@ func TestTextSentToAWindowCanBeReadBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	var text string
-	for range 50 {
+	for range 250 { // 5s: a loaded machine runs every test at once
 		if text, err = a.ReadWindow(record, "agent"); err == nil && strings.Count(text, "hello there") == 2 {
 			break
 		}
