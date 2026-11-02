@@ -270,6 +270,7 @@ func Run(args []string) int {
 	case "machine", "machines", "runtime":
 		if rest[0] == "poll" {
 			_ = a.Remember() // what resurrect opens again after tmux goes down
+			sendEvent(a, app.Event{Name: "poll"})
 			// asking leaves each machine's answer where the status line reads
 			// it; each machine linked here is told, in turn, what this computer has
 			for _, state := range a.Machines() {

@@ -9,6 +9,10 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **A `poll` event for plugins**, every 30 seconds or so, for one that
+  looks outside mia. The `gh` plugin uses it: each worktree's pull request
+  shows on its row as `ci failed`, `changes asked` or `approved`, or quietly
+  as checks running. `mia plugin enable gh` to have it.
 - **`mia fork [worktree] <branch>`**: a second try beside the first: a new
   worktree on a new branch from where the worktree is, its uncommitted and
   untracked work copied, the first left as it is.

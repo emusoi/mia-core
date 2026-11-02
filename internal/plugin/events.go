@@ -12,6 +12,7 @@ import (
 var Events = []string{
 	"worktree.created", "worktree.removed", "session.started",
 	"env.up", "env.down", "stack.changed",
+	"poll", // every 30s or so while tmux shows mia's status line: for a plugin that looks outside
 }
 
 type Event struct {

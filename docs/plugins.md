@@ -51,4 +51,7 @@ radar runs it there and keeps its output up until a key.
 
 `mia-<name> event <event>` runs in the background with the event on stdin:
 `worktree.created`, `worktree.removed`, `session.started`, `env.up`,
-`env.down`, `stack.changed`.
+`env.down`, `stack.changed`, and `poll`: every 30 seconds or so while
+tmux shows mia's status line, for a plugin that looks at something outside
+— a CI, a review — and says what it saw with `mia signal`. It comes often;
+a plugin that asks a service keeps its own pace.
