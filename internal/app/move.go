@@ -116,6 +116,14 @@ func (a *App) Move(name, from, to string, say io.Writer) (Moved, error) {
 	if moved.Name == "" {
 		return moved, fmt.Errorf("make the worktree: no name in %q", strings.TrimSpace(out))
 	}
+	// it keeps its name across the move when that name is free there
+	if moved.Name != name {
+		if _, err := dst.sh(`cd "$1" && `+dst.mia+` rename "$2" "$3"`, dst.repo, moved.Name, name); err == nil {
+			moved.Name = name
+		} else {
+			fmt.Fprintf(say, "%s is taken there; it is %s now\n", name, moved.Name)
+		}
+	}
 	if p, err := dst.sh(`cd "$1" && `+dst.mia+` path "$2"`, dst.repo, moved.Name); err == nil {
 		moved.Path = strings.TrimSpace(p)
 	}
