@@ -106,7 +106,6 @@ var (
 	soft   = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
 	faint  = lipgloss.NewStyle().Faint(true)
 	accent = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
-	sel    = lipgloss.NewStyle().Background(lipgloss.Color("236"))
 	italic = muted.Italic(true)
 )
 
@@ -622,6 +621,7 @@ func (m model) build() []row {
 		}
 	}
 	sort.SliceStable(signalled, func(i, j int) bool { return signalled[i].signals[0].Rank < signalled[j].signals[0].Rank })
+	sort.SliceStable(active, func(i, j int) bool { return moved(active[i]).After(moved(active[j])) })
 	var rows []row
 	if len(signalled) > 0 {
 		rows = append(rows, row{kind: group, label: "needs you  " + fmt.Sprint(len(signalled))})
@@ -683,6 +683,40 @@ const idleDays = 14
 
 // Idle: nothing would be lost removing it, and nobody has touched it in
 // idleDays — what mia gc collects. here is the worktree you are in.
+// moved is when a worktree last moved: its last commit, or later, the last
+// output in any of its windows.
+func moved(r row) time.Time {
+	if r.listing == nil {
+		return time.Time{}
+	}
+	at := r.listing.LastWork
+	for _, w := range r.listing.Windows {
+		quiet := w.Quiet
+		if quiet == 0 && w.Still != "" {
+			quiet, _ = time.ParseDuration(w.Still) // a machine's, through JSON
+		}
+		if t := time.Now().Add(-quiet); quiet > 0 && t.After(at) {
+			at = t
+		}
+	}
+	return at
+}
+
+// agentSays is what an agent in the worktree says it is doing: the active
+// window's first, else any window's.
+func agentSays(r row) string {
+	if r.listing == nil {
+		return ""
+	}
+	said := ""
+	for _, w := range r.listing.Windows {
+		if w.Agent != "" && (said == "" || w.Active) {
+			said = w.Agent
+		}
+	}
+	return said
+}
+
 func Idle(l app.Listing, here string) bool {
 	if l.Main || l.Dirty || l.Session || l.Starred || len(l.Layers) > 1 || l.Name == here {
 		return false

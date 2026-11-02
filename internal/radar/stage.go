@@ -206,8 +206,8 @@ func (m model) rowLines(r row, on bool, width int) []string {
 		right = append(right, soft.Render("last"))
 	}
 	age := ""
-	if r.listing != nil && !r.listing.LastWork.IsZero() {
-		age = ago(time.Since(r.listing.LastWork))
+	if at := moved(r); !at.IsZero() {
+		age = ago(time.Since(at))
 	}
 	right = append(right, muted.Render(fmt.Sprintf("%4s", age)))
 	lines := []string{paint(between(left, strings.Join(right, "  "), width))}
@@ -215,6 +215,8 @@ func (m model) rowLines(r row, on bool, width int) []string {
 	case needsYou(r):
 		s := r.signals[0]
 		lines = append(lines, "      "+ghost.Render("└ ")+Style(s.Style).Bold(true).Render(s.Kind)+"  "+soft.Render(cut(s.Text, width-16)))
+	case agentSays(r) != "":
+		lines = append(lines, "      "+ghost.Render("└ "+cut(agentSays(r), width-10)))
 	}
 	return lines
 }
@@ -264,6 +266,9 @@ func (m model) stage(width, height int) []string {
 		}
 		if l.LastSubject != "" {
 			add(muted.Render(l.LastSubject))
+		}
+		if said := agentSays(r); said != "" {
+			add(soft.Render("✳ " + said))
 		}
 	}
 	add("")

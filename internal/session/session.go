@@ -5,10 +5,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/runtime"
@@ -364,9 +366,13 @@ type Pane struct {
 	Command  string
 	Activity time.Time
 	Active   bool
+	ID       string
+	Title    string
 }
 
-const paneFormat = "#{window_index} #{window_name} #{pane_pid} #{pane_current_command} #{window_activity} #{window_active}"
+// paneFormat is one pane a line, tab between fields: a window name or a
+// title may have spaces in it.
+const paneFormat = "#{window_index}\t#{window_name}\t#{pane_pid}\t#{pane_current_command}\t#{window_activity}\t#{window_active}\t#{pane_id}\t#{pane_title}"
 
 func parsePane(fields []string) (Pane, bool) {
 	if len(fields) < 3 {
@@ -392,6 +398,12 @@ func parsePane(fields []string) (Pane, bool) {
 	if len(fields) > 5 {
 		pane.Active = fields[5] == "1"
 	}
+	if len(fields) > 6 {
+		pane.ID = fields[6]
+	}
+	if len(fields) > 7 {
+		pane.Title = strings.Join(fields[7:], "\t")
+	}
 	return pane, true
 }
 
@@ -402,7 +414,7 @@ func (h Host) Panes(worktree string) []Pane {
 	}
 	var panes []Pane
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		if pane, ok := parsePane(strings.Fields(line)); ok {
+		if pane, ok := parsePane(strings.Split(line, "\t")); ok {
 			panes = append(panes, pane)
 		}
 	}
@@ -410,14 +422,14 @@ func (h Host) Panes(worktree string) []Pane {
 }
 
 func (h Host) AllPanes() map[string][]Pane {
-	out, err := h.run("list-panes", "-a", "-F", "#{session_name} "+paneFormat)
+	out, err := h.run("list-panes", "-a", "-F", "#{session_name}\t"+paneFormat)
 	if err != nil {
 		return nil
 	}
 	all := map[string][]Pane{}
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 3 {
+		fields := strings.Split(line, "\t")
+		if len(fields) < 4 {
 			continue
 		}
 		if pane, ok := parsePane(fields[1:]); ok {
@@ -450,6 +462,9 @@ type Window struct {
 	Still   string        `json:"quiet"`
 	Screen  string        `json:"-"`
 	Active  bool          `json:"active"`
+	// Agent is what an agent in the window says it is doing, from the title
+	// it gives its pane; "" for anything else.
+	Agent string `json:"agent,omitempty"`
 }
 
 func (h Host) WindowsOf(worktree string) []Window {
@@ -465,9 +480,40 @@ func WindowsFrom(panes []Pane) []Window {
 		}
 		seen[pane.Index] = true
 		quiet := pane.Quiet()
-		windows = append(windows, Window{Index: pane.Index, Name: pane.Window, Command: pane.Command, PID: pane.PID, Quiet: quiet, Still: quiet.Round(time.Second).String(), Active: pane.Active})
+		name, command := pane.Window, pane.Command
+		if version.MatchString(command) {
+			// ponytail: claude's own installer names its binary for its version,
+			// so tmux calls the window 2.1.316; the one agent known to do it
+			command = "claude"
+			if version.MatchString(name) {
+				name = "claude"
+			}
+		}
+		agent := AgentTitle(pane.Title)
+		if command == "claude" && agent == "" {
+			agent = strings.TrimSpace(pane.Title) // claude does not always mark it
+		}
+		if agent == "Claude Code" {
+			agent = "" // its name until it has something to say
+		}
+		windows = append(windows, Window{Index: pane.Index, Name: name, Command: command, PID: pane.PID, Quiet: quiet,
+			Still: quiet.Round(time.Second).String(), Active: pane.Active, Agent: agent})
 	}
 	return windows
+}
+
+var version = regexp.MustCompile(`^[0-9]+(\.[0-9]+)+$`)
+
+// AgentTitle is what claude says it is doing in the title it gives its
+// pane — "✳ Fix the retry loop" idle, a braille spinner before it while it
+// works — without the mark; "" for any other title, such as a shell's
+// folder or the host's name.
+func AgentTitle(title string) string {
+	mark, size := utf8.DecodeRuneInString(title)
+	if mark != '✳' && (mark < 0x2800 || mark > 0x28FF) {
+		return ""
+	}
+	return strings.TrimSpace(title[size:])
 }
 
 type Process struct {

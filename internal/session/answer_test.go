@@ -51,3 +51,25 @@ func TestAnAnswerGoesToItsPaneOnlyWhileTheWorktreeHoldsIt(t *testing.T) {
 		t.Errorf("nothing typed into the other pane: %q", screen)
 	}
 }
+
+func TestAnAgentsTitleSaysWhatItIsDoing(t *testing.T) {
+	for title, want := range map[string]string{
+		"✳ Fix the retry loop": "Fix the retry loop",
+		"⠐ Fix the retry loop": "Fix the retry loop",
+		"mia-core.kurasini":    "",
+		"MacBookPro.lan":       "",
+		"":                     "",
+	} {
+		if got := AgentTitle(title); got != want {
+			t.Errorf("AgentTitle(%q) = %q, want %q", title, got, want)
+		}
+	}
+	w := WindowsFrom([]Pane{{Index: 1, Window: "2.1.316", Command: "2.1.316", Title: "✳ Ship it"}})
+	if w[0].Name != "claude" || w[0].Command != "claude" || w[0].Agent != "Ship it" {
+		t.Errorf("claude's versioned binary is called claude: %+v", w[0])
+	}
+	w = WindowsFrom([]Pane{{Index: 1, Window: "2.1.316", Command: "2.1.316", Title: "resume the task"}, {Index: 2, Window: "2.1.316", Command: "2.1.316", Title: "Claude Code"}})
+	if w[0].Agent != "resume the task" || w[1].Agent != "" {
+		t.Errorf("a claude title unmarked is still its own; its bare name says nothing: %+v", w)
+	}
+}
