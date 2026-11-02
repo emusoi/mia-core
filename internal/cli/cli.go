@@ -540,11 +540,12 @@ func cmdRemove(a *app.App, args []string) int {
 
 func cmdShell(a *app.App, args []string) int {
 	popup := take(&args, "--popup")
+	view := takeValue(&args, "--view")
 	target := ""
 	if len(args) == 1 {
 		target = args[0]
 	} else if len(args) > 1 {
-		return usageErr("mia shell [--popup] [worktree]")
+		return usageErr("mia shell [--popup | --view <name>] [worktree]")
 	}
 	if name, on, ok := strings.Cut(target, "@"); ok && name != "" {
 		if os.Getenv("TMUX") != "" {
@@ -566,6 +567,9 @@ func cmdShell(a *app.App, args []string) int {
 			return fail(err)
 		}
 		target = path
+	}
+	if view != "" {
+		return exitFor(a.ShellView(target, view))
 	}
 	if err := a.Shell(target, popup); err != nil {
 		return fail(err)

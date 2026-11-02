@@ -634,6 +634,23 @@ func (a *App) ensureSession(host session.Host, record model.Record, dir string) 
 }
 
 func (a *App) Shell(query string, popup bool) error {
+	return a.shell(query, func(host session.Host, record model.Record, dir string) error {
+		if popup {
+			return host.AttachPopup(record.Name, dir)
+		}
+		return host.Attach(record.Name)
+	})
+}
+
+// ShellView attaches as a view of its own: the session's windows at this
+// terminal's size, its current window this terminal's to choose.
+func (a *App) ShellView(query, view string) error {
+	return a.shell(query, func(host session.Host, record model.Record, _ string) error {
+		return host.AttachView(record.Name, view)
+	})
+}
+
+func (a *App) shell(query string, attach func(session.Host, model.Record, string) error) error {
 	resolver, err := a.Resolver()
 	if err != nil {
 		return err
@@ -662,10 +679,7 @@ func (a *App) Shell(query string, popup bool) error {
 	if err := a.MarkSeen(record.Name); err != nil { // switched to: the visit, and signals that last until seen
 		return err
 	}
-	if popup {
-		return host.AttachPopup(record.Name, dir)
-	}
-	return host.Attach(record.Name)
+	return attach(host, record, dir)
 }
 
 func (a *App) Run(query string, argv []string) error {

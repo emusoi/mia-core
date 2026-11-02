@@ -86,7 +86,25 @@ func (h Host) shellPath() (string, error) {
 }
 
 func (h Host) Attach(worktree string) error {
-	name := Name(worktree)
+	return h.attach(Name(worktree))
+}
+
+// AttachView attaches through a session of the worktree's own group: the
+// same windows, but its own size and its own current window, so a phone
+// beside a desktop shrinks nothing and changes no one's window. The view
+// session goes when nothing is attached to it.
+func (h Host) AttachView(worktree, view string) error {
+	name, own := Name(worktree), Name(worktree)+"-"+view
+	if _, err := h.run("has-session", "-t", exact(own)); err != nil {
+		if out, err := h.run("new-session", "-d", "-s", own, "-t", exact(name)); err != nil {
+			return fmt.Errorf("open a %s view of %s: %s", view, worktree, strings.TrimSpace(out))
+		}
+		_, _ = h.run("set-option", "-t", exact(own), "destroy-unattached", "on")
+	}
+	return h.attach(own)
+}
+
+func (h Host) attach(name string) error {
 	if h.SSH != "" {
 		return runtime.Interactive(h.SSH, "tmux", "-u", "attach-session", "-t", exact(name)).Run()
 	}
@@ -96,7 +114,7 @@ func (h Host) Attach(worktree string) error {
 	}
 
 	if !isTerminal(os.Stdout) {
-		return fmt.Errorf("there is no terminal here to attach %s to — `tmux attach -t %s` from one", worktree, name)
+		return fmt.Errorf("there is no terminal here to attach %s to — `tmux attach -t %s` from one", name, name)
 	}
 
 	if tty := clientOfPane(os.Getenv("MIA_TMUX_PANE")); tty != "" {
