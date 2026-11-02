@@ -63,20 +63,6 @@
       "tag": "span",
       "text": "idle"
     },
-    "42778052": {
-      "id": "42778052",
-      "index": "a0",
-      "kind": "frame",
-      "name": "div",
-      "parent": "bd6da11d",
-      "style": {
-        "background": "var(--del)",
-        "borderRadius": "3px",
-        "height": "5px",
-        "width": "100%"
-      },
-      "tag": "div"
-    },
     "43324444": {
       "id": "43324444",
       "index": "a0",
@@ -576,10 +562,10 @@
       "id": "07809b21",
       "index": "a0",
       "kind": "frame",
-      "name": "row · radar.go",
+      "name": "commit · a7db048",
       "parent": "df91fee5",
       "style": {
-        "padding": "16px 20px"
+        "padding": "14px 18px"
       },
       "tag": "div"
     },
@@ -867,15 +853,15 @@
       "id": "0fa28686",
       "index": "a2",
       "kind": "text",
-      "name": "internal/radar, new",
+      "name": "c1067bc · joneskim",
       "parent": "1cb3aacd",
       "style": {
         "color": "var(--muted)",
-        "font": "16px/21px -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif",
-        "marginTop": "6px"
+        "font": "14px 'SF Mono', ui-monospace, Menlo, monospace",
+        "marginTop": "3px"
       },
       "tag": "div",
-      "text": "internal/radar, new"
+      "text": "c1067bc · joneskim"
     },
     "0fcc00c6": {
       "id": "0fcc00c6",
@@ -971,20 +957,6 @@
       },
       "tag": "div",
       "text": "Can’t reach your machines"
-    },
-    "12c65022": {
-      "id": "12c65022",
-      "index": "a0",
-      "kind": "frame",
-      "name": "div",
-      "parent": "18582f74",
-      "style": {
-        "background": "var(--add)",
-        "borderRadius": "3px",
-        "height": "5px",
-        "width": "88%"
-      },
-      "tag": "div"
     },
     "136bac0d": {
       "id": "136bac0d",
@@ -1283,21 +1255,6 @@
       "tag": "span",
       "text": "claude"
     },
-    "18582f74": {
-      "id": "18582f74",
-      "index": "a1",
-      "kind": "frame",
-      "name": "div",
-      "parent": "07809b21",
-      "style": {
-        "background": "var(--line)",
-        "borderRadius": "3px",
-        "height": "5px",
-        "marginTop": "12px",
-        "overflow": "hidden"
-      },
-      "tag": "div"
-    },
     "18d7ad7a": {
       "id": "18d7ad7a",
       "index": "aB",
@@ -1557,10 +1514,10 @@
       "id": "1cb3aacd",
       "index": "a2",
       "kind": "frame",
-      "name": "row · peek.go",
+      "name": "commit · c1067bc",
       "parent": "df91fee5",
       "style": {
-        "padding": "16px 20px"
+        "padding": "14px 18px"
       },
       "tag": "div"
     },
@@ -2611,14 +2568,14 @@
       "id": "33b9d10c",
       "index": "a1",
       "kind": "text",
-      "name": "−2",
+      "name": "1d",
       "parent": "f21661a4",
       "style": {
-        "color": "var(--ink)",
-        "font": "19px -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif"
+        "color": "var(--muted)",
+        "font": "15px -apple-system, 'SF Pro Text', system-ui, sans-serif"
       },
       "tag": "span",
-      "text": "−2"
+      "text": "1d"
     },
     "33bebf97": {
       "id": "33bebf97",
@@ -3450,18 +3407,15 @@
       "id": "43c359bc",
       "index": "a0",
       "kind": "text",
-      "name": "peek.go",
+      "name": "Radar: idle folds away",
       "parent": "d024f3b2",
       "style": {
         "color": "var(--ink)",
         "flex": "1",
-        "font": "19px 'SF Mono', ui-monospace, Menlo, monospace",
-        "overflow": "hidden",
-        "textOverflow": "ellipsis",
-        "whiteSpace": "nowrap"
+        "font": "18px -apple-system, 'SF Pro Text', system-ui, sans-serif"
       },
       "tag": "span",
-      "text": "peek.go"
+      "text": "Radar: idle folds away"
     },
     "44b9eedb": {
       "id": "44b9eedb",
@@ -3643,18 +3597,6 @@
         "width": "40px"
       },
       "tag": "div"
-    },
-    "47f1d4d2": {
-      "id": "47f1d4d2",
-      "index": "a1",
-      "kind": "text",
-      "name": "−7",
-      "parent": "a3060ef3",
-      "style": {
-        "color": "var(--muted)"
-      },
-      "tag": "span",
-      "text": "−7"
     },
     "482fb4bf": {
       "id": "482fb4bf",
@@ -4725,21 +4667,6 @@
       },
       "tag": "div",
       "text": " ❯ "
-    },
-    "615f32e2": {
-      "id": "615f32e2",
-      "index": "a1",
-      "kind": "frame",
-      "name": "div",
-      "parent": "1cb3aacd",
-      "style": {
-        "background": "var(--line)",
-        "borderRadius": "3px",
-        "height": "5px",
-        "marginTop": "12px",
-        "overflow": "hidden"
-      },
-      "tag": "div"
     },
     "6175839b": {
       "id": "6175839b",
@@ -5816,20 +5743,6 @@
       },
       "tag": "div"
     },
-    "7745b5cf": {
-      "id": "7745b5cf",
-      "index": "a0",
-      "kind": "frame",
-      "name": "div",
-      "parent": "615f32e2",
-      "style": {
-        "background": "var(--add)",
-        "borderRadius": "3px",
-        "height": "5px",
-        "width": "100%"
-      },
-      "tag": "div"
-    },
     "777961c9": {
       "id": "777961c9",
       "index": "a0",
@@ -5901,7 +5814,7 @@
       "id": "7876099f",
       "index": "a0",
       "kind": "text",
-      "name": "Changes",
+      "name": "Log",
       "parent": "7f1fc417",
       "style": {
         "color": "var(--ink)",
@@ -5910,7 +5823,7 @@
         "letterSpacing": "-.3px"
       },
       "tag": "span",
-      "text": "Changes"
+      "text": "Log"
     },
     "7a571f67": {
       "id": "7a571f67",
@@ -6235,18 +6148,15 @@
       "id": "7f13917a",
       "index": "a0",
       "kind": "text",
-      "name": "radar.go",
+      "name": "Radar: a peek beside the…",
       "parent": "ee9cdb49",
       "style": {
         "color": "var(--ink)",
         "flex": "1",
-        "font": "19px 'SF Mono', ui-monospace, Menlo, monospace",
-        "overflow": "hidden",
-        "textOverflow": "ellipsis",
-        "whiteSpace": "nowrap"
+        "font": "18px -apple-system, 'SF Pro Text', system-ui, sans-serif"
       },
       "tag": "span",
-      "text": "radar.go"
+      "text": "Radar: a peek beside the list"
     },
     "7f1fc417": {
       "id": "7f1fc417",
@@ -6369,11 +6279,11 @@
       "id": "805cbd8b",
       "index": "a0",
       "kind": "text",
-      "name": "+70",
+      "name": "3",
       "parent": "a3060ef3",
       "style": {},
       "tag": "span",
-      "text": "+70"
+      "text": "3"
     },
     "80a1c573": {
       "id": "80a1c573",
@@ -6506,7 +6416,7 @@
       "id": "81f097da",
       "index": "a2",
       "kind": "text",
-      "name": "in 4 files since the las…",
+      "name": "And 4 files not committe…",
       "parent": "6854378b",
       "style": {
         "color": "var(--muted)",
@@ -6514,7 +6424,7 @@
         "marginTop": "4px"
       },
       "tag": "div",
-      "text": "in 4 files since the last commit"
+      "text": "And 4 files not committed yet."
     },
     "82b12cbe": {
       "id": "82b12cbe",
@@ -7138,15 +7048,15 @@
       "id": "90af098d",
       "index": "a2",
       "kind": "text",
-      "name": "internal/radar",
+      "name": "a7db048 · joneskim",
       "parent": "07809b21",
       "style": {
         "color": "var(--muted)",
-        "font": "16px/21px -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif",
-        "marginTop": "6px"
+        "font": "14px 'SF Mono', ui-monospace, Menlo, monospace",
+        "marginTop": "3px"
       },
       "tag": "div",
-      "text": "internal/radar"
+      "text": "a7db048 · joneskim"
     },
     "90c63220": {
       "id": "90c63220",
@@ -7592,18 +7502,15 @@
       "id": "991cb05c",
       "index": "a0",
       "kind": "text",
-      "name": "side.go",
+      "name": "Radar: rows say +ahead a…",
       "parent": "f21661a4",
       "style": {
         "color": "var(--ink)",
         "flex": "1",
-        "font": "19px 'SF Mono', ui-monospace, Menlo, monospace",
-        "overflow": "hidden",
-        "textOverflow": "ellipsis",
-        "whiteSpace": "nowrap"
+        "font": "18px -apple-system, 'SF Pro Text', system-ui, sans-serif"
       },
       "tag": "span",
-      "text": "side.go"
+      "text": "Radar: rows say +ahead and ✎"
     },
     "992b9f76": {
       "id": "992b9f76",
@@ -7686,25 +7593,6 @@
         "padding": "8px 26px 0 34px"
       },
       "tag": "div"
-    },
-    "9b40bd99": {
-      "id": "9b40bd99",
-      "index": "a1",
-      "kind": "text",
-      "name": "Commit",
-      "parent": "f303d31f",
-      "style": {
-        "alignItems": "center",
-        "background": "var(--ink)",
-        "borderRadius": "27px",
-        "color": "var(--on-ink)",
-        "display": "flex",
-        "font": "600 17px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "height": "54px",
-        "padding": "0 22px"
-      },
-      "tag": "div",
-      "text": "Commit"
     },
     "9be00d09": {
       "id": "9be00d09",
@@ -8267,14 +8155,14 @@
       "id": "a64390bd",
       "index": "a0",
       "kind": "text",
-      "name": "Lines changed",
+      "name": "Commits",
       "parent": "6854378b",
       "style": {
         "color": "var(--muted)",
         "font": "17px -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif"
       },
       "tag": "div",
-      "text": "Lines changed"
+      "text": "Commits"
     },
     "a696f021": {
       "id": "a696f021",
@@ -8621,27 +8509,6 @@
       },
       "tag": "span",
       "text": "3"
-    },
-    "ab64e08e": {
-      "id": "ab64e08e",
-      "index": "a0",
-      "kind": "text",
-      "name": "Radar shows a peek besid…",
-      "parent": "f303d31f",
-      "style": {
-        "alignItems": "center",
-        "background": "var(--bg)",
-        "border": "1px solid var(--line)",
-        "borderRadius": "27px",
-        "color": "var(--muted)",
-        "display": "flex",
-        "flex": "1",
-        "font": "17px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "height": "54px",
-        "padding": "0 20px"
-      },
-      "tag": "div",
-      "text": "Radar shows a peek beside the list"
     },
     "ab894e43": {
       "id": "ab894e43",
@@ -9546,21 +9413,6 @@
       "tag": "span",
       "text": "Log"
     },
-    "bd6da11d": {
-      "id": "bd6da11d",
-      "index": "a1",
-      "kind": "frame",
-      "name": "div",
-      "parent": "f319799f",
-      "style": {
-        "background": "var(--line)",
-        "borderRadius": "3px",
-        "height": "5px",
-        "marginTop": "12px",
-        "overflow": "hidden"
-      },
-      "tag": "div"
-    },
     "bde6ae58": {
       "id": "bde6ae58",
       "index": "a4",
@@ -9755,14 +9607,14 @@
       "id": "c269dd56",
       "index": "a1",
       "kind": "text",
-      "name": "+24 −3",
+      "name": "2h",
       "parent": "ee9cdb49",
       "style": {
-        "color": "var(--ink)",
-        "font": "19px -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif"
+        "color": "var(--muted)",
+        "font": "15px -apple-system, 'SF Pro Text', system-ui, sans-serif"
       },
       "tag": "span",
-      "text": "+24 −3"
+      "text": "2h"
     },
     "c271d31e": {
       "id": "c271d31e",
@@ -10271,11 +10123,11 @@
       "id": "cd103eca",
       "index": "a0",
       "kind": "text",
-      "name": "Files",
+      "name": "Commits",
       "parent": "556ed6be",
       "style": {},
       "tag": "span",
-      "text": "Files"
+      "text": "Commits"
     },
     "cdaa7089": {
       "id": "cdaa7089",
@@ -10396,9 +10248,8 @@
       "name": "div",
       "parent": "1cb3aacd",
       "style": {
-        "alignItems": "center",
         "display": "flex",
-        "gap": "12px"
+        "gap": "10px"
       },
       "tag": "div"
     },
@@ -10449,7 +10300,8 @@
       "parent": "df91fee5",
       "style": {
         "background": "var(--line)",
-        "height": "1px"
+        "height": "1px",
+        "marginLeft": "44px"
       },
       "tag": "div"
     },
@@ -11309,11 +11161,11 @@
       "id": "df91fee5",
       "index": "a4",
       "kind": "frame",
-      "name": "div",
+      "name": "commits",
       "parent": "0319d172",
       "style": {
         "background": "var(--card)",
-        "borderRadius": "26px",
+        "borderRadius": "24px",
         "margin": "0 18px",
         "overflow": "hidden"
       },
@@ -11438,15 +11290,15 @@
       "id": "e258f4bb",
       "index": "a2",
       "kind": "text",
-      "name": "internal/tui, deleted",
+      "name": "55735b0 · joneskim",
       "parent": "f319799f",
       "style": {
         "color": "var(--muted)",
-        "font": "16px/21px -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif",
-        "marginTop": "6px"
+        "font": "14px 'SF Mono', ui-monospace, Menlo, monospace",
+        "marginTop": "3px"
       },
       "tag": "div",
-      "text": "internal/tui, deleted"
+      "text": "55735b0 · joneskim"
     },
     "e2684d85": {
       "id": "e2684d85",
@@ -11559,11 +11411,11 @@
       "id": "e4069d24",
       "index": "a0",
       "kind": "text",
-      "name": "Not committed",
+      "name": "Ahead of main",
       "parent": "b575999c",
       "style": {},
       "tag": "span",
-      "text": "Not committed"
+      "text": "Ahead of main"
     },
     "e46905d4": {
       "id": "e46905d4",
@@ -12133,14 +11985,14 @@
       "id": "eb55d3db",
       "index": "a1",
       "kind": "text",
-      "name": "+41",
+      "name": "5h",
       "parent": "d024f3b2",
       "style": {
-        "color": "var(--ink)",
-        "font": "19px -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif"
+        "color": "var(--muted)",
+        "font": "15px -apple-system, 'SF Pro Text', system-ui, sans-serif"
       },
       "tag": "span",
-      "text": "+41"
+      "text": "5h"
     },
     "ebbc7a84": {
       "id": "ebbc7a84",
@@ -12315,9 +12167,8 @@
       "name": "div",
       "parent": "07809b21",
       "style": {
-        "alignItems": "center",
         "display": "flex",
-        "gap": "12px"
+        "gap": "10px"
       },
       "tag": "div"
     },
@@ -12482,9 +12333,8 @@
       "name": "div",
       "parent": "f319799f",
       "style": {
-        "alignItems": "center",
         "display": "flex",
-        "gap": "12px"
+        "gap": "10px"
       },
       "tag": "div"
     },
@@ -12539,31 +12389,14 @@
       "tag": "div",
       "text": " the batch?"
     },
-    "f303d31f": {
-      "id": "f303d31f",
-      "index": "a5",
-      "kind": "frame",
-      "name": "commit",
-      "parent": "0319d172",
-      "style": {
-        "alignItems": "center",
-        "bottom": "30px",
-        "display": "flex",
-        "gap": "8px",
-        "left": "18px",
-        "position": "absolute",
-        "right": "18px"
-      },
-      "tag": "div"
-    },
     "f319799f": {
       "id": "f319799f",
       "index": "a4",
       "kind": "frame",
-      "name": "row · side.go",
+      "name": "commit · 55735b0",
       "parent": "df91fee5",
       "style": {
-        "padding": "16px 20px"
+        "padding": "14px 18px"
       },
       "tag": "div"
     },
@@ -12926,7 +12759,8 @@
       "parent": "df91fee5",
       "style": {
         "background": "var(--line)",
-        "height": "1px"
+        "height": "1px",
+        "marginLeft": "44px"
       },
       "tag": "div"
     },
