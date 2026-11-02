@@ -139,7 +139,7 @@ func cmdErr(code int) error {
 const tmuxMarker = "# mia: status line and popups"
 
 // tmuxSnippet is what mia adds to a tmux config: its part of the status
-// line, refreshed every 5s, and the two popups.
+// line, refreshed every 5s, the two popups, and its menu.
 func tmuxSnippet(self string) string {
 	mia := run.ShellJoin([]string{self})
 	return tmuxMarker + ` — mia tmux uninstall removes this block
@@ -148,6 +148,7 @@ set -g status-right-length 160
 set -ga status-right ' #(` + mia + ` status-line "#{pane_current_path}") '
 bind Space display-popup -E -d "#{pane_current_path}" -w 72 -h 60% -T " mia " "` + mia + ` radar"
 bind n display-popup -E -d "#{pane_current_path}" -w 110 -h 14 -T " new worktree " "` + mia + ` radar --new"
+bind m run-shell -c "#{pane_current_path}" "` + mia + ` tmux menu '#{client_name}'"
 # mia: end
 `
 }
@@ -193,7 +194,7 @@ func cmdTmux(args []string) int {
 		if out, err := run.Local("tmux").Combined("source-file", conf); err != nil {
 			return fail(fmt.Errorf("tmux source-file %s: %s", conf, strings.TrimSpace(out)))
 		}
-		fmt.Println("tmux has read it: prefix space opens the radar, prefix n a new worktree")
+		fmt.Println("tmux has read it: prefix space opens the radar, prefix n a new worktree, prefix m mia's menu")
 	}
 	return exitOK
 }

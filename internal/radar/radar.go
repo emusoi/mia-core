@@ -507,7 +507,7 @@ func (m model) build() []row {
 				machines = append(machines, r.machine)
 			}
 			elsewhere[r.machine] = append(elsewhere[r.machine], r)
-		case !isIdle(r, m.data.Here):
+		case r.listing == nil || !Idle(*r.listing, m.data.Here):
 			active = append(active, r)
 		default:
 			idle = append(idle, r)
@@ -562,11 +562,10 @@ func (m model) build() []row {
 // counts it.
 const idleDays = 14
 
-// isIdle: nothing would be lost removing it, and nobody has touched it in
-// idleDays — what mia gc collects.
-func isIdle(r row, here string) bool {
-	l := r.listing
-	if l == nil || l.Main || l.Dirty || l.Session || l.Starred || len(r.layers) > 1 || r.name == here {
+// Idle: nothing would be lost removing it, and nobody has touched it in
+// idleDays — what mia gc collects. here is the worktree you are in.
+func Idle(l app.Listing, here string) bool {
+	if l.Main || l.Dirty || l.Session || l.Starred || len(l.Layers) > 1 || l.Name == here {
 		return false
 	}
 	return !l.LastWork.IsZero() && time.Since(l.LastWork) > idleDays*24*time.Hour

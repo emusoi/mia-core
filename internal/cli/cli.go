@@ -99,7 +99,9 @@ func Run(args []string) int {
 	case "status-line":
 		return cmdStatusLine(rest)
 	case "tmux":
-		return cmdTmux(rest)
+		if len(rest) == 0 || rest[0] != "menu" {
+			return cmdTmux(rest)
+		}
 	case "machine", "machines", "runtime":
 		if len(rest) == 0 || (rest[0] != "attach" && rest[0] != "poll" && rest[0] != "link") {
 			return cmdRuntime(rest, asJSON)
@@ -127,6 +129,8 @@ func Run(args []string) int {
 	a.Events = func(e app.Event) { sendEvent(a, e) }
 
 	switch verb {
+	case "tmux":
+		return cmdTmuxMenu(a, rest[1:])
 	case "signal", "signals":
 		return cmdSignal(a, rest, asJSON)
 	case "radar":
@@ -381,19 +385,20 @@ func cmdPath(a *app.App, args []string) int {
 
 func cmdGC(a *app.App, args []string, asJSON bool) int {
 	apply := take(&args, "--apply")
+	ask := take(&args, "--ask")
 	days := 14
 	if value := takeValue(&args, "--days"); value != "" {
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
-			return usageErr("mia gc [--apply] [--days N] | mia gc --others [--apply] [path...]")
+			return usageErr("mia gc [--apply|--ask] [--days N] | mia gc --others [--apply|--ask] [path...]")
 		}
 		days = n
 	}
 	if take(&args, "--others") {
-		return gcOthers(a, args, apply)
+		return gcOthers(a, args, apply, ask)
 	}
 	if len(args) > 0 {
-		return usageErr("mia gc [--apply] [--days N] | mia gc --others [--apply] [path...]")
+		return usageErr("mia gc [--apply|--ask] [--days N] | mia gc --others [--apply|--ask] [path...]")
 	}
 	found, err := a.Abandoned(time.Duration(days)*24*time.Hour, time.Now())
 	if err != nil {
@@ -404,10 +409,20 @@ func cmdGC(a *app.App, args []string, asJSON bool) int {
 	}
 	if len(found) == 0 {
 		fmt.Printf("nothing abandoned — every worktree is starred, dirty, in a session, or touched within %d days\n", days)
+		if ask {
+			pressKey()
+		}
 		return exitOK
 	}
 	for _, one := range found {
 		fmt.Printf("%-12s %-28s %6s  last commit %s\n", one.Record.Name, one.Branch, one.Size, one.LastWork.Format("2006-01-02"))
+	}
+	if ask {
+		apply = askYes(fmt.Sprintf("\nremove these %d? branches stay. y removes them ", len(found)))
+		defer pressKey()
+		if !apply {
+			return exitOK
+		}
 	}
 	if !apply {
 		command := "mia gc --apply"
@@ -429,7 +444,7 @@ func cmdGC(a *app.App, args []string, asJSON bool) int {
 
 // gcOthers removes the repository's worktrees mia did not make — an agent's,
 // another tool's — when nothing in them is uncommitted. Their branches stay.
-func gcOthers(a *app.App, paths []string, apply bool) int {
+func gcOthers(a *app.App, paths []string, apply, ask bool) int {
 	listings, err := a.List()
 	if err != nil {
 		return fail(err)
@@ -450,7 +465,17 @@ func gcOthers(a *app.App, paths []string, apply bool) int {
 	}
 	if len(found) == 0 {
 		fmt.Println("nothing to remove")
+		if ask {
+			pressKey()
+		}
 		return exitOK
+	}
+	if ask {
+		apply = askYes(fmt.Sprintf("\nremove these %d? branches stay. y removes them ", len(found)))
+		defer pressKey()
+		if !apply {
+			return exitOK
+		}
 	}
 	if !apply {
 		fmt.Println("\nnothing was removed — `mia gc --others --apply` removes the above; branches stay")

@@ -1,6 +1,6 @@
 # mia in tmux
 
-mia lives in your tmux: a part of the status line, and two popups.
+mia lives in your tmux: a part of the status line, two popups and a menu.
 
 ```bash
 mia tmux            # print what it adds
@@ -12,6 +12,7 @@ mia tmux uninstall  # take it out again
 |---|---|
 | `prefix space` | the radar |
 | `prefix n` | a new worktree |
+| `prefix m` | mia's menu |
 
 ## The status line
 
@@ -56,6 +57,14 @@ there, in place. Type to find any worktree and what can be done with it.
 `mia dash` is the radar full-screen: the same rows, keys and groups, the
 groups counted in tabs across the top, and the selected worktree in full
 beside the list. Below 110 columns it is the radar.
+
+## The menu
+
+`prefix m` is tmux's own menu, built when you press it: the radar (`space`),
+the dash (`g`), a new worktree (`n`), cleaning up what is idle (`c`) and
+what mia did not make (`o`) with how many of each there are, then one entry
+for each plugin that is on. Cleaning up shows what would go and asks `y`
+first (`mia gc --ask`); branches stay.
 
 ## A new worktree
 

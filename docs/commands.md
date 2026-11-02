@@ -20,8 +20,8 @@
 | `mia setup [worktree]` | run setup again |
 | `mia run <worktree>[@machine] <cmd…>` | run a command in it, here or on a machine |
 | `mia rm <worktree>` | remove it |
-| `mia gc [--apply] [--days N]` | find, or remove, idle worktrees: clean, no session, not starred, untouched for N days (14) |
-| `mia gc --others [--apply] [path…]` | find, or remove, the clean worktrees mia did not make; branches stay |
+| `mia gc [--apply\|--ask] [--days N]` | find, or remove, idle worktrees: clean, no session, not starred, untouched for N days (14); `--ask` shows them and removes on `y` |
+| `mia gc --others [--apply\|--ask] [path…]` | find, or remove, the clean worktrees mia did not make; branches stay |
 
 ## Stacks
 
@@ -57,6 +57,6 @@
 | `mia plugin ls\|enable\|disable` | plugins |
 | `mia api <query>` | state as JSON |
 | `mia help vocabulary` | the words |
-| `mia help tmux` | what `mia tmux install` adds: the radar, a new worktree, the status line |
+| `mia help tmux` | what `mia tmux install` adds: the radar, a new worktree, the menu, the status line |
 
 Reading commands take `--json`.
