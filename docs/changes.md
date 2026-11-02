@@ -9,6 +9,9 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **`mia fork [worktree] <branch>`**: a second try beside the first: a new
+  worktree on a new branch from where the worktree is, its uncommitted and
+  untracked work copied, the first left as it is.
 - **`mia archive <worktree>`** and **`mia unarchive <name>`**: put a
   worktree away without committing or losing anything; its uncommitted and
   untracked work is kept as a commit under `refs/mia/archive/`, never

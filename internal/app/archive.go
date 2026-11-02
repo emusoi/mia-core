@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -155,16 +156,54 @@ func (a *App) Unarchive(name string) (model.Record, error) {
 		}
 	}
 	if saved != base {
-		g := run.Tool{Binary: "git", Dir: record.Path}
-		// the worktree goes from the branch's commit to the saved one, then the
-		// index back to the commit: the work is uncommitted again, as it was
-		if _, err := g.Capture("read-tree", "-m", "-u", "HEAD", saved); err != nil {
-			return record, err
-		}
-		if _, err := g.Capture("reset", "-q"); err != nil {
+		if err := putBack(record.Path, saved); err != nil {
 			return record, err
 		}
 	}
 	_, err = (run.Tool{Binary: "git", Dir: a.Root}).Capture("update-ref", "-d", archiveRefs+name)
 	return record, err
+}
+
+// putBack makes a clean worktree hold a snapshot's work, uncommitted: the
+// files go from HEAD to the snapshot, then the index back to HEAD.
+func putBack(dir, saved string) error {
+	g := run.Tool{Binary: "git", Dir: dir}
+	if _, err := g.Capture("read-tree", "-m", "-u", "HEAD", saved); err != nil {
+		return err
+	}
+	_, err := g.Capture("reset", "-q")
+	return err
+}
+
+// Fork makes a worktree on a new branch starting where another worktree
+// is, with a copy of its uncommitted and untracked work: a second try that
+// leaves the first as it is.
+func (a *App) Fork(query, branch string) (model.Record, error) {
+	from, err := a.RecordOrHere(query)
+	if err != nil {
+		return model.Record{}, err
+	}
+	if a.Config.Prefix != "" && !strings.HasPrefix(branch, a.Config.Prefix) {
+		branch = a.Config.Prefix + branch
+	}
+	if git.BranchExists(a.Root, branch) {
+		return model.Record{}, fmt.Errorf("%s already exists — a fork starts a new branch", branch)
+	}
+	head := git.RevParse(from.Path, "HEAD")
+	saved, err := snapshot(from.Path, "mia fork of "+from.Name)
+	if err != nil {
+		return model.Record{}, err
+	}
+	before, _ := a.Store.Load()
+	record, err := a.newWorktree(branch, head)
+	if record.Path != "" && !slices.ContainsFunc(before, func(one model.Record) bool { return one.Path == record.Path }) {
+		a.Emit("worktree.created", record, nil)
+	}
+	if err != nil {
+		return record, err
+	}
+	if saved != head {
+		return record, putBack(record.Path, saved)
+	}
+	return record, nil
 }

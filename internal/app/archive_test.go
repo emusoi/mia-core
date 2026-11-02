@@ -88,3 +88,41 @@ func TestAnArchivedWorktreeComesBackAsItWas(t *testing.T) {
 		t.Errorf("a clean one comes back too: %+v %v", again, err)
 	}
 }
+
+func TestAForkStartsWhereTheWorktreeIsWithItsWork(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	repo.Write("a.txt", "one\n")
+	repo.Commit("one")
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := a.New("first")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(first.Path, "a.txt"), []byte("one\ntwo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	repo.GitIn(first.Path, "commit", "-qam", "two")
+	if err := os.WriteFile(filepath.Join(first.Path, "b.txt"), []byte("draft\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	second, err := a.Fork(first.Name, "second")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := repo.GitIn(second.Path, "log", "-1", "--format=%s"); got != "two" {
+		t.Errorf("it starts at the worktree's commit, not base: %q", got)
+	}
+	if data, _ := os.ReadFile(filepath.Join(second.Path, "b.txt")); string(data) != "draft\n" {
+		t.Errorf("the uncommitted work comes along: %q", data)
+	}
+	if data, _ := os.ReadFile(filepath.Join(first.Path, "b.txt")); string(data) != "draft\n" {
+		t.Error("the first keeps its work")
+	}
+	if _, err := a.Fork(first.Name, "second"); err == nil {
+		t.Error("a fork onto a branch that exists is refused")
+	}
+}

@@ -219,14 +219,16 @@ func (a *App) Resolver() (resolve.Repo, error) {
 
 func (a *App) New(branch string) (model.Record, error) {
 	before, _ := a.Store.Load()
-	record, err := a.newWorktree(branch)
+	record, err := a.newWorktree(branch, "")
 	if record.Path != "" && !slices.ContainsFunc(before, func(one model.Record) bool { return one.Path == record.Path }) {
 		a.Emit("worktree.created", record, nil)
 	}
 	return record, err
 }
 
-func (a *App) newWorktree(branch string) (model.Record, error) {
+// newWorktree makes a worktree for branch, a new branch starting at start
+// when given, else at base.
+func (a *App) newWorktree(branch, start string) (model.Record, error) {
 	if branch == "" {
 		return model.Record{}, fmt.Errorf("`mia new <branch>` needs a branch name")
 	}
@@ -261,8 +263,11 @@ func (a *App) newWorktree(branch string) (model.Record, error) {
 		return model.Record{}, err
 	}
 	create := !git.BranchExists(a.Root, branch)
-	from := ""
-	if create && a.Config.Base != "" && git.RevParse(a.Root, a.Config.Base) != "" {
+	from := start
+	if start != "" && !create {
+		return model.Record{}, fmt.Errorf("%s already exists — a fork starts a new branch", branch)
+	}
+	if from == "" && create && a.Config.Base != "" && git.RevParse(a.Root, a.Config.Base) != "" {
 		from = a.Config.Base
 	}
 	if err := git.AddFrom(a.Root, path, branch, create, from); err != nil {

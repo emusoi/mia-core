@@ -176,6 +176,20 @@ func Run(args []string) int {
 		}
 		fmt.Printf("%s archived — its branch %s stays; `mia unarchive %s` brings it back\n", done.Name, done.Branch, done.Name)
 		return exitOK
+	case "fork":
+		if len(rest) < 1 || len(rest) > 2 {
+			return usageErr("mia fork [worktree] <branch>")
+		}
+		from, branch := "", rest[len(rest)-1]
+		if len(rest) == 2 {
+			from = rest[0]
+		}
+		record, err := a.Fork(from, branch)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Printf("%s — %s, forked with its uncommitted work, at %s\n", record.Name, branch, record.Path)
+		return exitOK
 	case "unarchive":
 		if len(rest) != 1 {
 			return usageErr("mia unarchive <name>")

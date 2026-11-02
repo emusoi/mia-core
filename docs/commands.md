@@ -20,6 +20,7 @@
 | `mia setup [worktree]` | run setup again |
 | `mia run <worktree>[@machine] <cmd…>` | run a command in it, here or on a machine |
 | `mia rm <worktree>` | remove it |
+| `mia fork [worktree] <branch>` | a new worktree on a new branch from where that worktree is, its uncommitted and untracked work copied; the first stays as it is |
 | `mia archive [--stop-running] <worktree>` | put it away: everything in it, uncommitted and untracked work too, kept under `refs/mia/archive/<name>`; the worktree goes, its branch stays |
 | `mia archive ls` | what is archived |
 | `mia unarchive <name>` | bring it back as it was, under its old name when that is free |

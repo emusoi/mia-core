@@ -18,7 +18,7 @@ var groupOf = map[string]string{
 	"dash": "Working", "stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working",
 	"env":    "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
-	"api": "Records", "signal": "Records", "radar": "Working", "tmux": "Working", "move": "Worktrees", "resurrect": "Worktrees", "why": "Records", "recall": "Records", "archive": "Worktrees", "unarchive": "Worktrees", "plugin": "Records",
+	"api": "Records", "signal": "Records", "radar": "Working", "tmux": "Working", "move": "Worktrees", "resurrect": "Worktrees", "why": "Records", "recall": "Records", "archive": "Worktrees", "fork": "Worktrees", "unarchive": "Worktrees", "plugin": "Records",
 }
 
 var verbs = []Verb{
@@ -43,6 +43,7 @@ var verbs = []Verb{
 	{"gateway", "mia gateway <status|start|stop|install|uninstall|setup|trust|untrust>", "what makes <name>.mia reach an environment", false, ""},
 	{"move", "mia move <worktree>[@<machine>] <machine|local>", "take a worktree to another machine or back: its branch, uncommitted work and windows", false, ""},
 	{"resurrect", "mia resurrect [--dry-run]", "after tmux or the computer went down, open each session again: its windows, their programs, an agent continuing its conversation", false, ""},
+	{"fork", "mia fork [worktree] <branch>", "a new worktree on a new branch from where a worktree is, its uncommitted and untracked work copied: a second try beside the first", false, ""},
 	{"archive", "mia archive [--stop-running] <worktree> · ls", "put a worktree away: everything in it, uncommitted and untracked work too, kept under refs/mia/archive; its branch stays", false, ""},
 	{"unarchive", "mia unarchive <name>", "bring an archived worktree back as it was, under its old name when free", false, ""},
 	{"recall", "mia recall <text…>", "the claude conversations here that mention it, newest first, and how to resume each", true, ""},
