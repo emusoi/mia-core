@@ -20,11 +20,11 @@ func cmdTmuxMenu(a *app.App, args []string) int {
 	}
 	self, err := os.Executable()
 	if err != nil {
-		return fail(err)
+		return tmuxSay(args, err)
 	}
 	local, err := a.List()
 	if err != nil {
-		return fail(err)
+		return tmuxSay(args, err)
 	}
 	here := ""
 	if record, err := a.RecordOrHere(""); err == nil {
@@ -40,9 +40,18 @@ func cmdTmuxMenu(a *app.App, args []string) int {
 	}
 	argv := menuItems(run.ShellJoin([]string{self}), filepath.Base(a.Root), here, local, plugins)
 	if out, err := run.Local("tmux").Combined(append([]string{"display-menu", "-c", args[0]}, argv...)...); err != nil {
-		return fail(fmt.Errorf("tmux display-menu: %s", strings.TrimSpace(out)))
+		return tmuxSay(args, fmt.Errorf("tmux display-menu: %s", strings.TrimSpace(out)))
 	}
 	return exitOK
+}
+
+// tmuxSay shows what went wrong on the client that pressed prefix m: a
+// background run-shell has nowhere else to say it.
+func tmuxSay(args []string, err error) int {
+	if len(args) == 1 {
+		_, _ = run.Local("tmux").Combined("display-message", "-c", args[0], "mia: "+err.Error())
+	}
+	return fail(err)
 }
 
 // menuItems is display-menu's title and items, by threes — name, key,

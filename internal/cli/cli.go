@@ -124,6 +124,9 @@ func Run(args []string) int {
 	}
 	a, err := app.Open(here)
 	if err != nil {
+		if verb == "tmux" { // prefix m, where a printed error is seen by no one
+			return tmuxSay(rest[1:], err)
+		}
 		return fail(err)
 	}
 	a.Events = func(e app.Event) { sendEvent(a, e) }
