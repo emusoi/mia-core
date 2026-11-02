@@ -67,6 +67,16 @@ on GitHub; a tag without its section is not released.
 
 ### Changed
 
+- The radar shows, under each worktree, what its claude says it is doing:
+  the summary claude keeps in its pane's title. The look shows it too.
+- **active** is in the order worktrees last moved, newest first, and the
+  age on a row is how long since anything happened in it, a commit or its
+  windows, not only the last commit.
+- A claude window is called `claude`, not after the version its installer
+  names the binary for (`2.1.316`).
+- A signal set from a tmux pane goes when that pane does.
+- `mia recall` reads the newest transcripts first and stops once it has
+  enough, and a subagent's prompt is no longer shown as what you said.
 - A signal ranked above 50, such as claude's `busy`, is a word on its row
   under active, not a call for you.
 - `mia dash` is the radar under its old name.

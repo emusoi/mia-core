@@ -93,6 +93,45 @@ mia gc --others --apply # remove the clean ones
 The radar folds both away under `idle` and `not mia's`, and removes them
 from there too; `^d` removes the one selected. Branches always stay.
 
+## Put away, or try again
+
+```bash
+mia archive monduli            # put it away as it is
+mia archive ls                 # what is put away
+mia unarchive monduli          # and back, as it was
+mia fork monduli second-try    # a second worktree beside it
+```
+
+`archive` keeps everything in the worktree that git does not ignore,
+uncommitted and untracked work too, as a commit under
+`refs/mia/archive/<name>`, then removes the worktree; its branch stays,
+and the stash is never touched. `unarchive` makes it again on that branch,
+under its old name when that is free, with the work uncommitted as it was.
+
+`fork` starts a new branch where a worktree is, not at base, and copies
+its uncommitted and untracked work in; the first is left as it is.
+
+## After a crash
+
+Every 30 seconds or so, while tmux shows mia's status line, mia notes each
+session's windows: their folders and what runs in them. When tmux or the
+computer goes down, `mia resurrect` opens each one again, its programs
+started anew and claude continuing its last conversation. A session you
+closed while tmux was running stays closed. `--dry-run` says what it would
+open.
+
+## Which conversation was that
+
+```bash
+mia why internal/app/app.go:212   # the conversation behind this line
+mia why 882b0e5                   # or behind a commit
+mia recall retry loop             # every conversation that mentions it
+```
+
+Both read claude's own transcripts of this repository and its worktrees,
+so nothing is recorded as you work, and both say what you asked there and
+how to `claude --resume` it.
+
 ## On another machine
 
 ```bash
