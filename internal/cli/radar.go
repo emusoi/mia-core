@@ -148,7 +148,7 @@ set -g status-right-length 160
 set -ga status-right ' #(` + mia + ` status-line "#{pane_current_path}") '
 bind Space display-popup -E -d "#{pane_current_path}" -w 72 -h 60% -T " mia " "` + mia + ` radar"
 bind n display-popup -E -d "#{pane_current_path}" -w 110 -h 14 -T " new worktree " "` + mia + ` radar --new"
-bind m run-shell -b -c "#{pane_current_path}" "` + mia + ` tmux menu '#{client_name}'"
+bind m run-shell -b "cd \"#{pane_current_path}\" && ` + mia + ` tmux menu '#{client_name}'"
 # mia: end
 `
 }
