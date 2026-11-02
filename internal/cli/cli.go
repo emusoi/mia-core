@@ -145,6 +145,47 @@ func Run(args []string) int {
 		return cmdAway(a, rest)
 	case "move":
 		return cmdMove(a, rest)
+	case "archive":
+		if len(rest) == 1 && (rest[0] == "ls" || rest[0] == "list") {
+			all, err := a.Archives()
+			if err != nil {
+				return fail(err)
+			}
+			if asJSON {
+				return emit(all)
+			}
+			if len(all) == 0 {
+				fmt.Println("nothing archived")
+			}
+			for _, one := range all {
+				kept := ""
+				if one.Dirty {
+					kept = "  ✎ with uncommitted work"
+				}
+				fmt.Printf("%-14s %-28s %s%s\n", one.Name, one.Branch, one.At.Local().Format("2006-01-02 15:04"), kept)
+			}
+			return exitOK
+		}
+		stop := take(&rest, "--stop-running")
+		if len(rest) != 1 {
+			return usageErr("mia archive [--stop-running] <worktree>  ·  mia archive ls")
+		}
+		done, err := a.Archive(rest[0], stop)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Printf("%s archived — its branch %s stays; `mia unarchive %s` brings it back\n", done.Name, done.Branch, done.Name)
+		return exitOK
+	case "unarchive":
+		if len(rest) != 1 {
+			return usageErr("mia unarchive <name>")
+		}
+		record, err := a.Unarchive(rest[0])
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Printf("%s is back at %s\n", record.Name, record.Path)
+		return exitOK
 	case "recall":
 		if len(rest) == 0 {
 			return usageErr("mia recall <text…>")

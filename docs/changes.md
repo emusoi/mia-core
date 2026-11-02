@@ -9,6 +9,11 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **`mia archive <worktree>`** and **`mia unarchive <name>`**: put a
+  worktree away without committing or losing anything; its uncommitted and
+  untracked work is kept as a commit under `refs/mia/archive/`, never
+  touching the stash, and comes back uncommitted, under its old name.
+  `mia archive ls` lists them; the radar offers it on a worktree.
 - **`mia recall <text…>`**: which conversation was that? The claude
   conversations of the repository and its worktrees that mention it, newest
   first, your own words over claude's, each with its `claude --resume` line.

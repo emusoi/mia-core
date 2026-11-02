@@ -20,6 +20,9 @@
 | `mia setup [worktree]` | run setup again |
 | `mia run <worktree>[@machine] <cmd…>` | run a command in it, here or on a machine |
 | `mia rm <worktree>` | remove it |
+| `mia archive [--stop-running] <worktree>` | put it away: everything in it, uncommitted and untracked work too, kept under `refs/mia/archive/<name>`; the worktree goes, its branch stays |
+| `mia archive ls` | what is archived |
+| `mia unarchive <name>` | bring it back as it was, under its old name when that is free |
 | `mia recall <text…>` | the claude conversations of this repository and its worktrees that mention it, newest first: the words around it, and how to resume each |
 | `mia why <file:line\|commit>` | the claude conversation that made a commit, or the line's last commit: what you asked, and how to resume it |
 | `mia resurrect [--dry-run]` | after tmux or the computer went down, open each session again: its windows in their folders, their programs restarted, claude with `--continue` |

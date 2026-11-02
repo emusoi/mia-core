@@ -879,6 +879,8 @@ func (m model) actionsFor(r row) []row {
 		acts = append(acts, row{kind: action, label: "clear its signals", act: clearSignals(r)})
 	}
 	if r.machine == "" {
+		acts = append(acts, row{kind: action, label: "archive it — put away as it is, mia unarchive brings it back",
+			act: confirmed("archive "+r.name+"? its session stops; everything in it is kept. y archives it", shown("archive", "--stop-running", r.name))})
 		acts = append(acts, row{kind: action, label: "remove it", act: removal(r)})
 	}
 	return acts
