@@ -99,7 +99,7 @@ func Run(args []string) int {
 	case "status-line":
 		return cmdStatusLine(rest)
 	case "tmux":
-		if len(rest) == 0 || rest[0] != "menu" {
+		if len(rest) == 0 || (rest[0] != "menu" && rest[0] != "next") {
 			return cmdTmux(rest)
 		}
 	case "machine", "machines", "runtime":
@@ -133,6 +133,9 @@ func Run(args []string) int {
 
 	switch verb {
 	case "tmux":
+		if rest[0] == "next" {
+			return cmdTmuxNext(a, rest[1:])
+		}
 		return cmdTmuxMenu(a, rest[1:])
 	case "signal", "signals":
 		return cmdSignal(a, rest, asJSON)
@@ -992,7 +995,7 @@ func printTmuxHelp() int {
 	if err != nil {
 		return fail(err)
 	}
-	fmt.Print("# mia in tmux — `mia tmux install` adds this to ~/.tmux.conf:\n# prefix space the radar, prefix n a new worktree, mia's part of the status line.\n\n")
+	fmt.Print("# mia in tmux — `mia tmux install` adds this to ~/.tmux.conf:\n# prefix space the radar, prefix n a new worktree, prefix m the menu, prefix a the next that needs you, mia's part of the status line.\n\n")
 	fmt.Print(tmuxSnippet(self))
 	return exitOK
 }

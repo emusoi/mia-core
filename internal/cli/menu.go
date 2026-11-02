@@ -50,6 +50,57 @@ func cmdTmuxMenu(a *app.App, args []string) int {
 	return exitOK
 }
 
+// cmdTmuxNext is mia tmux next <client>: prefix a. The client goes to the
+// next worktree here that needs you, after the one it is in, round again
+// at the end; best rank first.
+func cmdTmuxNext(a *app.App, args []string) int {
+	if len(args) != 1 {
+		return usageErr("mia tmux next <client>")
+	}
+	local, err := a.List()
+	if err != nil {
+		return tmuxSay(args, err)
+	}
+	here := ""
+	if record, err := a.RecordOrHere(""); err == nil {
+		here = record.Name
+	}
+	next := nextNeedingYou(local, here)
+	if next == "" {
+		_, _ = run.Local("tmux").Combined("display-message", "-c", args[0], "mia: nothing here needs you")
+		return exitOK
+	}
+	if err := a.SwitchClient(next, args[0]); err != nil {
+		return tmuxSay(args, err)
+	}
+	return exitOK
+}
+
+// nextNeedingYou is the worktree after here among those that need you, in
+// rank order then by name; "" when none does but here.
+// ponytail: this computer's alone; a machine's needs the radar's handover.
+func nextNeedingYou(local []app.Listing, here string) string {
+	var waiting []app.Listing
+	for _, l := range local {
+		if radar.NeedsYou(l.Signals) {
+			waiting = append(waiting, l)
+		}
+	}
+	slices.SortFunc(waiting, func(x, y app.Listing) int {
+		if c := x.Signals[0].Rank - y.Signals[0].Rank; c != 0 {
+			return c
+		}
+		return strings.Compare(x.Name, y.Name)
+	})
+	at := slices.IndexFunc(waiting, func(l app.Listing) bool { return l.Name == here })
+	for i := 1; i <= len(waiting); i++ {
+		if l := waiting[(at+i+len(waiting))%len(waiting)]; l.Name != here {
+			return l.Name
+		}
+	}
+	return ""
+}
+
 // tmuxSay shows what went wrong on the client that pressed prefix m: a
 // background run-shell has nowhere else to say it.
 func tmuxSay(args []string, err error) int {

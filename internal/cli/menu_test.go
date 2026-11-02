@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/signal"
 )
 
 func TestTheMenuCountsWhatCanGoAndKeysEveryPlugin(t *testing.T) {
@@ -44,5 +45,23 @@ func TestTheMenuCountsWhatCanGoAndKeysEveryPlugin(t *testing.T) {
 	none := menuItems("mia", "r", "", local[:1], nil)
 	if !slices.Contains(none, "-clean up idle  0") || !slices.Contains(none, "-clean up not mia's  0 of 0") {
 		t.Errorf("nothing to clean is greyed out: %q", none)
+	}
+}
+
+func TestPrefixAGoesRoundWhatNeedsYouBestFirst(t *testing.T) {
+	sig := func(rank int) []signal.Signal { return []signal.Signal{{Kind: "k", Rank: rank}} }
+	local := []app.Listing{
+		{Name: "busy", Signals: sig(60)},
+		{Name: "done", Signals: sig(30)},
+		{Name: "asks", Signals: sig(10)},
+		{Name: "quiet"},
+	}
+	for here, want := range map[string]string{"quiet": "asks", "asks": "done", "done": "asks"} {
+		if got := nextNeedingYou(local, here); got != want {
+			t.Errorf("from %s: %q, want %q", here, got, want)
+		}
+	}
+	if got := nextNeedingYou(local[:1], "busy"); got != "" {
+		t.Errorf("a busy signal does not call for you: %q", got)
 	}
 }

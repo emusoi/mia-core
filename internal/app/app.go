@@ -650,6 +650,21 @@ func (a *App) ShellView(query, view string) error {
 	})
 }
 
+// SwitchClient moves a tmux client to the worktree's session here, as
+// mia shell would from inside it: for a key that runs with no terminal.
+func (a *App) SwitchClient(query, client string) error {
+	return a.shell(query, func(host session.Host, record model.Record, _ string) error {
+		if host.SSH != "" {
+			return fmt.Errorf("%s's session is on %s — prefix space hands this terminal over", record.Name, host.SSH)
+		}
+		out, err := run.Local("tmux").Combined("switch-client", "-c", client, "-t", "="+session.Name(record.Name))
+		if err != nil {
+			return fmt.Errorf("switch to %s: %s", record.Name, strings.TrimSpace(out))
+		}
+		return nil
+	})
+}
+
 func (a *App) shell(query string, attach func(session.Host, model.Record, string) error) error {
 	resolver, err := a.Resolver()
 	if err != nil {

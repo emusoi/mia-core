@@ -9,6 +9,9 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **`prefix a`**: straight to the next worktree that needs you, without
+  opening the radar; again for the one after. Run `mia tmux install` once
+  more to get the key.
 - **`mia why <file:line|commit>`**: the claude conversation that made a
   commit, or the line's last commit: what you asked before it, and the
   `claude --resume` line to go back to it. It reads claude's own

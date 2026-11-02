@@ -13,6 +13,7 @@ mia tmux uninstall  # take it out again
 | `prefix space` | the radar |
 | `prefix n` | a new worktree |
 | `prefix m` | mia's menu |
+| `prefix a` | the next worktree here that needs you, best rank first, round again at the end |
 
 ## The status line
 

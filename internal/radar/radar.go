@@ -662,7 +662,10 @@ const quietRank = 50
 
 // needsYou: its best signal asks for you — asks, failed, done — rather than
 // saying how it is.
-func needsYou(r row) bool { return len(r.signals) > 0 && r.signals[0].Rank <= quietRank }
+func needsYou(r row) bool { return NeedsYou(r.signals) }
+
+// NeedsYou is whether a worktree's signals, best first, call for you.
+func NeedsYou(signals []signal.Signal) bool { return len(signals) > 0 && signals[0].Rank <= quietRank }
 
 // idleDays is how long untouched before a worktree folds away, as mia gc
 // counts it.
