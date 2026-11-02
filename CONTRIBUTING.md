@@ -32,3 +32,6 @@ configs to copy into `.git/mia/config.toml`. Delete it when done.
 - mia writes nothing into the working tree; everything goes in `.git/mia`.
   `mia dev` is the one exception, and it must always give main its own files
   back.
+- A change you would notice gets a line under **Unreleased** in
+  [docs/changes.md](docs/changes.md); a release renames that heading to its
+  tag, and the release workflow publishes that section as the notes.
