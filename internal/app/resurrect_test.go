@@ -3,8 +3,11 @@ package app_test
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/gittest"
@@ -67,5 +70,75 @@ func TestWhatWentDownWithTmuxComesBackAndWhatWasClosedStaysClosed(t *testing.T) 
 	}
 	if again, _ := a.Resurrect(true); len(again) != 0 {
 		t.Errorf("once back, it is not brought back twice: %+v", again)
+	}
+
+	// what was closed is still remembered, and comes back by name
+	states := map[string]string{}
+	for _, s := range a.Sessions() {
+		states[s.Name] = s.State
+	}
+	if states[kept.Name] != "running" || states[closed.Name] != "closed" {
+		t.Errorf("every session is listed with its state: %v", states)
+	}
+	if got, err := a.Resurrect(false, closed.Name); err != nil || len(got) != 1 || !session.Here().Exists(closed.Name) {
+		t.Errorf("a closed session comes back when it is named: %+v %v", got, err)
+	}
+	if _, err := a.Resurrect(true, "nowhere"); err == nil {
+		t.Error("a name mia never saw is refused")
+	}
+}
+
+func TestAClaudeResumesTheConversationItHad(t *testing.T) {
+	gittest.Isolate(t)
+	socket, err := os.MkdirTemp("/tmp", "mia-resurrect-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(socket) })
+	t.Setenv("TMUX_TMPDIR", socket)
+	t.Setenv("TMUX", "")
+	t.Cleanup(func() { exec.Command("tmux", "kill-server").Run() })
+	claudeHome := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", claudeHome)
+	bin := t.TempDir()
+	sleep, _ := exec.LookPath("sleep")
+	if err := os.Symlink(sleep, filepath.Join(bin, "claude")); err != nil {
+		t.Fatal(err)
+	}
+	repo := gittest.New(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt, err := a.New("talking")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.NewWindow(wt, "claude", []string{filepath.Join(bin, "claude"), "300"}); err != nil {
+		t.Fatal(err)
+	}
+	// claude says which session a process runs in sessions/<pid>.json
+	var pid string
+	for range 50 {
+		out, _ := exec.Command("tmux", "display", "-p", "-t", "="+session.Name(wt.Name)+":claude", "#{pane_pid}").Output()
+		pgid, _ := exec.Command("ps", "-o", "tpgid=", "-p", strings.TrimSpace(string(out))).Output()
+		if pid = strings.TrimSpace(string(pgid)); pid != "" && pid != "-1" {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	os.MkdirAll(filepath.Join(claudeHome, "sessions"), 0o755)
+	os.WriteFile(filepath.Join(claudeHome, "sessions", pid+".json"), []byte(`{"pid":`+pid+`,"sessionId":"23f98c02-c52b"}`), 0o644)
+	if err := a.Remember(); err != nil {
+		t.Fatal(err)
+	}
+	exec.Command("tmux", "kill-server").Run()
+	got, err := a.Resurrect(true)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("it went down with tmux: %+v %v", got, err)
+	}
+	i := slices.IndexFunc(got[0].Windows, func(w app.Window) bool { return w.Name == "claude" })
+	if i < 0 || !strings.HasSuffix(got[0].Windows[i].Command, "300 --resume 23f98c02-c52b") {
+		t.Errorf("the claude window resumes its own conversation: %+v", got[0].Windows)
 	}
 }

@@ -116,9 +116,11 @@ its uncommitted and untracked work in; the first is left as it is.
 Every 30 seconds or so, while tmux shows mia's status line, mia notes each
 session's windows: their folders and what runs in them. When tmux or the
 computer goes down, `mia resurrect` opens each one again, its programs
-started anew and claude continuing its last conversation. A session you
-closed while tmux was running stays closed. `--dry-run` says what it would
-open.
+started anew and each claude resuming the very conversation it had. mia
+forgets none: a session you closed while tmux was running stays closed,
+but `mia resurrect <worktree>` brings it back, and `mia resurrect --list`
+shows every session it remembers — running, down or closed — and when it
+was last seen. `--dry-run` says what it would open.
 
 ## Which conversation was that
 

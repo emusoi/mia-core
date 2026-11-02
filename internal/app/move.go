@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -48,6 +49,9 @@ type Window struct {
 	Name    string
 	Dir     string // under the worktree
 	Command string // what ran there; empty for a shell
+	// Conversation is the claude session the window ran, so it can be
+	// resumed exactly; "" for anything else, or when claude did not say.
+	Conversation string `json:",omitempty"`
 }
 
 // Moved is what a move made, for saying so.
@@ -196,6 +200,19 @@ func (a *App) carryBranch(src, dst side, branch string) error {
 
 // windows is the session's windows: name, folder under the worktree, and
 // the command running there when it is not just a shell.
+// conversationOf is the claude session the program in the foreground of a
+// pane's process runs: claude writes it to sessions/<pid>.json.
+func (s side) conversationOf(panePID string) string {
+	out, err := s.sh(`pid="$(ps -o tpgid= -p "$1" | tr -d ' ')"; cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions/$pid.json" 2>/dev/null`, panePID)
+	var running struct {
+		SessionID string `json:"sessionId"`
+	}
+	if err != nil || json.Unmarshal([]byte(out), &running) != nil {
+		return ""
+	}
+	return running.SessionID
+}
+
 func (s side) windows(name, path string) []Window {
 	out, err := s.sh(`tmux list-windows -t "=mia-$1" -F '#{window_name}	#{pane_current_path}	#{pane_current_command}	#{pane_pid}' 2>/dev/null`, name)
 	if err != nil {
@@ -216,6 +233,9 @@ func (s side) windows(name, path string) []Window {
 			w.Command = strings.TrimSpace(args)
 			if err != nil || w.Command == "" {
 				w.Command = f[2]
+			}
+			if words := strings.Fields(w.Command); len(words) > 0 && filepath.Base(words[0]) == "claude" {
+				w.Conversation = s.conversationOf(f[3])
 			}
 		}
 		windows = append(windows, w)

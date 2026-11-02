@@ -26,7 +26,7 @@
 | `mia unarchive <name>` | bring it back as it was, under its old name when that is free |
 | `mia recall <text…>` | the claude conversations of this repository and its worktrees that mention it, newest first: the words around it, and how to resume each |
 | `mia why <file:line\|commit>` | the claude conversation that made a commit, or the line's last commit: what you asked, and how to resume it |
-| `mia resurrect [--dry-run]` | after tmux or the computer went down, open each session again: its windows in their folders, their programs restarted, claude with `--continue` |
+| `mia resurrect [--dry-run] [--list] [<worktree>...]` | after tmux or the computer went down, open each session again — or any one named, closed on purpose or not: its windows in their folders, their programs restarted, each claude resuming its own conversation; `--list` shows every session remembered |
 | `mia gc [--apply\|--ask] [--days N]` | find, or remove, idle worktrees: clean, no session, not starred, untouched for N days (14); `--ask` shows them and removes on `y` |
 | `mia gc --others [--apply\|--ask] [path…]` | find, or remove, the clean worktrees mia did not make; branches stay |
 

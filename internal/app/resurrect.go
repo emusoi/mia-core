@@ -2,20 +2,24 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/session"
 )
 
-// remembered is one worktree's session as last seen: its windows, and the
-// tmux server it lived in.
+// remembered is one worktree's session as last seen: its windows, the tmux
+// server it lived in, when it was seen, and whether it was closed on purpose.
 type remembered struct {
-	Server  string   `json:"server"`
-	Windows []Window `json:"windows"`
+	Server  string    `json:"server"`
+	Windows []Window  `json:"windows"`
+	Seen    time.Time `json:"seen,omitzero"`
+	Closed  bool      `json:"closed,omitempty"`
 }
 
 func (a *App) sessionsFile() string { return filepath.Join(a.MiaDir, "sessions.json") }
@@ -40,8 +44,9 @@ func tmuxServer() string {
 }
 
 // Remember keeps each local session's windows, so that after tmux or the
-// computer goes down, Resurrect can open them again. A session gone while
-// its server still runs was closed on purpose, and is forgotten.
+// computer goes down Resurrect can open them again. None is forgotten while
+// its worktree is there: one gone while its server still runs was closed on
+// purpose, and stays, marked so, for when it is wanted back by name.
 func (a *App) Remember() error {
 	server := tmuxServer()
 	if server == "" {
@@ -60,9 +65,12 @@ func (a *App) Remember() error {
 		before, had := saved[record.Name]
 		switch {
 		case session.Here().Exists(record.Name):
-			kept[record.Name] = remembered{server, side{}.windows(record.Name, record.Path)}
-		case had && before.Server != server:
-			kept[record.Name] = before // its server went down with it
+			kept[record.Name] = remembered{Server: server, Windows: side{}.windows(record.Name, record.Path), Seen: time.Now()}
+		case had && before.Server == server && !before.Closed:
+			before.Closed = true // gone while its server runs: closed on purpose
+			kept[record.Name] = before
+		case had:
+			kept[record.Name] = before // went down with its server, or closed already
 		}
 	}
 	data, err := json.MarshalIndent(kept, "", "  ")
@@ -78,25 +86,59 @@ type Revived struct {
 	Windows []Window
 }
 
-// Resurrect opens again each session that went down with its tmux server,
-// its windows in their folders and their programs restarted, an agent
-// continuing its last conversation. dry only says which.
-func (a *App) Resurrect(dry bool) ([]Revived, error) {
+// Session is a remembered session, as mia resurrect --list says it.
+type Session struct {
+	Name    string    `json:"name"`
+	State   string    `json:"state"` // running, down (went down with tmux) or closed
+	Seen    time.Time `json:"seen,omitzero"`
+	Windows []Window  `json:"windows"`
+}
+
+// Sessions is every remembered session, the latest seen first.
+func (a *App) Sessions() []Session {
+	server := tmuxServer()
+	var all []Session
+	for name, was := range a.readRemembered() {
+		state := "down"
+		switch {
+		case server != "" && session.Here().Exists(name):
+			state = "running"
+		case was.Closed || (server != "" && was.Server == server):
+			state = "closed" // gone while the server it lived in still runs
+		}
+		all = append(all, Session{name, state, was.Seen, was.Windows})
+	}
+	slices.SortFunc(all, func(x, y Session) int { return y.Seen.Compare(x.Seen) })
+	return all
+}
+
+// Resurrect opens sessions again, their windows in their folders and their
+// programs restarted, a claude resuming the very conversation it had. With
+// no names it opens each that went down with its tmux server; named, any
+// remembered one that is not running, closed on purpose or not. dry only
+// says which.
+func (a *App) Resurrect(dry bool, names ...string) ([]Revived, error) {
 	server := tmuxServer()
 	records, err := a.Store.Load()
 	if err != nil {
 		return nil, err
 	}
 	saved := a.readRemembered()
+	for _, name := range names {
+		if _, ok := saved[name]; !ok {
+			return nil, fmt.Errorf("mia remembers no session of %s", name)
+		}
+	}
 	var revived []Revived
 	for _, record := range records {
 		was, ok := saved[record.Name]
-		if !ok || was.Server == server || len(was.Windows) == 0 || session.Here().Exists(record.Name) {
+		wanted := slices.Contains(names, record.Name) || (len(names) == 0 && was.Server != server && !was.Closed)
+		if !ok || !wanted || len(was.Windows) == 0 || session.Here().Exists(record.Name) {
 			continue
 		}
 		windows := slices.Clone(was.Windows)
 		for i := range windows {
-			windows[i].Command = again(windows[i].Command)
+			windows[i].Command = again(windows[i].Command, windows[i].Conversation)
 		}
 		if !dry {
 			if err := a.ensureSession(session.Here(), record, record.Path); err != nil {
@@ -114,15 +156,32 @@ func (a *App) Resurrect(dry bool) ([]Revived, error) {
 	return revived, nil
 }
 
-// again is how to start a window's program anew: an agent continues its
-// last conversation in that folder; anything else runs as it did.
-func again(command string) string {
+// again is how to start a window's program anew: a claude resumes the
+// conversation it had, or else continues the folder's last; anything else
+// runs as it did.
+func again(command, conversation string) string {
 	words := strings.Fields(command)
 	if len(words) == 0 {
 		return ""
 	}
 	switch filepath.Base(words[0]) {
 	case "claude":
+		if conversation != "" {
+			// whatever it resumed before, it resumes the one it had
+			kept := words[:1]
+			for i := 1; i < len(words); i++ {
+				switch words[i] {
+				case "-c", "--continue":
+				case "-r", "--resume":
+					if i+1 < len(words) && !strings.HasPrefix(words[i+1], "-") {
+						i++
+					}
+				default:
+					kept = append(kept, words[i])
+				}
+			}
+			return strings.Join(append(kept, "--resume", conversation), " ")
+		}
 		if slices.ContainsFunc(words[1:], func(w string) bool {
 			return w == "-c" || w == "--continue" || w == "-r" || w == "--resume"
 		}) {

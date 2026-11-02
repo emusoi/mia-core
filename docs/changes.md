@@ -35,11 +35,14 @@ on GitHub; a tag without its section is not released.
   `claude --resume` line to go back to it. It reads claude's own
   transcripts, so nothing is recorded when committing, and it works on
   history made before it existed.
-- **`mia resurrect [--dry-run]`**: after tmux or the computer went down,
-  each session opens again with its windows in their folders and their
-  programs restarted; claude continues its last conversation
-  (`--continue`), a bare codex runs `codex resume --last`. A session you
-  closed while tmux kept running stays closed.
+- **`mia resurrect [--dry-run] [--list] [<worktree>...]`**: after tmux or
+  the computer went down, each session opens again with its windows in
+  their folders and their programs restarted; each claude resumes the very
+  conversation it had (`--resume <id>`, else `--continue`), a bare codex
+  runs `codex resume --last`. Every session is remembered: one you closed
+  stays closed until you name it, `mia resurrect <worktree>`, and
+  `--list` shows them all — running, down or closed — and when each was
+  last seen.
 - **Answer from the radar**: on a row under needs you, `^y` approves and
   `^r` types a reply into the pane the signal came from, without switching.
   `mia signal .` now keeps the tmux pane it ran in, and `--yes <keys>` says

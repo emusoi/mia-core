@@ -255,7 +255,24 @@ func Run(args []string) int {
 		return exitOK
 	case "resurrect":
 		dry := take(&rest, "--dry-run")
-		revived, err := a.Resurrect(dry)
+		if take(&rest, "--list") {
+			if asJSON {
+				return emit(a.Sessions())
+			}
+			for _, s := range a.Sessions() {
+				var what []string
+				for _, w := range s.Windows {
+					what = append(what, strings.TrimSpace(w.Name+" "+w.Command))
+				}
+				seen := ""
+				if !s.Seen.IsZero() {
+					seen = s.Seen.Local().Format("Jan 2 15:04")
+				}
+				fmt.Printf("%-16s %-8s %-13s %s\n", s.Name, s.State, seen, strings.Join(what, " · "))
+			}
+			return exitOK
+		}
+		revived, err := a.Resurrect(dry, rest...)
 		for _, r := range revived {
 			var what []string
 			for _, w := range r.Windows {
@@ -264,7 +281,11 @@ func Run(args []string) int {
 			fmt.Printf("%s: %s\n", r.Name, strings.Join(what, " · "))
 		}
 		if err == nil && len(revived) == 0 {
-			fmt.Println("nothing went down with tmux")
+			if len(rest) > 0 {
+				fmt.Println("already running")
+			} else {
+				fmt.Println("nothing went down with tmux — mia resurrect --list shows every session mia remembers")
+			}
 		}
 		return exitFor(err)
 	case "machine", "machines", "runtime":
