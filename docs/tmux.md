@@ -86,7 +86,9 @@ mia signal <worktree> clear [--from claude]
 mia signal ls
 ```
 
-`.` is the worktree the command runs in, which is what a hook means. One
+`.` is the worktree the command runs in, which is what a hook means. A
+signal set from a tmux pane goes when that pane does: an agent that asked
+and then died asks no more. One
 signal per source per worktree. Lower ranks come first (50 if none is
 given). A signal ranked above 50, such as claude's `busy` at 60, says how a
 worktree is rather than asking for you: it is a word on its row, under

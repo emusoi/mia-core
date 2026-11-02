@@ -44,7 +44,6 @@ type App struct {
 	survey     *stack.Survey
 	trees      []git.Worktree
 	dirtiness  sync.Map
-	shots      sync.Map
 	reach      sync.Map
 	hereOnce   sync.Once
 	here       string
@@ -462,11 +461,36 @@ func (a *App) List(names ...string) ([]Listing, error) {
 	}
 	wg.Wait()
 	if signals, err := a.Signals.Load(); err == nil {
+		signals = a.withoutGonePanes(signals, ctx.panes)
 		for i := range listings {
 			listings[i].Signals = signal.Of(signals, listings[i].Name)
 		}
 	}
 	return listings, nil
+}
+
+// withoutGonePanes drops, and forgets, the signals set from a tmux pane
+// that is no longer there: an agent that asked and then died asks no more.
+// Only when tmux answered; with no word from it, nothing is known gone.
+func (a *App) withoutGonePanes(signals []signal.Signal, panes map[string][]session.Pane) []signal.Signal {
+	if panes == nil {
+		return signals
+	}
+	live := map[string]bool{}
+	for _, all := range panes {
+		for _, p := range all {
+			live[p.ID] = true
+		}
+	}
+	kept := signals[:0]
+	for _, one := range signals {
+		if one.Pane != "" && !live[one.Pane] {
+			_ = a.Signals.Clear(one.Worktree, one.From)
+			continue
+		}
+		kept = append(kept, one)
+	}
+	return kept
 }
 
 func (a *App) surveyRepository() (*listing, error) {
