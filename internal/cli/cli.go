@@ -142,6 +142,37 @@ func Run(args []string) int {
 		return cmdAway(a, rest)
 	case "move":
 		return cmdMove(a, rest)
+	case "why":
+		if len(rest) != 1 {
+			return usageErr("mia why <file:line|commit>")
+		}
+		why, err := a.Why(rest[0])
+		if err != nil {
+			return fail(err)
+		}
+		if asJSON {
+			return emit(why)
+		}
+		fmt.Printf("%s %s\n", why.Commit[:7], why.Subject)
+		if len(why.Conversations) == 0 {
+			fmt.Println("  no conversation of claude's here shows it: made by hand, -q, or on another machine")
+		}
+		for _, c := range why.Conversations {
+			how := "first seen in"
+			if c.Made {
+				how = "made in"
+			}
+			fmt.Printf("\n  %s %s · %s\n", how, c.Session, c.At.Local().Format("2006-01-02 15:04"))
+			if c.Asked != "" {
+				asked := strings.Join(strings.Fields(c.Asked), " ")
+				if r := []rune(asked); len(r) > 160 {
+					asked = string(r[:160]) + "…"
+				}
+				fmt.Printf("  you asked: %s\n", asked)
+			}
+			fmt.Printf("  cd %s && claude --resume %s\n", c.Cwd, c.Session)
+		}
+		return exitOK
 	case "resurrect":
 		dry := take(&rest, "--dry-run")
 		revived, err := a.Resurrect(dry)
