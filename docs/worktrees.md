@@ -68,7 +68,7 @@ and hyphens, because it becomes a hostname and a tmux session.
 
 ```bash
 mia rename monduli billing     # a name you choose
-mia star monduli               # keep it at the top of the dashboard
+mia star monduli               # never idle: kept out of mia gc
 mia setup monduli              # run setup again
 mia run monduli make test      # run a command in it
 ```
@@ -84,9 +84,14 @@ when there are uncommitted changes (`--force` discards them) or a session is
 running (`--stop-running` stops it).
 
 ```bash
-mia gc             # worktrees untouched for 14 days
-mia gc --apply     # remove them
+mia gc                  # idle worktrees: clean, no session, not starred, untouched for 14 days
+mia gc --apply          # remove them
+mia gc --others         # worktrees mia did not make, an agent's or another tool's
+mia gc --others --apply # remove the clean ones
 ```
+
+The radar folds both away under `idle` and `not mia's`, and removes them
+from there too; `^d` removes the one selected. Branches always stay.
 
 ## On another machine
 
@@ -102,10 +107,14 @@ exists here) before making the worktree. fedora never needs GitHub;
 `git fetch fedora` brings its commits back. mia ships itself there first,
 built for fedora, whenever this mia is a build fedora has not had.
 
-The dashboard lists fedora's worktrees beside yours as `@fedora`, asking
-fedora's mia each time it refreshes and fetching fedora's branches as it
-does; ⏎ on one opens its session there. When fedora does not answer, its
-rows stay, dimmed and marked unreachable, as it last reported them.
+The radar lists fedora's worktrees under `on fedora`, as fedora's mia last
+answered; tmux's status line has it asked again every 30 seconds, fetching
+fedora's branches as it does. ⏎ on one hands this terminal over to its
+session there. When fedora does not answer, its rows stay, marked not
+answering, as it last reported them.
+
+While a terminal is there, fedora's radar lists this computer's worktrees
+too, told again every 30 seconds, and ⏎ on one hands the terminal back.
 
 `mia shell <worktree>@fedora` is its session there. Its branches arrive
 here as `fedora/<branch>` on every refresh; pushing them anywhere is yours.

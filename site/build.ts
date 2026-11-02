@@ -15,7 +15,7 @@ const pages = [
   { file: "worktrees.md", slug: "worktrees", group: "Using mia" },
   { file: "stacks.md", slug: "stacks", group: "Using mia" },
   { file: "environments.md", slug: "environments", group: "Using mia" },
-  { file: "dashboard.md", slug: "dashboard", group: "Using mia" },
+  { file: "tmux.md", slug: "tmux", group: "Using mia" },
   { file: "configuration.md", slug: "configuration", group: "Reference" },
   { file: "commands.md", slug: "commands", group: "Reference" },
   { file: "plugins.md", slug: "plugins", group: "Reference" },
@@ -335,11 +335,21 @@ const home = `<main class="home">
     <details id="plugin">
       <summary>
         <p class="head"><strong>plugin</strong><em>noun</em></p>
-        <p class="sense">Any program named <code>mia-&lt;name&gt;</code> that adds verbs, rows, keys and panels. Everything mia does not do itself.</p>
+        <p class="sense">Any program named <code>mia-&lt;name&gt;</code> that adds verbs and signals and hears mia's events. Everything mia does not do itself.</p>
       </summary>
       <div class="more">
         ${sample("mia plugin enable agent\nmia agent run monduli")}
         <a href="/docs/plugins">Plugins</a>
+      </div>
+    </details>
+    <details id="radar">
+      <summary>
+        <p class="head"><strong>radar</strong><em>noun</em></p>
+        <p class="sense">The popup that shows every worktree, what needs you first, and folds away what is idle or not mia's. <code>prefix space</code> in tmux; <code>mia dash</code> is it full-screen.</p>
+      </summary>
+      <div class="more">
+        ${sample("mia tmux install   # prefix space opens it\nmia dash")}
+        <a href="/docs/tmux#the-radar">The radar</a>
       </div>
     </details>
     <details id="stack">

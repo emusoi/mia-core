@@ -23,11 +23,39 @@ last answers and has them asked again every 30 seconds.
 
 ## The radar
 
-Worktrees with signals first, by rank; then those in progress; the rest
-are counted. A stack is one row: `→` opens it into its layers, and `⏎` on
-a layer moves there, in place. Type to find any worktree and what can be
-done with it. `⏎` switches there; a worktree on another machine opens in a
-window of its own.
+A popup 72 columns wide, one row per worktree, in four groups:
+
+| group | holds |
+|---|---|
+| needs you | worktrees with a [signal](#signals), by rank: an agent asks, tests went red, a task is done |
+| active | the worktree you are in, an open session, uncommitted work, a stack, or anything touched in 14 days |
+| ▸ idle | clean, no session, not starred, untouched for 14 days: what `mia gc` removes. Folded |
+| ▸ not mia's | worktrees of the repository mia did not make, such as an agent's or another tool's. Folded, with how many hold changes |
+
+Another machine's worktrees come under `on <machine>`. `⏎` on a fold opens
+it, and its last row removes all of it at once (idle ones with `mia gc
+--apply`, clean ones mia did not make with `mia gc --others --apply`);
+branches stay. `⏎` on a worktree mia did not make adopts it.
+
+A stack is one row: `→` opens it into its layers, and `⏎` on a layer moves
+there, in place. Type to find any worktree and what can be done with it.
+`⏎` switches there; a worktree on another machine hands this terminal over.
+
+| key | does |
+|---|---|
+| `⏎` | switch there |
+| `?` | the selected worktree in full, its windows as they are now; `?` again for the list |
+| `^d` | remove it, after a `y`; one mia did not make only when nothing in it is uncommitted |
+| `^n` | a new worktree |
+| `tab` | only what needs you, this computer's (`local`), or one machine's |
+| `^x` | clear its signal |
+| `esc` | close |
+
+## The dash
+
+`mia dash` is the radar full-screen: the same rows, keys and groups, the
+groups counted in tabs across the top, and the selected worktree in full
+beside the list. Below 110 columns it is the radar.
 
 ## A new worktree
 

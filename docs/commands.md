@@ -20,7 +20,8 @@
 | `mia setup [worktree]` | run setup again |
 | `mia run <worktree>[@machine] <cmd…>` | run a command in it, here or on a machine |
 | `mia rm <worktree>` | remove it |
-| `mia gc [--apply]` | find, or remove, untouched worktrees |
+| `mia gc [--apply] [--days N]` | find, or remove, idle worktrees: clean, no session, not starred, untouched for N days (14) |
+| `mia gc --others [--apply] [path…]` | find, or remove, the clean worktrees mia did not make; branches stay |
 
 ## Stacks
 
@@ -50,8 +51,9 @@
 | command | does |
 |---|---|
 | `mia radar [--new]` | find and switch to any worktree, or make one — `prefix space` and `prefix n` in tmux |
+| `mia dash` | the radar full-screen, the selected worktree beside the list |
 | `mia config` | edit the repository's config |
-| `mia config [--global] <key> [<value>]` | say, or set, one setting: `base staging`, `keys.quizzicle.quiz K`, `plugin.agent.default codex`; one line edited, comments kept, and a setting mia would not load refused. `B` in the dashboard sets `base` |
+| `mia config [--global] <key> [<value>]` | say, or set, one setting: `base staging`, `keys.quizzicle.quiz K`, `plugin.agent.default codex`; one line edited, comments kept, and a setting mia would not load refused |
 | `mia plugin ls\|enable\|disable` | plugins |
 | `mia api <query>` | state as JSON |
 | `mia help vocabulary` | the words |
