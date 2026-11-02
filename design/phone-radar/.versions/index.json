@@ -1,0 +1,14 @@
+[
+  {
+    "id": "2026-11-02T00-23-12-639Z",
+    "name": "Before cli's changes",
+    "at": "2026-11-02T00:23:12.639Z",
+    "by": "cli"
+  },
+  {
+    "id": "2026-11-02T00-21-25-662Z",
+    "name": "Before claude's changes",
+    "at": "2026-11-02T00:21:25.662Z",
+    "by": "claude"
+  }
+]
