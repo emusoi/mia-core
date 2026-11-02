@@ -67,6 +67,6 @@ menu = ["type", "quiz"]     # the verbs prefix m offers
 `mia config --global plugin.gh.token …` — editing that line only and
 refusing what mia would not load.
 
-`[keys]` and `[popup]` set the old dashboard's keys and popup size. Neither
-the radar nor `mia dash` reads them; they are still loaded, so a config that
+`[keys]` and `[popup]` set the old dashboard's keys and popup size. The radar
+does not read them; they are still loaded, so a config that
 has them loads.

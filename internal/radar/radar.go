@@ -40,8 +40,6 @@ type Data struct {
 	// Away is the computer that handed this terminal here, and what it has:
 	// picking one of its worktrees hands the terminal back.
 	Away *Away
-	// Dash: the same radar full-screen, the selected worktree beside the list.
-	Dash bool
 }
 
 // Away is the note a computer leaves on a machine about itself.

@@ -12,7 +12,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/emusoi/mia-core/internal/app"
-	"github.com/emusoi/mia-core/internal/git"
 	"github.com/emusoi/mia-core/internal/runtime"
 	"github.com/emusoi/mia-core/internal/signal"
 	"github.com/emusoi/mia-core/internal/stack"
@@ -318,21 +317,5 @@ func TestCtrlDRemovesTheSelectedWorktreeOnlyWhenNothingIsLost(t *testing.T) {
 	}
 	if got := press("agent-b2"); !strings.Contains(got.confirm, "uncommitted") {
 		t.Errorf("an other with changes is refused: %q", got.confirm)
-	}
-}
-
-func TestTheDashIsTheRadarWithTheWorktreeBesideTheList(t *testing.T) {
-	d := data()
-	d.Dash = true
-	m := model{data: d, open: map[string]bool{}, width: 160, height: 30, commits: map[string][]git.Commit{}, screens: map[string]string{}, window: map[string]int{}}
-	m.rows = m.build()
-	m.cursor = m.opening()
-	wide := m.View()
-	if !strings.Contains(wide, "needs you 3") || !strings.Contains(wide, "◆ this computer") {
-		t.Errorf("the dash counts its tabs and shows the selected worktree beside the list:\n%s", wide)
-	}
-	m.width = 80
-	if narrow := m.View(); strings.Contains(narrow, "◆ this computer") {
-		t.Errorf("a narrow dash is the radar: the list alone\n%s", narrow)
 	}
 }

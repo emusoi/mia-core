@@ -22,7 +22,6 @@ func cmdRadar(a *app.App, args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	data.Dash = take(&args, "--dash")
 	if a.PollDue(pollEvery) {
 		pollInBackground(a.Root)
 	}

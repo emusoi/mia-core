@@ -79,7 +79,6 @@ func menuItems(mia, repo, here string, local []app.Listing, plugins []string) []
 	}
 	items := []string{"-T", " mia · " + repo + " ",
 		"radar", "Space", popup("72", "60%", "mia", mia+" radar"),
-		"dash", "g", popup("100%", "100%", "mia dash", mia+" dash"),
 		"",
 		"new worktree", "n", popup("110", "14", "new worktree", mia+" radar --new"),
 		"",
@@ -92,7 +91,7 @@ func menuItems(mia, repo, here string, local []app.Listing, plugins []string) []
 	}
 	cleanup(fmt.Sprintf("clean up idle  %d", idle), idle, "c", "idle", mia+" gc --ask")
 	cleanup(fmt.Sprintf("clean up not mia's  %d of %d", clean, others), clean, "o", "not mia's", mia+" gc --others --ask")
-	taken := map[rune]bool{'g': true, 'n': true, 'c': true, 'o': true}
+	taken := map[rune]bool{'n': true, 'c': true, 'o': true}
 	for i, verb := range plugins {
 		if i == 0 {
 			items = append(items, "")

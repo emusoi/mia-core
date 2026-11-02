@@ -345,10 +345,10 @@ const home = `<main class="home">
     <details id="radar">
       <summary>
         <p class="head"><strong>radar</strong><em>noun</em></p>
-        <p class="sense">The popup that shows every worktree, what needs you first, and folds away what is idle or not mia's. <code>prefix space</code> in tmux; <code>mia dash</code> is it full-screen.</p>
+        <p class="sense">The popup that shows every worktree, what needs you first, and folds away what is idle or not mia's. <code>prefix space</code> in tmux.</p>
       </summary>
       <div class="more">
-        ${sample("mia tmux install   # prefix space opens it\nmia dash")}
+        ${sample("mia tmux install   # prefix space opens it\nmia radar")}
         <a href="/docs/tmux#the-radar">The radar</a>
       </div>
     </details>

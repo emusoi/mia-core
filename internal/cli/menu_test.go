@@ -33,7 +33,7 @@ func TestTheMenuCountsWhatCanGoAndKeysEveryPlugin(t *testing.T) {
 			keys[k] = true
 		}
 	}
-	for _, want := range []string{"clean up idle  1", "clean up not mia's  1 of 2", "cost", "quiz", "radar", "dash"} {
+	for _, want := range []string{"clean up idle  1", "clean up not mia's  1 of 2", "cost", "quiz", "radar"} {
 		if _, ok := names[want]; !ok {
 			t.Errorf("no %q in %q", want, items)
 		}

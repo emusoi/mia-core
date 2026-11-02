@@ -52,17 +52,11 @@ there, in place. Type to find any worktree and what can be done with it.
 | `^x` | clear its signal |
 | `esc` | close |
 
-## The dash
-
-`mia dash` is the radar full-screen: the same rows, keys and groups, the
-groups counted in tabs across the top, and the selected worktree in full
-beside the list. Below 110 columns it is the radar.
-
 ## The menu
 
-`prefix m` is tmux's own menu, built when you press it: the radar (`space`),
-the dash (`g`), a new worktree (`n`), cleaning up what is idle (`c`) and
-what mia did not make (`o`) with how many of each there are, then the
+`prefix m` is tmux's own menu, built when you press it: the radar
+(`space`), a new worktree (`n`), cleaning up what is idle (`c`) and what
+mia did not make (`o`) with how many of each there are, then the
 plugins' verbs your config's `menu` names, such as `menu = ["type", "quiz"]`.
 Every verb is still one word away in the radar. Cleaning up shows what would go and asks `y`
 first (`mia gc --ask`); branches stay.

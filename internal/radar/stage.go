@@ -84,9 +84,6 @@ func (m model) View() string {
 		return m.formView()
 	}
 	full := max(m.width-1, 30)
-	if m.data.Dash && full >= 110 {
-		return m.dashView(full)
-	}
 	room := max(m.height-2, 4)
 	var b strings.Builder
 	prompt := edge.Render("› ")
@@ -121,67 +118,6 @@ func (m model) View() string {
 	}
 	b.WriteString(cut(foot, full))
 	return b.String()
-}
-
-// dashView is the radar full-screen: the tabs counted out, the list on the
-// left and the selected worktree in full beside it.
-func (m model) dashView(full int) string {
-	room := max(m.height-6, 4)
-	listW := min(full*40/100, 68)
-	var b strings.Builder
-	prompt := edge.Render("› ")
-	if m.query == "" {
-		prompt += accent.Render("█") + ghost.Render(" find")
-	} else {
-		prompt += ink.Render(m.query) + accent.Render("█")
-	}
-	b.WriteString(between(prompt, m.machinesLine(), full) + "\n\n")
-	b.WriteString(m.tabsLine(full) + "\n\n")
-	list, stage := m.listLines(listW, room), m.stage(full-listW-3, room)
-	for i := 0; i < room; i++ {
-		left, right := "", ""
-		if i < len(list) {
-			left = list[i]
-		}
-		if i < len(stage) {
-			right = stage[i]
-		}
-		b.WriteString(left + strings.Repeat(" ", max(listW-lipgloss.Width(left), 0)) + "   " + right + "\n")
-	}
-	foot := keys("⏎", "switch") + keys("^n", "new") + keys("^d", "remove") + keys("←→", "windows") + keys("^x", "clear") + keys("tab", "filter") + keys("esc", "quit")
-	if m.confirm != "" {
-		foot = Style("yellow").Render(m.confirm)
-	}
-	b.WriteString(cut(foot, full))
-	return b.String()
-}
-
-// tabsLine is what tab walks, each with its count: everything, what needs
-// you, this computer's, then each machine's.
-func (m model) tabsLine(width int) string {
-	var parts []string
-	all := m.worktrees()
-	for i, f := range m.filters() {
-		n := 0
-		for _, r := range all {
-			if f.keep(r) {
-				n++
-			}
-		}
-		style := muted
-		switch {
-		case i > 2:
-			style = m.colour(f.label)
-		case i == 1 && n > 0:
-			style = Style("yellow")
-		}
-		label := style.Render(f.label + " " + fmt.Sprint(n))
-		if i == m.filter {
-			label = inkB.Underline(true).Render(f.label) + " " + soft.Render(fmt.Sprint(n))
-		}
-		parts = append(parts, label)
-	}
-	return cut(strings.Join(parts, "     "), width)
 }
 
 // listLines draws the rows, a worktree in two lines, keeping the cursor in
