@@ -13,6 +13,7 @@ import (
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/runtime"
+	"github.com/emusoi/mia-core/internal/session"
 	"github.com/emusoi/mia-core/internal/signal"
 	"github.com/emusoi/mia-core/internal/stack"
 )
@@ -338,5 +339,55 @@ func TestAQuietSignalIsANoteOnItsRowNotACallForYou(t *testing.T) {
 	}
 	if m.filters()[1].keep(r) {
 		t.Errorf("the needs-you tab leaves busy out")
+	}
+}
+
+func TestASignalIsAnsweredInThePaneItCameFrom(t *testing.T) {
+	type typed struct {
+		worktree, pane, text string
+		enter                bool
+	}
+	var got []typed
+	answer = func(_ session.Host, worktree, pane, text string, enter bool) error {
+		got = append(got, typed{worktree, pane, text, enter})
+		return nil
+	}
+	d := data()
+	d.Local[2].Signals = []signal.Signal{{Kind: "asks", Rank: 10, From: "claude", Pane: "%7", Yes: "1"}}
+	m := model{data: d, open: map[string]bool{}}
+	m.rows = m.build()
+	m.cursor = slices.Index(labels(m.rows), "kijenge")
+	key := func(m model, k tea.KeyMsg) model {
+		next, cmd := m.Update(k)
+		for cmd != nil {
+			msg := cmd()
+			if msg == nil {
+				break
+			}
+			next, cmd = next.Update(msg)
+		}
+		return next.(model)
+	}
+	approved := key(m, tea.KeyMsg{Type: tea.KeyCtrlY})
+	if len(got) != 1 || got[0] != (typed{"kijenge", "%7", "1", false}) {
+		t.Fatalf("^y presses the setter's yes, no Enter: %+v", got)
+	}
+	if slices.Contains(labels(approved.rows)[:2], "kijenge") {
+		t.Errorf("an answered signal leaves needs you: %q", labels(approved.rows))
+	}
+	r := key(m, tea.KeyMsg{Type: tea.KeyCtrlR})
+	for _, k := range []tea.KeyMsg{{Type: tea.KeyRunes, Runes: []rune("go")}, {Type: tea.KeySpace, Runes: []rune(" ")}, {Type: tea.KeyRunes, Runes: []rune("on")}} {
+		r = key(r, k)
+	}
+	if r.query != "" {
+		t.Errorf("a reply is not a search: %q", r.query)
+	}
+	key(r, tea.KeyMsg{Type: tea.KeyEnter})
+	if len(got) != 2 || got[1] != (typed{"kijenge", "%7", "go on", true}) {
+		t.Errorf("⏎ sends the reply with Enter: %+v", got)
+	}
+	m.cursor = slices.Index(labels(m.rows), "lemara")
+	if key(m, tea.KeyMsg{Type: tea.KeyCtrlY}); len(got) != 2 {
+		t.Errorf("a signal with no pane is not typed into: %+v", got)
 	}
 }

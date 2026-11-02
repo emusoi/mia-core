@@ -304,6 +304,26 @@ func (h Host) Press(worktree, window, text string) error {
 	return nil
 }
 
+// Answer types text into one pane of the worktree's session, Enter after it
+// when enter. A pane that is no longer the session's is refused: its id may
+// have gone to something else.
+func (h Host) Answer(worktree, pane, text string, enter bool) error {
+	out, err := h.run("display-message", "-p", "-t", pane, "#{session_name}")
+	if err != nil || strings.TrimSpace(out) != Name(worktree) {
+		return fmt.Errorf("%s: the pane that signalled is gone", worktree)
+	}
+	args := []string{"send-keys", "-t", pane, "-l", text}
+	if out, err := h.run(args...); err != nil {
+		return fmt.Errorf("type into %s: %s", worktree, strings.TrimSpace(out))
+	}
+	if enter {
+		if out, err := h.run("send-keys", "-t", pane, "Enter"); err != nil {
+			return fmt.Errorf("type into %s: %s", worktree, strings.TrimSpace(out))
+		}
+	}
+	return nil
+}
+
 func (h Host) CaptureBack(worktree, window string, withEscapes bool, back int) (string, error) {
 	args := []string{"capture-pane", "-p", "-t", Target(worktree, window)}
 	if withEscapes {

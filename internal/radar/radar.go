@@ -5,6 +5,7 @@ package radar
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -158,6 +159,20 @@ type model struct {
 	filter  int                     // 0 all, 1 signals, 2 here, then one per machine
 	look    bool                    // the selected worktree in full, in place of the list
 	window  map[string]int          // the window the stage shows, by row name
+	reply   *row                    // the worktree whose signalling pane the reply line answers
+	typed   string                  // the reply so far
+	said    string                  // what the last answer did, or why it could not
+}
+
+// answered is what typing into an agent's pane came to.
+type answered struct {
+	name string
+	err  error
+}
+
+// answer types into a pane; a test puts its own in.
+var answer = func(h session.Host, worktree, pane, text string, enter bool) error {
+	return h.Answer(worktree, pane, text, enter)
 }
 
 type screened struct {
@@ -196,18 +211,8 @@ func (m model) fetch() tea.Cmd {
 // capture reads the worktree's session's active window, here or on its
 // machine; nothing when it has no session.
 func (m model) capture(r row) tea.Cmd {
-	host := session.Here()
-	if r.machine != "" {
-		found := false
-		for _, state := range m.data.Machines {
-			if state.Name == r.machine && state.Answers {
-				host, found = session.On(state.Machine), true
-			}
-		}
-		if !found {
-			return nil
-		}
-	} else if r.listing == nil || !r.listing.Session {
+	host, ok := m.hostOf(r)
+	if !ok || (r.machine == "" && (r.listing == nil || !r.listing.Session)) {
 		return nil
 	}
 	name, worktree, window := r.name, r.label, ""
@@ -218,6 +223,32 @@ func (m model) capture(r row) tea.Cmd {
 		screen, _ := host.Capture(worktree, window, true)
 		return screened{name, screen}
 	}
+}
+
+// hostOf is where the worktree's session runs: here, or a machine that
+// answers.
+func (m model) hostOf(r row) (session.Host, bool) {
+	if r.machine == "" {
+		return session.Here(), true
+	}
+	for _, state := range m.data.Machines {
+		if state.Name == r.machine && state.Answers {
+			return session.On(state.Machine), true
+		}
+	}
+	return session.Host{}, false
+}
+
+// answering types into the pane the row's top signal came from — its
+// approval, or a reply and Enter — and keeps the radar open.
+func (m model) answering(r row, text string, enter bool) (model, tea.Cmd) {
+	host, ok := m.hostOf(r)
+	if !ok || len(r.signals) == 0 || r.signals[0].Pane == "" {
+		m.said = r.label + ": no pane to answer in — switch there"
+		return m, nil
+	}
+	name, worktree, pane := r.name, r.label, r.signals[0].Pane
+	return m, func() tea.Msg { return answered{name, answer(host, worktree, pane, text, enter)} }
 }
 
 // Run opens the radar, or the new-worktree popup when newOnly, and returns
@@ -257,9 +288,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.capture(r) // still selected: look again
 		}
 		return m, nil
+	case answered:
+		if msg.err != nil {
+			m.said = msg.err.Error()
+			return m, nil
+		}
+		m.said = "answered " + msg.name
+		m.data = withoutTopSignal(m.data, msg.name)
+		m.rows = m.build()
+		m.cursor = m.next(0)
+		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
+		}
+		m.said = ""
+		if m.reply != nil {
+			return m.replyKey(msg)
 		}
 		if m.mode == making {
 			return m.formKey(msg)
@@ -337,6 +382,18 @@ func (m model) browseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if r := m.selected(); r.kind == worktree && len(r.signals) > 0 {
 			return clearSignals(r)(m)
 		}
+	case "ctrl+y":
+		if r := m.selected(); r.kind == worktree && needsYou(r) {
+			if r.signals[0].Yes == "" {
+				m.said = r.label + ": nothing to approve — ^r replies"
+				return m, nil
+			}
+			return m.answering(r, r.signals[0].Yes, false)
+		}
+	case "ctrl+r":
+		if r := m.selected(); r.kind == worktree && needsYou(r) {
+			m.reply, m.typed = &r, ""
+		}
 	case "enter":
 		r := m.selected()
 		switch r.kind {
@@ -368,6 +425,49 @@ func (m model) browseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// replyKey types the reply line: Enter sends it to the agent, esc drops it.
+func (m model) replyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	r := *m.reply
+	switch msg.Type {
+	case tea.KeyEsc:
+		m.reply = nil
+	case tea.KeyEnter:
+		m.reply = nil
+		if strings.TrimSpace(m.typed) != "" {
+			return m.answering(r, m.typed, true)
+		}
+	case tea.KeyBackspace:
+		if runes := []rune(m.typed); len(runes) > 0 {
+			m.typed = string(runes[:len(runes)-1])
+		}
+	case tea.KeySpace:
+		m.typed += " "
+	case tea.KeyRunes:
+		m.typed += string(msg.Runes)
+	}
+	return m, nil
+}
+
+// withoutTopSignal is the data with the worktree's first signal gone: it
+// was answered, and the agent's hooks will say what it is doing next.
+func withoutTopSignal(d Data, name string) Data {
+	drop := func(ls []app.Listing, suffix string) []app.Listing {
+		out := slices.Clone(ls)
+		for i, l := range out {
+			if l.Name+suffix == name && len(l.Signals) > 0 {
+				out[i].Signals = l.Signals[1:]
+			}
+		}
+		return out
+	}
+	d.Local = drop(d.Local, "")
+	d.Machines = slices.Clone(d.Machines)
+	for i, state := range d.Machines {
+		d.Machines[i].Worktrees = drop(state.Worktrees, "@"+state.Name)
+	}
+	return d
 }
 
 // opening is where the cursor opens: on the top signal, else on the

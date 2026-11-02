@@ -50,6 +50,8 @@ there, in place. Type to find any worktree and what can be done with it.
 | `^n` | a new worktree |
 | `tab` | only what needs you, this computer's (`local`), or one machine's |
 | `^x` | clear its signal |
+| `^y` | approve what it asks: presses its signal's `--yes` keys in the pane that set it |
+| `^r` | reply: type a line, `⏎` sends it with Enter to that pane, `esc` drops it |
 | `esc` | close |
 
 ## The menu
@@ -78,7 +80,7 @@ a test watcher, you. mia gives it no meaning; it shows it as its setter
 asks.
 
 ```bash
-mia signal <worktree|.> <kind> [text] [--style red] [--rank 10] [--from claude] [--for 10m | --until seen]
+mia signal <worktree|.> <kind> [text] [--style red] [--rank 10] [--from claude] [--for 10m | --until seen] [--yes 1]
 mia signal <worktree> clear [--from claude]
 mia signal ls
 ```
@@ -90,11 +92,18 @@ worktree is rather than asking for you: it is a word on its row, under
 active. `--for` ends it after a while, `--until seen` when you next switch
 to the worktree. A machine's signals arrive with its worktrees.
 
+Set with `.` from inside tmux, a signal keeps the pane it came from, so the
+radar can answer there without switching: `^r` types a reply, and `^y`
+presses what `--yes` names as the approval. A pane no longer in the
+worktree's session is not typed into.
+
 A claude hook, in `~/.claude/settings.json`; it reads its event on stdin:
 
 ```json
-"Notification": [{"hooks": [{"type": "command", "command":
+"Notification": [{"matcher": "idle_prompt", "hooks": [{"type": "command", "command":
   "mia signal . asks \"$(jq -r .message)\" --style red --rank 10 --from claude"}]}],
+"PermissionRequest": [{"hooks": [{"type": "command", "command":
+  "mia signal . asks \"wants $(jq -r .tool_name)\" --style red --rank 10 --from claude --yes 1"}]}],
 "Stop": [{"hooks": [{"type": "command", "command":
   "mia signal . done --style green --rank 30 --from claude --until seen"}]}]
 ```

@@ -32,6 +32,11 @@ type Signal struct {
 	Until time.Time `json:"until,omitzero"`
 	// UntilSeen: it goes when the worktree is next switched to.
 	UntilSeen bool `json:"until_seen,omitempty"`
+	// Pane is the tmux pane the setter ran in, when it ran in one: where the
+	// radar types an answer.
+	Pane string `json:"pane,omitempty"`
+	// Yes is the keys its setter says approve it, pressed with no Enter.
+	Yes string `json:"yes,omitempty"`
 }
 
 type Store struct{ Dir string }

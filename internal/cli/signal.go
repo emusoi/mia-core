@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/emusoi/mia-core/internal/signal"
 )
 
-const signalUsage = "mia signal <worktree|.> <kind> [text] [--style <style>] [--rank <n>] [--from <source>] [--for <duration>|--until seen]  ·  mia signal <worktree> clear [--from <source>]  ·  mia signal ls"
+const signalUsage = "mia signal <worktree|.> <kind> [text] [--style <style>] [--rank <n>] [--from <source>] [--for <duration>|--until seen] [--yes <keys>]  ·  mia signal <worktree> clear [--from <source>]  ·  mia signal ls"
 
 // cmdSignal is mia signal: what anything outside mia says about a worktree,
 // kept and shown as its setter says, with no meaning of mia's own.
@@ -33,6 +34,7 @@ func cmdSignal(a *app.App, args []string, asJSON bool) int {
 	from := takeValue(&args, "--from")
 	lasts := takeValue(&args, "--for")
 	until := takeValue(&args, "--until")
+	yes := takeValue(&args, "--yes")
 	if len(args) < 2 {
 		return usageErr(signalUsage)
 	}
@@ -48,7 +50,10 @@ func cmdSignal(a *app.App, args []string, asJSON bool) int {
 		return exitFor(a.Signals.Clear(record.Name, from))
 	}
 	one := signal.Signal{Worktree: record.Name, Kind: args[1], Text: strings.Join(args[2:], " "),
-		Style: style, Rank: signal.DefaultRank, From: from, At: time.Now()}
+		Style: style, Rank: signal.DefaultRank, From: from, At: time.Now(), Yes: yes}
+	if worktree == "" {
+		one.Pane = os.Getenv("TMUX_PANE") // set from inside: the radar can answer there
+	}
 	if one.From == "" {
 		one.From = "you"
 	}

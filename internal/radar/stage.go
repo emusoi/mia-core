@@ -113,8 +113,20 @@ func (m model) View() string {
 		look = "back"
 	}
 	foot := keys("⏎", "switch") + keys("^n", "new") + keys("^d", "remove") + keys("?", look) + keys("tab", "filter") + keys("esc", "close")
-	if m.confirm != "" {
+	if r := m.selected(); r.kind == worktree && needsYou(r) && r.signals[0].Pane != "" {
+		foot = keys("⏎", "switch")
+		if r.signals[0].Yes != "" {
+			foot += keys("^y", "approve")
+		}
+		foot += keys("^r", "reply") + keys("^x", "clear") + keys("esc", "close")
+	}
+	switch {
+	case m.reply != nil:
+		foot = accent.Render("reply to "+m.reply.label+" › ") + ink.Render(m.typed+"▏")
+	case m.confirm != "":
 		foot = Style("yellow").Render(m.confirm)
+	case m.said != "":
+		foot = Style("yellow").Render(m.said)
 	}
 	b.WriteString(cut(foot, full))
 	return b.String()
