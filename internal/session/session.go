@@ -99,9 +99,9 @@ func (h Host) AttachView(worktree, view string) error {
 		if out, err := h.run("new-session", "-d", "-s", own, "-t", exact(name)); err != nil {
 			return fmt.Errorf("open a %s view of %s: %s", view, worktree, strings.TrimSpace(out))
 		}
-		_, _ = h.run("set-option", "-t", own, "destroy-unattached", "on") // a grouped session does not answer to =own
 	}
-	// the client runs as a child, not in our place: the view is killed once it goes
+	// the client runs as a child, not in our place, and the view is killed once
+	// it goes (destroy-unattached would destroy it now, before anyone attaches)
 	defer func() { _, _ = h.run("kill-session", "-t", own) }()
 	if h.SSH != "" {
 		return runtime.Interactive(h.SSH, "tmux", "-u", "attach-session", "-t", exact(own)).Run()
