@@ -374,7 +374,7 @@ func (m model) browseKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // worktree the radar was opened from, else on the first worktree.
 func (m model) opening() int {
 	for i, r := range m.rows {
-		if len(r.signals) > 0 {
+		if needsYou(r) {
 			return i
 		}
 	}
@@ -498,7 +498,7 @@ func (m model) build() []row {
 			if r.listing.Dirty {
 				changed++
 			}
-		case len(r.signals) > 0:
+		case needsYou(r):
 			signalled = append(signalled, r)
 		case r.machine != "":
 			if _, seen := elsewhere[r.machine]; !seen {
@@ -555,6 +555,14 @@ func (m model) build() []row {
 	}
 	return rows
 }
+
+// quietRank: a signal ranked above it is a note on its row, not a call for
+// you — claude's busy, at 60. One set without a rank is 50, and needs you.
+const quietRank = 50
+
+// needsYou: its best signal asks for you — asks, failed, done — rather than
+// saying how it is.
+func needsYou(r row) bool { return len(r.signals) > 0 && r.signals[0].Rank <= quietRank }
 
 // idleDays is how long untouched before a worktree folds away, as mia gc
 // counts it.

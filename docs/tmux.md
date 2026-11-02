@@ -28,7 +28,7 @@ A popup 72 columns wide, one row per worktree, in four groups:
 
 | group | holds |
 |---|---|
-| needs you | worktrees with a [signal](#signals), by rank: an agent asks, tests went red, a task is done |
+| needs you | worktrees with a [signal](#signals) ranked 50 or below, by rank: an agent asks, tests went red, a task is done |
 | active | the worktree you are in, an open session, uncommitted work, a stack, or anything touched in 14 days |
 | ▸ idle | clean, no session, not starred, untouched for 14 days: what `mia gc` removes. Folded |
 | ▸ not mia's | worktrees of the repository mia did not make, such as an agent's or another tool's. Folded, with how many hold changes |
@@ -85,7 +85,9 @@ mia signal ls
 
 `.` is the worktree the command runs in, which is what a hook means. One
 signal per source per worktree. Lower ranks come first (50 if none is
-given). `--for` ends it after a while, `--until seen` when you next switch
+given). A signal ranked above 50, such as claude's `busy` at 60, says how a
+worktree is rather than asking for you: it is a word on its row, under
+active. `--for` ends it after a while, `--until seen` when you next switch
 to the worktree. A machine's signals arrive with its worktrees.
 
 A claude hook, in `~/.claude/settings.json`; it reads its event on stdin:

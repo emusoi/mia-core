@@ -54,7 +54,7 @@ type filter struct {
 func (m model) filters() []filter {
 	fs := []filter{
 		{"all", func(r row) bool { return !r.other }},
-		{"needs you", func(r row) bool { return len(r.signals) > 0 }},
+		{"needs you", needsYou},
 		{"local", func(r row) bool { return r.machine == "" && !r.other }},
 	}
 	seen := map[string]bool{}
@@ -181,6 +181,10 @@ func (m model) rowLines(r row, on bool, width int) []string {
 	}
 	left := mark + m.glyph(r) + " " + nameStyle.Render(pad(name, 15)) + soft.Render(pad(r.branch, 18))
 	var right []string
+	if len(r.signals) > 0 && !needsYou(r) {
+		s := r.signals[0]
+		right = append(right, Style(s.Style).Render(s.Kind))
+	}
 	switch {
 	case r.machine != "":
 		right = append(right, m.colour(r.machine).Render(r.machine))
@@ -196,7 +200,7 @@ func (m model) rowLines(r row, on bool, width int) []string {
 	right = append(right, muted.Render(fmt.Sprintf("%4s", age)))
 	lines := []string{paint(between(left, strings.Join(right, "  "), width))}
 	switch {
-	case len(r.signals) > 0:
+	case needsYou(r):
 		s := r.signals[0]
 		lines = append(lines, "      "+ghost.Render("└ ")+Style(s.Style).Bold(true).Render(s.Kind)+"  "+soft.Render(cut(s.Text, width-16)))
 	}
@@ -207,7 +211,7 @@ func (m model) rowLines(r row, on bool, width int) []string {
 // setter's colour, an open session, or nothing going on.
 func (m model) glyph(r row) string {
 	switch {
-	case len(r.signals) > 0:
+	case needsYou(r):
 		return Style(r.signals[0].Style).Render("●")
 	case r.listing != nil && r.listing.Session:
 		return m.colour(r.machine).Render("◐")

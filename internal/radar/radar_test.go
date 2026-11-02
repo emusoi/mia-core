@@ -319,3 +319,24 @@ func TestCtrlDRemovesTheSelectedWorktreeOnlyWhenNothingIsLost(t *testing.T) {
 		t.Errorf("an other with changes is refused: %q", got.confirm)
 	}
 }
+
+func TestAQuietSignalIsANoteOnItsRowNotACallForYou(t *testing.T) {
+	d := data()
+	d.Local = append(d.Local, app.Listing{Name: "mbezi", Branch: "busy-work", Adopted: true, Session: true,
+		Signals: []signal.Signal{{Kind: "busy", Style: "dim", Rank: 60, From: "claude"}}})
+	m := model{data: d, open: map[string]bool{}}
+	got := labels(m.build())
+	if at := slices.Index(got, "mbezi"); at < slices.Index(got, "active  3") {
+		t.Errorf("busy is under active, not needs you: %q", got)
+	}
+	if !slices.Contains(got, "needs you  3") {
+		t.Errorf("asks, done and tests red still need you: %q", got)
+	}
+	r := m.build()[slices.Index(got, "mbezi")]
+	if lines := m.rowLines(r, false, 70); len(lines) != 1 || !strings.Contains(lines[0], "busy") {
+		t.Errorf("busy is said on the row itself: %q", lines)
+	}
+	if m.filters()[1].keep(r) {
+		t.Errorf("the needs-you tab leaves busy out")
+	}
+}
