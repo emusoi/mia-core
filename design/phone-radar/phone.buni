@@ -6610,6 +6610,22 @@
         "flexShrink": "0"
       }
     },
+    "3d6acf2c": {
+      "id": "3d6acf2c",
+      "index": "a1",
+      "kind": "text",
+      "name": "moshono: Retry the 503s?",
+      "parent": "858783c7",
+      "style": {
+        "color": "rgba(255,255,255,.8)",
+        "font": "12px -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif",
+        "overflow": "hidden",
+        "textOverflow": "ellipsis",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "div",
+      "text": "moshono: Retry the 503s?"
+    },
     "3d911200": {
       "id": "3d911200",
       "index": "a0",
@@ -7259,6 +7275,21 @@
         "padding": "16px 18px"
       },
       "tag": "div"
+    },
+    "435f5b4d": {
+      "id": "435f5b4d",
+      "index": "a0",
+      "kind": "text",
+      "name": "mia-core · 2 need you",
+      "parent": "858783c7",
+      "style": {
+        "font": "600 15px -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif",
+        "overflow": "hidden",
+        "textOverflow": "ellipsis",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "div",
+      "text": "mia-core · 2 need you"
     },
     "437f1dfb": {
       "id": "437f1dfb",
@@ -13657,6 +13688,28 @@
       "style": {
         "flex": "1",
         "textAlign": "center"
+      },
+      "tag": "div"
+    },
+    "858783c7": {
+      "id": "858783c7",
+      "index": "a2V",
+      "kind": "frame",
+      "name": "widget · mia",
+      "parent": "288c6b32",
+      "style": {
+        "background": "rgba(255,255,255,.14)",
+        "borderRadius": "16px",
+        "boxSizing": "border-box",
+        "color": "#fff",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "2px",
+        "height": "72px",
+        "justifyContent": "center",
+        "margin": "-14px 12px 14px",
+        "padding": "10px 12px",
+        "width": "172px"
       },
       "tag": "div"
     },
@@ -24786,6 +24839,22 @@
       },
       "tag": "div",
       "text": " the batch?"
+    },
+    "f2c2fd60": {
+      "id": "f2c2fd60",
+      "index": "a2",
+      "kind": "text",
+      "name": "lido-app · 1 needs you",
+      "parent": "858783c7",
+      "style": {
+        "color": "rgba(255,255,255,.8)",
+        "font": "12px -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif",
+        "overflow": "hidden",
+        "textOverflow": "ellipsis",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "div",
+      "text": "lido-app · 1 needs you"
     },
     "f319799f": {
       "id": "f319799f",
