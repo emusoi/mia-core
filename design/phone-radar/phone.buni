@@ -154,6 +154,39 @@
     }
   },
   "journeys": {},
+  "modes": {
+    "dark": {
+      "--add": "#3dd68c",
+      "--add-bg": "rgba(61,214,140,.12)",
+      "--amber": "#ffa94d",
+      "--bg": "#0b0b0c",
+      "--blue": "#5b8cff",
+      "--body": "#0b0b0c",
+      "--box": "#5b8cff",
+      "--card": "#1b1b1d",
+      "--del": "#ff6369",
+      "--del-bg": "rgba(255,99,105,.12)",
+      "--faint": "#5c5c61",
+      "--fedora": "#e8896a",
+      "--glass": "rgba(28,28,30,.88)",
+      "--green": "#3dd68c",
+      "--ink": "#f2f2f3",
+      "--kbd": "#1f1f22",
+      "--key": "#46464a",
+      "--key-ink": "#ffffff",
+      "--key2": "#2c2c2f",
+      "--knob": "#3a3a3d",
+      "--lift": "rgba(0,0,0,.5)",
+      "--line": "#2a2a2d",
+      "--mac": "#d6d6da",
+      "--muted": "#8e8e93",
+      "--on-ink": "#0b0b0c",
+      "--red": "#ff6369",
+      "--shade": "rgba(0,0,0,.6)",
+      "--term": "#141416",
+      "--track": "#1b1b1d"
+    }
+  },
   "nodes": {
     "16236002": {
       "id": "16236002",
