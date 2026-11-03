@@ -18,7 +18,7 @@ func TestTheMenuCountsWhatCanGoAndKeysEveryPlugin(t *testing.T) {
 		{Name: "agent-a1"},
 		{Name: "agent-b2", Dirty: true},
 	}
-	items := menuItems("mia", "new_idea", "", local, []string{"cost", "gc-ish", "quiz"})
+	items := menuItems("mia", "new_idea", "", local, []string{"cost", "gc-ish", "quiz"}, 2)
 	names := map[string]string{}
 	keys := map[string]bool{}
 	for i := 2; i < len(items); {
@@ -34,7 +34,7 @@ func TestTheMenuCountsWhatCanGoAndKeysEveryPlugin(t *testing.T) {
 			keys[k] = true
 		}
 	}
-	for _, want := range []string{"clean up idle  1", "clean up not mia's  1 of 2", "cost", "quiz", "radar"} {
+	for _, want := range []string{"bring sessions back  2", "clean up idle  1", "clean up not mia's  1 of 2", "cost", "quiz", "radar"} {
 		if _, ok := names[want]; !ok {
 			t.Errorf("no %q in %q", want, items)
 		}
@@ -42,8 +42,8 @@ func TestTheMenuCountsWhatCanGoAndKeysEveryPlugin(t *testing.T) {
 	if items[1] != " mia · new_idea " {
 		t.Errorf("title: %q", items[1])
 	}
-	none := menuItems("mia", "r", "", local[:1], nil)
-	if !slices.Contains(none, "-clean up idle  0") || !slices.Contains(none, "-clean up not mia's  0 of 0") {
+	none := menuItems("mia", "r", "", local[:1], nil, 0)
+	if !slices.Contains(none, "-bring sessions back  0") || !slices.Contains(none, "-clean up idle  0") || !slices.Contains(none, "-clean up not mia's  0 of 0") {
 		t.Errorf("nothing to clean is greyed out: %q", none)
 	}
 }

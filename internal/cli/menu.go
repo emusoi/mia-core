@@ -43,7 +43,13 @@ func cmdTmuxMenu(a *app.App, args []string) int {
 			}
 		}
 	}
-	argv := menuItems(run.ShellJoin([]string{self}), filepath.Base(a.Root), here, local, plugins)
+	down := 0
+	for _, s := range a.Sessions() {
+		if s.State == "down" {
+			down++
+		}
+	}
+	argv := menuItems(run.ShellJoin([]string{self}), filepath.Base(a.Root), here, local, plugins, down)
 	if out, err := run.Local("tmux").Combined(append([]string{"display-menu", "-c", args[0]}, argv...)...); err != nil {
 		return tmuxSay(args, fmt.Errorf("tmux display-menu: %s", strings.TrimSpace(out)))
 	}
@@ -112,7 +118,7 @@ func tmuxSay(args []string, err error) int {
 
 // menuItems is display-menu's title and items, by threes — name, key,
 // command — with "" between sections. A name starting with - is greyed out.
-func menuItems(mia, repo, here string, local []app.Listing, plugins []string) []string {
+func menuItems(mia, repo, here string, local []app.Listing, plugins []string, down int) []string {
 	idle, others, clean := 0, 0, 0
 	for _, l := range local {
 		switch {
@@ -140,9 +146,10 @@ func menuItems(mia, repo, here string, local []app.Listing, plugins []string) []
 		}
 		items = append(items, label, key, popup("100", "60%", title, command))
 	}
+	cleanup(fmt.Sprintf("bring sessions back  %d", down), down, "b", "sessions", mia+" resurrect --ask")
 	cleanup(fmt.Sprintf("clean up idle  %d", idle), idle, "c", "idle", mia+" gc --ask")
 	cleanup(fmt.Sprintf("clean up not mia's  %d of %d", clean, others), clean, "o", "not mia's", mia+" gc --others --ask")
-	taken := map[rune]bool{'n': true, 'c': true, 'o': true}
+	taken := map[rune]bool{'n': true, 'b': true, 'c': true, 'o': true}
 	for i, verb := range plugins {
 		if i == 0 {
 			items = append(items, "")

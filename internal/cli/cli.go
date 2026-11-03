@@ -255,6 +255,9 @@ func Run(args []string) int {
 		return exitOK
 	case "resurrect":
 		dry := take(&rest, "--dry-run")
+		if take(&rest, "--ask") {
+			defer pressKey() // from the tmux menu's popup: stay up until ⏎
+		}
 		if take(&rest, "--list") {
 			if asJSON {
 				return emit(a.Sessions())

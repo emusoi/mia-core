@@ -42,7 +42,9 @@ on GitHub; a tag without its section is not released.
   runs `codex resume --last`. Every session is remembered: one you closed
   stays closed until you name it, `mia resurrect <worktree>`, and
   `--list` shows them all — running, down or closed — and when each was
-  last seen.
+  last seen. The radar puts what tmux took down first, one row brings it
+  all back, and a worktree's actions bring its own session back; the tmux
+  menu's `b` does the same.
 - **Answer from the radar**: on a row under needs you, `^y` approves and
   `^r` types a reply into the pane the signal came from, without switching.
   `mia signal .` now keeps the tmux pane it ran in, and `--yes <keys>` says

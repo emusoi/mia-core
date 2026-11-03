@@ -426,3 +426,37 @@ func TestTheLookFlipsFromTheWindowsToTheDiff(t *testing.T) {
 		t.Errorf("the diff shows the uncommitted line:\n%s", view)
 	}
 }
+
+func TestSessionsTmuxTookDownComeBackFromTheRadar(t *testing.T) {
+	d := data()
+	d.Down = map[string]string{"temeke": "down", "lemara": "closed"}
+	m := model{data: d, open: map[string]bool{}}
+	m.rows = m.build()
+	got := labels(m.rows)
+	if got[0] != "went down with tmux  1" || got[1] != "bring back 1 session — windows and claudes as they were" {
+		t.Errorf("what tmux took down comes first: %q", got[:3])
+	}
+	next, _ := m.rows[1].act(m)
+	if next.chosen == nil || strings.Join(next.chosen.Argv, " ") != "resurrect" || !next.chosen.Wait {
+		t.Errorf("it runs mia resurrect and shows what came back: %+v", next.chosen)
+	}
+	for _, r := range m.worktrees() {
+		if r.name == "lemara" && !strings.Contains(r.detail, "session closed") {
+			t.Errorf("a closed session is said on its row: %q", r.detail)
+		}
+	}
+	m.query = "lem"
+	rows := m.build()
+	i := slices.IndexFunc(rows, func(r row) bool { return strings.HasPrefix(r.label, "bring its session back") })
+	if i < 0 {
+		t.Fatalf("a closed session comes back from its own actions: %q", labels(rows))
+	}
+	next, _ = rows[i].act(m)
+	if next.chosen == nil || strings.Join(next.chosen.Argv, " ") != "resurrect lemara" {
+		t.Errorf("by name: %+v", next.chosen)
+	}
+	m.data.Down, m.query = nil, ""
+	if got := labels(m.build()); strings.HasPrefix(got[0], "went down") {
+		t.Errorf("nothing down, nothing said: %q", got[:2])
+	}
+}

@@ -52,6 +52,14 @@ func radarData(a *app.App) (radar.Data, error) {
 		data.Branch = git.CurrentBranch(record.Path)
 	}
 	data.Away = a.ReadNote()
+	for _, s := range a.Sessions() {
+		if s.State != "running" {
+			if data.Down == nil {
+				data.Down = map[string]string{}
+			}
+			data.Down[s.Name] = s.State
+		}
+	}
 	if plugins, err := enabledPlugins(a); err == nil {
 		for _, p := range plugins {
 			for _, v := range p.Manifest.Verbs {

@@ -41,6 +41,9 @@ type Data struct {
 	// Away is the computer that handed this terminal here, and what it has:
 	// picking one of its worktrees hands the terminal back.
 	Away *Away
+	// Down is each worktree whose session mia remembers but is not running:
+	// "down" when it went down with tmux, "closed" when it was closed.
+	Down map[string]string
 }
 
 // Away is the note a computer leaves on a machine about itself.
@@ -623,6 +626,11 @@ func (m model) build() []row {
 	sort.SliceStable(signalled, func(i, j int) bool { return signalled[i].signals[0].Rank < signalled[j].signals[0].Rank })
 	sort.SliceStable(active, func(i, j int) bool { return moved(active[i]).After(moved(active[j])) })
 	var rows []row
+	if n := m.wentDown(); n > 0 {
+		// sessions tmux took down are the first thing to see
+		rows = append(rows, row{kind: group, label: "went down with tmux  " + fmt.Sprint(n)},
+			row{kind: action, label: fmt.Sprintf("bring back %s — windows and claudes as they were", plural(n, "session")), act: shown("resurrect")})
+	}
 	if len(signalled) > 0 {
 		rows = append(rows, row{kind: group, label: "needs you  " + fmt.Sprint(len(signalled))})
 		rows = m.withLayers(rows, signalled)
@@ -664,6 +672,25 @@ func (m model) build() []row {
 		rows = m.fold(rows, "not mia's", label, others, sweep...)
 	}
 	return rows
+}
+
+// wentDown counts the local sessions that went down with tmux and are
+// not running again.
+func (m model) wentDown() int {
+	n := 0
+	for _, l := range m.data.Local {
+		if m.data.Down[l.Name] == "down" && !l.Session {
+			n++
+		}
+	}
+	return n
+}
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return "1 " + word
+	}
+	return fmt.Sprintf("%d %ss", n, word)
 }
 
 // quietRank: a signal ranked above it is a note on its row, not a call for
@@ -822,6 +849,9 @@ func (m model) worktrees() []row {
 			r.branch = fmt.Sprintf("%s · %d layers", l.Branch, len(l.Layers))
 		}
 		r.detail = listingDetail(l)
+		if state := m.data.Down[l.Name]; state != "" && !l.Session {
+			r.detail = strings.Join(slices.DeleteFunc([]string{r.detail, "session " + state}, func(s string) bool { return s == "" }), " · ")
+		}
 		rows = append(rows, r)
 	}
 	if a := m.data.Away; a != nil {
@@ -890,6 +920,9 @@ func (m model) actionsFor(r row) []row {
 		}
 	}
 	acts := []row{{kind: action, label: "switch there", act: switchTo(r)}}
+	if state := m.data.Down[r.name]; state != "" && r.machine == "" && (r.listing == nil || !r.listing.Session) {
+		acts = append(acts, row{kind: action, label: "bring its session back — its windows, a claude resuming its conversation", act: shown("resurrect", r.name)})
+	}
 	if r.away == "" {
 		if r.machine != "" {
 			acts = append(acts, row{kind: action, label: "move here — its changes and windows too", act: run(r, "move", r.name, "local")})
