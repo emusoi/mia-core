@@ -6614,7 +6614,7 @@
       "id": "3d6acf2c",
       "index": "a1",
       "kind": "text",
-      "name": "moshono: Retry the 503s?",
+      "name": "mia-core · moshono",
       "parent": "858783c7",
       "style": {
         "color": "rgba(255,255,255,.8)",
@@ -6624,7 +6624,7 @@
         "whiteSpace": "nowrap"
       },
       "tag": "div",
-      "text": "moshono: Retry the 503s?"
+      "text": "mia-core · moshono"
     },
     "3d911200": {
       "id": "3d911200",
@@ -7280,7 +7280,7 @@
       "id": "435f5b4d",
       "index": "a0",
       "kind": "text",
-      "name": "mia-core · 2 need you",
+      "name": "2 need you",
       "parent": "858783c7",
       "style": {
         "font": "600 15px -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif",
@@ -7289,7 +7289,7 @@
         "whiteSpace": "nowrap"
       },
       "tag": "div",
-      "text": "mia-core · 2 need you"
+      "text": "2 need you"
     },
     "437f1dfb": {
       "id": "437f1dfb",
@@ -24844,7 +24844,7 @@
       "id": "f2c2fd60",
       "index": "a2",
       "kind": "text",
-      "name": "lido-app · 1 needs you",
+      "name": "Retry the 503s with back…",
       "parent": "858783c7",
       "style": {
         "color": "rgba(255,255,255,.8)",
@@ -24854,7 +24854,7 @@
         "whiteSpace": "nowrap"
       },
       "tag": "div",
-      "text": "lido-app · 1 needs you"
+      "text": "Retry the 503s with backoff?"
     },
     "f319799f": {
       "id": "f319799f",
