@@ -6,3 +6,8 @@
 design/*.buni
 design/*.buni.*
 design/.versions/
+
+# the buni editor’s own files, beside a design
+*.buni.live
+*.buni.version
+.versions/
