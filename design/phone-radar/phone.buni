@@ -34232,8 +34232,10 @@
         "alignItems": "center",
         "background": "var(--bg)",
         "borderBottom": "1px solid var(--line)",
+        "borderTop": "1px solid var(--line)",
         "display": "flex",
         "flex": "none",
+        "marginBottom": "34px",
         "padding": "0 12px 0 6px"
       },
       "tag": "div"
