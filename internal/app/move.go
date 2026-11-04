@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -58,14 +57,14 @@ type Window struct {
 type Moved struct {
 	Name, Path string
 	Windows    []Window
-	Carried    []string // programs whose state an extension carried
+	Carried    []string // programs whose conversation came along
 }
 
 var shells = map[string]bool{"zsh": true, "bash": true, "sh": true, "fish": true, "dash": true, "-zsh": true, "-bash": true}
 
 // Move takes a worktree from one side to the other: its branch, its
 // uncommitted work and its session's windows, each restarted there; a
-// program with a mia-carry-<name> extension has its state carried too.
+// claude, codex or pi window has its conversation carried too.
 // Only once all of that is there is the worktree here removed; its branch
 // stays where it was.
 func (a *App) Move(name, from, to string, say io.Writer) (Moved, error) {
@@ -268,17 +267,10 @@ func (s side) open(name, path string, windows []Window) error {
 	return nil
 }
 
-// carry asks each window's program for its state, when an extension named
-// mia-carry-<program> is on this computer's PATH, and unpacks it under the
-// home on the other side; the window then restarts with what the extension
-// says. The extension is called as:
-//
-//	mia-carry-<program> pack <from worktree> <to worktree>   # a tar of files under the home, on stdout
-//	mia-carry-<program> command                               # how to start it again, on stdout
+// carry brings each window's conversation along when its program has a
+// carrier, unpacking it under the home on the other side; the window then
+// restarts with what the carrier says, so the agent picks up where it was.
 func (a *App) carry(src, dst side, from, to string, windows []Window) []string {
-	if !src.here() {
-		return nil // ponytail: the extension runs here; carrying from a machine needs it there too
-	}
 	var carried []string
 	for i, w := range windows {
 		words := strings.Fields(w.Command)
@@ -286,8 +278,8 @@ func (a *App) carry(src, dst side, from, to string, windows []Window) []string {
 			continue // a shell: nothing to carry
 		}
 		program := filepath.Base(words[0])
-		extension, err := exec.LookPath("mia-carry-" + program)
-		if err != nil {
+		script, ok := carriers[program]
+		if !ok {
 			continue
 		}
 		toPath := to
@@ -296,15 +288,15 @@ func (a *App) carry(src, dst side, from, to string, windows []Window) []string {
 				toPath = filepath.Join(strings.TrimSpace(home), to)
 			}
 		}
-		packed, err := exec.Command(extension, "pack", from, toPath).Output()
+		packed, err := src.bytesOf(script, from, toPath, "pack")
 		if err != nil || len(packed) == 0 {
 			continue
 		}
 		if err := dst.feed(packed, `cd && tar -xf -`); err != nil {
 			continue
 		}
-		if again, err := exec.Command(extension, "command").Output(); err == nil && strings.TrimSpace(string(again)) != "" {
-			windows[i].Command = strings.TrimSpace(string(again))
+		if again, err := src.sh(script, from, toPath, "command"); err == nil && strings.TrimSpace(again) != "" {
+			windows[i].Command = strings.TrimSpace(again)
 		}
 		carried = append(carried, program)
 	}
