@@ -20366,7 +20366,7 @@
       "id": "bc1df007",
       "index": "a1",
       "kind": "text",
-      "name": "Send to nduruma",
+      "name": "Send to moshono",
       "parent": "51419957",
       "style": {
         "color": "var(--ink)",
@@ -20374,7 +20374,7 @@
         "padding": "0 22px 4px"
       },
       "tag": "div",
-      "text": "Send to nduruma"
+      "text": "Send to moshono"
     },
     "bc1f86be": {
       "id": "bc1f86be",
@@ -26907,7 +26907,7 @@
       "id": "f68b9d4a",
       "index": "a2",
       "kind": "text",
-      "name": "Saved on mac, outside th…",
+      "name": "Saved on fedora, outside…",
       "parent": "51419957",
       "style": {
         "color": "var(--muted)",
@@ -26915,7 +26915,7 @@
         "padding": "0 22px 14px"
       },
       "tag": "div",
-      "text": "Saved on mac, outside the worktree; its path is typed into the terminal for the agent to read. Add a word or two, then Enter."
+      "text": "Saved on fedora, outside the worktree; its path is typed into the terminal for the agent to read. Add a word or two, then Enter."
     },
     "f6ac67bc": {
       "id": "f6ac67bc",
