@@ -89,6 +89,19 @@
       "tag": "span",
       "text": "9:41"
     },
+    "30443101": {
+      "id": "30443101",
+      "index": "a1",
+      "kind": "text",
+      "name": "Inbox",
+      "parent": "6487d9f5",
+      "style": {
+        "color": "var(--ink)",
+        "font": "600 11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+      },
+      "tag": "span",
+      "text": "Inbox"
+    },
     "41591622": {
       "id": "41591622",
       "index": "a3",
@@ -114,21 +127,6 @@
       },
       "tag": "span",
       "text": "Me"
-    },
-    "46755218": {
-      "id": "46755218",
-      "index": "a0",
-      "kind": "frame",
-      "name": "div",
-      "parent": "f1d3c7f4",
-      "style": {
-        "alignItems": "center",
-        "color": "var(--muted)",
-        "display": "flex",
-        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "gap": "8px"
-      },
-      "tag": "div"
     },
     "49716581": {
       "id": "49716581",
@@ -180,6 +178,19 @@
       "parent": "e996915c",
       "style": {},
       "tag": "span"
+    },
+    "59254104": {
+      "id": "59254104",
+      "index": "a3",
+      "kind": "frame",
+      "name": "div",
+      "parent": "937b4be6",
+      "style": {
+        "display": "flex",
+        "gap": "8px",
+        "marginTop": "12px"
+      },
+      "tag": "div"
     },
     "62226469": {
       "id": "62226469",
@@ -238,6 +249,16 @@
       },
       "tag": "div"
     },
+    "65308851": {
+      "id": "65308851",
+      "index": "a2",
+      "kind": "text",
+      "name": "·",
+      "parent": "5c5ec215",
+      "style": {},
+      "tag": "span",
+      "text": "·"
+    },
     "66306819": {
       "id": "66306819",
       "index": "a0",
@@ -281,21 +302,19 @@
       },
       "tag": "div"
     },
-    "73231989": {
-      "id": "73231989",
-      "index": "a0",
+    "72123836": {
+      "id": "72123836",
+      "index": "a1",
       "kind": "text",
-      "name": "Open",
-      "parent": "7539b648",
+      "name": "Retry the 503s with back…",
+      "parent": "ac7cd249",
       "style": {
-        "background": "var(--ink)",
-        "borderRadius": "17px",
-        "color": "var(--on-ink)",
-        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "9px 16px"
+        "color": "var(--ink)",
+        "font": "600 17px/22px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "marginTop": "8px"
       },
-      "tag": "span",
-      "text": "Open"
+      "tag": "div",
+      "text": "Retry the 503s with backoff, or fail the batch?"
     },
     "75503010": {
       "id": "75503010",
@@ -396,6 +415,17 @@
       },
       "tag": "div"
     },
+    "94852498": {
+      "id": "94852498",
+      "index": "a2",
+      "kind": "frame",
+      "name": "span",
+      "parent": "ac76d31d",
+      "style": {
+        "flex": "1"
+      },
+      "tag": "span"
+    },
     "96165170": {
       "id": "96165170",
       "index": "a1",
@@ -465,6 +495,37 @@
         "font": "14px -apple-system, 'SF Pro Text', system-ui, sans-serif"
       },
       "tag": "span"
+    },
+    "0062af4d": {
+      "id": "0062af4d",
+      "index": "a1",
+      "kind": "frame",
+      "name": "div",
+      "parent": "ffa8c777",
+      "style": {
+        "alignItems": "center",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "4px",
+        "width": "70px"
+      },
+      "tag": "div"
+    },
+    "008c1084": {
+      "id": "008c1084",
+      "index": "a0",
+      "kind": "text",
+      "name": "Open",
+      "parent": "47e44a9e",
+      "style": {
+        "background": "var(--ink)",
+        "borderRadius": "17px",
+        "color": "var(--on-ink)",
+        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "9px 16px"
+      },
+      "tag": "span",
+      "text": "Open"
     },
     "0101d672": {
       "id": "0101d672",
@@ -557,21 +618,21 @@
       },
       "tag": "div"
     },
-    "02dd213a": {
-      "id": "02dd213a",
-      "index": "a0",
+    "02d62807": {
+      "id": "02d62807",
+      "index": "a6",
       "kind": "frame",
-      "name": "screen",
-      "parent": "2c5d20a7",
+      "name": "home indicator",
+      "parent": "6da06029",
       "style": {
-        "background": "#0b0b0c",
-        "display": "flex",
-        "flexDirection": "column",
-        "fontFamily": "-apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "height": "844px",
-        "overflow": "hidden",
-        "position": "relative",
-        "width": "390px"
+        "background": "var(--ink)",
+        "borderRadius": "3px",
+        "bottom": "8px",
+        "height": "5px",
+        "left": "50%",
+        "position": "absolute",
+        "transform": "translateX(-50%)",
+        "width": "134px"
       },
       "tag": "div"
     },
@@ -605,6 +666,16 @@
       "tag": "div",
       "text": "jk/ledger · on mac"
     },
+    "03401018": {
+      "id": "03401018",
+      "index": "a0",
+      "kind": "text",
+      "name": "9:41",
+      "parent": "dc06418c",
+      "style": {},
+      "tag": "span",
+      "text": "9:41"
+    },
     "03b5b4ff": {
       "id": "03b5b4ff",
       "index": "a1",
@@ -632,6 +703,23 @@
       },
       "tag": "div"
     },
+    "040d8d19": {
+      "id": "040d8d19",
+      "index": "a0",
+      "kind": "frame",
+      "name": "span",
+      "parent": "ac76d31d",
+      "style": {
+        "alignItems": "center",
+        "background": "#191919",
+        "borderRadius": "6px",
+        "display": "flex",
+        "height": "22px",
+        "justifyContent": "center",
+        "width": "22px"
+      },
+      "tag": "span"
+    },
     "04a82a90": {
       "id": "04a82a90",
       "index": "a1",
@@ -658,21 +746,6 @@
       "style": {},
       "tag": "span",
       "text": "Open a page"
-    },
-    "05465cb6": {
-      "id": "05465cb6",
-      "index": "a2",
-      "kind": "frame",
-      "name": "div",
-      "parent": "0cb10bab",
-      "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "flexDirection": "column",
-        "gap": "4px",
-        "width": "70px"
-      },
-      "tag": "div"
     },
     "057c0e85": {
       "id": "057c0e85",
@@ -714,6 +787,23 @@
       "tag": "span",
       "text": "box, mac"
     },
+    "05e2f716": {
+      "id": "05e2f716",
+      "index": "a1",
+      "kind": "frame",
+      "name": "div",
+      "parent": "0a7ad190",
+      "style": {
+        "alignItems": "center",
+        "background": "var(--card)",
+        "borderRadius": "20px",
+        "display": "flex",
+        "height": "40px",
+        "justifyContent": "center",
+        "width": "40px"
+      },
+      "tag": "div"
+    },
     "05e89500": {
       "id": "05e89500",
       "index": "a1",
@@ -736,20 +826,6 @@
       "style": {},
       "tag": "span",
       "text": "Machines come from"
-    },
-    "064559f8": {
-      "id": "064559f8",
-      "index": "a3",
-      "kind": "text",
-      "name": "moshono",
-      "parent": "89b2362a",
-      "style": {
-        "color": "var(--ink)",
-        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "moshono"
     },
     "0647d720": {
       "id": "0647d720",
@@ -791,6 +867,19 @@
       "tag": "span",
       "text": "fedora"
     },
+    "06d6c513": {
+      "id": "06d6c513",
+      "index": "a1",
+      "kind": "text",
+      "name": "Me",
+      "parent": "27d2438e",
+      "style": {
+        "color": "var(--faint)",
+        "font": "11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+      },
+      "tag": "span",
+      "text": "Me"
+    },
     "06fed4a9": {
       "id": "06fed4a9",
       "index": "a3",
@@ -809,6 +898,23 @@
       },
       "tag": "div"
     },
+    "0700ac5d": {
+      "id": "0700ac5d",
+      "index": "a0",
+      "kind": "frame",
+      "name": "div",
+      "parent": "0a7ad190",
+      "style": {
+        "alignItems": "center",
+        "background": "var(--card)",
+        "borderRadius": "20px",
+        "display": "flex",
+        "height": "40px",
+        "justifyContent": "center",
+        "width": "40px"
+      },
+      "tag": "div"
+    },
     "073f1bf9": {
       "id": "073f1bf9",
       "index": "a0",
@@ -822,6 +928,19 @@
         "padding": "16px"
       },
       "tag": "div"
+    },
+    "074bc625": {
+      "id": "074bc625",
+      "index": "a1",
+      "kind": "frame",
+      "name": "span",
+      "parent": "b0c83375",
+      "style": {
+        "alignItems": "center",
+        "display": "flex",
+        "gap": "6px"
+      },
+      "tag": "span"
     },
     "075f9779": {
       "id": "075f9779",
@@ -848,6 +967,16 @@
         "display": "inline-flex",
         "flexShrink": "0"
       }
+    },
+    "07b3d1e8": {
+      "id": "07b3d1e8",
+      "index": "a0",
+      "kind": "text",
+      "name": "Your agents,",
+      "parent": "717e2d61",
+      "style": {},
+      "tag": "span",
+      "text": "Your agents,"
     },
     "07c0d458": {
       "id": "07c0d458",
@@ -901,6 +1030,32 @@
       },
       "tag": "div"
     },
+    "08b6ccc5": {
+      "id": "08b6ccc5",
+      "index": "a0",
+      "kind": "text",
+      "name": "Open",
+      "parent": "982dbded",
+      "style": {
+        "background": "var(--ink)",
+        "borderRadius": "17px",
+        "color": "var(--on-ink)",
+        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "9px 16px"
+      },
+      "tag": "span",
+      "text": "Open"
+    },
+    "0933ab28": {
+      "id": "0933ab28",
+      "index": "a0",
+      "kind": "text",
+      "name": "1 commit · ",
+      "parent": "23157d1a",
+      "style": {},
+      "tag": "span",
+      "text": "1 commit · "
+    },
     "09b170c8": {
       "id": "09b170c8",
       "index": "a0",
@@ -951,23 +1106,6 @@
       },
       "tag": "div"
     },
-    "0a2edc20": {
-      "id": "0a2edc20",
-      "index": "a2",
-      "kind": "frame",
-      "name": "div",
-      "parent": "b42d94ce",
-      "style": {
-        "alignItems": "center",
-        "background": "var(--card)",
-        "borderRadius": "20px",
-        "display": "flex",
-        "gap": "12px",
-        "margin": "6px 16px 0",
-        "padding": "14px 16px"
-      },
-      "tag": "div"
-    },
     "0a7131c2": {
       "id": "0a7131c2",
       "index": "a3",
@@ -982,19 +1120,17 @@
       "tag": "div",
       "text": "+ if w.Machine != m.here {"
     },
-    "0aa24a4d": {
-      "id": "0aa24a4d",
+    "0a7ad190": {
+      "id": "0a7ad190",
       "index": "a1",
-      "kind": "text",
-      "name": "Retry the 503s with back…",
-      "parent": "238fa353",
+      "kind": "frame",
+      "name": "span",
+      "parent": "ce4795d4",
       "style": {
-        "color": "var(--ink)",
-        "font": "600 17px/22px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "marginTop": "8px"
+        "display": "flex",
+        "gap": "8px"
       },
-      "tag": "div",
-      "text": "Retry the 503s with backoff, or fail the batch?"
+      "tag": "span"
     },
     "0ad44288": {
       "id": "0ad44288",
@@ -1011,31 +1147,6 @@
       },
       "tag": "div",
       "text": "radar.go"
-    },
-    "0b16f605": {
-      "id": "0b16f605",
-      "index": "a5",
-      "kind": "text",
-      "name": "14m",
-      "parent": "0df08c73",
-      "style": {
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "14m"
-    },
-    "0b1c823c": {
-      "id": "0b1c823c",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"8\" r=\"5\"/><path d=\"M20 21a8 8 0 0 0-16 0\"/></svg>",
-      "name": "user-round",
-      "parent": "1de203cb",
-      "style": {
-        "color": "var(--faint)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
     },
     "0b381a01": {
       "id": "0b381a01",
@@ -1060,6 +1171,15 @@
       },
       "tag": "span"
     },
+    "0ba9a4c0": {
+      "id": "0ba9a4c0",
+      "index": "a0",
+      "kind": "frame",
+      "name": "02 Inbox",
+      "style": {
+        "width": "1440px"
+      }
+    },
     "0c2e534c": {
       "id": "0c2e534c",
       "index": "a0",
@@ -1073,12 +1193,12 @@
         "flexShrink": "0"
       }
     },
-    "0c4cd917": {
-      "id": "0c4cd917",
+    "0c8dcfce": {
+      "id": "0c8dcfce",
       "index": "a1",
       "kind": "text",
       "name": "Retry the 503s with back…",
-      "parent": "3ff26cc6",
+      "parent": "dd563a6f",
       "style": {
         "color": "var(--ink)",
         "font": "600 17px/22px -apple-system, 'SF Pro Text', system-ui, sans-serif",
@@ -1086,53 +1206,6 @@
       },
       "tag": "div",
       "text": "Retry the 503s with backoff, or fail the batch?"
-    },
-    "0cade683": {
-      "id": "0cade683",
-      "index": "a2",
-      "kind": "text",
-      "name": "−12",
-      "parent": "ffccca97",
-      "style": {
-        "color": "var(--del)"
-      },
-      "tag": "span",
-      "text": "−12"
-    },
-    "0cb10bab": {
-      "id": "0cb10bab",
-      "index": "a4",
-      "kind": "frame",
-      "name": "tab bar",
-      "parent": "21d302cf",
-      "style": {
-        "background": "var(--bg)",
-        "borderTop": "1px solid var(--line)",
-        "bottom": "0",
-        "display": "flex",
-        "height": "84px",
-        "justifyContent": "space-around",
-        "left": "0",
-        "padding": "10px 10px 0",
-        "position": "absolute",
-        "right": "0"
-      },
-      "tag": "div"
-    },
-    "0cb13e23": {
-      "id": "0cb13e23",
-      "index": "a0",
-      "kind": "frame",
-      "name": "div",
-      "parent": "0cb10bab",
-      "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "flexDirection": "column",
-        "gap": "4px",
-        "width": "70px"
-      },
-      "tag": "div"
     },
     "0cb1f84e": {
       "id": "0cb1f84e",
@@ -1161,20 +1234,6 @@
         "height": "44px",
         "justifyContent": "space-between",
         "padding": "14px 28px 0"
-      },
-      "tag": "div"
-    },
-    "0cc01ee4": {
-      "id": "0cc01ee4",
-      "index": "a1",
-      "kind": "frame",
-      "name": "card · olkokola",
-      "parent": "7ff515aa",
-      "style": {
-        "background": "var(--card)",
-        "borderRadius": "20px",
-        "margin": "0 16px 10px",
-        "padding": "14px 16px"
       },
       "tag": "div"
     },
@@ -1222,17 +1281,16 @@
       "tag": "span",
       "text": "Appearance"
     },
-    "0cf968d2": {
-      "id": "0cf968d2",
+    "0cfddbd1": {
+      "id": "0cfddbd1",
       "index": "a2",
       "kind": "frame",
-      "name": "card · olkokola",
-      "parent": "6ed6c459",
+      "name": "div",
+      "parent": "e9651c33",
       "style": {
-        "background": "var(--card)",
-        "borderRadius": "20px",
-        "margin": "0 16px 10px",
-        "padding": "14px 16px"
+        "color": "var(--muted)",
+        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
+        "marginTop": "6px"
       },
       "tag": "div"
     },
@@ -1296,21 +1354,6 @@
         "flexShrink": "0"
       }
     },
-    "0df08c73": {
-      "id": "0df08c73",
-      "index": "a0",
-      "kind": "frame",
-      "name": "div",
-      "parent": "0cf968d2",
-      "style": {
-        "alignItems": "center",
-        "color": "var(--muted)",
-        "display": "flex",
-        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "gap": "8px"
-      },
-      "tag": "div"
-    },
     "0dfd1e93": {
       "id": "0dfd1e93",
       "index": "a0",
@@ -1324,6 +1367,16 @@
       "tag": "span",
       "text": "Running"
     },
+    "0e2d6b16": {
+      "id": "0e2d6b16",
+      "index": "a2",
+      "kind": "text",
+      "name": "in your pocket.",
+      "parent": "717e2d61",
+      "style": {},
+      "tag": "span",
+      "text": "in your pocket."
+    },
     "0e6c7113": {
       "id": "0e6c7113",
       "index": "a3",
@@ -1336,6 +1389,15 @@
         "marginLeft": "16px"
       },
       "tag": "div"
+    },
+    "0e8a8d9f": {
+      "id": "0e8a8d9f",
+      "index": "a0",
+      "kind": "frame",
+      "name": "01 Welcome",
+      "style": {
+        "width": "1440px"
+      }
     },
     "0e9ce602": {
       "id": "0e9ce602",
@@ -1368,19 +1430,30 @@
       "tag": "span",
       "text": "120 GB free"
     },
-    "0f787d2c": {
-      "id": "0f787d2c",
-      "index": "a2",
+    "0f2c156e": {
+      "id": "0f2c156e",
+      "index": "a0",
       "kind": "text",
-      "name": "⏺ Bash(curl -s localhost…",
-      "parent": "3ff26cc6",
+      "name": "2 need you",
+      "parent": "a18c041b",
       "style": {
-        "color": "var(--muted)",
-        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
-        "marginTop": "6px"
+        "font": "600 15px -apple-system, 'SF Pro Text', system-ui, sans-serif"
       },
       "tag": "div",
-      "text": "⏺ Bash(curl -s localhost:8080/batch) → 503 ×14"
+      "text": "2 need you"
+    },
+    "0f6409af": {
+      "id": "0f6409af",
+      "index": "a3",
+      "kind": "frame",
+      "name": "div",
+      "parent": "e9651c33",
+      "style": {
+        "display": "flex",
+        "gap": "8px",
+        "marginTop": "12px"
+      },
+      "tag": "div"
     },
     "0fa12d99": {
       "id": "0fa12d99",
@@ -1450,6 +1523,19 @@
       },
       "tag": "div"
     },
+    "10c2eb30": {
+      "id": "10c2eb30",
+      "index": "a1",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h.01\"/><path d=\"M2 8.82a15 15 0 0 1 20 0\"/><path d=\"M5 12.859a10 10 0 0 1 14 0\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/></svg>",
+      "name": "wifi",
+      "parent": "c9b6c411",
+      "style": {
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
     "10dea568": {
       "id": "10dea568",
       "index": "a0",
@@ -1466,20 +1552,6 @@
       },
       "tag": "span"
     },
-    "10f8dbdd": {
-      "id": "10f8dbdd",
-      "index": "a1",
-      "kind": "frame",
-      "name": "div",
-      "parent": "35afd3b3",
-      "style": {
-        "color": "var(--ink)",
-        "font": "700 34px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "letterSpacing": "-.8px",
-        "marginTop": "26px"
-      },
-      "tag": "div"
-    },
     "111bcddd": {
       "id": "111bcddd",
       "index": "a3",
@@ -1491,6 +1563,15 @@
         "font": "12px 'SF Mono', ui-monospace, Menlo, monospace"
       },
       "tag": "span"
+    },
+    "113a7263": {
+      "id": "113a7263",
+      "index": "a0",
+      "kind": "frame",
+      "name": "13 Lock screen",
+      "style": {
+        "width": "1440px"
+      }
     },
     "12239bf5": {
       "id": "12239bf5",
@@ -1547,19 +1628,6 @@
         "padding": "6px 12px 8px"
       },
       "tag": "div"
-    },
-    "12aad97d": {
-      "id": "12aad97d",
-      "index": "a2",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 10v4\"/><path d=\"M14 10v4\"/><path d=\"M22 14v-4\"/><path d=\"M6 10v4\"/><rect x=\"2\" y=\"6\" width=\"16\" height=\"12\" rx=\"2\"/></svg>",
-      "name": "battery-full",
-      "parent": "b65174bf",
-      "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
     },
     "12b4fd15": {
       "id": "12b4fd15",
@@ -1620,6 +1688,20 @@
       "tag": "span",
       "text": "streaming"
     },
+    "13e6c12c": {
+      "id": "13e6c12c",
+      "index": "a1",
+      "kind": "text",
+      "name": "needs you",
+      "parent": "429ee1ea",
+      "style": {
+        "color": "var(--red)",
+        "font": "600 13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "needs you"
+    },
     "144fe3fb": {
       "id": "144fe3fb",
       "index": "a1",
@@ -1635,47 +1717,20 @@
       "tag": "span",
       "text": "Log · 2"
     },
-    "14c4d30c": {
-      "id": "14c4d30c",
-      "index": "a3",
-      "kind": "frame",
-      "name": "div",
-      "parent": "0cf968d2",
-      "style": {
-        "display": "flex",
-        "gap": "8px",
-        "marginTop": "12px"
-      },
-      "tag": "div"
-    },
-    "1525e7b2": {
-      "id": "1525e7b2",
+    "156048a8": {
+      "id": "156048a8",
       "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m16 9-5.5 5.5L8 12\"/></svg>",
-      "name": "circle-check",
-      "parent": "0df08c73",
+      "kind": "frame",
+      "name": "span",
+      "parent": "9761e4b9",
       "style": {
-        "color": "var(--green)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
-    },
-    "159724e8": {
-      "id": "159724e8",
-      "index": "a1",
-      "kind": "text",
-      "name": "Stop",
-      "parent": "788f3b5d",
-      "style": {
-        "background": "var(--track)",
-        "borderRadius": "17px",
+        "alignItems": "center",
         "color": "var(--ink)",
-        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "9px 16px"
+        "display": "flex",
+        "font": "700 32px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "letterSpacing": "-.6px"
       },
-      "tag": "span",
-      "text": "Stop"
+      "tag": "span"
     },
     "15ef593f": {
       "id": "15ef593f",
@@ -1689,6 +1744,20 @@
       },
       "tag": "span",
       "text": "13 pt"
+    },
+    "160be137": {
+      "id": "160be137",
+      "index": "a3",
+      "kind": "text",
+      "name": "mianzini",
+      "parent": "498b7e82",
+      "style": {
+        "color": "var(--ink)",
+        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "mianzini"
     },
     "1619d92f": {
       "id": "1619d92f",
@@ -1770,6 +1839,16 @@
       },
       "tag": "div"
     },
+    "16b2f678": {
+      "id": "16b2f678",
+      "index": "a0",
+      "kind": "text",
+      "name": "9:41",
+      "parent": "962c6107",
+      "style": {},
+      "tag": "span",
+      "text": "9:41"
+    },
     "16c7714e": {
       "id": "16c7714e",
       "index": "a6",
@@ -1807,22 +1886,6 @@
         "width": "40px"
       },
       "tag": "div"
-    },
-    "1834f8d6": {
-      "id": "1834f8d6",
-      "index": "a0",
-      "kind": "text",
-      "name": "Open",
-      "parent": "14c4d30c",
-      "style": {
-        "background": "var(--ink)",
-        "borderRadius": "17px",
-        "color": "var(--on-ink)",
-        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "9px 16px"
-      },
-      "tag": "span",
-      "text": "Open"
     },
     "18498cfc": {
       "id": "18498cfc",
@@ -1953,33 +2016,6 @@
       "tag": "span",
       "text": "Pages open"
     },
-    "1a6d14c2": {
-      "id": "1a6d14c2",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect width=\"20\" height=\"8\" x=\"2\" y=\"2\" rx=\"2\" ry=\"2\"/><rect width=\"20\" height=\"8\" x=\"2\" y=\"14\" rx=\"2\" ry=\"2\"/><line x1=\"6\" x2=\"6.01\" y1=\"6\" y2=\"6\"/><line x1=\"6\" x2=\"6.01\" y1=\"18\" y2=\"18\"/></svg>",
-      "name": "server",
-      "parent": "ad78f906",
-      "style": {
-        "color": "var(--faint)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
-    },
-    "1a747065": {
-      "id": "1a747065",
-      "index": "a2",
-      "kind": "text",
-      "name": "internal/radar · interna…",
-      "parent": "4cf72d13",
-      "style": {
-        "color": "var(--muted)",
-        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
-        "marginTop": "6px"
-      },
-      "tag": "div",
-      "text": "internal/radar · internal/app"
-    },
     "1a9acbb1": {
       "id": "1a9acbb1",
       "index": "a2",
@@ -1994,15 +2030,19 @@
       "tag": "span",
       "text": "14m"
     },
-    "1ac68e13": {
-      "id": "1ac68e13",
-      "index": "a0",
+    "1abb546b": {
+      "id": "1abb546b",
+      "index": "a1",
       "kind": "text",
-      "name": "1 commit · ",
-      "parent": "b018def8",
-      "style": {},
+      "name": "done",
+      "parent": "950b909b",
+      "style": {
+        "color": "var(--green)",
+        "font": "600 13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "whiteSpace": "nowrap"
+      },
       "tag": "span",
-      "text": "1 commit · "
+      "text": "done"
     },
     "1b10ec56": {
       "id": "1b10ec56",
@@ -2017,16 +2057,6 @@
       },
       "tag": "span",
       "text": "6m"
-    },
-    "1b174ce6": {
-      "id": "1b174ce6",
-      "index": "a2",
-      "kind": "text",
-      "name": "·",
-      "parent": "4284a53f",
-      "style": {},
-      "tag": "span",
-      "text": "·"
     },
     "1b842b8a": {
       "id": "1b842b8a",
@@ -2087,33 +2117,6 @@
       "tag": "span",
       "text": "buni"
     },
-    "1c462692": {
-      "id": "1c462692",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m16 9-5.5 5.5L8 12\"/></svg>",
-      "name": "circle-check",
-      "parent": "9012a4b4",
-      "style": {
-        "color": "var(--green)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
-    },
-    "1c52be8e": {
-      "id": "1c52be8e",
-      "index": "a3",
-      "kind": "text",
-      "name": "mianzini",
-      "parent": "7c5a53a6",
-      "style": {
-        "color": "var(--ink)",
-        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "mianzini"
-    },
     "1c5b3494": {
       "id": "1c5b3494",
       "index": "a3",
@@ -2153,23 +2156,6 @@
         "flexShrink": "0"
       }
     },
-    "1d0d8c33": {
-      "id": "1d0d8c33",
-      "index": "a0",
-      "kind": "frame",
-      "name": "div",
-      "parent": "6e9dc672",
-      "style": {
-        "alignItems": "center",
-        "background": "var(--card)",
-        "borderRadius": "20px",
-        "display": "flex",
-        "height": "40px",
-        "justifyContent": "center",
-        "width": "40px"
-      },
-      "tag": "div"
-    },
     "1d181907": {
       "id": "1d181907",
       "index": "a0",
@@ -2183,21 +2169,6 @@
         "flexShrink": "0"
       }
     },
-    "1de203cb": {
-      "id": "1de203cb",
-      "index": "a3",
-      "kind": "frame",
-      "name": "div",
-      "parent": "0cb10bab",
-      "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "flexDirection": "column",
-        "gap": "4px",
-        "width": "70px"
-      },
-      "tag": "div"
-    },
     "1df0ccc2": {
       "id": "1df0ccc2",
       "index": "aF",
@@ -2210,6 +2181,26 @@
       },
       "tag": "div",
       "text": "❯ "
+    },
+    "1e965e77": {
+      "id": "1e965e77",
+      "index": "a4",
+      "kind": "frame",
+      "name": "tab bar",
+      "parent": "a9234a06",
+      "style": {
+        "background": "var(--bg)",
+        "borderTop": "1px solid var(--line)",
+        "bottom": "0",
+        "display": "flex",
+        "height": "84px",
+        "justifyContent": "space-around",
+        "left": "0",
+        "padding": "10px 10px 0",
+        "position": "absolute",
+        "right": "0"
+      },
+      "tag": "div"
     },
     "1eba08e8": {
       "id": "1eba08e8",
@@ -2257,23 +2248,6 @@
       "style": {
         "width": "1440px"
       }
-    },
-    "1fcc1b8f": {
-      "id": "1fcc1b8f",
-      "index": "a0",
-      "kind": "frame",
-      "name": "status bar",
-      "parent": "22ea54fb",
-      "style": {
-        "alignItems": "center",
-        "color": "var(--ink)",
-        "display": "flex",
-        "font": "600 17px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "height": "44px",
-        "justifyContent": "space-between",
-        "padding": "14px 28px 0"
-      },
-      "tag": "div"
     },
     "1fe32eae": {
       "id": "1fe32eae",
@@ -2347,6 +2321,34 @@
       },
       "tag": "div"
     },
+    "2088cf10": {
+      "id": "2088cf10",
+      "index": "a6",
+      "kind": "text",
+      "name": "or scan the code mia-pho…",
+      "parent": "2c208d6e",
+      "style": {
+        "color": "var(--muted)",
+        "font": "15px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "marginTop": "14px",
+        "textAlign": "center"
+      },
+      "tag": "div",
+      "text": "or scan the code mia-phone-server prints"
+    },
+    "20d535b1": {
+      "id": "20d535b1",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 20h.01\"/><path d=\"M7 20v-4\"/><path d=\"M12 20v-8\"/><path d=\"M17 20V8\"/><path d=\"M22 4v16\"/></svg>",
+      "name": "signal",
+      "parent": "94e15394",
+      "style": {
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
     "20fce639": {
       "id": "20fce639",
       "index": "a1",
@@ -2397,20 +2399,6 @@
       },
       "tag": "div"
     },
-    "2156e30d": {
-      "id": "2156e30d",
-      "index": "a1",
-      "kind": "text",
-      "name": "done",
-      "parent": "0df08c73",
-      "style": {
-        "color": "var(--green)",
-        "font": "600 13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "done"
-    },
     "2193b78a": {
       "id": "2193b78a",
       "index": "a1",
@@ -2427,24 +2415,6 @@
       },
       "tag": "div",
       "text": "3 worktrees · 1 running"
-    },
-    "21d302cf": {
-      "id": "21d302cf",
-      "index": "a0",
-      "kind": "frame",
-      "name": "screen",
-      "parent": "da18cb60",
-      "style": {
-        "background": "var(--body)",
-        "display": "flex",
-        "flexDirection": "column",
-        "fontFamily": "-apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "height": "844px",
-        "overflow": "hidden",
-        "position": "relative",
-        "width": "390px"
-      },
-      "tag": "div"
     },
     "21f06032": {
       "id": "21f06032",
@@ -2475,6 +2445,16 @@
       },
       "tag": "span",
       "text": "moshono"
+    },
+    "224141cd": {
+      "id": "224141cd",
+      "index": "a1",
+      "kind": "text",
+      "name": "mia · kurasini needs you",
+      "parent": "ac76d31d",
+      "style": {},
+      "tag": "span",
+      "text": "mia · kurasini needs you"
     },
     "2251deb1": {
       "id": "2251deb1",
@@ -2530,43 +2510,35 @@
         "flexShrink": "0"
       }
     },
-    "22ea54fb": {
-      "id": "22ea54fb",
-      "index": "a0",
+    "23157d1a": {
+      "id": "23157d1a",
+      "index": "a2",
       "kind": "frame",
-      "name": "screen",
-      "parent": "2dd3b237",
+      "name": "div",
+      "parent": "937b4be6",
       "style": {
-        "background": "var(--body)",
-        "display": "flex",
-        "flexDirection": "column",
-        "fontFamily": "-apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "height": "844px",
-        "overflow": "hidden",
-        "position": "relative",
-        "width": "390px"
+        "color": "var(--muted)",
+        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
+        "marginTop": "6px"
       },
       "tag": "div"
     },
-    "236ea8c9": {
-      "id": "236ea8c9",
-      "index": "a0",
+    "233d5be0": {
+      "id": "233d5be0",
+      "index": "a3",
       "kind": "text",
-      "name": "m",
-      "parent": "35afd3b3",
+      "name": "9:41",
+      "parent": "6da06029",
       "style": {
-        "alignItems": "center",
-        "background": "var(--ink)",
-        "borderRadius": "18px",
-        "color": "var(--on-ink)",
-        "display": "flex",
-        "font": "700 30px 'SF Mono', ui-monospace, Menlo, monospace",
-        "height": "64px",
-        "justifyContent": "center",
-        "width": "64px"
+        "color": "#fff",
+        "font": "600 92px/1 -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "letterSpacing": "-2px",
+        "marginBottom": "22px",
+        "position": "relative",
+        "textAlign": "center"
       },
       "tag": "div",
-      "text": "m"
+      "text": "9:41"
     },
     "236f5b15": {
       "id": "236f5b15",
@@ -2583,20 +2555,6 @@
         "position": "absolute",
         "transform": "translateX(-50%)",
         "width": "134px"
-      },
-      "tag": "div"
-    },
-    "238fa353": {
-      "id": "238fa353",
-      "index": "a0",
-      "kind": "frame",
-      "name": "card · moshono",
-      "parent": "7ff515aa",
-      "style": {
-        "background": "var(--card)",
-        "borderRadius": "20px",
-        "margin": "0 16px 10px",
-        "padding": "14px 16px"
       },
       "tag": "div"
     },
@@ -2624,17 +2582,6 @@
         "borderRadius": "20px",
         "margin": "0 16px",
         "overflow": "hidden"
-      },
-      "tag": "div"
-    },
-    "23eab235": {
-      "id": "23eab235",
-      "index": "a1",
-      "kind": "frame",
-      "name": "div",
-      "parent": "0a2edc20",
-      "style": {
-        "flex": "1"
       },
       "tag": "div"
     },
@@ -2680,22 +2627,6 @@
       },
       "tag": "div",
       "text": "+}"
-    },
-    "24d4da76": {
-      "id": "24d4da76",
-      "index": "a4",
-      "kind": "text",
-      "name": "in learnharness on fedor…",
-      "parent": "9012a4b4",
-      "style": {
-        "flex": "1",
-        "minWidth": "0",
-        "overflow": "hidden",
-        "textOverflow": "ellipsis",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "in learnharness on fedora"
     },
     "24f5ea9b": {
       "id": "24f5ea9b",
@@ -2774,21 +2705,25 @@
       "tag": "div",
       "text": "+func peek(m model) string {"
     },
-    "2617f6c3": {
-      "id": "2617f6c3",
-      "index": "a3",
+    "26a2207c": {
+      "id": "26a2207c",
+      "index": "a4",
       "kind": "text",
-      "name": "All",
-      "parent": "cf4c3609",
+      "name": "fedora.tailbc661a.ts.net",
+      "parent": "2c208d6e",
       "style": {
+        "alignItems": "center",
         "background": "var(--card)",
-        "borderRadius": "18px",
+        "borderRadius": "16px",
         "color": "var(--ink)",
-        "font": "14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "8px 14px"
+        "display": "flex",
+        "font": "17px 'SF Mono', ui-monospace, Menlo, monospace",
+        "height": "56px",
+        "marginTop": "8px",
+        "padding": "0 18px"
       },
-      "tag": "span",
-      "text": "All"
+      "tag": "div",
+      "text": "fedora.tailbc661a.ts.net"
     },
     "2767a64e": {
       "id": "2767a64e",
@@ -2814,6 +2749,34 @@
       },
       "tag": "span",
       "text": "load"
+    },
+    "27b0141c": {
+      "id": "27b0141c",
+      "index": "a1",
+      "kind": "frame",
+      "name": "div",
+      "parent": "6da06029",
+      "style": {
+        "background": "linear-gradient(180deg,#1a1d2a,#0b0b0c)",
+        "inset": "0",
+        "position": "absolute"
+      },
+      "tag": "div"
+    },
+    "27d2438e": {
+      "id": "27d2438e",
+      "index": "a3",
+      "kind": "frame",
+      "name": "div",
+      "parent": "1e965e77",
+      "style": {
+        "alignItems": "center",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "4px",
+        "width": "70px"
+      },
+      "tag": "div"
     },
     "27df610c": {
       "id": "27df610c",
@@ -2891,19 +2854,6 @@
         "flexShrink": "0"
       }
     },
-    "291a8e1f": {
-      "id": "291a8e1f",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14 17H5\"/><path d=\"M19 7h-9\"/><circle cx=\"17\" cy=\"17\" r=\"3\"/><circle cx=\"7\" cy=\"7\" r=\"3\"/></svg>",
-      "name": "settings-2",
-      "parent": "76fc4942",
-      "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
-    },
     "29759d63": {
       "id": "29759d63",
       "index": "a5",
@@ -2947,6 +2897,39 @@
       },
       "tag": "span",
       "text": "3d"
+    },
+    "2aefc540": {
+      "id": "2aefc540",
+      "index": "a1",
+      "kind": "text",
+      "name": "Changes",
+      "parent": "59254104",
+      "style": {
+        "background": "var(--track)",
+        "borderRadius": "17px",
+        "color": "var(--ink)",
+        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "9px 16px"
+      },
+      "tag": "span",
+      "text": "Changes"
+    },
+    "2afad153": {
+      "id": "2afad153",
+      "index": "a0",
+      "kind": "frame",
+      "name": "div",
+      "parent": "33662e65",
+      "style": {
+        "alignItems": "center",
+        "background": "var(--card)",
+        "borderRadius": "20px",
+        "display": "flex",
+        "height": "40px",
+        "justifyContent": "center",
+        "width": "40px"
+      },
+      "tag": "div"
     },
     "2b1d7f6e": {
       "id": "2b1d7f6e",
@@ -3039,6 +3022,16 @@
       },
       "tag": "div"
     },
+    "2bbb59b5": {
+      "id": "2bbb59b5",
+      "index": "a0",
+      "kind": "text",
+      "name": "9:41",
+      "parent": "b0c83375",
+      "style": {},
+      "tag": "span",
+      "text": "9:41"
+    },
     "2bcbfadf": {
       "id": "2bcbfadf",
       "index": "a0",
@@ -3078,6 +3071,18 @@
       },
       "tag": "span"
     },
+    "2c208d6e": {
+      "id": "2c208d6e",
+      "index": "a1",
+      "kind": "frame",
+      "name": "div",
+      "parent": "e376b865",
+      "style": {
+        "flex": "1",
+        "padding": "70px 24px 0"
+      },
+      "tag": "div"
+    },
     "2c255659": {
       "id": "2c255659",
       "index": "a2",
@@ -3094,27 +3099,6 @@
       },
       "tag": "span",
       "text": "what this session spent"
-    },
-    "2c5d20a7": {
-      "id": "2c5d20a7",
-      "index": "a0",
-      "kind": "frame",
-      "name": "13 Lock screen",
-      "style": {
-        "width": "1440px"
-      }
-    },
-    "2c84adcd": {
-      "id": "2c84adcd",
-      "index": "a0",
-      "kind": "text",
-      "name": "2 need you",
-      "parent": "aa4305ed",
-      "style": {
-        "font": "600 15px -apple-system, 'SF Pro Text', system-ui, sans-serif"
-      },
-      "tag": "div",
-      "text": "2 need you"
     },
     "2ca93b20": {
       "id": "2ca93b20",
@@ -3207,6 +3191,19 @@
       },
       "tag": "span"
     },
+    "2da2ca14": {
+      "id": "2da2ca14",
+      "index": "a2",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 10v4\"/><path d=\"M14 10v4\"/><path d=\"M22 14v-4\"/><path d=\"M6 10v4\"/><rect x=\"2\" y=\"6\" width=\"16\" height=\"12\" rx=\"2\"/></svg>",
+      "name": "battery-full",
+      "parent": "074bc625",
+      "style": {
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
     "2da726d7": {
       "id": "2da726d7",
       "index": "a1",
@@ -3232,15 +3229,6 @@
         "marginLeft": "66px"
       },
       "tag": "div"
-    },
-    "2dd3b237": {
-      "id": "2dd3b237",
-      "index": "a0",
-      "kind": "frame",
-      "name": "01 Welcome",
-      "style": {
-        "width": "1440px"
-      }
     },
     "2df9b683": {
       "id": "2df9b683",
@@ -3285,6 +3273,32 @@
         "padding": "14px 28px 0"
       },
       "tag": "div"
+    },
+    "2ead010f": {
+      "id": "2ead010f",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 20h.01\"/><path d=\"M7 20v-4\"/><path d=\"M12 20v-8\"/><path d=\"M17 20V8\"/><path d=\"M22 4v16\"/></svg>",
+      "name": "signal",
+      "parent": "c9b6c411",
+      "style": {
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
+    "2ed911fe": {
+      "id": "2ed911fe",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14 17H5\"/><path d=\"M19 7h-9\"/><circle cx=\"17\" cy=\"17\" r=\"3\"/><circle cx=\"7\" cy=\"7\" r=\"3\"/></svg>",
+      "name": "settings-2",
+      "parent": "05e2f716",
+      "style": {
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
     },
     "2f1355ad": {
       "id": "2f1355ad",
@@ -3370,6 +3384,28 @@
       "tag": "span",
       "text": "Stop"
     },
+    "303e61f7": {
+      "id": "303e61f7",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M18 19a5 5 0 0 1-5-5v8\"/><path d=\"M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5\"/><circle cx=\"13\" cy=\"12\" r=\"2\"/><circle cx=\"20\" cy=\"19\" r=\"2\"/></svg>",
+      "name": "folder-git-2",
+      "parent": "ba18dc08",
+      "style": {
+        "color": "var(--faint)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
+    "30433dcc": {
+      "id": "30433dcc",
+      "index": "a0",
+      "kind": "frame",
+      "name": "14 Can’t reach",
+      "style": {
+        "width": "1440px"
+      }
+    },
     "3061ca80": {
       "id": "3061ca80",
       "index": "a1",
@@ -3381,20 +3417,6 @@
         "gap": "8px"
       },
       "tag": "span"
-    },
-    "3077bab1": {
-      "id": "3077bab1",
-      "index": "a2",
-      "kind": "text",
-      "name": "Bash · push",
-      "parent": "f1d3c7f4",
-      "style": {
-        "color": "var(--muted)",
-        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
-        "marginTop": "6px"
-      },
-      "tag": "div",
-      "text": "Bash · push"
     },
     "30aa1888": {
       "id": "30aa1888",
@@ -3472,6 +3494,16 @@
       },
       "tag": "div"
     },
+    "3283e7e5": {
+      "id": "3283e7e5",
+      "index": "a1",
+      "kind": "text",
+      "name": "Inbox",
+      "parent": "c3f18ab6",
+      "style": {},
+      "tag": "span",
+      "text": "Inbox"
+    },
     "332c10d2": {
       "id": "332c10d2",
       "index": "a1",
@@ -3484,18 +3516,31 @@
       },
       "tag": "span"
     },
-    "33413ed0": {
-      "id": "33413ed0",
-      "index": "a0",
+    "335a9e97": {
+      "id": "335a9e97",
+      "index": "a2",
       "kind": "text",
-      "name": "Can’t reach your machine…",
-      "parent": "23eab235",
+      "name": "mia runs on your machine…",
+      "parent": "2c208d6e",
       "style": {
-        "color": "var(--ink)",
-        "font": "600 16px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+        "color": "var(--muted)",
+        "font": "17px/24px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "marginTop": "12px"
       },
       "tag": "div",
-      "text": "Can’t reach your machines"
+      "text": "mia runs on your machines. This phone reaches them over your tailnet and nothing else; every machine answers only you."
+    },
+    "33662e65": {
+      "id": "33662e65",
+      "index": "a1",
+      "kind": "frame",
+      "name": "span",
+      "parent": "9761e4b9",
+      "style": {
+        "display": "flex",
+        "gap": "8px"
+      },
+      "tag": "span"
     },
     "3383dc6f": {
       "id": "3383dc6f",
@@ -3510,36 +3555,6 @@
       },
       "tag": "span",
       "text": "Machines"
-    },
-    "3392823d": {
-      "id": "3392823d",
-      "index": "a3",
-      "kind": "text",
-      "name": "olkokola",
-      "parent": "0df08c73",
-      "style": {
-        "color": "var(--ink)",
-        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "olkokola"
-    },
-    "341ff7dd": {
-      "id": "341ff7dd",
-      "index": "a4",
-      "kind": "text",
-      "name": "in mia-core on mac",
-      "parent": "7c5a53a6",
-      "style": {
-        "flex": "1",
-        "minWidth": "0",
-        "overflow": "hidden",
-        "textOverflow": "ellipsis",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "in mia-core on mac"
     },
     "349aa9b7": {
       "id": "349aa9b7",
@@ -3585,36 +3600,6 @@
       "tag": "div",
       "text": "+40 −7"
     },
-    "35afd3b3": {
-      "id": "35afd3b3",
-      "index": "a1",
-      "kind": "frame",
-      "name": "div",
-      "parent": "22ea54fb",
-      "style": {
-        "flex": "1",
-        "padding": "70px 24px 0"
-      },
-      "tag": "div"
-    },
-    "35e8cd1f": {
-      "id": "35e8cd1f",
-      "index": "a2",
-      "kind": "frame",
-      "name": "home indicator",
-      "parent": "22ea54fb",
-      "style": {
-        "background": "var(--ink)",
-        "borderRadius": "3px",
-        "bottom": "8px",
-        "height": "5px",
-        "left": "50%",
-        "position": "absolute",
-        "transform": "translateX(-50%)",
-        "width": "134px"
-      },
-      "tag": "div"
-    },
     "35eefac2": {
       "id": "35eefac2",
       "index": "a1",
@@ -3649,19 +3634,6 @@
       "name": "08 A file’s changes",
       "style": {
         "width": "1440px"
-      }
-    },
-    "367a34c8": {
-      "id": "367a34c8",
-      "index": "a2",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 10v4\"/><path d=\"M14 10v4\"/><path d=\"M22 14v-4\"/><path d=\"M6 10v4\"/><rect x=\"2\" y=\"6\" width=\"16\" height=\"12\" rx=\"2\"/></svg>",
-      "name": "battery-full",
-      "parent": "a507ffd0",
-      "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
       }
     },
     "36bcd3b5": {
@@ -3702,18 +3674,6 @@
       },
       "tag": "div"
     },
-    "377cba89": {
-      "id": "377cba89",
-      "index": "a2",
-      "kind": "text",
-      "name": "−12",
-      "parent": "b018def8",
-      "style": {
-        "color": "var(--del)"
-      },
-      "tag": "span",
-      "text": "−12"
-    },
     "3791c02e": {
       "id": "3791c02e",
       "index": "a2",
@@ -3727,6 +3687,22 @@
         "flexShrink": "0"
       }
     },
+    "3792af6e": {
+      "id": "3792af6e",
+      "index": "a1",
+      "kind": "text",
+      "name": "Stop",
+      "parent": "f1f928c6",
+      "style": {
+        "background": "var(--track)",
+        "borderRadius": "17px",
+        "color": "var(--ink)",
+        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "9px 16px"
+      },
+      "tag": "span",
+      "text": "Stop"
+    },
     "37a8366c": {
       "id": "37a8366c",
       "index": "a0",
@@ -3736,16 +3712,6 @@
       "style": {},
       "tag": "span",
       "text": "retry-503s"
-    },
-    "37b0df01": {
-      "id": "37b0df01",
-      "index": "a0",
-      "kind": "text",
-      "name": "9:41",
-      "parent": "cddcf9b0",
-      "style": {},
-      "tag": "span",
-      "text": "9:41"
     },
     "38638da0": {
       "id": "38638da0",
@@ -3759,21 +3725,6 @@
         "display": "inline-flex",
         "flexShrink": "0"
       }
-    },
-    "388b678d": {
-      "id": "388b678d",
-      "index": "a6",
-      "kind": "text",
-      "name": "or scan the code mia-pho…",
-      "parent": "35afd3b3",
-      "style": {
-        "color": "var(--muted)",
-        "font": "15px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "marginTop": "14px",
-        "textAlign": "center"
-      },
-      "tag": "div",
-      "text": "or scan the code mia-phone-server prints"
     },
     "38ede78b": {
       "id": "38ede78b",
@@ -3800,6 +3751,36 @@
         "display": "inline-flex",
         "flexShrink": "0"
       }
+    },
+    "38fe48ff": {
+      "id": "38fe48ff",
+      "index": "a2",
+      "kind": "text",
+      "name": "as it was",
+      "parent": "ac7cd249",
+      "style": {
+        "color": "var(--muted)",
+        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
+        "marginTop": "6px"
+      },
+      "tag": "div",
+      "text": "as it was"
+    },
+    "39180efc": {
+      "id": "39180efc",
+      "index": "a2",
+      "kind": "text",
+      "name": "Tuesday 4 November",
+      "parent": "6da06029",
+      "style": {
+        "color": "rgba(255,255,255,.85)",
+        "font": "500 22px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "marginTop": "24px",
+        "position": "relative",
+        "textAlign": "center"
+      },
+      "tag": "div",
+      "text": "Tuesday 4 November"
     },
     "393dc18d": {
       "id": "393dc18d",
@@ -3874,32 +3855,33 @@
       },
       "tag": "div"
     },
-    "3ce853e9": {
-      "id": "3ce853e9",
-      "index": "a1",
-      "kind": "text",
-      "name": "needs you",
-      "parent": "89b2362a",
+    "3bb9837b": {
+      "id": "3bb9837b",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m16 9-5.5 5.5L8 12\"/></svg>",
+      "name": "circle-check",
+      "parent": "5c5ec215",
       "style": {
-        "color": "var(--red)",
-        "font": "600 13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "needs you"
+        "color": "var(--green)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
     },
-    "3de25f34": {
-      "id": "3de25f34",
-      "index": "a1",
-      "kind": "text",
-      "name": "Work",
-      "parent": "d3164faa",
+    "3dcb4392": {
+      "id": "3dcb4392",
+      "index": "a0",
+      "kind": "frame",
+      "name": "div",
+      "parent": "ffa8c777",
       "style": {
-        "color": "var(--faint)",
-        "font": "11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+        "alignItems": "center",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "4px",
+        "width": "70px"
       },
-      "tag": "span",
-      "text": "Work"
+      "tag": "div"
     },
     "3e7f26bb": {
       "id": "3e7f26bb",
@@ -3984,19 +3966,21 @@
       "tag": "span",
       "text": "14.2 of 16 cores"
     },
-    "3ff26cc6": {
-      "id": "3ff26cc6",
-      "index": "a0",
-      "kind": "frame",
-      "name": "card · moshono",
-      "parent": "6ed6c459",
+    "3f2bd6cd": {
+      "id": "3f2bd6cd",
+      "index": "a3",
+      "kind": "text",
+      "name": "All",
+      "parent": "73b44900",
       "style": {
         "background": "var(--card)",
-        "borderRadius": "20px",
-        "margin": "0 16px 10px",
-        "padding": "14px 16px"
+        "borderRadius": "18px",
+        "color": "var(--ink)",
+        "font": "14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "8px 14px"
       },
-      "tag": "div"
+      "tag": "span",
+      "text": "All"
     },
     "40e6ff79": {
       "id": "40e6ff79",
@@ -4040,6 +4024,18 @@
       "tag": "div",
       "text": "⏺ Bash(go test ./...)"
     },
+    "41fb4493": {
+      "id": "41fb4493",
+      "index": "a2",
+      "kind": "text",
+      "name": "−12",
+      "parent": "0cfddbd1",
+      "style": {
+        "color": "var(--del)"
+      },
+      "tag": "span",
+      "text": "−12"
+    },
     "4202091b": {
       "id": "4202091b",
       "index": "a0",
@@ -4060,12 +4056,12 @@
       },
       "tag": "div"
     },
-    "4284a53f": {
-      "id": "4284a53f",
+    "429ee1ea": {
+      "id": "429ee1ea",
       "index": "a0",
       "kind": "frame",
       "name": "div",
-      "parent": "238fa353",
+      "parent": "ac7cd249",
       "style": {
         "alignItems": "center",
         "color": "var(--muted)",
@@ -4074,6 +4070,22 @@
         "gap": "8px"
       },
       "tag": "div"
+    },
+    "435e7efc": {
+      "id": "435e7efc",
+      "index": "a2",
+      "kind": "frame",
+      "name": "span",
+      "parent": "3dcb4392",
+      "style": {
+        "background": "var(--red)",
+        "borderRadius": "50%",
+        "height": "8px",
+        "margin": "-4px 0 0 20px",
+        "position": "absolute",
+        "width": "8px"
+      },
+      "tag": "span"
     },
     "43739d95": {
       "id": "43739d95",
@@ -4089,19 +4101,21 @@
       },
       "tag": "div"
     },
-    "43c8865b": {
-      "id": "43c8865b",
+    "43d013a3": {
+      "id": "43d013a3",
       "index": "a2",
       "kind": "text",
-      "name": "mia runs on your machine…",
-      "parent": "35afd3b3",
+      "name": "Failed 1",
+      "parent": "73b44900",
       "style": {
-        "color": "var(--muted)",
-        "font": "17px/24px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "marginTop": "12px"
+        "background": "var(--card)",
+        "borderRadius": "18px",
+        "color": "var(--ink)",
+        "font": "14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "8px 14px"
       },
-      "tag": "div",
-      "text": "mia runs on your machines. This phone reaches them over your tailnet and nothing else; every machine answers only you."
+      "tag": "span",
+      "text": "Failed 1"
     },
     "43d0b9c1": {
       "id": "43d0b9c1",
@@ -4119,6 +4133,16 @@
         "padding": "14px 28px 0"
       },
       "tag": "div"
+    },
+    "44060fcc": {
+      "id": "44060fcc",
+      "index": "a0",
+      "kind": "text",
+      "name": "9:41",
+      "parent": "e29e2dae",
+      "style": {},
+      "tag": "span",
+      "text": "9:41"
     },
     "444fdb4a": {
       "id": "444fdb4a",
@@ -4146,16 +4170,6 @@
       },
       "tag": "span",
       "text": "not answering · seen 3h ago"
-    },
-    "454489e7": {
-      "id": "454489e7",
-      "index": "a0",
-      "kind": "text",
-      "name": "9:41",
-      "parent": "c54f7f0b",
-      "style": {},
-      "tag": "span",
-      "text": "9:41"
     },
     "456808b8": {
       "id": "456808b8",
@@ -4217,17 +4231,15 @@
       "tag": "span",
       "text": "Stop"
     },
-    "46deff21": {
-      "id": "46deff21",
-      "index": "a5",
+    "4632e0e0": {
+      "id": "4632e0e0",
+      "index": "a2",
       "kind": "text",
-      "name": "6m",
-      "parent": "46755218",
-      "style": {
-        "whiteSpace": "nowrap"
-      },
+      "name": "·",
+      "parent": "950b909b",
+      "style": {},
       "tag": "span",
-      "text": "6m"
+      "text": "·"
     },
     "4746da52": {
       "id": "4746da52",
@@ -4269,6 +4281,19 @@
       },
       "tag": "div"
     },
+    "47e44a9e": {
+      "id": "47e44a9e",
+      "index": "a3",
+      "kind": "frame",
+      "name": "div",
+      "parent": "dd563a6f",
+      "style": {
+        "display": "flex",
+        "gap": "8px",
+        "marginTop": "12px"
+      },
+      "tag": "div"
+    },
     "4808917f": {
       "id": "4808917f",
       "index": "a0",
@@ -4277,6 +4302,24 @@
       "style": {
         "width": "1440px"
       }
+    },
+    "481adcae": {
+      "id": "481adcae",
+      "index": "a5",
+      "kind": "frame",
+      "name": "home indicator",
+      "parent": "bc2d39f3",
+      "style": {
+        "background": "var(--ink)",
+        "borderRadius": "3px",
+        "bottom": "8px",
+        "height": "5px",
+        "left": "50%",
+        "position": "absolute",
+        "transform": "translateX(-50%)",
+        "width": "134px"
+      },
+      "tag": "div"
     },
     "482d8031": {
       "id": "482d8031",
@@ -4343,6 +4386,21 @@
       },
       "tag": "div"
     },
+    "498b7e82": {
+      "id": "498b7e82",
+      "index": "a0",
+      "kind": "frame",
+      "name": "div",
+      "parent": "f3703ff6",
+      "style": {
+        "alignItems": "center",
+        "color": "var(--muted)",
+        "display": "flex",
+        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "gap": "8px"
+      },
+      "tag": "div"
+    },
     "49d6418d": {
       "id": "49d6418d",
       "index": "a6",
@@ -4357,20 +4415,18 @@
       },
       "tag": "div"
     },
-    "4a00c5e4": {
-      "id": "4a00c5e4",
-      "index": "a1",
-      "kind": "frame",
-      "name": "div",
-      "parent": "981f7096",
+    "4a2bcb5a": {
+      "id": "4a2bcb5a",
+      "index": "a2",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 10v4\"/><path d=\"M14 10v4\"/><path d=\"M22 14v-4\"/><path d=\"M6 10v4\"/><rect x=\"2\" y=\"6\" width=\"16\" height=\"12\" rx=\"2\"/></svg>",
+      "name": "battery-full",
+      "parent": "94e15394",
       "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "flexDirection": "column",
-        "gap": "4px",
-        "width": "70px"
-      },
-      "tag": "div"
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
     },
     "4a3ec7db": {
       "id": "4a3ec7db",
@@ -4470,20 +4526,6 @@
         "flexShrink": "0"
       }
     },
-    "4c12c840": {
-      "id": "4c12c840",
-      "index": "a1",
-      "kind": "frame",
-      "name": "title",
-      "parent": "b42d94ce",
-      "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "justifyContent": "space-between",
-        "padding": "10px 20px 6px"
-      },
-      "tag": "div"
-    },
     "4c1a6376": {
       "id": "4c1a6376",
       "index": "a1",
@@ -4496,20 +4538,6 @@
         "flexDirection": "column",
         "gap": "4px",
         "width": "70px"
-      },
-      "tag": "div"
-    },
-    "4cf72d13": {
-      "id": "4cf72d13",
-      "index": "a3",
-      "kind": "frame",
-      "name": "card · mianzini",
-      "parent": "6ed6c459",
-      "style": {
-        "background": "var(--card)",
-        "borderRadius": "20px",
-        "margin": "0 16px 10px",
-        "padding": "14px 16px"
       },
       "tag": "div"
     },
@@ -4530,6 +4558,29 @@
         "width": "38px"
       },
       "tag": "div"
+    },
+    "4d76af2b": {
+      "id": "4d76af2b",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg viewBox=\"0 0 512 512\" width=\"14\" height=\"14\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"#f2f1ee\"><circle cx=\"88\" cy=\"88\" r=\"20\"></circle><circle cx=\"200\" cy=\"88\" r=\"46\"></circle><circle cx=\"312\" cy=\"88\" r=\"20\"></circle><circle cx=\"424\" cy=\"88\" r=\"20\"></circle><circle cx=\"88\" cy=\"200\" r=\"20\"></circle><circle cx=\"200\" cy=\"200\" r=\"20\"></circle><circle cx=\"312\" cy=\"200\" r=\"20\"></circle><circle cx=\"424\" cy=\"200\" r=\"46\"></circle><circle cx=\"88\" cy=\"312\" r=\"20\"></circle><circle cx=\"200\" cy=\"312\" r=\"20\"></circle><circle cx=\"312\" cy=\"312\" r=\"20\"></circle><circle cx=\"424\" cy=\"312\" r=\"20\"></circle><circle cx=\"88\" cy=\"424\" r=\"46\"></circle><circle cx=\"200\" cy=\"424\" r=\"20\"></circle><circle cx=\"312\" cy=\"424\" r=\"20\"></circle><circle cx=\"424\" cy=\"424\" r=\"20\"></circle></svg>",
+      "name": "Icon",
+      "parent": "040d8d19",
+      "style": {}
+    },
+    "4d9af72b": {
+      "id": "4d9af72b",
+      "index": "a1",
+      "kind": "text",
+      "name": "needs you",
+      "parent": "aa50b905",
+      "style": {
+        "color": "var(--red)",
+        "font": "600 13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "needs you"
     },
     "4dbc5dff": {
       "id": "4dbc5dff",
@@ -4559,18 +4610,19 @@
       },
       "tag": "div"
     },
-    "4e279a92": {
-      "id": "4e279a92",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"/><path d=\"M12 17h.01\"/></svg>",
-      "name": "circle-help",
-      "parent": "4284a53f",
+    "4e256fae": {
+      "id": "4e256fae",
+      "index": "a1",
+      "kind": "text",
+      "name": "needs you",
+      "parent": "5cac9683",
       "style": {
         "color": "var(--red)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
+        "font": "600 13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "needs you"
     },
     "4e3e9980": {
       "id": "4e3e9980",
@@ -4601,6 +4653,19 @@
       "tag": "div",
       "text": "fedora"
     },
+    "4e5e9aeb": {
+      "id": "4e5e9aeb",
+      "index": "a1",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h.01\"/><path d=\"M2 8.82a15 15 0 0 1 20 0\"/><path d=\"M5 12.859a10 10 0 0 1 14 0\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/></svg>",
+      "name": "wifi",
+      "parent": "94e15394",
+      "style": {
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
     "4e726e53": {
       "id": "4e726e53",
       "index": "a0",
@@ -4613,20 +4678,6 @@
         "display": "inline-flex",
         "flexShrink": "0"
       }
-    },
-    "4eb04354": {
-      "id": "4eb04354",
-      "index": "a2",
-      "kind": "text",
-      "name": "lido-app on mac · open i…",
-      "parent": "ef7e1e90",
-      "style": {
-        "color": "rgba(255,255,255,.85)",
-        "font": "14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "marginTop": "2px"
-      },
-      "tag": "div",
-      "text": "lido-app on mac · open its terminal"
     },
     "4f3252f3": {
       "id": "4f3252f3",
@@ -4723,6 +4774,19 @@
       "tag": "div",
       "text": "❯ 1. retry with backoff"
     },
+    "517387f4": {
+      "id": "517387f4",
+      "index": "a1",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h.01\"/><path d=\"M2 8.82a15 15 0 0 1 20 0\"/><path d=\"M5 12.859a10 10 0 0 1 14 0\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/></svg>",
+      "name": "wifi",
+      "parent": "f10319c5",
+      "style": {
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
     "5174e9c2": {
       "id": "5174e9c2",
       "index": "a0",
@@ -4778,29 +4842,6 @@
       "tag": "span",
       "text": "/craft"
     },
-    "52b6f1dd": {
-      "id": "52b6f1dd",
-      "index": "a1",
-      "kind": "text",
-      "name": "Machines",
-      "parent": "ad78f906",
-      "style": {
-        "color": "var(--faint)",
-        "font": "11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
-      },
-      "tag": "span",
-      "text": "Machines"
-    },
-    "5329b8d1": {
-      "id": "5329b8d1",
-      "index": "a2",
-      "kind": "text",
-      "name": "·",
-      "parent": "9012a4b4",
-      "style": {},
-      "tag": "span",
-      "text": "·"
-    },
     "535f7107": {
       "id": "535f7107",
       "index": "a0",
@@ -4817,32 +4858,21 @@
       "tag": "span",
       "text": "nduruma"
     },
-    "5399e03e": {
-      "id": "5399e03e",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect width=\"20\" height=\"8\" x=\"2\" y=\"2\" rx=\"2\" ry=\"2\"/><rect width=\"20\" height=\"8\" x=\"2\" y=\"14\" rx=\"2\" ry=\"2\"/><line x1=\"6\" x2=\"6.01\" y1=\"6\" y2=\"6\"/><line x1=\"6\" x2=\"6.01\" y1=\"18\" y2=\"18\"/></svg>",
-      "name": "server",
-      "parent": "05465cb6",
-      "style": {
-        "color": "var(--faint)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
-    },
-    "539ab267": {
-      "id": "539ab267",
-      "index": "a0",
+    "5439de27": {
+      "id": "5439de27",
+      "index": "a3",
       "kind": "text",
-      "name": "Inbox",
-      "parent": "ea04bd07",
+      "name": "a machine that runs mia-…",
+      "parent": "2c208d6e",
       "style": {
-        "color": "var(--ink)",
-        "font": "700 32px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "letterSpacing": "-.6px"
+        "color": "var(--muted)",
+        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "letterSpacing": ".6px",
+        "marginTop": "34px",
+        "textTransform": "uppercase"
       },
-      "tag": "span",
-      "text": "Inbox"
+      "tag": "div",
+      "text": "a machine that runs mia-phone-server"
     },
     "548198d0": {
       "id": "548198d0",
@@ -4874,46 +4904,18 @@
       "tag": "span",
       "text": "scope, cut the smallest change, prove it"
     },
-    "54ed0623": {
-      "id": "54ed0623",
-      "index": "a3",
-      "kind": "frame",
-      "name": "div",
-      "parent": "4cf72d13",
+    "54b5a53c": {
+      "id": "54b5a53c",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 20h.01\"/><path d=\"M7 20v-4\"/><path d=\"M12 20v-8\"/><path d=\"M17 20V8\"/><path d=\"M22 4v16\"/></svg>",
+      "name": "signal",
+      "parent": "074bc625",
       "style": {
-        "display": "flex",
-        "gap": "8px",
-        "marginTop": "12px"
-      },
-      "tag": "div"
-    },
-    "552b2a01": {
-      "id": "552b2a01",
-      "index": "a4",
-      "kind": "text",
-      "name": "in learnharness on fedor…",
-      "parent": "0df08c73",
-      "style": {
-        "flex": "1",
-        "minWidth": "0",
-        "overflow": "hidden",
-        "textOverflow": "ellipsis",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "in learnharness on fedora"
-    },
-    "554dc6d1": {
-      "id": "554dc6d1",
-      "index": "a5",
-      "kind": "text",
-      "name": "1h",
-      "parent": "7c5a53a6",
-      "style": {
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "1h"
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
     },
     "55573c13": {
       "id": "55573c13",
@@ -4973,6 +4975,19 @@
       "style": {},
       "tag": "span",
       "text": " "
+    },
+    "56989f43": {
+      "id": "56989f43",
+      "index": "a1",
+      "kind": "text",
+      "name": "Me",
+      "parent": "d0ac91fc",
+      "style": {
+        "color": "var(--faint)",
+        "font": "11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+      },
+      "tag": "span",
+      "text": "Me"
     },
     "5706be88": {
       "id": "5706be88",
@@ -5045,22 +5060,6 @@
       },
       "tag": "div"
     },
-    "58de6774": {
-      "id": "58de6774",
-      "index": "a2",
-      "kind": "text",
-      "name": "Failed 1",
-      "parent": "cf4c3609",
-      "style": {
-        "background": "var(--card)",
-        "borderRadius": "18px",
-        "color": "var(--ink)",
-        "font": "14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "8px 14px"
-      },
-      "tag": "span",
-      "text": "Failed 1"
-    },
     "58e9ea95": {
       "id": "58e9ea95",
       "index": "a0",
@@ -5089,6 +5088,19 @@
       },
       "tag": "div",
       "text": "over Tailscale · 2 of 3 machines"
+    },
+    "596fbb8f": {
+      "id": "596fbb8f",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m21 21-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/></svg>",
+      "name": "search",
+      "parent": "0700ac5d",
+      "style": {
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
     },
     "5a7a6ee7": {
       "id": "5a7a6ee7",
@@ -5177,6 +5189,21 @@
       },
       "tag": "div"
     },
+    "5c5ec215": {
+      "id": "5c5ec215",
+      "index": "a0",
+      "kind": "frame",
+      "name": "div",
+      "parent": "e9651c33",
+      "style": {
+        "alignItems": "center",
+        "color": "var(--muted)",
+        "display": "flex",
+        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "gap": "8px"
+      },
+      "tag": "div"
+    },
     "5c808d06": {
       "id": "5c808d06",
       "index": "a1",
@@ -5205,6 +5232,21 @@
         "height": "38px",
         "justifyContent": "center",
         "width": "38px"
+      },
+      "tag": "div"
+    },
+    "5cac9683": {
+      "id": "5cac9683",
+      "index": "a0",
+      "kind": "frame",
+      "name": "div",
+      "parent": "7a35a2a9",
+      "style": {
+        "alignItems": "center",
+        "color": "var(--muted)",
+        "display": "flex",
+        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "gap": "8px"
       },
       "tag": "div"
     },
@@ -5249,20 +5291,26 @@
       },
       "tag": "div"
     },
-    "5daf75fe": {
-      "id": "5daf75fe",
-      "index": "a0",
+    "5db4cba5": {
+      "id": "5db4cba5",
+      "index": "a1",
       "kind": "frame",
       "name": "div",
-      "parent": "981f7096",
+      "parent": "f6103565",
       "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "flexDirection": "column",
-        "gap": "4px",
-        "width": "70px"
+        "flex": "1"
       },
       "tag": "div"
+    },
+    "5dc7016e": {
+      "id": "5dc7016e",
+      "index": "a1",
+      "kind": "text",
+      "name": "Inbox",
+      "parent": "156048a8",
+      "style": {},
+      "tag": "span",
+      "text": "Inbox"
     },
     "5e2e33b7": {
       "id": "5e2e33b7",
@@ -5279,17 +5327,21 @@
       },
       "tag": "div"
     },
-    "5e2e635e": {
-      "id": "5e2e635e",
-      "index": "a5",
+    "5e755776": {
+      "id": "5e755776",
+      "index": "a4",
       "kind": "text",
-      "name": "26m",
-      "parent": "9012a4b4",
+      "name": "in learnharness on fedor…",
+      "parent": "5c5ec215",
       "style": {
+        "flex": "1",
+        "minWidth": "0",
+        "overflow": "hidden",
+        "textOverflow": "ellipsis",
         "whiteSpace": "nowrap"
       },
       "tag": "span",
-      "text": "26m"
+      "text": "in learnharness on fedora"
     },
     "5edcd8fc": {
       "id": "5edcd8fc",
@@ -5304,24 +5356,6 @@
       },
       "tag": "span",
       "text": "Stop"
-    },
-    "5ee296e1": {
-      "id": "5ee296e1",
-      "index": "a5",
-      "kind": "frame",
-      "name": "home indicator",
-      "parent": "b42d94ce",
-      "style": {
-        "background": "var(--ink)",
-        "borderRadius": "3px",
-        "bottom": "8px",
-        "height": "5px",
-        "left": "50%",
-        "position": "absolute",
-        "transform": "translateX(-50%)",
-        "width": "134px"
-      },
-      "tag": "div"
     },
     "5eefce4c": {
       "id": "5eefce4c",
@@ -5446,22 +5480,6 @@
         "flexShrink": "0"
       }
     },
-    "60cca7bd": {
-      "id": "60cca7bd",
-      "index": "a2",
-      "kind": "frame",
-      "name": "span",
-      "parent": "5daf75fe",
-      "style": {
-        "background": "var(--red)",
-        "borderRadius": "50%",
-        "height": "8px",
-        "margin": "-4px 0 0 20px",
-        "position": "absolute",
-        "width": "8px"
-      },
-      "tag": "span"
-    },
     "6119fbc1": {
       "id": "6119fbc1",
       "index": "a0",
@@ -5475,18 +5493,16 @@
         "flexShrink": "0"
       }
     },
-    "623f8acc": {
-      "id": "623f8acc",
-      "index": "a1",
+    "615ffdb2": {
+      "id": "615ffdb2",
+      "index": "a5",
       "kind": "frame",
-      "name": "span",
-      "parent": "b9a6e4de",
+      "name": "div",
+      "parent": "2c208d6e",
       "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "gap": "6px"
+        "marginTop": "14px"
       },
-      "tag": "span"
+      "tag": "div"
     },
     "628ee129": {
       "id": "628ee129",
@@ -5644,29 +5660,18 @@
         "flexShrink": "0"
       }
     },
-    "6469b6d9": {
-      "id": "6469b6d9",
+    "6487d9f5": {
+      "id": "6487d9f5",
       "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 20h.01\"/><path d=\"M7 20v-4\"/><path d=\"M12 20v-8\"/><path d=\"M17 20V8\"/><path d=\"M22 4v16\"/></svg>",
-      "name": "signal",
-      "parent": "e1271bc0",
-      "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
-    },
-    "647d7745": {
-      "id": "647d7745",
-      "index": "a3",
       "kind": "frame",
       "name": "div",
-      "parent": "3ff26cc6",
+      "parent": "1e965e77",
       "style": {
+        "alignItems": "center",
         "display": "flex",
-        "gap": "8px",
-        "marginTop": "12px"
+        "flexDirection": "column",
+        "gap": "4px",
+        "width": "70px"
       },
       "tag": "div"
     },
@@ -5698,15 +5703,21 @@
       "tag": "div",
       "text": " for _, w := range m.worktrees {"
     },
-    "64d509dc": {
-      "id": "64d509dc",
+    "64d9136f": {
+      "id": "64d9136f",
       "index": "a0",
       "kind": "text",
-      "name": "1 commit · ",
-      "parent": "ffccca97",
-      "style": {},
+      "name": "Open",
+      "parent": "d07df288",
+      "style": {
+        "background": "var(--ink)",
+        "borderRadius": "17px",
+        "color": "var(--on-ink)",
+        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "9px 16px"
+      },
       "tag": "span",
-      "text": "1 commit · "
+      "text": "Open"
     },
     "64f169e1": {
       "id": "64f169e1",
@@ -5795,19 +5806,6 @@
         "flexShrink": "0"
       }
     },
-    "65c3f11f": {
-      "id": "65c3f11f",
-      "index": "a1",
-      "kind": "text",
-      "name": "Work",
-      "parent": "4a00c5e4",
-      "style": {
-        "color": "var(--faint)",
-        "font": "11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
-      },
-      "tag": "span",
-      "text": "Work"
-    },
     "65f07b8b": {
       "id": "65f07b8b",
       "index": "a3",
@@ -5847,18 +5845,6 @@
         "gap": "8px"
       },
       "tag": "span"
-    },
-    "6651a133": {
-      "id": "6651a133",
-      "index": "a1",
-      "kind": "text",
-      "name": "+61",
-      "parent": "b018def8",
-      "style": {
-        "color": "var(--add)"
-      },
-      "tag": "span",
-      "text": "+61"
     },
     "66674ed1": {
       "id": "66674ed1",
@@ -5901,16 +5887,6 @@
       "tag": "span",
       "text": "levolosi"
     },
-    "66df9a8a": {
-      "id": "66df9a8a",
-      "index": "a2",
-      "kind": "text",
-      "name": "·",
-      "parent": "7c5a53a6",
-      "style": {},
-      "tag": "span",
-      "text": "·"
-    },
     "66e3b129": {
       "id": "66e3b129",
       "index": "a1",
@@ -5923,6 +5899,19 @@
         "marginLeft": "66px"
       },
       "tag": "div"
+    },
+    "66fc79be": {
+      "id": "66fc79be",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m21 21-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/></svg>",
+      "name": "search",
+      "parent": "2afad153",
+      "style": {
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
     },
     "67f223fe": {
       "id": "67f223fe",
@@ -6002,6 +5991,20 @@
       "tag": "div",
       "text": "Make it and open its shell"
     },
+    "69373d6b": {
+      "id": "69373d6b",
+      "index": "a1",
+      "kind": "text",
+      "name": "done",
+      "parent": "5c5ec215",
+      "style": {
+        "color": "var(--green)",
+        "font": "600 13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "done"
+    },
     "696cb0f8": {
       "id": "696cb0f8",
       "index": "a1",
@@ -6045,35 +6048,19 @@
         "flexShrink": "0"
       }
     },
-    "69c940b4": {
-      "id": "69c940b4",
-      "index": "a0",
-      "kind": "frame",
-      "name": "div",
-      "parent": "dcd80a87",
+    "69ea8cf0": {
+      "id": "69ea8cf0",
+      "index": "a1",
+      "kind": "text",
+      "name": "Allow git push origin jk…",
+      "parent": "8b9ed0ca",
       "style": {
-        "alignItems": "center",
-        "background": "var(--card)",
-        "borderRadius": "20px",
-        "display": "flex",
-        "height": "40px",
-        "justifyContent": "center",
-        "width": "40px"
+        "color": "#fff",
+        "font": "600 16px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "marginTop": "4px"
       },
-      "tag": "div"
-    },
-    "6a1e16c8": {
-      "id": "6a1e16c8",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h.01\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/><path d=\"M5 12.859a10 10 0 0 1 5.17-2.69\"/><path d=\"M19 12.859a10 10 0 0 0-2.007-1.523\"/><path d=\"M2 8.82a15 15 0 0 1 4.177-2.643\"/><path d=\"M22 8.82a15 15 0 0 0-11.288-3.764\"/><path d=\"m2 2 20 20\"/></svg>",
-      "name": "wifi-off",
-      "parent": "0a2edc20",
-      "style": {
-        "color": "var(--muted)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
+      "tag": "div",
+      "text": "Allow git push origin jk/ledger?"
     },
     "6aad762c": {
       "id": "6aad762c",
@@ -6206,22 +6193,6 @@
       "tag": "span",
       "text": "levolosi.mia"
     },
-    "6cf94d9b": {
-      "id": "6cf94d9b",
-      "index": "a1",
-      "kind": "text",
-      "name": "Done 3",
-      "parent": "cf4c3609",
-      "style": {
-        "background": "var(--card)",
-        "borderRadius": "18px",
-        "color": "var(--ink)",
-        "font": "14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "8px 14px"
-      },
-      "tag": "span",
-      "text": "Done 3"
-    },
     "6d19a07a": {
       "id": "6d19a07a",
       "index": "a4",
@@ -6236,16 +6207,21 @@
       },
       "tag": "div"
     },
-    "6d24ed81": {
-      "id": "6d24ed81",
-      "index": "a3",
+    "6da06029": {
+      "id": "6da06029",
+      "index": "a0",
       "kind": "frame",
-      "name": "div",
-      "parent": "0cc01ee4",
+      "name": "screen",
+      "parent": "113a7263",
       "style": {
+        "background": "#0b0b0c",
         "display": "flex",
-        "gap": "8px",
-        "marginTop": "12px"
+        "flexDirection": "column",
+        "fontFamily": "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "height": "844px",
+        "overflow": "hidden",
+        "position": "relative",
+        "width": "390px"
       },
       "tag": "div"
     },
@@ -6266,6 +6242,20 @@
       "tag": "div",
       "text": "jk/retry-503s · on fedora"
     },
+    "6e00465c": {
+      "id": "6e00465c",
+      "index": "a3",
+      "kind": "text",
+      "name": "kurasini",
+      "parent": "5cac9683",
+      "style": {
+        "color": "var(--ink)",
+        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "kurasini"
+    },
     "6e1f4377": {
       "id": "6e1f4377",
       "index": "a0",
@@ -6278,37 +6268,6 @@
         "gap": "8px"
       },
       "tag": "div"
-    },
-    "6e2ca690": {
-      "id": "6e2ca690",
-      "index": "a5",
-      "kind": "frame",
-      "name": "home indicator",
-      "parent": "21d302cf",
-      "style": {
-        "background": "var(--ink)",
-        "borderRadius": "3px",
-        "bottom": "8px",
-        "height": "5px",
-        "left": "50%",
-        "position": "absolute",
-        "transform": "translateX(-50%)",
-        "width": "134px"
-      },
-      "tag": "div"
-    },
-    "6e407df6": {
-      "id": "6e407df6",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M18 19a5 5 0 0 1-5-5v8\"/><path d=\"M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5\"/><circle cx=\"13\" cy=\"12\" r=\"2\"/><circle cx=\"20\" cy=\"19\" r=\"2\"/></svg>",
-      "name": "folder-git-2",
-      "parent": "4a00c5e4",
-      "style": {
-        "color": "var(--faint)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
     },
     "6e6e11b9": {
       "id": "6e6e11b9",
@@ -6342,18 +6301,6 @@
       },
       "tag": "div"
     },
-    "6e9dc672": {
-      "id": "6e9dc672",
-      "index": "a1",
-      "kind": "frame",
-      "name": "span",
-      "parent": "4c12c840",
-      "style": {
-        "display": "flex",
-        "gap": "8px"
-      },
-      "tag": "span"
-    },
     "6e9ebd29": {
       "id": "6e9ebd29",
       "index": "a1",
@@ -6380,19 +6327,6 @@
         "flexDirection": "column",
         "gap": "4px",
         "width": "70px"
-      },
-      "tag": "div"
-    },
-    "6ed6c459": {
-      "id": "6ed6c459",
-      "index": "a3",
-      "kind": "frame",
-      "name": "inbox",
-      "parent": "21d302cf",
-      "style": {
-        "flex": "1",
-        "overflow": "hidden",
-        "paddingTop": "6px"
       },
       "tag": "div"
     },
@@ -6475,19 +6409,18 @@
       },
       "tag": "div"
     },
-    "707311f8": {
-      "id": "707311f8",
+    "707ef637": {
+      "id": "707ef637",
       "index": "a1",
       "kind": "text",
-      "name": "Radar rows fold idle",
-      "parent": "0cc01ee4",
+      "name": "Work",
+      "parent": "0062af4d",
       "style": {
-        "color": "var(--ink)",
-        "font": "600 17px/22px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "marginTop": "8px"
+        "color": "var(--faint)",
+        "font": "11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
       },
-      "tag": "div",
-      "text": "Radar rows fold idle"
+      "tag": "span",
+      "text": "Work"
     },
     "708e905c": {
       "id": "708e905c",
@@ -6502,21 +6435,19 @@
         "flexShrink": "0"
       }
     },
-    "70b6416f": {
-      "id": "70b6416f",
-      "index": "a4",
-      "kind": "text",
-      "name": "in mia-core on fedora",
-      "parent": "89b2362a",
+    "717e2d61": {
+      "id": "717e2d61",
+      "index": "a1",
+      "kind": "frame",
+      "name": "div",
+      "parent": "2c208d6e",
       "style": {
-        "flex": "1",
-        "minWidth": "0",
-        "overflow": "hidden",
-        "textOverflow": "ellipsis",
-        "whiteSpace": "nowrap"
+        "color": "var(--ink)",
+        "font": "700 34px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "letterSpacing": "-.8px",
+        "marginTop": "26px"
       },
-      "tag": "span",
-      "text": "in mia-core on fedora"
+      "tag": "div"
     },
     "718091e1": {
       "id": "718091e1",
@@ -6579,19 +6510,20 @@
       },
       "tag": "span"
     },
-    "7383a354": {
-      "id": "7383a354",
-      "index": "a3",
-      "kind": "text",
-      "name": "moshono",
-      "parent": "4284a53f",
+    "73b44900": {
+      "id": "73b44900",
+      "index": "a2",
+      "kind": "frame",
+      "name": "filters",
+      "parent": "a9234a06",
       "style": {
-        "color": "var(--ink)",
-        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
+        "display": "flex",
+        "gap": "8px",
+        "overflow": "hidden",
+        "padding": "8px 20px 6px",
         "whiteSpace": "nowrap"
       },
-      "tag": "span",
-      "text": "moshono"
+      "tag": "div"
     },
     "73e17a91": {
       "id": "73e17a91",
@@ -6606,6 +6538,21 @@
         "flexShrink": "0"
       }
     },
+    "744566b0": {
+      "id": "744566b0",
+      "index": "a0",
+      "kind": "frame",
+      "name": "mark",
+      "parent": "156048a8",
+      "style": {
+        "display": "inline-block",
+        "height": "26px",
+        "marginRight": "10px",
+        "verticalAlign": "-2px",
+        "width": "26px"
+      },
+      "tag": "span"
+    },
     "748ad603": {
       "id": "748ad603",
       "index": "a0",
@@ -6617,19 +6564,6 @@
         "display": "flex",
         "justifyContent": "space-between",
         "padding": "20px 20px 8px"
-      },
-      "tag": "div"
-    },
-    "7539b648": {
-      "id": "7539b648",
-      "index": "a3",
-      "kind": "frame",
-      "name": "div",
-      "parent": "238fa353",
-      "style": {
-        "display": "flex",
-        "gap": "8px",
-        "marginTop": "12px"
       },
       "tag": "div"
     },
@@ -6699,23 +6633,6 @@
       },
       "tag": "div"
     },
-    "76fc4942": {
-      "id": "76fc4942",
-      "index": "a1",
-      "kind": "frame",
-      "name": "div",
-      "parent": "dcd80a87",
-      "style": {
-        "alignItems": "center",
-        "background": "var(--card)",
-        "borderRadius": "20px",
-        "display": "flex",
-        "height": "40px",
-        "justifyContent": "center",
-        "width": "40px"
-      },
-      "tag": "div"
-    },
     "77713e27": {
       "id": "77713e27",
       "index": "a2",
@@ -6752,6 +6669,16 @@
         "textAlign": "center"
       },
       "tag": "div"
+    },
+    "779f45c3": {
+      "id": "779f45c3",
+      "index": "a3",
+      "kind": "text",
+      "name": "2m ago",
+      "parent": "ac76d31d",
+      "style": {},
+      "tag": "span",
+      "text": "2m ago"
     },
     "77b728ce": {
       "id": "77b728ce",
@@ -6816,19 +6743,6 @@
       },
       "tag": "div"
     },
-    "788f3b5d": {
-      "id": "788f3b5d",
-      "index": "a3",
-      "kind": "frame",
-      "name": "div",
-      "parent": "f1d3c7f4",
-      "style": {
-        "display": "flex",
-        "gap": "8px",
-        "marginTop": "12px"
-      },
-      "tag": "div"
-    },
     "78f18e14": {
       "id": "78f18e14",
       "index": "a2",
@@ -6838,19 +6752,6 @@
       "parent": "8834edda",
       "style": {
         "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
-    },
-    "7908679f": {
-      "id": "7908679f",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"8\" r=\"5\"/><path d=\"M20 21a8 8 0 0 0-16 0\"/></svg>",
-      "name": "user-round",
-      "parent": "fd466167",
-      "style": {
-        "color": "var(--faint)",
         "display": "inline-flex",
         "flexShrink": "0"
       }
@@ -6867,6 +6768,20 @@
         "font": "15px -apple-system, 'SF Pro Text', system-ui, sans-serif",
         "gap": "22px",
         "margin": "18px 20px 0"
+      },
+      "tag": "div"
+    },
+    "7a35a2a9": {
+      "id": "7a35a2a9",
+      "index": "a1",
+      "kind": "frame",
+      "name": "card · kurasini",
+      "parent": "7e80eaf0",
+      "style": {
+        "background": "var(--card)",
+        "borderRadius": "20px",
+        "margin": "0 16px 10px",
+        "padding": "14px 16px"
       },
       "tag": "div"
     },
@@ -7003,21 +6918,6 @@
         "flexShrink": "0"
       }
     },
-    "7c5a53a6": {
-      "id": "7c5a53a6",
-      "index": "a0",
-      "kind": "frame",
-      "name": "div",
-      "parent": "4cf72d13",
-      "style": {
-        "alignItems": "center",
-        "color": "var(--muted)",
-        "display": "flex",
-        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "gap": "8px"
-      },
-      "tag": "div"
-    },
     "7cfd8d95": {
       "id": "7cfd8d95",
       "index": "a1",
@@ -7045,16 +6945,6 @@
       },
       "tag": "div"
     },
-    "7d91339b": {
-      "id": "7d91339b",
-      "index": "a2",
-      "kind": "text",
-      "name": "·",
-      "parent": "0df08c73",
-      "style": {},
-      "tag": "span",
-      "text": "·"
-    },
     "7e579f04": {
       "id": "7e579f04",
       "index": "a6",
@@ -7063,6 +6953,19 @@
       "parent": "cf427671",
       "style": {
         "marginTop": "28px"
+      },
+      "tag": "div"
+    },
+    "7e80eaf0": {
+      "id": "7e80eaf0",
+      "index": "a3",
+      "kind": "frame",
+      "name": "inbox",
+      "parent": "a9234a06",
+      "style": {
+        "flex": "1",
+        "overflow": "hidden",
+        "paddingTop": "6px"
       },
       "tag": "div"
     },
@@ -7106,20 +7009,6 @@
       },
       "tag": "div"
     },
-    "7f9dd9bc": {
-      "id": "7f9dd9bc",
-      "index": "a1",
-      "kind": "text",
-      "name": "needs you",
-      "parent": "4284a53f",
-      "style": {
-        "color": "var(--red)",
-        "font": "600 13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "needs you"
-    },
     "7fee25d1": {
       "id": "7fee25d1",
       "index": "a2",
@@ -7133,20 +7022,6 @@
       },
       "tag": "span",
       "text": "1h"
-    },
-    "7ff515aa": {
-      "id": "7ff515aa",
-      "index": "a3",
-      "kind": "frame",
-      "name": "div",
-      "parent": "b42d94ce",
-      "style": {
-        "flex": "1",
-        "opacity": ".55",
-        "overflow": "hidden",
-        "paddingTop": "10px"
-      },
-      "tag": "div"
     },
     "8015c29c": {
       "id": "8015c29c",
@@ -7172,6 +7047,16 @@
       "tag": "span",
       "text": "needs you"
     },
+    "80631fee": {
+      "id": "80631fee",
+      "index": "a2",
+      "kind": "text",
+      "name": "·",
+      "parent": "5cac9683",
+      "style": {},
+      "tag": "span",
+      "text": "·"
+    },
     "80b585db": {
       "id": "80b585db",
       "index": "a0",
@@ -7184,6 +7069,16 @@
         "display": "inline-flex",
         "flexShrink": "0"
       }
+    },
+    "80bb0433": {
+      "id": "80bb0433",
+      "index": "a2",
+      "kind": "text",
+      "name": "·",
+      "parent": "429ee1ea",
+      "style": {},
+      "tag": "span",
+      "text": "·"
     },
     "810b1c1d": {
       "id": "810b1c1d",
@@ -7277,19 +7172,6 @@
       "tag": "span",
       "text": "adversarial review of a diff"
     },
-    "8361fa05": {
-      "id": "8361fa05",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m15 9-6 6\"/><path d=\"m9 9 6 6\"/></svg>",
-      "name": "circle-x",
-      "parent": "7c5a53a6",
-      "style": {
-        "color": "var(--red)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
-    },
     "83875fed": {
       "id": "83875fed",
       "index": "a0",
@@ -7315,6 +7197,22 @@
       },
       "tag": "span"
     },
+    "851bf240": {
+      "id": "851bf240",
+      "index": "a4",
+      "kind": "text",
+      "name": "in mia-core on mac",
+      "parent": "498b7e82",
+      "style": {
+        "flex": "1",
+        "minWidth": "0",
+        "overflow": "hidden",
+        "textOverflow": "ellipsis",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "in mia-core on mac"
+    },
     "8533d566": {
       "id": "8533d566",
       "index": "a0",
@@ -7330,16 +7228,6 @@
       },
       "tag": "span",
       "text": "oloirien"
-    },
-    "856c1a10": {
-      "id": "856c1a10",
-      "index": "a0",
-      "kind": "text",
-      "name": "mia · kurasini needs you",
-      "parent": "c0163684",
-      "style": {},
-      "tag": "span",
-      "text": "mia · kurasini needs you"
     },
     "859158d2": {
       "id": "859158d2",
@@ -7395,6 +7283,19 @@
       "tag": "span",
       "text": "gateway"
     },
+    "868b83ec": {
+      "id": "868b83ec",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M18 19a5 5 0 0 1-5-5v8\"/><path d=\"M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5\"/><circle cx=\"13\" cy=\"12\" r=\"2\"/><circle cx=\"20\" cy=\"19\" r=\"2\"/></svg>",
+      "name": "folder-git-2",
+      "parent": "0062af4d",
+      "style": {
+        "color": "var(--faint)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
     "8696280a": {
       "id": "8696280a",
       "index": "a2",
@@ -7423,19 +7324,6 @@
       },
       "tag": "div"
     },
-    "877c065b": {
-      "id": "877c065b",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m21 21-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/></svg>",
-      "name": "search",
-      "parent": "1d0d8c33",
-      "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
-    },
     "8789fd9f": {
       "id": "8789fd9f",
       "index": "a1",
@@ -7453,6 +7341,31 @@
       "tag": "div",
       "text": "mia-core · jk/peers · on fedora"
     },
+    "87a49ecd": {
+      "id": "87a49ecd",
+      "index": "a1",
+      "kind": "text",
+      "name": "Work",
+      "parent": "ba18dc08",
+      "style": {
+        "color": "var(--faint)",
+        "font": "11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+      },
+      "tag": "span",
+      "text": "Work"
+    },
+    "87c18e26": {
+      "id": "87c18e26",
+      "index": "a1",
+      "kind": "text",
+      "name": "+61",
+      "parent": "23157d1a",
+      "style": {
+        "color": "var(--add)"
+      },
+      "tag": "span",
+      "text": "+61"
+    },
     "87d0df03": {
       "id": "87d0df03",
       "index": "aA",
@@ -7466,20 +7379,6 @@
       },
       "tag": "div",
       "text": "+ return m.selected().summary"
-    },
-    "87da727e": {
-      "id": "87da727e",
-      "index": "a2",
-      "kind": "text",
-      "name": "as it was",
-      "parent": "238fa353",
-      "style": {
-        "color": "var(--muted)",
-        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
-        "marginTop": "6px"
-      },
-      "tag": "div",
-      "text": "as it was"
     },
     "881283dc": {
       "id": "881283dc",
@@ -7514,16 +7413,6 @@
       },
       "tag": "span"
     },
-    "888265ec": {
-      "id": "888265ec",
-      "index": "a1",
-      "kind": "text",
-      "name": "2m ago",
-      "parent": "c0163684",
-      "style": {},
-      "tag": "span",
-      "text": "2m ago"
-    },
     "8883b0a5": {
       "id": "8883b0a5",
       "index": "a0",
@@ -7540,21 +7429,6 @@
       "tag": "span",
       "text": "kurasini"
     },
-    "89b2362a": {
-      "id": "89b2362a",
-      "index": "a0",
-      "kind": "frame",
-      "name": "div",
-      "parent": "3ff26cc6",
-      "style": {
-        "alignItems": "center",
-        "color": "var(--muted)",
-        "display": "flex",
-        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "gap": "8px"
-      },
-      "tag": "div"
-    },
     "89b7c676": {
       "id": "89b7c676",
       "index": "a2",
@@ -7567,6 +7441,27 @@
         "display": "inline-flex",
         "flexShrink": "0"
       }
+    },
+    "89e91e3e": {
+      "id": "89e91e3e",
+      "index": "a0",
+      "kind": "text",
+      "name": "Find my machines",
+      "parent": "615ffdb2",
+      "style": {
+        "alignItems": "center",
+        "background": "var(--ink)",
+        "borderRadius": "25px",
+        "color": "var(--on-ink)",
+        "display": "flex",
+        "flex": "1",
+        "font": "600 16px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "gap": "8px",
+        "height": "50px",
+        "justifyContent": "center"
+      },
+      "tag": "div",
+      "text": "Find my machines"
     },
     "8a10d051": {
       "id": "8a10d051",
@@ -7657,6 +7552,34 @@
         "flexShrink": "0"
       }
     },
+    "8afabc0b": {
+      "id": "8afabc0b",
+      "index": "a1",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h.01\"/><path d=\"M2 8.82a15 15 0 0 1 20 0\"/><path d=\"M5 12.859a10 10 0 0 1 14 0\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/></svg>",
+      "name": "wifi",
+      "parent": "074bc625",
+      "style": {
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
+    "8b9ed0ca": {
+      "id": "8b9ed0ca",
+      "index": "a5",
+      "kind": "frame",
+      "name": "notification · mia",
+      "parent": "6da06029",
+      "style": {
+        "background": "rgba(255,255,255,.18)",
+        "borderRadius": "22px",
+        "margin": "0 16px",
+        "padding": "14px 16px",
+        "position": "relative"
+      },
+      "tag": "div"
+    },
     "8c1c7948": {
       "id": "8c1c7948",
       "index": "a0",
@@ -7668,16 +7591,6 @@
       },
       "tag": "span",
       "text": "memory"
-    },
-    "8c317d17": {
-      "id": "8c317d17",
-      "index": "a0",
-      "kind": "text",
-      "name": "9:41",
-      "parent": "1fcc1b8f",
-      "style": {},
-      "tag": "span",
-      "text": "9:41"
     },
     "8c489b9c": {
       "id": "8c489b9c",
@@ -7710,19 +7623,45 @@
       },
       "tag": "div"
     },
-    "8d8fa482": {
-      "id": "8d8fa482",
-      "index": "a1",
+    "8ce122c3": {
+      "id": "8ce122c3",
+      "index": "a5",
       "kind": "text",
-      "name": "Radar rows fold idle",
-      "parent": "0cf968d2",
+      "name": "2m",
+      "parent": "aa50b905",
       "style": {
-        "color": "var(--ink)",
-        "font": "600 17px/22px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "marginTop": "8px"
+        "whiteSpace": "nowrap"
       },
-      "tag": "div",
-      "text": "Radar rows fold idle"
+      "tag": "span",
+      "text": "2m"
+    },
+    "8d680b5d": {
+      "id": "8d680b5d",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"/><path d=\"M12 17h.01\"/></svg>",
+      "name": "circle-help",
+      "parent": "5cac9683",
+      "style": {
+        "color": "var(--red)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
+    "8d82ed14": {
+      "id": "8d82ed14",
+      "index": "a2",
+      "kind": "frame",
+      "name": "div",
+      "parent": "ffa8c777",
+      "style": {
+        "alignItems": "center",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "4px",
+        "width": "70px"
+      },
+      "tag": "div"
     },
     "8db7ffa3": {
       "id": "8db7ffa3",
@@ -7739,6 +7678,37 @@
         "height": "38px",
         "justifyContent": "center",
         "width": "38px"
+      },
+      "tag": "div"
+    },
+    "8dd0d717": {
+      "id": "8dd0d717",
+      "index": "a4",
+      "kind": "text",
+      "name": "in mia-core on fedora",
+      "parent": "429ee1ea",
+      "style": {
+        "flex": "1",
+        "minWidth": "0",
+        "overflow": "hidden",
+        "textOverflow": "ellipsis",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "in mia-core on fedora"
+    },
+    "8dd10336": {
+      "id": "8dd10336",
+      "index": "a2",
+      "kind": "frame",
+      "name": "div",
+      "parent": "1e965e77",
+      "style": {
+        "alignItems": "center",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "4px",
+        "width": "70px"
       },
       "tag": "div"
     },
@@ -7807,36 +7777,18 @@
       "tag": "span",
       "text": "2h"
     },
-    "8f7cec18": {
-      "id": "8f7cec18",
-      "index": "a1",
-      "kind": "text",
-      "name": "Log",
-      "parent": "54ed0623",
-      "style": {
-        "background": "var(--track)",
-        "borderRadius": "17px",
-        "color": "var(--ink)",
-        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "9px 16px"
-      },
-      "tag": "span",
-      "text": "Log"
-    },
-    "9012a4b4": {
-      "id": "9012a4b4",
+    "8ee56137": {
+      "id": "8ee56137",
       "index": "a0",
-      "kind": "frame",
-      "name": "div",
-      "parent": "0cc01ee4",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\"/><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\"/></svg>",
+      "name": "inbox",
+      "parent": "3dcb4392",
       "style": {
-        "alignItems": "center",
-        "color": "var(--muted)",
-        "display": "flex",
-        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "gap": "8px"
-      },
-      "tag": "div"
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
     },
     "91479abe": {
       "id": "91479abe",
@@ -7918,22 +7870,6 @@
       },
       "tag": "div"
     },
-    "91e16a2e": {
-      "id": "91e16a2e",
-      "index": "a4",
-      "kind": "text",
-      "name": "in mia-core on fedora",
-      "parent": "4284a53f",
-      "style": {
-        "flex": "1",
-        "minWidth": "0",
-        "overflow": "hidden",
-        "textOverflow": "ellipsis",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "in mia-core on fedora"
-    },
     "9213b2ac": {
       "id": "9213b2ac",
       "index": "a1",
@@ -7946,6 +7882,22 @@
       },
       "tag": "div",
       "text": "answering · stream dropped 40s ago"
+    },
+    "922b2462": {
+      "id": "922b2462",
+      "index": "a0",
+      "kind": "text",
+      "name": "Open",
+      "parent": "f1f928c6",
+      "style": {
+        "background": "var(--ink)",
+        "borderRadius": "17px",
+        "color": "var(--on-ink)",
+        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "9px 16px"
+      },
+      "tag": "span",
+      "text": "Open"
     },
     "923b17ea": {
       "id": "923b17ea",
@@ -7965,6 +7917,18 @@
       },
       "tag": "div"
     },
+    "92aab4a0": {
+      "id": "92aab4a0",
+      "index": "a5",
+      "kind": "text",
+      "name": "14m",
+      "parent": "429ee1ea",
+      "style": {
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "14m"
+    },
     "9340eb41": {
       "id": "9340eb41",
       "index": "a1",
@@ -7977,6 +7941,20 @@
       },
       "tag": "span",
       "text": "Machines"
+    },
+    "937b4be6": {
+      "id": "937b4be6",
+      "index": "a2",
+      "kind": "frame",
+      "name": "card · olkokola",
+      "parent": "7e80eaf0",
+      "style": {
+        "background": "var(--card)",
+        "borderRadius": "20px",
+        "margin": "0 16px 10px",
+        "padding": "14px 16px"
+      },
+      "tag": "div"
     },
     "9424ce4a": {
       "id": "9424ce4a",
@@ -8005,6 +7983,19 @@
       },
       "tag": "div"
     },
+    "94e15394": {
+      "id": "94e15394",
+      "index": "a1",
+      "kind": "frame",
+      "name": "span",
+      "parent": "dc06418c",
+      "style": {
+        "alignItems": "center",
+        "display": "flex",
+        "gap": "6px"
+      },
+      "tag": "span"
+    },
     "94ee68d5": {
       "id": "94ee68d5",
       "index": "a0",
@@ -8017,6 +8008,21 @@
       },
       "tag": "span",
       "text": "Safety"
+    },
+    "950b909b": {
+      "id": "950b909b",
+      "index": "a0",
+      "kind": "frame",
+      "name": "div",
+      "parent": "937b4be6",
+      "style": {
+        "alignItems": "center",
+        "color": "var(--muted)",
+        "display": "flex",
+        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "gap": "8px"
+      },
+      "tag": "div"
     },
     "954573d3": {
       "id": "954573d3",
@@ -8031,19 +8037,22 @@
       },
       "tag": "div"
     },
-    "966ef207": {
-      "id": "966ef207",
-      "index": "a3",
-      "kind": "text",
-      "name": "kurasini",
-      "parent": "46755218",
+    "962c6107": {
+      "id": "962c6107",
+      "index": "a0",
+      "kind": "frame",
+      "name": "status bar",
+      "parent": "e376b865",
       "style": {
+        "alignItems": "center",
         "color": "var(--ink)",
-        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
-        "whiteSpace": "nowrap"
+        "display": "flex",
+        "font": "600 17px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "height": "44px",
+        "justifyContent": "space-between",
+        "padding": "14px 28px 0"
       },
-      "tag": "span",
-      "text": "kurasini"
+      "tag": "div"
     },
     "968e6df8": {
       "id": "968e6df8",
@@ -8072,31 +8081,32 @@
       "tag": "span",
       "text": "When"
     },
-    "96d5e243": {
-      "id": "96d5e243",
+    "96bcf69e": {
+      "id": "96bcf69e",
       "index": "a0",
       "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\"/><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\"/></svg>",
-      "name": "inbox",
-      "parent": "0cb13e23",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m16 9-5.5 5.5L8 12\"/></svg>",
+      "name": "circle-check",
+      "parent": "950b909b",
       "style": {
-        "color": "var(--ink)",
+        "color": "var(--green)",
         "display": "inline-flex",
         "flexShrink": "0"
       }
     },
-    "96fdcfb1": {
-      "id": "96fdcfb1",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 20h.01\"/><path d=\"M7 20v-4\"/><path d=\"M12 20v-8\"/><path d=\"M17 20V8\"/><path d=\"M22 4v16\"/></svg>",
-      "name": "signal",
-      "parent": "a507ffd0",
+    "9761e4b9": {
+      "id": "9761e4b9",
+      "index": "a1",
+      "kind": "frame",
+      "name": "title",
+      "parent": "bc2d39f3",
       "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
+        "alignItems": "center",
+        "display": "flex",
+        "justifyContent": "space-between",
+        "padding": "10px 20px 6px"
+      },
+      "tag": "div"
     },
     "980bf89a": {
       "id": "980bf89a",
@@ -8142,26 +8152,6 @@
       "tag": "span",
       "text": "wazo"
     },
-    "981f7096": {
-      "id": "981f7096",
-      "index": "a4",
-      "kind": "frame",
-      "name": "tab bar",
-      "parent": "b42d94ce",
-      "style": {
-        "background": "var(--bg)",
-        "borderTop": "1px solid var(--line)",
-        "bottom": "0",
-        "display": "flex",
-        "height": "84px",
-        "justifyContent": "space-around",
-        "left": "0",
-        "padding": "10px 10px 0",
-        "position": "absolute",
-        "right": "0"
-      },
-      "tag": "div"
-    },
     "982c75be": {
       "id": "982c75be",
       "index": "a0",
@@ -8175,17 +8165,18 @@
         "flexShrink": "0"
       }
     },
-    "9847bf39": {
-      "id": "9847bf39",
-      "index": "a5",
-      "kind": "text",
-      "name": "14m",
-      "parent": "4284a53f",
+    "982dbded": {
+      "id": "982dbded",
+      "index": "a3",
+      "kind": "frame",
+      "name": "div",
+      "parent": "ac7cd249",
       "style": {
-        "whiteSpace": "nowrap"
+        "display": "flex",
+        "gap": "8px",
+        "marginTop": "12px"
       },
-      "tag": "span",
-      "text": "14m"
+      "tag": "div"
     },
     "98b27c2e": {
       "id": "98b27c2e",
@@ -8366,19 +8357,6 @@
       },
       "tag": "div"
     },
-    "9bd9cb5d": {
-      "id": "9bd9cb5d",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"/><path d=\"M12 17h.01\"/></svg>",
-      "name": "circle-help",
-      "parent": "46755218",
-      "style": {
-        "color": "var(--red)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
-    },
     "9bdb4708": {
       "id": "9bdb4708",
       "index": "a3",
@@ -8448,6 +8426,19 @@
       },
       "tag": "span",
       "text": "Idle 4"
+    },
+    "9cd35631": {
+      "id": "9cd35631",
+      "index": "a1",
+      "kind": "text",
+      "name": "Machines",
+      "parent": "8d82ed14",
+      "style": {
+        "color": "var(--faint)",
+        "font": "11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+      },
+      "tag": "span",
+      "text": "Machines"
     },
     "9d18161a": {
       "id": "9d18161a",
@@ -8538,6 +8529,22 @@
       "tag": "span",
       "text": ":5173"
     },
+    "9f45c149": {
+      "id": "9f45c149",
+      "index": "a2",
+      "kind": "text",
+      "name": "Retry the 503s with back…",
+      "parent": "a18c041b",
+      "style": {
+        "color": "rgba(255,255,255,.8)",
+        "font": "12px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "overflow": "hidden",
+        "textOverflow": "ellipsis",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "div",
+      "text": "Retry the 503s with backoff?"
+    },
     "9fb31a6c": {
       "id": "9fb31a6c",
       "index": "a1",
@@ -8625,18 +8632,28 @@
       },
       "tag": "div"
     },
-    "a1e7cbfb": {
-      "id": "a1e7cbfb",
-      "index": "a2",
-      "kind": "text",
-      "name": "Retry",
-      "parent": "0a2edc20",
+    "a18c041b": {
+      "id": "a18c041b",
+      "index": "a4",
+      "kind": "frame",
+      "name": "widget · mia",
+      "parent": "6da06029",
       "style": {
-        "color": "var(--ink)",
-        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+        "background": "rgba(255,255,255,.14)",
+        "borderRadius": "16px",
+        "boxSizing": "border-box",
+        "color": "#fff",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "2px",
+        "height": "72px",
+        "justifyContent": "center",
+        "margin": "0 0 14px 26px",
+        "padding": "10px 12px",
+        "position": "relative",
+        "width": "172px"
       },
-      "tag": "span",
-      "text": "Retry"
+      "tag": "div"
     },
     "a20ea3c8": {
       "id": "a20ea3c8",
@@ -8656,6 +8673,19 @@
       },
       "tag": "div"
     },
+    "a26fde66": {
+      "id": "a26fde66",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect width=\"20\" height=\"8\" x=\"2\" y=\"2\" rx=\"2\" ry=\"2\"/><rect width=\"20\" height=\"8\" x=\"2\" y=\"14\" rx=\"2\" ry=\"2\"/><line x1=\"6\" x2=\"6.01\" y1=\"6\" y2=\"6\"/><line x1=\"6\" x2=\"6.01\" y1=\"18\" y2=\"18\"/></svg>",
+      "name": "server",
+      "parent": "8dd10336",
+      "style": {
+        "color": "var(--faint)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
     "a278c39c": {
       "id": "a278c39c",
       "index": "a4",
@@ -8668,6 +8698,18 @@
       },
       "tag": "div",
       "text": " ⎿ ok internal/radar 0.13s"
+    },
+    "a27dc769": {
+      "id": "a27dc769",
+      "index": "a2",
+      "kind": "text",
+      "name": "−12",
+      "parent": "23157d1a",
+      "style": {
+        "color": "var(--del)"
+      },
+      "tag": "span",
+      "text": "−12"
     },
     "a3813ada": {
       "id": "a3813ada",
@@ -8682,15 +8724,15 @@
       "tag": "span",
       "text": "asks, done, failed"
     },
-    "a3aec266": {
-      "id": "a3aec266",
+    "a38d1da7": {
+      "id": "a38d1da7",
       "index": "a0",
       "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"/><path d=\"M12 17h.01\"/></svg>",
-      "name": "circle-help",
-      "parent": "89b2362a",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\"/><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\"/></svg>",
+      "name": "inbox",
+      "parent": "6487d9f5",
       "style": {
-        "color": "var(--red)",
+        "color": "var(--ink)",
         "display": "inline-flex",
         "flexShrink": "0"
       }
@@ -8708,18 +8750,20 @@
       },
       "tag": "div"
     },
-    "a4adc0d3": {
-      "id": "a4adc0d3",
-      "index": "a1",
-      "kind": "text",
-      "name": "Is Tailscale on? Showing…",
-      "parent": "23eab235",
+    "a4a2c5ad": {
+      "id": "a4a2c5ad",
+      "index": "a0",
+      "kind": "frame",
+      "name": "mark",
+      "parent": "c3f18ab6",
       "style": {
-        "color": "var(--muted)",
-        "font": "14px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+        "display": "inline-block",
+        "height": "26px",
+        "marginRight": "10px",
+        "verticalAlign": "-2px",
+        "width": "26px"
       },
-      "tag": "div",
-      "text": "Is Tailscale on? Showing what was last known, 12m ago."
+      "tag": "span"
     },
     "a4d2b732": {
       "id": "a4d2b732",
@@ -8733,19 +8777,6 @@
         "marginLeft": "46px"
       },
       "tag": "div"
-    },
-    "a507ffd0": {
-      "id": "a507ffd0",
-      "index": "a1",
-      "kind": "frame",
-      "name": "span",
-      "parent": "1fcc1b8f",
-      "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "gap": "6px"
-      },
-      "tag": "span"
     },
     "a52bcc83": {
       "id": "a52bcc83",
@@ -8787,14 +8818,18 @@
       },
       "tag": "span"
     },
-    "a5e4eb55": {
-      "id": "a5e4eb55",
-      "index": "a1",
-      "kind": "frame",
-      "name": "br",
-      "parent": "10f8dbdd",
-      "style": {},
-      "tag": "br"
+    "a59cee4d": {
+      "id": "a59cee4d",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"/><path d=\"M12 17h.01\"/></svg>",
+      "name": "circle-help",
+      "parent": "aa50b905",
+      "style": {
+        "color": "var(--red)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
     },
     "a6403c4f": {
       "id": "a6403c4f",
@@ -8866,19 +8901,6 @@
         "width": "390px"
       },
       "tag": "div"
-    },
-    "a6b1ba71": {
-      "id": "a6b1ba71",
-      "index": "a1",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h.01\"/><path d=\"M2 8.82a15 15 0 0 1 20 0\"/><path d=\"M5 12.859a10 10 0 0 1 14 0\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/></svg>",
-      "name": "wifi",
-      "parent": "e1271bc0",
-      "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
     },
     "a6f90091": {
       "id": "a6f90091",
@@ -9054,6 +9076,24 @@
       },
       "tag": "span"
     },
+    "a9234a06": {
+      "id": "a9234a06",
+      "index": "a0",
+      "kind": "frame",
+      "name": "screen",
+      "parent": "0ba9a4c0",
+      "style": {
+        "background": "var(--body)",
+        "display": "flex",
+        "flexDirection": "column",
+        "fontFamily": "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "height": "844px",
+        "overflow": "hidden",
+        "position": "relative",
+        "width": "390px"
+      },
+      "tag": "div"
+    },
     "a9649341": {
       "id": "a9649341",
       "index": "a2",
@@ -9086,26 +9126,18 @@
       },
       "tag": "div"
     },
-    "aa4305ed": {
-      "id": "aa4305ed",
-      "index": "a4",
+    "aa50b905": {
+      "id": "aa50b905",
+      "index": "a0",
       "kind": "frame",
-      "name": "widget · mia",
-      "parent": "02dd213a",
+      "name": "div",
+      "parent": "dd563a6f",
       "style": {
-        "background": "rgba(255,255,255,.14)",
-        "borderRadius": "16px",
-        "boxSizing": "border-box",
-        "color": "#fff",
+        "alignItems": "center",
+        "color": "var(--muted)",
         "display": "flex",
-        "flexDirection": "column",
-        "gap": "2px",
-        "height": "72px",
-        "justifyContent": "center",
-        "margin": "0 0 14px 26px",
-        "padding": "10px 12px",
-        "position": "relative",
-        "width": "172px"
+        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "gap": "8px"
       },
       "tag": "div"
     },
@@ -9137,6 +9169,49 @@
       },
       "tag": "div"
     },
+    "ac76d31d": {
+      "id": "ac76d31d",
+      "index": "a0",
+      "kind": "frame",
+      "name": "div",
+      "parent": "8b9ed0ca",
+      "style": {
+        "alignItems": "center",
+        "color": "rgba(255,255,255,.7)",
+        "display": "flex",
+        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "gap": "8px"
+      },
+      "tag": "div"
+    },
+    "ac7cd249": {
+      "id": "ac7cd249",
+      "index": "a0",
+      "kind": "frame",
+      "name": "card · moshono",
+      "parent": "ee1b5c74",
+      "style": {
+        "background": "var(--card)",
+        "borderRadius": "20px",
+        "margin": "0 16px 10px",
+        "padding": "14px 16px"
+      },
+      "tag": "div"
+    },
+    "acb21f69": {
+      "id": "acb21f69",
+      "index": "a2",
+      "kind": "text",
+      "name": "Bash · push",
+      "parent": "7a35a2a9",
+      "style": {
+        "color": "var(--muted)",
+        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
+        "marginTop": "6px"
+      },
+      "tag": "div",
+      "text": "Bash · push"
+    },
     "acb49228": {
       "id": "acb49228",
       "index": "a3",
@@ -9149,34 +9224,6 @@
         "display": "inline-flex",
         "flexShrink": "0"
       }
-    },
-    "ad36288e": {
-      "id": "ad36288e",
-      "index": "a1",
-      "kind": "text",
-      "name": "mia-core · moshono",
-      "parent": "aa4305ed",
-      "style": {
-        "color": "rgba(255,255,255,.8)",
-        "font": "12px -apple-system, 'SF Pro Text', system-ui, sans-serif"
-      },
-      "tag": "div",
-      "text": "mia-core · moshono"
-    },
-    "ad78f906": {
-      "id": "ad78f906",
-      "index": "a2",
-      "kind": "frame",
-      "name": "div",
-      "parent": "981f7096",
-      "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "flexDirection": "column",
-        "gap": "4px",
-        "width": "70px"
-      },
-      "tag": "div"
     },
     "ad9975de": {
       "id": "ad9975de",
@@ -9191,15 +9238,19 @@
         "flexShrink": "0"
       }
     },
-    "ae07eb6a": {
-      "id": "ae07eb6a",
-      "index": "a0",
+    "adbb5df6": {
+      "id": "adbb5df6",
+      "index": "a1",
       "kind": "text",
-      "name": "Your agents,",
-      "parent": "10f8dbdd",
-      "style": {},
-      "tag": "span",
-      "text": "Your agents,"
+      "name": "Radar rows fold idle",
+      "parent": "e9651c33",
+      "style": {
+        "color": "var(--ink)",
+        "font": "600 17px/22px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "marginTop": "8px"
+      },
+      "tag": "div",
+      "text": "Radar rows fold idle"
     },
     "ae52a7bf": {
       "id": "ae52a7bf",
@@ -9274,26 +9325,6 @@
       },
       "tag": "div"
     },
-    "af886456": {
-      "id": "af886456",
-      "index": "a2",
-      "kind": "text",
-      "name": "in your pocket.",
-      "parent": "10f8dbdd",
-      "style": {},
-      "tag": "span",
-      "text": "in your pocket."
-    },
-    "afa0a88a": {
-      "id": "afa0a88a",
-      "index": "a0",
-      "kind": "text",
-      "name": "9:41",
-      "parent": "b9a6e4de",
-      "style": {},
-      "tag": "span",
-      "text": "9:41"
-    },
     "afc5b25d": {
       "id": "afc5b25d",
       "index": "a0",
@@ -9306,19 +9337,6 @@
         "flexDirection": "column",
         "gap": "4px",
         "width": "70px"
-      },
-      "tag": "div"
-    },
-    "b018def8": {
-      "id": "b018def8",
-      "index": "a2",
-      "kind": "frame",
-      "name": "div",
-      "parent": "0cf968d2",
-      "style": {
-        "color": "var(--muted)",
-        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
-        "marginTop": "6px"
       },
       "tag": "div"
     },
@@ -9345,22 +9363,6 @@
       "tag": "span",
       "text": "9:41"
     },
-    "b074ab2f": {
-      "id": "b074ab2f",
-      "index": "a4",
-      "kind": "text",
-      "name": "in lido-app on mac",
-      "parent": "46755218",
-      "style": {
-        "flex": "1",
-        "minWidth": "0",
-        "overflow": "hidden",
-        "textOverflow": "ellipsis",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "in lido-app on mac"
-    },
     "b0917f5a": {
       "id": "b0917f5a",
       "index": "a8",
@@ -9375,18 +9377,35 @@
       },
       "tag": "div"
     },
-    "b0a973d4": {
-      "id": "b0a973d4",
-      "index": "a0",
+    "b0c1d390": {
+      "id": "b0c1d390",
+      "index": "a2",
       "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\"/><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\"/></svg>",
-      "name": "inbox",
-      "parent": "5daf75fe",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 10v4\"/><path d=\"M14 10v4\"/><path d=\"M22 14v-4\"/><path d=\"M6 10v4\"/><rect x=\"2\" y=\"6\" width=\"16\" height=\"12\" rx=\"2\"/></svg>",
+      "name": "battery-full",
+      "parent": "c9b6c411",
       "style": {
         "color": "var(--ink)",
         "display": "inline-flex",
         "flexShrink": "0"
       }
+    },
+    "b0c83375": {
+      "id": "b0c83375",
+      "index": "a0",
+      "kind": "frame",
+      "name": "status bar",
+      "parent": "6da06029",
+      "style": {
+        "alignItems": "center",
+        "color": "var(--ink)",
+        "display": "flex",
+        "font": "600 17px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "height": "44px",
+        "justifyContent": "space-between",
+        "padding": "14px 28px 0"
+      },
+      "tag": "div"
     },
     "b118c63c": {
       "id": "b118c63c",
@@ -9418,19 +9437,6 @@
       },
       "tag": "span",
       "text": "2m"
-    },
-    "b1881422": {
-      "id": "b1881422",
-      "index": "a1",
-      "kind": "text",
-      "name": "Inbox",
-      "parent": "0cb13e23",
-      "style": {
-        "color": "var(--ink)",
-        "font": "600 11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
-      },
-      "tag": "span",
-      "text": "Inbox"
     },
     "b1a46dc7": {
       "id": "b1a46dc7",
@@ -9499,6 +9505,24 @@
       },
       "tag": "div"
     },
+    "b21fbfca": {
+      "id": "b21fbfca",
+      "index": "a5",
+      "kind": "frame",
+      "name": "home indicator",
+      "parent": "a9234a06",
+      "style": {
+        "background": "var(--ink)",
+        "borderRadius": "3px",
+        "bottom": "8px",
+        "height": "5px",
+        "left": "50%",
+        "position": "absolute",
+        "transform": "translateX(-50%)",
+        "width": "134px"
+      },
+      "tag": "div"
+    },
     "b227a4ec": {
       "id": "b227a4ec",
       "index": "a0",
@@ -9512,21 +9536,19 @@
         "flexShrink": "0"
       }
     },
-    "b27117a1": {
-      "id": "b27117a1",
-      "index": "a0",
+    "b2c954c8": {
+      "id": "b2c954c8",
+      "index": "a1",
       "kind": "text",
-      "name": "Open",
-      "parent": "647d7745",
+      "name": "go test ./... failed: 2 …",
+      "parent": "f3703ff6",
       "style": {
-        "background": "var(--ink)",
-        "borderRadius": "17px",
-        "color": "var(--on-ink)",
-        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "9px 16px"
+        "color": "var(--ink)",
+        "font": "600 17px/22px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "marginTop": "8px"
       },
-      "tag": "span",
-      "text": "Open"
+      "tag": "div",
+      "text": "go test ./... failed: 2 tests"
     },
     "b2fa8f12": {
       "id": "b2fa8f12",
@@ -9564,24 +9586,6 @@
       "tag": "div",
       "text": "on top of nduruma"
     },
-    "b42d94ce": {
-      "id": "b42d94ce",
-      "index": "a0",
-      "kind": "frame",
-      "name": "screen",
-      "parent": "ff6be6b8",
-      "style": {
-        "background": "var(--body)",
-        "display": "flex",
-        "flexDirection": "column",
-        "fontFamily": "-apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "height": "844px",
-        "overflow": "hidden",
-        "position": "relative",
-        "width": "390px"
-      },
-      "tag": "div"
-    },
     "b44c781e": {
       "id": "b44c781e",
       "index": "a0",
@@ -9591,6 +9595,16 @@
       "style": {},
       "tag": "span",
       "text": "load 14.2 / 16"
+    },
+    "b4a97061": {
+      "id": "b4a97061",
+      "index": "a2",
+      "kind": "text",
+      "name": "·",
+      "parent": "aa50b905",
+      "style": {},
+      "tag": "span",
+      "text": "·"
     },
     "b4c85152": {
       "id": "b4c85152",
@@ -9604,6 +9618,22 @@
         "display": "inline-flex",
         "flexShrink": "0"
       }
+    },
+    "b4db7513": {
+      "id": "b4db7513",
+      "index": "a0",
+      "kind": "text",
+      "name": "Open",
+      "parent": "0f6409af",
+      "style": {
+        "background": "var(--ink)",
+        "borderRadius": "17px",
+        "color": "var(--on-ink)",
+        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "9px 16px"
+      },
+      "tag": "span",
+      "text": "Open"
     },
     "b5157829": {
       "id": "b5157829",
@@ -9687,19 +9717,6 @@
       "style": {},
       "tag": "span"
     },
-    "b6101dbf": {
-      "id": "b6101dbf",
-      "index": "a1",
-      "kind": "text",
-      "name": "Me",
-      "parent": "fd466167",
-      "style": {
-        "color": "var(--faint)",
-        "font": "11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
-      },
-      "tag": "span",
-      "text": "Me"
-    },
     "b6463103": {
       "id": "b6463103",
       "index": "a2",
@@ -9714,18 +9731,19 @@
       "tag": "span",
       "text": "2m"
     },
-    "b65174bf": {
-      "id": "b65174bf",
+    "b66642da": {
+      "id": "b66642da",
       "index": "a1",
-      "kind": "frame",
-      "name": "span",
-      "parent": "cddcf9b0",
+      "kind": "text",
+      "name": "Allow git push origin jk…",
+      "parent": "7a35a2a9",
       "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "gap": "6px"
+        "color": "var(--ink)",
+        "font": "600 17px/22px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "marginTop": "8px"
       },
-      "tag": "span"
+      "tag": "div",
+      "text": "Allow git push origin jk/ledger?"
     },
     "b682f331": {
       "id": "b682f331",
@@ -9766,19 +9784,6 @@
         "position": "absolute",
         "transform": "translateX(-50%)",
         "width": "134px"
-      },
-      "tag": "div"
-    },
-    "b6f2b033": {
-      "id": "b6f2b033",
-      "index": "a1",
-      "kind": "frame",
-      "name": "div",
-      "parent": "02dd213a",
-      "style": {
-        "background": "linear-gradient(180deg,#1a1d2a,#0b0b0c)",
-        "inset": "0",
-        "position": "absolute"
       },
       "tag": "div"
     },
@@ -9834,6 +9839,46 @@
       "style": {},
       "tag": "span",
       "text": "9:41"
+    },
+    "b7bdad36": {
+      "id": "b7bdad36",
+      "index": "a3",
+      "kind": "text",
+      "name": "olkokola",
+      "parent": "5c5ec215",
+      "style": {
+        "color": "var(--ink)",
+        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "olkokola"
+    },
+    "b7cb1700": {
+      "id": "b7cb1700",
+      "index": "a5",
+      "kind": "text",
+      "name": "6m",
+      "parent": "5cac9683",
+      "style": {
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "6m"
+    },
+    "b813276c": {
+      "id": "b813276c",
+      "index": "a1",
+      "kind": "text",
+      "name": "failed",
+      "parent": "498b7e82",
+      "style": {
+        "color": "var(--red)",
+        "font": "600 13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "failed"
     },
     "b82a69ec": {
       "id": "b82a69ec",
@@ -9898,6 +9943,20 @@
       "tag": "span",
       "text": "3 dev"
     },
+    "b9215349": {
+      "id": "b9215349",
+      "index": "a3",
+      "kind": "text",
+      "name": "olkokola",
+      "parent": "950b909b",
+      "style": {
+        "color": "var(--ink)",
+        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "olkokola"
+    },
     "b933d9eb": {
       "id": "b933d9eb",
       "index": "a1",
@@ -9908,36 +9967,6 @@
         "background": "var(--line)",
         "height": "1px",
         "marginLeft": "16px"
-      },
-      "tag": "div"
-    },
-    "b9a3c0df": {
-      "id": "b9a3c0df",
-      "index": "a1",
-      "kind": "text",
-      "name": "Me",
-      "parent": "1de203cb",
-      "style": {
-        "color": "var(--faint)",
-        "font": "11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
-      },
-      "tag": "span",
-      "text": "Me"
-    },
-    "b9a6e4de": {
-      "id": "b9a6e4de",
-      "index": "a0",
-      "kind": "frame",
-      "name": "status bar",
-      "parent": "b42d94ce",
-      "style": {
-        "alignItems": "center",
-        "color": "var(--ink)",
-        "display": "flex",
-        "font": "600 17px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "height": "44px",
-        "justifyContent": "space-between",
-        "padding": "14px 28px 0"
       },
       "tag": "div"
     },
@@ -9953,6 +9982,21 @@
         "display": "inline-flex",
         "flexShrink": "0"
       }
+    },
+    "ba18dc08": {
+      "id": "ba18dc08",
+      "index": "a1",
+      "kind": "frame",
+      "name": "div",
+      "parent": "1e965e77",
+      "style": {
+        "alignItems": "center",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "4px",
+        "width": "70px"
+      },
+      "tag": "div"
     },
     "ba1e9cf1": {
       "id": "ba1e9cf1",
@@ -9982,19 +10026,6 @@
       },
       "tag": "div",
       "text": "+ }"
-    },
-    "ba441e83": {
-      "id": "ba441e83",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 20h.01\"/><path d=\"M7 20v-4\"/><path d=\"M12 20v-8\"/><path d=\"M17 20V8\"/><path d=\"M22 4v16\"/></svg>",
-      "name": "signal",
-      "parent": "b65174bf",
-      "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
     },
     "ba4636d7": {
       "id": "ba4636d7",
@@ -10097,19 +10128,23 @@
       },
       "tag": "span"
     },
-    "bc587cec": {
-      "id": "bc587cec",
-      "index": "a1",
-      "kind": "text",
-      "name": "Allow git push origin jk…",
-      "parent": "f1d3c7f4",
+    "bc2d39f3": {
+      "id": "bc2d39f3",
+      "index": "a0",
+      "kind": "frame",
+      "name": "screen",
+      "parent": "30433dcc",
       "style": {
-        "color": "var(--ink)",
-        "font": "600 17px/22px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "marginTop": "8px"
+        "background": "var(--body)",
+        "display": "flex",
+        "flexDirection": "column",
+        "fontFamily": "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "height": "844px",
+        "overflow": "hidden",
+        "position": "relative",
+        "width": "390px"
       },
-      "tag": "div",
-      "text": "Allow git push origin jk/ledger?"
+      "tag": "div"
     },
     "bcd90755": {
       "id": "bcd90755",
@@ -10136,33 +10171,6 @@
       "tag": "span",
       "text": "−2"
     },
-    "bd241401": {
-      "id": "bd241401",
-      "index": "a1",
-      "kind": "text",
-      "name": "Machines",
-      "parent": "05465cb6",
-      "style": {
-        "color": "var(--faint)",
-        "font": "11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
-      },
-      "tag": "span",
-      "text": "Machines"
-    },
-    "bd3a5a55": {
-      "id": "bd3a5a55",
-      "index": "a1",
-      "kind": "text",
-      "name": "done",
-      "parent": "9012a4b4",
-      "style": {
-        "color": "var(--green)",
-        "font": "600 13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "done"
-    },
     "bd4e9118": {
       "id": "bd4e9118",
       "index": "a3",
@@ -10176,20 +10184,6 @@
         "flexShrink": "0"
       }
     },
-    "bd9736b3": {
-      "id": "bd9736b3",
-      "index": "a1",
-      "kind": "text",
-      "name": "Allow git push origin jk…",
-      "parent": "ef7e1e90",
-      "style": {
-        "color": "#fff",
-        "font": "600 16px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "marginTop": "4px"
-      },
-      "tag": "div",
-      "text": "Allow git push origin jk/ledger?"
-    },
     "bdf49627": {
       "id": "bdf49627",
       "index": "a1",
@@ -10201,32 +10195,6 @@
       },
       "tag": "span",
       "text": "new"
-    },
-    "be208194": {
-      "id": "be208194",
-      "index": "a1",
-      "kind": "text",
-      "name": "+61",
-      "parent": "ffccca97",
-      "style": {
-        "color": "var(--add)"
-      },
-      "tag": "span",
-      "text": "+61"
-    },
-    "c0163684": {
-      "id": "c0163684",
-      "index": "a0",
-      "kind": "frame",
-      "name": "div",
-      "parent": "ef7e1e90",
-      "style": {
-        "color": "rgba(255,255,255,.7)",
-        "display": "flex",
-        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "justifyContent": "space-between"
-      },
-      "tag": "div"
     },
     "c02db1f3": {
       "id": "c02db1f3",
@@ -10281,22 +10249,6 @@
       },
       "tag": "div",
       "text": "⏺ The machine’s worktrees now have a place of their own."
-    },
-    "c17e6392": {
-      "id": "c17e6392",
-      "index": "a3",
-      "kind": "text",
-      "name": "a machine that runs mia-…",
-      "parent": "35afd3b3",
-      "style": {
-        "color": "var(--muted)",
-        "font": "13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "letterSpacing": ".6px",
-        "marginTop": "34px",
-        "textTransform": "uppercase"
-      },
-      "tag": "div",
-      "text": "a machine that runs mia-phone-server"
     },
     "c1c504af": {
       "id": "c1c504af",
@@ -10380,6 +10332,20 @@
       "tag": "span",
       "text": "Esc"
     },
+    "c2eedc5c": {
+      "id": "c2eedc5c",
+      "index": "a2",
+      "kind": "text",
+      "name": "internal/radar · interna…",
+      "parent": "f3703ff6",
+      "style": {
+        "color": "var(--muted)",
+        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
+        "marginTop": "6px"
+      },
+      "tag": "div",
+      "text": "internal/radar · internal/app"
+    },
     "c32dd702": {
       "id": "c32dd702",
       "index": "a1",
@@ -10397,26 +10363,6 @@
       "tag": "div",
       "text": "12 worktrees · 4 running"
     },
-    "c35d919b": {
-      "id": "c35d919b",
-      "index": "a4",
-      "kind": "text",
-      "name": "fedora.tailbc661a.ts.net",
-      "parent": "35afd3b3",
-      "style": {
-        "alignItems": "center",
-        "background": "var(--card)",
-        "borderRadius": "16px",
-        "color": "var(--ink)",
-        "display": "flex",
-        "font": "17px 'SF Mono', ui-monospace, Menlo, monospace",
-        "height": "56px",
-        "marginTop": "8px",
-        "padding": "0 18px"
-      },
-      "tag": "div",
-      "text": "fedora.tailbc661a.ts.net"
-    },
     "c3b0209e": {
       "id": "c3b0209e",
       "index": "a0",
@@ -10430,6 +10376,21 @@
       },
       "tag": "div"
     },
+    "c3f18ab6": {
+      "id": "c3f18ab6",
+      "index": "a0",
+      "kind": "frame",
+      "name": "span",
+      "parent": "ce4795d4",
+      "style": {
+        "alignItems": "center",
+        "color": "var(--ink)",
+        "display": "flex",
+        "font": "700 32px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "letterSpacing": "-.6px"
+      },
+      "tag": "span"
+    },
     "c402941c": {
       "id": "c402941c",
       "index": "a3",
@@ -10439,6 +10400,19 @@
       "parent": "51010c31",
       "style": {
         "color": "var(--faint)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
+    "c40ba3eb": {
+      "id": "c40ba3eb",
+      "index": "a2",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 10v4\"/><path d=\"M14 10v4\"/><path d=\"M22 14v-4\"/><path d=\"M6 10v4\"/><rect x=\"2\" y=\"6\" width=\"16\" height=\"12\" rx=\"2\"/></svg>",
+      "name": "battery-full",
+      "parent": "f10319c5",
+      "style": {
+        "color": "var(--ink)",
         "display": "inline-flex",
         "flexShrink": "0"
       }
@@ -10472,23 +10446,6 @@
       "tag": "div",
       "text": " ok internal/app 1.02s"
     },
-    "c54f7f0b": {
-      "id": "c54f7f0b",
-      "index": "a0",
-      "kind": "frame",
-      "name": "status bar",
-      "parent": "02dd213a",
-      "style": {
-        "alignItems": "center",
-        "color": "var(--ink)",
-        "display": "flex",
-        "font": "600 17px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "height": "44px",
-        "justifyContent": "space-between",
-        "padding": "14px 28px 0"
-      },
-      "tag": "div"
-    },
     "c57c6646": {
       "id": "c57c6646",
       "index": "a1",
@@ -10498,20 +10455,6 @@
       "style": {},
       "tag": "span",
       "text": "4 sessions"
-    },
-    "c5b7c956": {
-      "id": "c5b7c956",
-      "index": "a3",
-      "kind": "text",
-      "name": "olkokola",
-      "parent": "9012a4b4",
-      "style": {
-        "color": "var(--ink)",
-        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "olkokola"
     },
     "c68e28a7": {
       "id": "c68e28a7",
@@ -10539,6 +10482,18 @@
       },
       "tag": "div"
     },
+    "c6f75852": {
+      "id": "c6f75852",
+      "index": "a1",
+      "kind": "text",
+      "name": "+61",
+      "parent": "0cfddbd1",
+      "style": {
+        "color": "var(--add)"
+      },
+      "tag": "span",
+      "text": "+61"
+    },
     "c7352756": {
       "id": "c7352756",
       "index": "a1",
@@ -10552,19 +10507,6 @@
       "tag": "span",
       "text": "Send a photo"
     },
-    "c7870b07": {
-      "id": "c7870b07",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m21 21-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/></svg>",
-      "name": "search",
-      "parent": "69c940b4",
-      "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
-    },
     "c7981316": {
       "id": "c7981316",
       "index": "a3",
@@ -10576,6 +10518,15 @@
         "font": "12px 'SF Mono', ui-monospace, Menlo, monospace"
       },
       "tag": "span"
+    },
+    "c7c69262": {
+      "id": "c7c69262",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg viewBox=\"0 0 512 512\" width=\"26\" height=\"26\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"var(--ink)\"><circle cx=\"88\" cy=\"88\" r=\"20\"></circle><circle cx=\"200\" cy=\"88\" r=\"46\"></circle><circle cx=\"312\" cy=\"88\" r=\"20\"></circle><circle cx=\"424\" cy=\"88\" r=\"20\"></circle><circle cx=\"88\" cy=\"200\" r=\"20\"></circle><circle cx=\"200\" cy=\"200\" r=\"20\"></circle><circle cx=\"312\" cy=\"200\" r=\"20\"></circle><circle cx=\"424\" cy=\"200\" r=\"46\"></circle><circle cx=\"88\" cy=\"312\" r=\"20\"></circle><circle cx=\"200\" cy=\"312\" r=\"20\"></circle><circle cx=\"312\" cy=\"312\" r=\"20\"></circle><circle cx=\"424\" cy=\"312\" r=\"20\"></circle><circle cx=\"88\" cy=\"424\" r=\"46\"></circle><circle cx=\"200\" cy=\"424\" r=\"20\"></circle><circle cx=\"312\" cy=\"424\" r=\"20\"></circle><circle cx=\"424\" cy=\"424\" r=\"20\"></circle></svg>",
+      "name": "Icon",
+      "parent": "744566b0",
+      "style": {}
     },
     "c7e59418": {
       "id": "c7e59418",
@@ -10595,18 +10546,14 @@
       },
       "tag": "div"
     },
-    "c8a1aa0a": {
-      "id": "c8a1aa0a",
+    "c8aa5769": {
+      "id": "c8aa5769",
       "index": "a1",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h.01\"/><path d=\"M2 8.82a15 15 0 0 1 20 0\"/><path d=\"M5 12.859a10 10 0 0 1 14 0\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/></svg>",
-      "name": "wifi",
-      "parent": "a507ffd0",
-      "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
+      "kind": "frame",
+      "name": "br",
+      "parent": "717e2d61",
+      "style": {},
+      "tag": "br"
     },
     "c9221dcf": {
       "id": "c9221dcf",
@@ -10634,6 +10581,19 @@
       "tag": "span",
       "text": "9:41"
     },
+    "c996538f": {
+      "id": "c996538f",
+      "index": "a2",
+      "kind": "text",
+      "name": "Retry",
+      "parent": "f6103565",
+      "style": {
+        "color": "var(--ink)",
+        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+      },
+      "tag": "span",
+      "text": "Retry"
+    },
     "c9b231ec": {
       "id": "c9b231ec",
       "index": "a4",
@@ -10646,6 +10606,19 @@
       },
       "tag": "span",
       "text": "Cancel"
+    },
+    "c9b6c411": {
+      "id": "c9b6c411",
+      "index": "a1",
+      "kind": "frame",
+      "name": "span",
+      "parent": "962c6107",
+      "style": {
+        "alignItems": "center",
+        "display": "flex",
+        "gap": "6px"
+      },
+      "tag": "span"
     },
     "c9cbdf13": {
       "id": "c9cbdf13",
@@ -10730,6 +10703,18 @@
       },
       "tag": "div"
     },
+    "cc9f7da0": {
+      "id": "cc9f7da0",
+      "index": "a5",
+      "kind": "text",
+      "name": "14m",
+      "parent": "950b909b",
+      "style": {
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "14m"
+    },
     "ccbe395c": {
       "id": "ccbe395c",
       "index": "a2",
@@ -10743,6 +10728,24 @@
       },
       "tag": "span",
       "text": "now"
+    },
+    "ccc35c1e": {
+      "id": "ccc35c1e",
+      "index": "a2",
+      "kind": "frame",
+      "name": "home indicator",
+      "parent": "e376b865",
+      "style": {
+        "background": "var(--ink)",
+        "borderRadius": "3px",
+        "bottom": "8px",
+        "height": "5px",
+        "left": "50%",
+        "position": "absolute",
+        "transform": "translateX(-50%)",
+        "width": "134px"
+      },
+      "tag": "div"
     },
     "cccb0f54": {
       "id": "cccb0f54",
@@ -10838,20 +10841,15 @@
         "flexShrink": "0"
       }
     },
-    "cddcf9b0": {
-      "id": "cddcf9b0",
+    "cdc217fd": {
+      "id": "cdc217fd",
       "index": "a0",
       "kind": "frame",
-      "name": "status bar",
-      "parent": "21d302cf",
+      "name": "mark",
+      "parent": "2c208d6e",
       "style": {
-        "alignItems": "center",
-        "color": "var(--ink)",
-        "display": "flex",
-        "font": "600 17px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "height": "44px",
-        "justifyContent": "space-between",
-        "padding": "14px 28px 0"
+        "height": "64px",
+        "width": "64px"
       },
       "tag": "div"
     },
@@ -10898,6 +10896,20 @@
       "tag": "div",
       "text": "────────────────────────────────────────"
     },
+    "ce4795d4": {
+      "id": "ce4795d4",
+      "index": "a1",
+      "kind": "frame",
+      "name": "title",
+      "parent": "a9234a06",
+      "style": {
+        "alignItems": "center",
+        "display": "flex",
+        "justifyContent": "space-between",
+        "padding": "10px 20px 6px"
+      },
+      "tag": "div"
+    },
     "ce6a5a0c": {
       "id": "ce6a5a0c",
       "index": "a1",
@@ -10922,59 +10934,33 @@
       },
       "tag": "div"
     },
-    "cf4c3609": {
-      "id": "cf4c3609",
-      "index": "a2",
-      "kind": "frame",
-      "name": "filters",
-      "parent": "21d302cf",
-      "style": {
-        "display": "flex",
-        "gap": "8px",
-        "overflow": "hidden",
-        "padding": "8px 20px 6px",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "div"
-    },
-    "cf852d31": {
-      "id": "cf852d31",
-      "index": "a1",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h.01\"/><path d=\"M2 8.82a15 15 0 0 1 20 0\"/><path d=\"M5 12.859a10 10 0 0 1 14 0\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/></svg>",
-      "name": "wifi",
-      "parent": "623f8acc",
-      "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
-    },
-    "cfdd83cf": {
-      "id": "cfdd83cf",
+    "cf8adbc2": {
+      "id": "cf8adbc2",
       "index": "a1",
       "kind": "text",
-      "name": "Inbox",
-      "parent": "5daf75fe",
+      "name": "Stop",
+      "parent": "47e44a9e",
       "style": {
+        "background": "var(--track)",
+        "borderRadius": "17px",
         "color": "var(--ink)",
-        "font": "600 11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "9px 16px"
       },
       "tag": "span",
-      "text": "Inbox"
+      "text": "Stop"
     },
-    "d05dc7bf": {
-      "id": "d05dc7bf",
-      "index": "a1",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h.01\"/><path d=\"M2 8.82a15 15 0 0 1 20 0\"/><path d=\"M5 12.859a10 10 0 0 1 14 0\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/></svg>",
-      "name": "wifi",
-      "parent": "b65174bf",
+    "d007a4da": {
+      "id": "d007a4da",
+      "index": "a5",
+      "kind": "text",
+      "name": "1h",
+      "parent": "498b7e82",
       "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "1h"
     },
     "d07603a2": {
       "id": "d07603a2",
@@ -10988,6 +10974,19 @@
       },
       "tag": "div",
       "text": " ⎿ Updated with 24 additions"
+    },
+    "d07df288": {
+      "id": "d07df288",
+      "index": "a3",
+      "kind": "frame",
+      "name": "div",
+      "parent": "f3703ff6",
+      "style": {
+        "display": "flex",
+        "gap": "8px",
+        "marginTop": "12px"
+      },
+      "tag": "div"
     },
     "d0937c7f": {
       "id": "d0937c7f",
@@ -11005,6 +11004,21 @@
       },
       "tag": "div",
       "text": "learnharness · test2"
+    },
+    "d0ac91fc": {
+      "id": "d0ac91fc",
+      "index": "a3",
+      "kind": "frame",
+      "name": "div",
+      "parent": "ffa8c777",
+      "style": {
+        "alignItems": "center",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "4px",
+        "width": "70px"
+      },
+      "tag": "div"
     },
     "d0b8f3b1": {
       "id": "d0b8f3b1",
@@ -11042,6 +11056,33 @@
         "padding": "11px 16px"
       },
       "tag": "div"
+    },
+    "d14a9feb": {
+      "id": "d14a9feb",
+      "index": "a1",
+      "kind": "text",
+      "name": "mia-core · moshono",
+      "parent": "a18c041b",
+      "style": {
+        "color": "rgba(255,255,255,.8)",
+        "font": "12px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+      },
+      "tag": "div",
+      "text": "mia-core · moshono"
+    },
+    "d16ed8f0": {
+      "id": "d16ed8f0",
+      "index": "a2",
+      "kind": "text",
+      "name": "⏺ Bash(curl -s localhost…",
+      "parent": "dd563a6f",
+      "style": {
+        "color": "var(--muted)",
+        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
+        "marginTop": "6px"
+      },
+      "tag": "div",
+      "text": "⏺ Bash(curl -s localhost:8080/batch) → 503 ×14"
     },
     "d1e39625": {
       "id": "d1e39625",
@@ -11092,34 +11133,6 @@
         "padding": "12px 16px"
       },
       "tag": "div"
-    },
-    "d3164faa": {
-      "id": "d3164faa",
-      "index": "a1",
-      "kind": "frame",
-      "name": "div",
-      "parent": "0cb10bab",
-      "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "flexDirection": "column",
-        "gap": "4px",
-        "width": "70px"
-      },
-      "tag": "div"
-    },
-    "d35fe1e0": {
-      "id": "d35fe1e0",
-      "index": "a0",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M18 19a5 5 0 0 1-5-5v8\"/><path d=\"M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5\"/><circle cx=\"13\" cy=\"12\" r=\"2\"/><circle cx=\"20\" cy=\"19\" r=\"2\"/></svg>",
-      "name": "folder-git-2",
-      "parent": "d3164faa",
-      "style": {
-        "color": "var(--faint)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
     },
     "d361b304": {
       "id": "d361b304",
@@ -11196,6 +11209,22 @@
       "tag": "span",
       "text": "9:41"
     },
+    "d4dacf2b": {
+      "id": "d4dacf2b",
+      "index": "a4",
+      "kind": "text",
+      "name": "in lido-app on mac",
+      "parent": "5cac9683",
+      "style": {
+        "flex": "1",
+        "minWidth": "0",
+        "overflow": "hidden",
+        "textOverflow": "ellipsis",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "in lido-app on mac"
+    },
     "d4e7d84d": {
       "id": "d4e7d84d",
       "index": "a1",
@@ -11256,22 +11285,6 @@
       },
       "tag": "div"
     },
-    "d5b1ef68": {
-      "id": "d5b1ef68",
-      "index": "a0",
-      "kind": "text",
-      "name": "Open",
-      "parent": "788f3b5d",
-      "style": {
-        "background": "var(--ink)",
-        "borderRadius": "17px",
-        "color": "var(--on-ink)",
-        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "9px 16px"
-      },
-      "tag": "span",
-      "text": "Open"
-    },
     "d5b52147": {
       "id": "d5b52147",
       "index": "a1",
@@ -11283,6 +11296,19 @@
       },
       "tag": "span",
       "text": "deleted"
+    },
+    "d5c338af": {
+      "id": "d5c338af",
+      "index": "a1",
+      "kind": "text",
+      "name": "Is Tailscale on? Showing…",
+      "parent": "5db4cba5",
+      "style": {
+        "color": "var(--muted)",
+        "font": "14px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+      },
+      "tag": "div",
+      "text": "Is Tailscale on? Showing what was last known, 12m ago."
     },
     "d601a74a": {
       "id": "d601a74a",
@@ -11322,6 +11348,20 @@
       },
       "tag": "div"
     },
+    "d7a323b7": {
+      "id": "d7a323b7",
+      "index": "a2",
+      "kind": "text",
+      "name": "lido-app on mac · open i…",
+      "parent": "8b9ed0ca",
+      "style": {
+        "color": "rgba(255,255,255,.85)",
+        "font": "14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "marginTop": "2px"
+      },
+      "tag": "div",
+      "text": "lido-app on mac · open its terminal"
+    },
     "d82a97cc": {
       "id": "d82a97cc",
       "index": "a0",
@@ -11352,19 +11392,21 @@
       },
       "tag": "div"
     },
-    "d88a7ffe": {
-      "id": "d88a7ffe",
+    "d85880b8": {
+      "id": "d85880b8",
       "index": "a1",
       "kind": "text",
-      "name": "failed",
-      "parent": "7c5a53a6",
+      "name": "Log",
+      "parent": "d07df288",
       "style": {
-        "color": "var(--red)",
-        "font": "600 13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "whiteSpace": "nowrap"
+        "background": "var(--track)",
+        "borderRadius": "17px",
+        "color": "var(--ink)",
+        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "9px 16px"
       },
       "tag": "span",
-      "text": "failed"
+      "text": "Log"
     },
     "d8a4ac17": {
       "id": "d8a4ac17",
@@ -11379,18 +11421,15 @@
       },
       "tag": "div"
     },
-    "d913a35f": {
-      "id": "d913a35f",
-      "index": "a2",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 10v4\"/><path d=\"M14 10v4\"/><path d=\"M22 14v-4\"/><path d=\"M6 10v4\"/><rect x=\"2\" y=\"6\" width=\"16\" height=\"12\" rx=\"2\"/></svg>",
-      "name": "battery-full",
-      "parent": "623f8acc",
-      "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
+    "d8eee11f": {
+      "id": "d8eee11f",
+      "index": "a0",
+      "kind": "text",
+      "name": "1 commit · ",
+      "parent": "0cfddbd1",
+      "style": {},
+      "tag": "span",
+      "text": "1 commit · "
     },
     "d95b21ff": {
       "id": "d95b21ff",
@@ -11418,15 +11457,6 @@
         "flexShrink": "0"
       }
     },
-    "da18cb60": {
-      "id": "da18cb60",
-      "index": "a0",
-      "kind": "frame",
-      "name": "02 Inbox",
-      "style": {
-        "width": "1440px"
-      }
-    },
     "da28f76c": {
       "id": "da28f76c",
       "index": "a2",
@@ -11443,6 +11473,19 @@
       },
       "tag": "span",
       "text": "switch to window"
+    },
+    "da5d4ee1": {
+      "id": "da5d4ee1",
+      "index": "a1",
+      "kind": "text",
+      "name": "Inbox",
+      "parent": "3dcb4392",
+      "style": {
+        "color": "var(--ink)",
+        "font": "600 11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+      },
+      "tag": "span",
+      "text": "Inbox"
     },
     "db20e20b": {
       "id": "db20e20b",
@@ -11463,22 +11506,6 @@
       },
       "tag": "div",
       "text": "Commit message"
-    },
-    "db5c4faf": {
-      "id": "db5c4faf",
-      "index": "a2",
-      "kind": "text",
-      "name": "Tuesday 4 November",
-      "parent": "02dd213a",
-      "style": {
-        "color": "rgba(255,255,255,.85)",
-        "font": "500 22px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "marginTop": "24px",
-        "position": "relative",
-        "textAlign": "center"
-      },
-      "tag": "div",
-      "text": "Tuesday 4 November"
     },
     "db60bee1": {
       "id": "db60bee1",
@@ -11506,21 +11533,38 @@
       "tag": "div",
       "text": "- if w.Machine != \"\" {"
     },
-    "dbd13031": {
-      "id": "dbd13031",
-      "index": "a2",
-      "kind": "text",
-      "name": "Retry the 503s with back…",
-      "parent": "aa4305ed",
+    "dc06418c": {
+      "id": "dc06418c",
+      "index": "a0",
+      "kind": "frame",
+      "name": "status bar",
+      "parent": "bc2d39f3",
       "style": {
-        "color": "rgba(255,255,255,.8)",
-        "font": "12px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "overflow": "hidden",
-        "textOverflow": "ellipsis",
-        "whiteSpace": "nowrap"
+        "alignItems": "center",
+        "color": "var(--ink)",
+        "display": "flex",
+        "font": "600 17px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "height": "44px",
+        "justifyContent": "space-between",
+        "padding": "14px 28px 0"
       },
-      "tag": "div",
-      "text": "Retry the 503s with backoff?"
+      "tag": "div"
+    },
+    "dc3da0a5": {
+      "id": "dc3da0a5",
+      "index": "a1",
+      "kind": "text",
+      "name": "Done 3",
+      "parent": "73b44900",
+      "style": {
+        "background": "var(--card)",
+        "borderRadius": "18px",
+        "color": "var(--ink)",
+        "font": "14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "8px 14px"
+      },
+      "tag": "span",
+      "text": "Done 3"
     },
     "dc9addad": {
       "id": "dc9addad",
@@ -11549,18 +11593,6 @@
         "width": "70px"
       },
       "tag": "div"
-    },
-    "dcd80a87": {
-      "id": "dcd80a87",
-      "index": "a1",
-      "kind": "frame",
-      "name": "span",
-      "parent": "ea04bd07",
-      "style": {
-        "display": "flex",
-        "gap": "8px"
-      },
-      "tag": "span"
     },
     "dd248cd6": {
       "id": "dd248cd6",
@@ -11597,6 +11629,36 @@
       },
       "tag": "span",
       "text": "arusha.mia:3000"
+    },
+    "dd563a6f": {
+      "id": "dd563a6f",
+      "index": "a0",
+      "kind": "frame",
+      "name": "card · moshono",
+      "parent": "7e80eaf0",
+      "style": {
+        "background": "var(--card)",
+        "borderRadius": "20px",
+        "margin": "0 16px 10px",
+        "padding": "14px 16px"
+      },
+      "tag": "div"
+    },
+    "de1944fa": {
+      "id": "de1944fa",
+      "index": "a0",
+      "kind": "text",
+      "name": "Open",
+      "parent": "59254104",
+      "style": {
+        "background": "var(--ink)",
+        "borderRadius": "17px",
+        "color": "var(--on-ink)",
+        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "9px 16px"
+      },
+      "tag": "span",
+      "text": "Open"
     },
     "de2d7f73": {
       "id": "de2d7f73",
@@ -11679,19 +11741,35 @@
       },
       "tag": "div"
     },
-    "df10d54a": {
-      "id": "df10d54a",
+    "df15c993": {
+      "id": "df15c993",
+      "index": "a0",
+      "kind": "text",
+      "name": "Needs you 2",
+      "parent": "73b44900",
+      "style": {
+        "background": "var(--ink)",
+        "borderRadius": "18px",
+        "color": "var(--on-ink)",
+        "font": "14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "padding": "8px 14px"
+      },
+      "tag": "span",
+      "text": "Needs you 2"
+    },
+    "dffa6924": {
+      "id": "dffa6924",
       "index": "a1",
       "kind": "text",
-      "name": "go test ./... failed: 2 …",
-      "parent": "4cf72d13",
+      "name": "Radar rows fold idle",
+      "parent": "937b4be6",
       "style": {
         "color": "var(--ink)",
         "font": "600 17px/22px -apple-system, 'SF Pro Text', system-ui, sans-serif",
         "marginTop": "8px"
       },
       "tag": "div",
-      "text": "go test ./... failed: 2 tests"
+      "text": "Radar rows fold idle"
     },
     "e01eb492": {
       "id": "e01eb492",
@@ -11718,6 +11796,19 @@
       },
       "tag": "div"
     },
+    "e04feeee": {
+      "id": "e04feeee",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h.01\"/><path d=\"M8.5 16.429a5 5 0 0 1 7 0\"/><path d=\"M5 12.859a10 10 0 0 1 5.17-2.69\"/><path d=\"M19 12.859a10 10 0 0 0-2.007-1.523\"/><path d=\"M2 8.82a15 15 0 0 1 4.177-2.643\"/><path d=\"M22 8.82a15 15 0 0 0-11.288-3.764\"/><path d=\"m2 2 20 20\"/></svg>",
+      "name": "wifi-off",
+      "parent": "f6103565",
+      "style": {
+        "color": "var(--muted)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
     "e0bb0738": {
       "id": "e0bb0738",
       "index": "a0",
@@ -11734,18 +11825,34 @@
       },
       "tag": "div"
     },
-    "e1271bc0": {
-      "id": "e1271bc0",
-      "index": "a1",
-      "kind": "frame",
-      "name": "span",
-      "parent": "c54f7f0b",
+    "e0d97135": {
+      "id": "e0d97135",
+      "index": "a0",
+      "kind": "text",
+      "name": "Can’t reach your machine…",
+      "parent": "5db4cba5",
       "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "gap": "6px"
+        "color": "var(--ink)",
+        "font": "600 16px -apple-system, 'SF Pro Text', system-ui, sans-serif"
       },
-      "tag": "span"
+      "tag": "div",
+      "text": "Can’t reach your machines"
+    },
+    "e12bf947": {
+      "id": "e12bf947",
+      "index": "a4",
+      "kind": "text",
+      "name": "in learnharness on fedor…",
+      "parent": "950b909b",
+      "style": {
+        "flex": "1",
+        "minWidth": "0",
+        "overflow": "hidden",
+        "textOverflow": "ellipsis",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "in learnharness on fedora"
     },
     "e15a835b": {
       "id": "e15a835b",
@@ -11789,27 +11896,6 @@
       "tag": "div",
       "text": "New worktree"
     },
-    "e1bb92f4": {
-      "id": "e1bb92f4",
-      "index": "a0",
-      "kind": "text",
-      "name": "Find my machines",
-      "parent": "e317fdd6",
-      "style": {
-        "alignItems": "center",
-        "background": "var(--ink)",
-        "borderRadius": "25px",
-        "color": "var(--on-ink)",
-        "display": "flex",
-        "flex": "1",
-        "font": "600 16px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "gap": "8px",
-        "height": "50px",
-        "justifyContent": "center"
-      },
-      "tag": "div",
-      "text": "Find my machines"
-    },
     "e226cda4": {
       "id": "e226cda4",
       "index": "a4",
@@ -11843,16 +11929,34 @@
       "tag": "span",
       "text": "stop what it is doing"
     },
-    "e317fdd6": {
-      "id": "e317fdd6",
-      "index": "a5",
+    "e29e2dae": {
+      "id": "e29e2dae",
+      "index": "a0",
       "kind": "frame",
-      "name": "div",
-      "parent": "35afd3b3",
+      "name": "status bar",
+      "parent": "a9234a06",
       "style": {
-        "marginTop": "14px"
+        "alignItems": "center",
+        "color": "var(--ink)",
+        "display": "flex",
+        "font": "600 17px -apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "height": "44px",
+        "justifyContent": "space-between",
+        "padding": "14px 28px 0"
       },
       "tag": "div"
+    },
+    "e32225a9": {
+      "id": "e32225a9",
+      "index": "a5",
+      "kind": "text",
+      "name": "26m",
+      "parent": "5c5ec215",
+      "style": {
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "26m"
     },
     "e34d9fb4": {
       "id": "e34d9fb4",
@@ -11867,19 +11971,23 @@
       },
       "tag": "div"
     },
-    "e38d6dce": {
-      "id": "e38d6dce",
+    "e376b865": {
+      "id": "e376b865",
       "index": "a0",
-      "kind": "text",
-      "name": "Inbox",
-      "parent": "4c12c840",
+      "kind": "frame",
+      "name": "screen",
+      "parent": "0e8a8d9f",
       "style": {
-        "color": "var(--ink)",
-        "font": "700 32px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "letterSpacing": "-.6px"
+        "background": "var(--body)",
+        "display": "flex",
+        "flexDirection": "column",
+        "fontFamily": "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+        "height": "844px",
+        "overflow": "hidden",
+        "position": "relative",
+        "width": "390px"
       },
-      "tag": "span",
-      "text": "Inbox"
+      "tag": "div"
     },
     "e4594440": {
       "id": "e4594440",
@@ -11907,24 +12015,6 @@
       "tag": "span",
       "text": "olkokola"
     },
-    "e46d9091": {
-      "id": "e46d9091",
-      "index": "a6",
-      "kind": "frame",
-      "name": "home indicator",
-      "parent": "02dd213a",
-      "style": {
-        "background": "var(--ink)",
-        "borderRadius": "3px",
-        "bottom": "8px",
-        "height": "5px",
-        "left": "50%",
-        "position": "absolute",
-        "transform": "translateX(-50%)",
-        "width": "134px"
-      },
-      "tag": "div"
-    },
     "e4ba3616": {
       "id": "e4ba3616",
       "index": "a4",
@@ -11939,6 +12029,20 @@
       },
       "tag": "div"
     },
+    "e4c47200": {
+      "id": "e4c47200",
+      "index": "a3",
+      "kind": "text",
+      "name": "moshono",
+      "parent": "429ee1ea",
+      "style": {
+        "color": "var(--ink)",
+        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "moshono"
+    },
     "e4d5e53c": {
       "id": "e4d5e53c",
       "index": "a1",
@@ -11952,15 +12056,15 @@
       "tag": "span",
       "text": "box"
     },
-    "e52b26a2": {
-      "id": "e52b26a2",
+    "e50ffad6": {
+      "id": "e50ffad6",
       "index": "a0",
       "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 20h.01\"/><path d=\"M7 20v-4\"/><path d=\"M12 20v-8\"/><path d=\"M17 20V8\"/><path d=\"M22 4v16\"/></svg>",
-      "name": "signal",
-      "parent": "623f8acc",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"8\" r=\"5\"/><path d=\"M20 21a8 8 0 0 0-16 0\"/></svg>",
+      "name": "user-round",
+      "parent": "d0ac91fc",
       "style": {
-        "color": "var(--ink)",
+        "color": "var(--faint)",
         "display": "inline-flex",
         "flexShrink": "0"
       }
@@ -12001,21 +12105,21 @@
         "flexShrink": "0"
       }
     },
-    "e6cf7446": {
-      "id": "e6cf7446",
-      "index": "a0",
-      "kind": "text",
-      "name": "Open",
-      "parent": "6d24ed81",
+    "e6b9db22": {
+      "id": "e6b9db22",
+      "index": "a2",
+      "kind": "frame",
+      "name": "span",
+      "parent": "6487d9f5",
       "style": {
-        "background": "var(--ink)",
-        "borderRadius": "17px",
-        "color": "var(--on-ink)",
-        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "9px 16px"
+        "background": "var(--red)",
+        "borderRadius": "50%",
+        "height": "8px",
+        "margin": "-4px 0 0 20px",
+        "position": "absolute",
+        "width": "8px"
       },
-      "tag": "span",
-      "text": "Open"
+      "tag": "span"
     },
     "e6de7be5": {
       "id": "e6de7be5",
@@ -12040,21 +12144,34 @@
       "tag": "span",
       "text": "1 page"
     },
-    "e75f5a83": {
-      "id": "e75f5a83",
+    "e8142472": {
+      "id": "e8142472",
       "index": "a0",
-      "kind": "text",
-      "name": "Needs you 2",
-      "parent": "cf4c3609",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 20h.01\"/><path d=\"M7 20v-4\"/><path d=\"M12 20v-8\"/><path d=\"M17 20V8\"/><path d=\"M22 4v16\"/></svg>",
+      "name": "signal",
+      "parent": "f10319c5",
       "style": {
-        "background": "var(--ink)",
-        "borderRadius": "18px",
-        "color": "var(--on-ink)",
-        "font": "14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "8px 14px"
+        "color": "var(--ink)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
+    "e8609def": {
+      "id": "e8609def",
+      "index": "a4",
+      "kind": "text",
+      "name": "in mia-core on fedora",
+      "parent": "aa50b905",
+      "style": {
+        "flex": "1",
+        "minWidth": "0",
+        "overflow": "hidden",
+        "textOverflow": "ellipsis",
+        "whiteSpace": "nowrap"
       },
       "tag": "span",
-      "text": "Needs you 2"
+      "text": "in mia-core on fedora"
     },
     "e87cee04": {
       "id": "e87cee04",
@@ -12134,6 +12251,20 @@
       },
       "tag": "span"
     },
+    "e9651c33": {
+      "id": "e9651c33",
+      "index": "a1",
+      "kind": "frame",
+      "name": "card · olkokola",
+      "parent": "ee1b5c74",
+      "style": {
+        "background": "var(--card)",
+        "borderRadius": "20px",
+        "margin": "0 16px 10px",
+        "padding": "14px 16px"
+      },
+      "tag": "div"
+    },
     "e98f988f": {
       "id": "e98f988f",
       "index": "a1",
@@ -12196,20 +12327,6 @@
       },
       "tag": "div",
       "text": "jk/radar-rows · on mac"
-    },
-    "ea04bd07": {
-      "id": "ea04bd07",
-      "index": "a1",
-      "kind": "frame",
-      "name": "title",
-      "parent": "21d302cf",
-      "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "justifyContent": "space-between",
-        "padding": "10px 20px 6px"
-      },
-      "tag": "div"
     },
     "ea16c96f": {
       "id": "ea16c96f",
@@ -12319,6 +12436,19 @@
         "flexShrink": "0"
       }
     },
+    "ec411fbc": {
+      "id": "ec411fbc",
+      "index": "a1",
+      "kind": "text",
+      "name": "Machines",
+      "parent": "8dd10336",
+      "style": {
+        "color": "var(--faint)",
+        "font": "11px -apple-system, 'SF Pro Text', system-ui, sans-serif"
+      },
+      "tag": "span",
+      "text": "Machines"
+    },
     "ec7a7d4c": {
       "id": "ec7a7d4c",
       "index": "a3",
@@ -12357,6 +12487,15 @@
         "flexShrink": "0"
       }
     },
+    "ed990ef2": {
+      "id": "ed990ef2",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg viewBox=\"0 0 512 512\" width=\"26\" height=\"26\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"var(--ink)\"><circle cx=\"88\" cy=\"88\" r=\"20\"></circle><circle cx=\"200\" cy=\"88\" r=\"46\"></circle><circle cx=\"312\" cy=\"88\" r=\"20\"></circle><circle cx=\"424\" cy=\"88\" r=\"20\"></circle><circle cx=\"88\" cy=\"200\" r=\"20\"></circle><circle cx=\"200\" cy=\"200\" r=\"20\"></circle><circle cx=\"312\" cy=\"200\" r=\"20\"></circle><circle cx=\"424\" cy=\"200\" r=\"46\"></circle><circle cx=\"88\" cy=\"312\" r=\"20\"></circle><circle cx=\"200\" cy=\"312\" r=\"20\"></circle><circle cx=\"312\" cy=\"312\" r=\"20\"></circle><circle cx=\"424\" cy=\"312\" r=\"20\"></circle><circle cx=\"88\" cy=\"424\" r=\"46\"></circle><circle cx=\"200\" cy=\"424\" r=\"20\"></circle><circle cx=\"312\" cy=\"424\" r=\"20\"></circle><circle cx=\"424\" cy=\"424\" r=\"20\"></circle></svg>",
+      "name": "Icon",
+      "parent": "a4a2c5ad",
+      "style": {}
+    },
     "edb5f56e": {
       "id": "edb5f56e",
       "index": "a0",
@@ -12380,6 +12519,34 @@
       "style": {
         "flex": "1",
         "minWidth": "0"
+      },
+      "tag": "div"
+    },
+    "edf19405": {
+      "id": "edf19405",
+      "index": "a3",
+      "kind": "text",
+      "name": "moshono",
+      "parent": "aa50b905",
+      "style": {
+        "color": "var(--ink)",
+        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
+        "whiteSpace": "nowrap"
+      },
+      "tag": "span",
+      "text": "moshono"
+    },
+    "ee1b5c74": {
+      "id": "ee1b5c74",
+      "index": "a3",
+      "kind": "frame",
+      "name": "div",
+      "parent": "bc2d39f3",
+      "style": {
+        "flex": "1",
+        "opacity": ".55",
+        "overflow": "hidden",
+        "paddingTop": "10px"
       },
       "tag": "div"
     },
@@ -12410,22 +12577,6 @@
       "tag": "span",
       "text": "on · levolosi.mia, oloirien.mia"
     },
-    "eea75e68": {
-      "id": "eea75e68",
-      "index": "a1",
-      "kind": "text",
-      "name": "Changes",
-      "parent": "14c4d30c",
-      "style": {
-        "background": "var(--track)",
-        "borderRadius": "17px",
-        "color": "var(--ink)",
-        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "9px 16px"
-      },
-      "tag": "span",
-      "text": "Changes"
-    },
     "ef571b99": {
       "id": "ef571b99",
       "index": "a3",
@@ -12435,21 +12586,6 @@
       "style": {
         "flex": "1",
         "textAlign": "center"
-      },
-      "tag": "div"
-    },
-    "ef7e1e90": {
-      "id": "ef7e1e90",
-      "index": "a5",
-      "kind": "frame",
-      "name": "notification · mia",
-      "parent": "02dd213a",
-      "style": {
-        "background": "rgba(255,255,255,.18)",
-        "borderRadius": "22px",
-        "margin": "0 16px",
-        "padding": "14px 16px",
-        "position": "relative"
       },
       "tag": "div"
     },
@@ -12532,6 +12668,19 @@
       },
       "tag": "div"
     },
+    "f10319c5": {
+      "id": "f10319c5",
+      "index": "a1",
+      "kind": "frame",
+      "name": "span",
+      "parent": "e29e2dae",
+      "style": {
+        "alignItems": "center",
+        "display": "flex",
+        "gap": "6px"
+      },
+      "tag": "span"
+    },
     "f12c459c": {
       "id": "f12c459c",
       "index": "a6",
@@ -12606,17 +12755,16 @@
       },
       "tag": "div"
     },
-    "f1d3c7f4": {
-      "id": "f1d3c7f4",
-      "index": "a1",
+    "f1f928c6": {
+      "id": "f1f928c6",
+      "index": "a3",
       "kind": "frame",
-      "name": "card · kurasini",
-      "parent": "6ed6c459",
+      "name": "div",
+      "parent": "7a35a2a9",
       "style": {
-        "background": "var(--card)",
-        "borderRadius": "20px",
-        "margin": "0 16px 10px",
-        "padding": "14px 16px"
+        "display": "flex",
+        "gap": "8px",
+        "marginTop": "12px"
       },
       "tag": "div"
     },
@@ -12653,18 +12801,6 @@
       },
       "tag": "div",
       "text": "mac"
-    },
-    "f2dc6402": {
-      "id": "f2dc6402",
-      "index": "a5",
-      "kind": "text",
-      "name": "2m",
-      "parent": "89b2362a",
-      "style": {
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "2m"
     },
     "f300b5a6": {
       "id": "f300b5a6",
@@ -12703,6 +12839,20 @@
       },
       "tag": "div"
     },
+    "f3703ff6": {
+      "id": "f3703ff6",
+      "index": "a3",
+      "kind": "frame",
+      "name": "card · mianzini",
+      "parent": "7e80eaf0",
+      "style": {
+        "background": "var(--card)",
+        "borderRadius": "20px",
+        "margin": "0 16px 10px",
+        "padding": "14px 16px"
+      },
+      "tag": "div"
+    },
     "f3bb56c2": {
       "id": "f3bb56c2",
       "index": "a0",
@@ -12712,6 +12862,19 @@
       "parent": "4d16bf68",
       "style": {
         "color": "var(--blue)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
+    "f3f807b8": {
+      "id": "f3f807b8",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m15 9-6 6\"/><path d=\"m9 9 6 6\"/></svg>",
+      "name": "circle-x",
+      "parent": "498b7e82",
+      "style": {
+        "color": "var(--red)",
         "display": "inline-flex",
         "flexShrink": "0"
       }
@@ -12783,22 +12946,6 @@
       "tag": "span",
       "text": "1 claude"
     },
-    "f5c32992": {
-      "id": "f5c32992",
-      "index": "a1",
-      "kind": "text",
-      "name": "Stop",
-      "parent": "647d7745",
-      "style": {
-        "background": "var(--track)",
-        "borderRadius": "17px",
-        "color": "var(--ink)",
-        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "9px 16px"
-      },
-      "tag": "span",
-      "text": "Stop"
-    },
     "f5cd7106": {
       "id": "f5cd7106",
       "index": "a1",
@@ -12845,6 +12992,23 @@
       },
       "tag": "div"
     },
+    "f6103565": {
+      "id": "f6103565",
+      "index": "a2",
+      "kind": "frame",
+      "name": "div",
+      "parent": "bc2d39f3",
+      "style": {
+        "alignItems": "center",
+        "background": "var(--card)",
+        "borderRadius": "20px",
+        "display": "flex",
+        "gap": "12px",
+        "margin": "6px 16px 0",
+        "padding": "14px 16px"
+      },
+      "tag": "div"
+    },
     "f68b20cc": {
       "id": "f68b20cc",
       "index": "a0",
@@ -12873,22 +13037,6 @@
         "display": "inline-flex",
         "flexShrink": "0"
       }
-    },
-    "f6e70f50": {
-      "id": "f6e70f50",
-      "index": "a0",
-      "kind": "text",
-      "name": "Open",
-      "parent": "54ed0623",
-      "style": {
-        "background": "var(--ink)",
-        "borderRadius": "17px",
-        "color": "var(--on-ink)",
-        "font": "600 14px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "padding": "9px 16px"
-      },
-      "tag": "span",
-      "text": "Open"
     },
     "f7038b4a": {
       "id": "f7038b4a",
@@ -12981,46 +13129,37 @@
       },
       "tag": "div"
     },
-    "f9bf494a": {
-      "id": "f9bf494a",
-      "index": "a1",
-      "kind": "text",
-      "name": "needs you",
-      "parent": "46755218",
-      "style": {
-        "color": "var(--red)",
-        "font": "600 13px -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "whiteSpace": "nowrap"
-      },
-      "tag": "span",
-      "text": "needs you"
-    },
-    "f9d2d1e7": {
-      "id": "f9d2d1e7",
-      "index": "a3",
-      "kind": "text",
-      "name": "9:41",
-      "parent": "02dd213a",
-      "style": {
-        "color": "#fff",
-        "font": "600 92px/1 -apple-system, 'SF Pro Text', system-ui, sans-serif",
-        "letterSpacing": "-2px",
-        "marginBottom": "22px",
-        "position": "relative",
-        "textAlign": "center"
-      },
-      "tag": "div",
-      "text": "9:41"
-    },
-    "f9e65b34": {
-      "id": "f9e65b34",
+    "f91db092": {
+      "id": "f91db092",
       "index": "a2",
       "kind": "text",
       "name": "·",
-      "parent": "89b2362a",
+      "parent": "498b7e82",
       "style": {},
       "tag": "span",
       "text": "·"
+    },
+    "f965b0e3": {
+      "id": "f965b0e3",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3\"/><path d=\"M12 17h.01\"/></svg>",
+      "name": "circle-help",
+      "parent": "429ee1ea",
+      "style": {
+        "color": "var(--red)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
+    "fa14d0e6": {
+      "id": "fa14d0e6",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg viewBox=\"0 0 512 512\" width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"var(--ink)\"><circle cx=\"88\" cy=\"88\" r=\"20\"></circle><circle cx=\"200\" cy=\"88\" r=\"46\"></circle><circle cx=\"312\" cy=\"88\" r=\"20\"></circle><circle cx=\"424\" cy=\"88\" r=\"20\"></circle><circle cx=\"88\" cy=\"200\" r=\"20\"></circle><circle cx=\"200\" cy=\"200\" r=\"20\"></circle><circle cx=\"312\" cy=\"200\" r=\"20\"></circle><circle cx=\"424\" cy=\"200\" r=\"46\"></circle><circle cx=\"88\" cy=\"312\" r=\"20\"></circle><circle cx=\"200\" cy=\"312\" r=\"20\"></circle><circle cx=\"312\" cy=\"312\" r=\"20\"></circle><circle cx=\"424\" cy=\"312\" r=\"20\"></circle><circle cx=\"88\" cy=\"424\" r=\"46\"></circle><circle cx=\"200\" cy=\"424\" r=\"20\"></circle><circle cx=\"312\" cy=\"424\" r=\"20\"></circle><circle cx=\"424\" cy=\"424\" r=\"20\"></circle></svg>",
+      "name": "Icon",
+      "parent": "cdc217fd",
+      "style": {}
     },
     "fa41c27f": {
       "id": "fa41c27f",
@@ -13077,16 +13216,6 @@
       "tag": "span",
       "text": "Idle"
     },
-    "fcae53cb": {
-      "id": "fcae53cb",
-      "index": "a2",
-      "kind": "text",
-      "name": "·",
-      "parent": "46755218",
-      "style": {},
-      "tag": "span",
-      "text": "·"
-    },
     "fcbe1c10": {
       "id": "fcbe1c10",
       "index": "a0",
@@ -13104,22 +13233,6 @@
         "width": "38px"
       },
       "tag": "div"
-    },
-    "fcd451ce": {
-      "id": "fcd451ce",
-      "index": "a2",
-      "kind": "frame",
-      "name": "span",
-      "parent": "0cb13e23",
-      "style": {
-        "background": "var(--red)",
-        "borderRadius": "50%",
-        "height": "8px",
-        "margin": "-4px 0 0 20px",
-        "position": "absolute",
-        "width": "8px"
-      },
-      "tag": "span"
     },
     "fd21bb86": {
       "id": "fd21bb86",
@@ -13150,21 +13263,6 @@
       },
       "tag": "div"
     },
-    "fd466167": {
-      "id": "fd466167",
-      "index": "a3",
-      "kind": "frame",
-      "name": "div",
-      "parent": "981f7096",
-      "style": {
-        "alignItems": "center",
-        "display": "flex",
-        "flexDirection": "column",
-        "gap": "4px",
-        "width": "70px"
-      },
-      "tag": "div"
-    },
     "fd833d31": {
       "id": "fd833d31",
       "index": "a3",
@@ -13192,19 +13290,6 @@
       "tag": "div",
       "text": " 2. fail the batch"
     },
-    "fdbc3751": {
-      "id": "fdbc3751",
-      "index": "a2",
-      "kind": "svg",
-      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 10v4\"/><path d=\"M14 10v4\"/><path d=\"M22 14v-4\"/><path d=\"M6 10v4\"/><rect x=\"2\" y=\"6\" width=\"16\" height=\"12\" rx=\"2\"/></svg>",
-      "name": "battery-full",
-      "parent": "e1271bc0",
-      "style": {
-        "color": "var(--ink)",
-        "display": "inline-flex",
-        "flexShrink": "0"
-      }
-    },
     "fdc5a0dd": {
       "id": "fdc5a0dd",
       "index": "a0",
@@ -13230,6 +13315,19 @@
       "tag": "span",
       "text": "knows"
     },
+    "fe654c61": {
+      "id": "fe654c61",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect width=\"20\" height=\"8\" x=\"2\" y=\"2\" rx=\"2\" ry=\"2\"/><rect width=\"20\" height=\"8\" x=\"2\" y=\"14\" rx=\"2\" ry=\"2\"/><line x1=\"6\" x2=\"6.01\" y1=\"6\" y2=\"6\"/><line x1=\"6\" x2=\"6.01\" y1=\"18\" y2=\"18\"/></svg>",
+      "name": "server",
+      "parent": "8d82ed14",
+      "style": {
+        "color": "var(--faint)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
+    },
     "fef8c968": {
       "id": "fef8c968",
       "index": "a0",
@@ -13243,43 +13341,54 @@
         "flexShrink": "0"
       }
     },
-    "ff6be6b8": {
-      "id": "ff6be6b8",
-      "index": "a0",
+    "ffa8c777": {
+      "id": "ffa8c777",
+      "index": "a4",
       "kind": "frame",
-      "name": "14 Can’t reach",
+      "name": "tab bar",
+      "parent": "bc2d39f3",
       "style": {
-        "width": "1440px"
-      }
-    },
-    "ffccca97": {
-      "id": "ffccca97",
-      "index": "a2",
-      "kind": "frame",
-      "name": "div",
-      "parent": "0cc01ee4",
-      "style": {
-        "color": "var(--muted)",
-        "font": "13px 'SF Mono', ui-monospace, Menlo, monospace",
-        "marginTop": "6px"
+        "background": "var(--bg)",
+        "borderTop": "1px solid var(--line)",
+        "bottom": "0",
+        "display": "flex",
+        "height": "84px",
+        "justifyContent": "space-around",
+        "left": "0",
+        "padding": "10px 10px 0",
+        "position": "absolute",
+        "right": "0"
       },
       "tag": "div"
+    },
+    "ffdd1d48": {
+      "id": "ffdd1d48",
+      "index": "a0",
+      "kind": "svg",
+      "markup": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"8\" r=\"5\"/><path d=\"M20 21a8 8 0 0 0-16 0\"/></svg>",
+      "name": "user-round",
+      "parent": "27d2438e",
+      "style": {
+        "color": "var(--faint)",
+        "display": "inline-flex",
+        "flexShrink": "0"
+      }
     }
   },
   "pages": {
-    "52172785": {
-      "frame": "ff6be6b8",
-      "id": "52172785",
-      "index": "aH",
-      "name": "14 Can’t reach",
-      "route": "/offline"
-    },
     "099d6bf2": {
       "frame": "f3101247",
       "id": "099d6bf2",
       "index": "aG",
       "name": "10 Machines",
       "route": "/machines"
+    },
+    "113bf76a": {
+      "frame": "30433dcc",
+      "id": "113bf76a",
+      "index": "aL",
+      "name": "14 Can’t reach",
+      "route": "/offline"
     },
     "3886da4c": {
       "frame": "3a822993",
@@ -13295,6 +13404,13 @@
       "name": "03 Work",
       "route": "/work"
     },
+    "53dd226e": {
+      "frame": "0ba9a4c0",
+      "id": "53dd226e",
+      "index": "aJ",
+      "name": "02 Inbox",
+      "route": "/"
+    },
     "58a51b9d": {
       "frame": "62a1ce3a",
       "id": "58a51b9d",
@@ -13302,26 +13418,19 @@
       "name": "05 A worktree",
       "route": "/work/worktree"
     },
+    "5c783479": {
+      "frame": "0e8a8d9f",
+      "id": "5c783479",
+      "index": "aI",
+      "name": "01 Welcome",
+      "route": "/welcome"
+    },
     "927d0382": {
       "frame": "1f77d0e2",
       "id": "927d0382",
       "index": "a6",
       "name": "07 Command palette",
       "route": "/terminal/palette"
-    },
-    "99079e31": {
-      "frame": "2c5d20a7",
-      "id": "99079e31",
-      "index": "aC",
-      "name": "13 Lock screen",
-      "route": "/lock"
-    },
-    "9bcc4116": {
-      "frame": "da18cb60",
-      "id": "9bcc4116",
-      "index": "aE",
-      "name": "02 Inbox",
-      "route": "/"
     },
     "a5c57de1": {
       "frame": "55573c13",
@@ -13337,12 +13446,12 @@
       "name": "06 Terminal",
       "route": "/terminal"
     },
-    "ca2e4577": {
-      "frame": "2dd3b237",
-      "id": "ca2e4577",
-      "index": "a0",
-      "name": "01 Welcome",
-      "route": "/welcome"
+    "dcc16a90": {
+      "frame": "113a7263",
+      "id": "dcc16a90",
+      "index": "aK",
+      "name": "13 Lock screen",
+      "route": "/lock"
     },
     "dcce428e": {
       "frame": "3610c8e8",
