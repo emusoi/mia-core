@@ -84,6 +84,18 @@ cache = ["/root/.npm"]
 `node_modules` never mixes with your computer's. `cache` is shared by all
 the repository's containers, so the second install is fast.
 
+On another machine the tree is mirrored, and `.git`, `node_modules`,
+`target`, `dist`, `build` and the like stay behind on their own. A path of
+the project's that the box never needs, or one the mirror cannot hold (an
+iOS `Pods` tree, whose header symlinks are too long), goes in
+`sync_ignore`; it takes effect when the mirror is next created
+(`mia env rm && mia env up`):
+
+```toml
+[env]
+sync_ignore = ["packages/mobile/ios/Pods"]
+```
+
 Check it from scratch:
 
 ```bash

@@ -65,10 +65,11 @@ func (s Session) Describe() string {
 
 func SessionName(worktree string) string { return "mia-" + worktree }
 
-// Ensure has a session between local and machine:remote. An existing one for
-// the same two ends is kept, paused or not: a manual worktree's session is
-// paused on purpose, and only `mia env sync` changes that.
-func (m Mirror) Ensure(worktree, local, machine, remote string) error {
+// Ensure has a session between local and machine:remote, leaving out Ignores
+// and the project's own `sync_ignore` paths. An existing one for the same two
+// ends is kept, paused or not: a manual worktree's session is paused on
+// purpose, and only `mia env sync` changes that.
+func (m Mirror) Ensure(worktree, local, machine, remote string, ignores []string) error {
 	name := SessionName(worktree)
 	beta := machine + ":" + remote
 
@@ -86,16 +87,27 @@ func (m Mirror) Ensure(worktree, local, machine, remote string) error {
 	// That broke anything that hashes a folder: yarn's hash of a `file:`
 	// dependency changed on the box, and `yarn install --immutable` refused
 	// the lockfile. Give new files the modes a checkout has.
-	args := []string{"sync", "create", "--name=" + name, "--sync-mode=two-way-safe", "--no-global-configuration",
-		"--default-file-mode=0644", "--default-directory-mode=0755"}
-	for _, ignore := range Ignores {
-		args = append(args, "--ignore="+ignore)
-	}
-	args = append(args, local, beta)
-	if _, err := m.tool().Combined(args...); err != nil {
+	if _, err := m.tool().Combined(createArgs(name, local, beta, ignores)...); err != nil {
 		return fmt.Errorf("start the mirror for %s: %s", worktree, err)
 	}
 	return nil
+}
+
+// createArgs is the `mutagen sync create` line: Ignores first, then the
+// project's own, each once, in the order given.
+func createArgs(name, local, beta string, ignores []string) []string {
+	args := []string{"sync", "create", "--name=" + name, "--sync-mode=two-way-safe", "--no-global-configuration",
+		"--default-file-mode=0644", "--default-directory-mode=0755"}
+	seen := map[string]bool{}
+	for _, ignore := range append(append([]string{}, Ignores...), ignores...) {
+		ignore = strings.TrimSpace(ignore)
+		if ignore == "" || seen[ignore] {
+			continue
+		}
+		seen[ignore] = true
+		args = append(args, "--ignore="+ignore)
+	}
+	return append(args, local, beta)
 }
 
 func (m Mirror) Seed(worktree string) error {

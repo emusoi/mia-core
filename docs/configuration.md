@@ -33,6 +33,7 @@ uses every key.
 | `host_ports` | ports on your computer the container can reach |
 | `pass_host` | send the original `Host` header |
 | `container_only` | paths kept inside the container, like `node_modules` |
+| `sync_ignore` | paths the mirror to another machine leaves out, beyond the built-in ones |
 | `cache` | container paths shared by the repository's environments |
 | `pass` | environment variables passed from your shell |
 

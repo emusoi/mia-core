@@ -30,6 +30,10 @@ type Settings struct {
 
 	ContainerOnly []string `toml:"container_only"`
 
+	// Paths the mirror to another machine leaves out, beyond mirror.Ignores:
+	// a build tree the box never needs, or one whose symlinks it cannot hold.
+	SyncIgnore []string `toml:"sync_ignore"`
+
 	Cache []string `toml:"cache"`
 
 	Pass []string `toml:"pass"`
@@ -145,7 +149,7 @@ func (m Manager) Up(record model.Record, out *os.File) (Environment, error) {
 		if _, err := runtime.Run(where.Machine.SSH, "mkdir", "-p", where.Dir); err != nil {
 			return Environment{}, err
 		}
-		if err := where.Mirror.Ensure(record.Name, record.Path, where.Machine.SSH, where.Dir); err != nil {
+		if err := where.Mirror.Ensure(record.Name, record.Path, where.Machine.SSH, where.Dir, m.Settings.SyncIgnore); err != nil {
 			return Environment{}, err
 		}
 		// A manual worktree's session stays paused: it was seeded when it was
