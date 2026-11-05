@@ -142,7 +142,7 @@ func (a *App) Move(name, from, to string, say io.Writer) (Moved, error) {
 		}
 	}
 	moved.Carried = a.carry(src, dst, path, moved.Path, windows)
-	ridden := a.ride(src, dst, path, moved.Path)
+	ridden := a.ride(src, dst, path, moved.Path, say)
 	moved.Carried = append(moved.Carried, ridden...)
 	fmt.Fprintf(say, "opening its windows there: %d\n", len(windows))
 	if err := dst.open(moved.Name, moved.Path, windows); err != nil {
@@ -321,7 +321,7 @@ func (a *App) carry(src, dst side, from, to string, windows []Window) []string {
 // ride carries what rides with the worktree: each rider packs on the side
 // it leaves and lands on the other, and is told later when the worktree is
 // gone from where it was.
-func (a *App) ride(src, dst side, from, to string) []string {
+func (a *App) ride(src, dst side, from, to string, say io.Writer) []string {
 	var ridden []string
 	for name, script := range riders {
 		toPath := to
@@ -331,12 +331,18 @@ func (a *App) ride(src, dst side, from, to string) []string {
 			}
 		}
 		packed, err := src.bytesOf(`cd "$1" && shift && `+script, src.repo, from, toPath, "pack", dst.label())
-		if err != nil || len(packed) == 0 {
+		if err != nil {
+			fmt.Fprintf(say, "%s stays behind: %v\n", name, err)
 			continue
+		}
+		if len(packed) == 0 {
+			continue // nothing of it here
 		}
 		if err := dst.feed(packed, script, from, toPath, "land", src.label()); err != nil {
+			fmt.Fprintf(say, "%s stays behind: %v\n", name, err)
 			continue
 		}
+		fmt.Fprintf(say, "taking its %s review along\n", name)
 		ridden = append(ridden, name)
 	}
 	return ridden
