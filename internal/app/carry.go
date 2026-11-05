@@ -53,3 +53,25 @@ pack)
 	tar -cf - -C "$tmp" .pi ;;
 esac`,
 }
+
+// riders ride along with every worktree, window or not: sawa keeps a
+// worktree's review beside the repository, not in it. A rider's script is
+// run in the repository on the side the worktree leaves with its path
+// there, its path on the other side, the verb and the other machine's name:
+// `pack` prints what goes; `land` runs on the other side with that on its
+// standard input; `done` runs once the worktree is gone from where it was.
+// Nothing printed by pack means nothing to carry.
+var riders = map[string]string{
+	"sawa": `
+case "$3" in
+pack) command -v sw >/dev/null 2>&1 && sw carry pack "$1" "$2" ;;
+land)
+	common=$(git -C "$2" rev-parse --path-format=absolute --git-common-dir) || exit 1
+	(cd "$common" && tar -xf -) || exit 1
+	slug=$(cat "$common/sawa/moved") || exit 1
+	rm -f "$common/sawa/moved"
+	dir=$(git -C "$2" rev-parse --path-format=absolute --git-dir) || exit 1
+	mkdir -p "$dir/sawa" && printf '%s\n' "$slug" > "$dir/sawa/current" ;;
+done) command -v sw >/dev/null 2>&1 && sw carry away "$1" "$4" ;;
+esac`,
+}

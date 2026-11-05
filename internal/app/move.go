@@ -142,6 +142,8 @@ func (a *App) Move(name, from, to string, say io.Writer) (Moved, error) {
 		}
 	}
 	moved.Carried = a.carry(src, dst, path, moved.Path, windows)
+	ridden := a.ride(src, dst, path, moved.Path)
+	moved.Carried = append(moved.Carried, ridden...)
 	fmt.Fprintf(say, "opening its windows there: %d\n", len(windows))
 	if err := dst.open(moved.Name, moved.Path, windows); err != nil {
 		return moved, err
@@ -150,7 +152,20 @@ func (a *App) Move(name, from, to string, say io.Writer) (Moved, error) {
 	if _, err := src.sh(`cd "$1" && `+src.mia+` rm --force --stop-running "$2"`, src.repo, name); err != nil {
 		return moved, fmt.Errorf("it is there now, but removing it here failed: %w", err)
 	}
+	for _, name := range ridden {
+		_, _ = src.sh(`cd "$1" && shift && `+riders[name], src.repo, path, moved.Path, "done", dst.label())
+	}
 	return moved, nil
+}
+
+// label is what the other side calls this one: the machine's name, or this
+// computer's host name.
+func (s side) label() string {
+	if !s.here() {
+		return s.machine.Name
+	}
+	host, _ := os.Hostname()
+	return strings.ToLower(strings.SplitN(host, ".", 2)[0])
 }
 
 func (a *App) sideOf(where string) (side, error) {
@@ -301,6 +316,30 @@ func (a *App) carry(src, dst side, from, to string, windows []Window) []string {
 		carried = append(carried, program)
 	}
 	return carried
+}
+
+// ride carries what rides with the worktree: each rider packs on the side
+// it leaves and lands on the other, and is told later when the worktree is
+// gone from where it was.
+func (a *App) ride(src, dst side, from, to string) []string {
+	var ridden []string
+	for name, script := range riders {
+		toPath := to
+		if !dst.here() {
+			if home, err := dst.machine.Home(); err == nil && !filepath.IsAbs(to) {
+				toPath = filepath.Join(strings.TrimSpace(home), to)
+			}
+		}
+		packed, err := src.bytesOf(`cd "$1" && shift && `+script, src.repo, from, toPath, "pack", dst.label())
+		if err != nil || len(packed) == 0 {
+			continue
+		}
+		if err := dst.feed(packed, script, from, toPath, "land", src.label()); err != nil {
+			continue
+		}
+		ridden = append(ridden, name)
+	}
+	return ridden
 }
 
 func madeName(out string) string {
