@@ -26,6 +26,7 @@ import (
 
 	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/runtime"
+	"github.com/emusoi/mia-core/internal/signal"
 )
 
 var version = "dev"
@@ -509,6 +510,9 @@ func cmdList(a *app.App, asJSON bool) int {
 		if l.Stack != "" {
 			marks = append(marks, "in "+l.Stack)
 		}
+		if len(l.Signals) > 0 {
+			marks = append(marks, signalMark(l.Signals[0]))
+		}
 		branch := l.Branch
 		if branch == "" {
 			branch = "(detached)"
@@ -520,6 +524,14 @@ func cmdList(a *app.App, asJSON bool) int {
 		fmt.Printf("%s%-*s  %s %s\n", star, width, l.Name, padded(branch, 28), strings.Join(marks, " · "))
 	}
 	return exitOK
+}
+
+// signalMark is a worktree's best signal on its ls row: its kind, and its text.
+func signalMark(one signal.Signal) string {
+	if one.Text == "" {
+		return one.Kind
+	}
+	return one.Kind + ": " + one.Text
 }
 
 func cmdPath(a *app.App, args []string) int {

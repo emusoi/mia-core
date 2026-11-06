@@ -95,6 +95,11 @@ worktree is rather than asking for you: it is a word on its row, under
 active. `--for` ends it after a while, `--until seen` when you next switch
 to the worktree. A machine's signals arrive with its worktrees.
 
+A note on where a worktree stands, one an agent leaves and that should
+outlive it, is a signal with no pane: `TMUX_PANE= mia signal . note "tests
+green, ready for review" --rank 60 --from note`. `mia ls` shows each
+worktree's best signal at the end of its row.
+
 Set with `.` from inside tmux, a signal keeps the pane it came from, so the
 radar can answer there without switching: `^r` types a reply, and `^y`
 presses what `--yes` names as the approval. A pane no longer in the

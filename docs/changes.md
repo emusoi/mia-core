@@ -13,6 +13,9 @@ on GitHub; a tag without its section is not released.
   tag or branch instead of base. A branch that is only on origin, such as a
   pull request to review after `git fetch`, now starts at origin's branch
   and tracks it, rather than as a new branch from base.
+- **`mia ls` shows each worktree's best signal** at the end of its row:
+  `note: tests green, ready for review`. A signal set with `TMUX_PANE=`
+  emptied keeps no pane, so a note an agent leaves outlives the agent.
 - **A `poll` event for plugins**, every 30 seconds or so, for one that
   looks outside mia. The `gh` plugin uses it: each worktree's pull request
   shows on its row as `ci failed`, `changes asked` or `approved`, or quietly
