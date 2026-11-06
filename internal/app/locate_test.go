@@ -42,6 +42,7 @@ func TestAStackNameLocatesTheWorktreeThatHoldsIt(t *testing.T) {
 }
 
 func TestAbandonedIsCleanQuietAndOld(t *testing.T) {
+	gittest.Isolate(t) // a real session sharing a test worktree's name would keep it
 	repo := gittest.New(t)
 	a := open(t, repo)
 	old, err := a.New("forgotten")

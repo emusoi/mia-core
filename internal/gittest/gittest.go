@@ -92,6 +92,10 @@ func Isolate(t *testing.T) {
 	t.Helper()
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("TMUX_TMPDIR", t.TempDir())
+	// run inside tmux, $TMUX names the real server and tmux uses it over
+	// TMUX_TMPDIR: a test worktree sharing a real session's name saw it
+	t.Setenv("TMUX", "")
+	t.Setenv("TMUX_PANE", "")
 	t.Setenv("HOME", t.TempDir())
 	// a session's shell is sh: a login zsh, killed with tmux, writes its
 	// history into HOME as the test removes it
