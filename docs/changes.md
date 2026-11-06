@@ -9,6 +9,10 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **`mia new <branch> --from <ref>`**: start the new branch at a commit,
+  tag or branch instead of base. A branch that is only on origin, such as a
+  pull request to review after `git fetch`, now starts at origin's branch
+  and tracks it, rather than as a new branch from base.
 - **A `poll` event for plugins**, every 30 seconds or so, for one that
   looks outside mia. The `gh` plugin uses it: each worktree's pull request
   shows on its row as `ci failed`, `changes asked` or `approved`, or quietly

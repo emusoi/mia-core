@@ -22,7 +22,7 @@ var groupOf = map[string]string{
 }
 
 var verbs = []Verb{
-	{"new", "mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--shell] <branch>", "create a worktree and name it", false, ""},
+	{"new", "mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--from <ref>] [--shell] <branch>", "create a worktree and name it", false, ""},
 	{"ls", "mia ls", "what exists", true, ""},
 	{"setup", "mia setup [worktree]", "run the configured setup in a worktree again", false, ""},
 	{"path", "mia path [worktree|stack]", "print a worktree's path, for scripts; no argument is the main checkout", true, ""},

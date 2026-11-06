@@ -6,7 +6,8 @@
 mia new due-dates
 ```
 
-makes the branch (from `base` if set), a worktree next to the repository
+makes the branch (from origin's branch of that name if there is one, else
+from `base` if set), a worktree next to the repository
 (`~/src/shop.monduli`), and a name. It copies `clone` files from the main
 checkout and runs `setup`. If the branch is already checked out somewhere,
 you get that worktree.
@@ -14,6 +15,7 @@ you get that worktree.
 | flag | does |
 |---|---|
 | `--shell` | attach to its session after |
+| `--from <ref>` | start the new branch at a commit, tag or branch instead |
 | `--on <machine>` | make the whole worktree on that machine: its git, session and agent live there |
 | `--stack` | a [stack](stacks.md) layer instead |
 

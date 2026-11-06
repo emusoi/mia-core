@@ -74,6 +74,33 @@ func TestNewStartsFromTheConfiguredBase(t *testing.T) {
 	}
 }
 
+func TestNewFromStartsWhereItIsToldAndAtOriginsBranch(t *testing.T) {
+	repo := gittest.New(t)
+	a := open(t, repo)
+	old := git.Head(repo.Root)
+	repo.Write("later.txt", "x\n")
+	repo.Commit("later")
+	record, err := a.NewFrom("from-old", old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if git.Head(record.Path) != old {
+		t.Errorf("--from starts at %s, want %s", git.Head(record.Path), old)
+	}
+	if _, err := a.NewFrom("from-nowhere", "no-such-ref"); err == nil {
+		t.Error("--from a ref that is not there must refuse")
+	}
+	// a branch that is only on origin starts there, tracking it
+	repo.Git("update-ref", "refs/remotes/origin/review-me", old)
+	record, err = a.New("review-me")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if git.Head(record.Path) != old {
+		t.Errorf("origin's branch: starts at %s, want %s", git.Head(record.Path), old)
+	}
+}
+
 func TestSetupRunsAgainAndAFailedSetupIsReported(t *testing.T) {
 	repo := gittest.New(t)
 	a := open(t, repo)

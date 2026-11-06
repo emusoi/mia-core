@@ -435,8 +435,9 @@ func cmdNew(a *app.App, args []string, asJSON bool) int {
 	own := take(&args, "--worktree")
 	andShell := take(&args, "--shell")
 	on := takeValue(&args, "--on")
-	if len(args) != 1 {
-		return usageErr("mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--shell] <branch>")
+	from := takeValue(&args, "--from")
+	if len(args) != 1 || (from != "" && (asLayer || on != "")) {
+		return usageErr("mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--from <ref>] [--shell] <branch>")
 	}
 	if strings.HasPrefix(args[0], "-") {
 		return usageErr("mia new: unknown flag " + args[0])
@@ -458,7 +459,7 @@ func cmdNew(a *app.App, args []string, asJSON bool) int {
 		return exitFor(a.NewOn(machine, args[0]))
 	}
 	before, _ := a.Store.Load()
-	record, err := a.New(args[0])
+	record, err := a.NewFrom(args[0], from)
 	if err != nil {
 		if record.Path == "" {
 			return fail(err)

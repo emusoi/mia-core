@@ -219,9 +219,16 @@ func (a *App) Resolver() (resolve.Repo, error) {
 	return resolve.Repo{Root: a.Root, Records: records}, nil
 }
 
-func (a *App) New(branch string) (model.Record, error) {
+func (a *App) New(branch string) (model.Record, error) { return a.NewFrom(branch, "") }
+
+// NewFrom is New with the new branch starting at from, any commit-ish,
+// instead of base.
+func (a *App) NewFrom(branch, from string) (model.Record, error) {
+	if from != "" && git.RevParse(a.Root, from+"^{commit}") == "" {
+		return model.Record{}, fmt.Errorf("%s is not a commit, branch or tag here", from)
+	}
 	before, _ := a.Store.Load()
-	record, err := a.newWorktree(branch, "")
+	record, err := a.newWorktree(branch, from)
 	if record.Path != "" && !slices.ContainsFunc(before, func(one model.Record) bool { return one.Path == record.Path }) {
 		a.Emit("worktree.created", record, nil)
 	}
@@ -229,7 +236,8 @@ func (a *App) New(branch string) (model.Record, error) {
 }
 
 // newWorktree makes a worktree for branch, a new branch starting at start
-// when given, else at base.
+// when given, else at origin's branch of that name when there is one, else
+// at base.
 func (a *App) newWorktree(branch, start string) (model.Record, error) {
 	if branch == "" {
 		return model.Record{}, fmt.Errorf("`mia new <branch>` needs a branch name")
@@ -267,7 +275,11 @@ func (a *App) newWorktree(branch, start string) (model.Record, error) {
 	create := !git.BranchExists(a.Root, branch)
 	from := start
 	if start != "" && !create {
-		return model.Record{}, fmt.Errorf("%s already exists — a fork starts a new branch", branch)
+		return model.Record{}, fmt.Errorf("%s already exists — a new start needs a new branch", branch)
+	}
+	// shortcut: origin only; a branch only on another remote starts at base.
+	if from == "" && create && git.RevParse(a.Root, "refs/remotes/origin/"+branch) != "" {
+		from = "origin/" + branch
 	}
 	if from == "" && create && a.Config.Base != "" && git.RevParse(a.Root, a.Config.Base) != "" {
 		from = a.Config.Base
