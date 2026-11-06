@@ -15,6 +15,7 @@ you get that worktree.
 | flag | does |
 |---|---|
 | `--shell` | attach to its session after |
+| `--bg` | return at once and run `setup` in a `setup` window of its session; a failed setup leaves a red signal |
 | `--from <ref>` | start the new branch at a commit, tag or branch instead |
 | `--on <machine>` | make the whole worktree on that machine: its git, session and agent live there |
 | `--stack` | a [stack](stacks.md) layer instead |

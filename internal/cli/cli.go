@@ -437,8 +437,9 @@ func cmdNew(a *app.App, args []string, asJSON bool) int {
 	andShell := take(&args, "--shell")
 	on := takeValue(&args, "--on")
 	from := takeValue(&args, "--from")
-	if len(args) != 1 || (from != "" && (asLayer || on != "")) {
-		return usageErr("mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--from <ref>] [--shell] <branch>")
+	bg := take(&args, "--bg")
+	if len(args) != 1 || ((from != "" || bg) && (asLayer || on != "")) {
+		return usageErr("mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--from <ref>] [--bg] [--shell] <branch>")
 	}
 	if strings.HasPrefix(args[0], "-") {
 		return usageErr("mia new: unknown flag " + args[0])
@@ -460,12 +461,23 @@ func cmdNew(a *app.App, args []string, asJSON bool) int {
 		return exitFor(a.NewOn(machine, args[0]))
 	}
 	before, _ := a.Store.Load()
+	setup := a.Config.Setup
+	if bg {
+		a.Config.Setup = nil // run below, in the session, not here
+	}
 	record, err := a.NewFrom(args[0], from)
 	if err != nil {
 		if record.Path == "" {
 			return fail(err)
 		}
 		fmt.Fprintf(os.Stderr, "mia: %v\n", err)
+	}
+	if bg && len(setup) > 0 && err == nil && !slices.ContainsFunc(before, func(one model.Record) bool { return one.Path == record.Path }) {
+		if err := setupInWindow(a, record, setup); err != nil {
+			fmt.Fprintf(os.Stderr, "mia: %s created, but setup did not start: %v\n", record.Name, err)
+		} else {
+			fmt.Fprintf(os.Stderr, "%s: setting up in its setup window\n", record.Name)
+		}
 	}
 	if asJSON {
 		return emit(record)
@@ -524,6 +536,20 @@ func cmdList(a *app.App, asJSON bool) int {
 		fmt.Printf("%s%-*s  %s %s\n", star, width, l.Name, padded(branch, 28), strings.Join(marks, " · "))
 	}
 	return exitOK
+}
+
+// setupInWindow runs setup in a setup window of the worktree's session. The
+// window stays, a shell under setup's output; a failed setup leaves a signal.
+func setupInWindow(a *app.App, record model.Record, setup []string) error {
+	self, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	script := `mia=$1 name=$2; shift 2; "$@"; s=$?
+if [ $s -ne 0 ]; then "$mia" signal "$name" setup "failed: exit $s" --style red --rank 20 --from setup; fi
+echo; echo "setup exited $s"; exec "${SHELL:-sh}"`
+	_, err = a.NewWindow(record, "setup", append([]string{"sh", "-c", script, "sh", self, record.Name}, setup...))
+	return err
 }
 
 // signalMark is a worktree's best signal on its ls row: its kind, and its text.
