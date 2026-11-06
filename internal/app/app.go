@@ -87,13 +87,16 @@ func (a *App) dirtyOf(path string, worked bool) bool {
 			return d.dirty
 		}
 	}
-	dirty, _ := git.DirtyTracked(path)
-	if !dirty {
-		if time.Since(d.untracked) > 30*time.Second {
-			d.untrackedDirty, _ = git.Dirty(path)
-			d.untracked = time.Now()
-		}
-		dirty = d.untrackedDirty
+	var dirty bool
+	if time.Since(d.untracked) > 30*time.Second {
+		// the full status answers tracked and untracked at once: a listing
+		// with nothing cached — the radar opening — runs it alone, not after
+		// a tracked-only one
+		dirty, _ = git.Dirty(path)
+		d.untrackedDirty, d.untracked = dirty, time.Now()
+	} else {
+		dirty, _ = git.DirtyTracked(path)
+		dirty = dirty || d.untrackedDirty
 	}
 	d.dirty, d.at = dirty, time.Now()
 	a.dirtiness.Store(path, d)
