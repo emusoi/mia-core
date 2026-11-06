@@ -182,13 +182,17 @@ func (s Store) Forget(branch string) error {
 }
 
 type Layer struct {
-	Branch       string `json:"branch"`
-	Parent       string `json:"parent"`
-	Landed       bool   `json:"landed"`
-	Ahead        int    `json:"ahead"`
-	NeedsRestack bool   `json:"needs_restack"`
-	Current      bool   `json:"current"`
-	Worktree     string `json:"worktree,omitempty"`
+	Branch string `json:"branch"`
+	Parent string `json:"parent"`
+	Landed bool   `json:"landed"`
+	Ahead  int    `json:"ahead"`
+	// NeedsRestack: the layer under it has commits it lacks — restack due.
+	NeedsRestack bool `json:"needs_restack"`
+	// BaseMoved: the bottom layer is behind the base, which moved on. Not
+	// due: a restack takes it, but nothing in the stack is out of step.
+	BaseMoved bool   `json:"base_moved,omitempty"`
+	Current   bool   `json:"current"`
+	Worktree  string `json:"worktree,omitempty"`
 }
 
 func (s Store) MemberOrParent(branch string) bool {
@@ -373,7 +377,8 @@ func (s Store) OfSurveyed(dir, branch, base string, counts *Counts, survey *Surv
 			Parent:       parent,
 			Landed:       isLanded,
 			Ahead:        ahead,
-			NeedsRestack: !isLanded && heads[parent] != "" && behind > 0,
+			NeedsRestack: !isLanded && parent != base && heads[parent] != "" && behind > 0,
+			BaseMoved:    !isLanded && parent == base && behind > 0,
 			Current:      name == branch,
 		})
 	}

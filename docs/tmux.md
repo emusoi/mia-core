@@ -19,7 +19,7 @@ mia tmux uninstall  # take it out again
 
 The right end of tmux's status line, for the pane you are in: the top
 signal (below), the worktree and its branch, its place in a stack with `⟳`
-when a restack is due, its uncommitted files, and a dot for each machine,
+when a layer has fallen behind the one under it, its uncommitted files, and a dot for each machine,
 red when it stops answering. It never waits on a machine; it reads their
 last answers and has them asked again every 30 seconds.
 

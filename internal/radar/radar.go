@@ -812,8 +812,11 @@ func layerDetail(l stack.Layer) string {
 	if l.Landed {
 		d = "landed"
 	}
-	if l.NeedsRestack {
+	switch {
+	case l.NeedsRestack:
 		d += "  ↓ behind " + l.Parent
+	case l.BaseMoved:
+		d += "  · " + l.Parent + " moved on"
 	}
 	if l.Current {
 		d += "  · you are here"

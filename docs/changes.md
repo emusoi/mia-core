@@ -72,6 +72,12 @@ on GitHub; a tag without its section is not released.
 
 ### Changed
 
+- **A restack is due only when a layer falls behind the layer under it.**
+  The bottom layer being behind the base — `staging` moved on, as it always
+  does — no longer lights `⟳ restack due` on the radar, the status line or
+  the phone; `mia stack` and a layer's row say `staging moved on` instead,
+  and `mia stack restack` still takes it.
+
 - The radar shows, under each worktree, what its claude says it is doing:
   the summary claude keeps in its pane's title. The look shows it too.
 - **active** is in the order worktrees last moved, newest first, and the

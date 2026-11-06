@@ -190,8 +190,11 @@ func showStack(a *app.App, _ string, layers []stack.Layer, asJSON bool) int {
 		case r.Ahead == 0:
 			state = "not started"
 		}
-		if r.NeedsRestack {
+		switch {
+		case r.NeedsRestack:
 			state += " · needs restack"
+		case r.BaseMoved:
+			state += " · " + r.Parent + " moved on"
 		}
 		where := ""
 		if r.Worktree != "" {

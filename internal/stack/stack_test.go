@@ -198,3 +198,41 @@ func TestALandedLayerNeverNeedsARestack(t *testing.T) {
 		t.Errorf("landed %v, needs restack %v; want landed and no restack", layers[0].Landed, layers[0].NeedsRestack)
 	}
 }
+
+func TestRestackIsDueOnlyWhenALayerFallsBehindTheOneUnderIt(t *testing.T) {
+	repo := gittest.New(t)
+	s := store(t)
+	repo.Git("branch", "schema")
+	if err := s.Record("schema", "main"); err != nil {
+		t.Fatal(err)
+	}
+	repo.Git("switch", "-q", "schema")
+	repo.Write("schema.txt", "schema")
+	repo.Commit("Schema")
+	repo.Git("branch", "api")
+	if err := s.Record("api", "schema"); err != nil {
+		t.Fatal(err)
+	}
+	repo.Git("switch", "-q", "main")
+	repo.Write("later.txt", "main moved on")
+	repo.Commit("Main moves on")
+
+	layers, err := s.Of(repo.Root, "api", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if layers[0].NeedsRestack || !layers[0].BaseMoved || layers[1].NeedsRestack {
+		t.Fatalf("main moving on is not a restack due: %+v", layers)
+	}
+
+	repo.Git("switch", "-q", "schema")
+	repo.Write("schema.txt", "schema, fixed")
+	repo.Commit("Schema fix")
+	layers, err = s.Of(repo.Root, "api", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !layers[1].NeedsRestack || layers[1].BaseMoved {
+		t.Errorf("a layer behind the one under it is: %+v", layers[1])
+	}
+}
