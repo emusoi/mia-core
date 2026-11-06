@@ -180,3 +180,28 @@ esac
 		t.Errorf("events log: %v", err)
 	}
 }
+
+func TestAManifestIsAskedOnceWhileThePluginIsTheSame(t *testing.T) {
+	h, dir := host(t)
+	asked := filepath.Join(t.TempDir(), "asked")
+	plugin := func(help string) string {
+		return `case "$1" in
+manifest) echo x >> ` + asked + `; echo '{"protocol":1,"help":"` + help + `"}' ;;
+esac
+`
+	}
+	write(t, dir, "counted", plugin("first"))
+	h.Configured = []string{"counted"}
+	for range 3 {
+		if on, err := h.Enabled(); err != nil || len(on) != 1 || on[0].Manifest.Help != "first" {
+			t.Fatalf("enabled %+v %v", on, err)
+		}
+	}
+	if data, _ := os.ReadFile(asked); strings.Count(string(data), "x") != 1 {
+		t.Errorf("asked %d times, want once", strings.Count(string(data), "x"))
+	}
+	write(t, dir, "counted", plugin("rebuilt, and longer"))
+	if on, _ := h.Enabled(); len(on) != 1 || on[0].Manifest.Help != "rebuilt, and longer" {
+		t.Errorf("a changed plugin is asked again: %+v", on)
+	}
+}

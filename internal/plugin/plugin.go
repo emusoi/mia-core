@@ -159,7 +159,7 @@ func (h Host) List() ([]Plugin, error) {
 		case p.Path == "":
 			p.Problem = "enabled, but no " + Prefix + name + " is installed"
 		case p.Enabled:
-			p.Manifest, err = ReadManifest(p.Path)
+			p.Manifest, err = h.manifest(p.Path)
 			if err != nil {
 				p.Problem = err.Error()
 			}
@@ -176,6 +176,60 @@ func (h Host) Enabled() ([]Plugin, error) {
 		return nil, err
 	}
 	return slices.DeleteFunc(all, func(p Plugin) bool { return !p.Enabled || p.Problem != "" }), nil
+}
+
+// manifestCache is what each plugin said its manifest was, by the file's
+// resolved path, while the file stays the same size and age: asking costs a
+// process each, every poll, event and radar, and mia-share alone takes 0.1s.
+type manifestCache map[string]struct {
+	Size     int64     `json:"size"`
+	Modified time.Time `json:"modified"`
+	Manifest Manifest  `json:"manifest"`
+}
+
+func (h Host) cachePath() string {
+	if h.StatePath == "" {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(h.StatePath), "cache", "manifests.json")
+}
+
+// manifest is the plugin's manifest, from the cache while its file is
+// unchanged, else asked for and kept. A manifest that fails is never kept.
+func (h Host) manifest(path string) (Manifest, error) {
+	cachePath := h.cachePath()
+	real, err := filepath.EvalSymlinks(path)
+	info, statErr := os.Stat(real)
+	if cachePath == "" || err != nil || statErr != nil {
+		return ReadManifest(path)
+	}
+	cache := manifestCache{}
+	if data, err := os.ReadFile(cachePath); err == nil {
+		_ = json.Unmarshal(data, &cache)
+	}
+	if hit, ok := cache[real]; ok && hit.Size == info.Size() && hit.Modified.Equal(info.ModTime()) {
+		return hit.Manifest, nil
+	}
+	m, err := ReadManifest(path)
+	if err != nil {
+		return m, err
+	}
+	entry := cache[real]
+	entry.Size, entry.Modified, entry.Manifest = info.Size(), info.ModTime(), m
+	cache[real] = entry
+	if data, err := json.Marshal(cache); err == nil && os.MkdirAll(filepath.Dir(cachePath), 0o755) == nil {
+		// another mia may write at the same time: write aside, then rename
+		if temp, err := os.CreateTemp(filepath.Dir(cachePath), ".manifests-*"); err == nil {
+			_, werr := temp.Write(data)
+			cerr := temp.Close()
+			if werr == nil && cerr == nil {
+				_ = os.Rename(temp.Name(), cachePath)
+			} else {
+				_ = os.Remove(temp.Name())
+			}
+		}
+	}
+	return m, nil
 }
 
 func ReadManifest(path string) (Manifest, error) {

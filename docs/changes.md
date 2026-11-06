@@ -72,6 +72,10 @@ on GitHub; a tag without its section is not released.
 
 ### Changed
 
+- **Plugins' manifests are read once, not on every call.** mia kept
+  running every plugin's `manifest` on each poll, event and radar —
+  about 0.2s; it keeps each answer while the plugin's file is unchanged,
+  and asks again when it is rebuilt.
 - **A restack is due only when a layer falls behind the layer under it.**
   The bottom layer being behind the base — `staging` moved on, as it always
   does — no longer lights `⟳ restack due` on the radar, the status line or
