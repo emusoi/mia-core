@@ -9,6 +9,8 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **`mia new --name <name>`** picks the worktree's name, and
+  **`mia rm --branch`** deletes the branch too once the base holds it.
 - **Environments run as isolated Compose projects**, with `mia doctor`,
   `mia env up --wait --recreate`, `mia env down --all`, and remote sync
   that is safe: secrets stay behind unless `sync_secrets` says otherwise,

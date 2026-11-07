@@ -171,3 +171,26 @@ func TestARecordWhosePathCannotBeReadIsKept(t *testing.T) {
 		t.Error("a worktree mia could not stat was forgotten as if it were gone")
 	}
 }
+
+func TestDropMergedBranchDeletesOnlyWhatTheBaseHas(t *testing.T) {
+	repo := gittest.New(t)
+	a := open(t, repo)
+	repo.Git("branch", "merged")
+	ahead := repo.Worktree("ahead", "ahead")
+	if err := os.WriteFile(filepath.Join(ahead, "new.txt"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	repo.GitIn(ahead, "add", ".")
+	repo.GitIn(ahead, "commit", "-qm", "work nowhere else")
+	repo.Git("worktree", "remove", ahead)
+
+	if dropped, err := a.DropMergedBranch("merged"); err != nil || !dropped || git.BranchExists(repo.Root, "merged") {
+		t.Errorf("a merged branch goes: %v %v", dropped, err)
+	}
+	if dropped, err := a.DropMergedBranch("ahead"); err != nil || dropped || !git.BranchExists(repo.Root, "ahead") {
+		t.Errorf("a branch with work the base lacks stays: %v %v", dropped, err)
+	}
+	if dropped, _ := a.DropMergedBranch(a.BaseBranch(repo.Root)); dropped {
+		t.Error("the base itself is never deleted")
+	}
+}

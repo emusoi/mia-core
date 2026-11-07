@@ -22,7 +22,7 @@ var groupOf = map[string]string{
 }
 
 var verbs = []Verb{
-	{"new", "mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--from <ref>] [--bg] [--shell] <branch>", "create a worktree and name it", false, ""},
+	{"new", "mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--from <ref>] [--name <name>] [--bg] [--shell] <branch>", "create a worktree and name it", false, ""},
 	{"ls", "mia ls", "what exists", true, ""},
 	{"setup", "mia setup [worktree]", "run the configured setup in a worktree again", false, ""},
 	{"path", "mia path [worktree|stack]", "print a worktree's path, for scripts; no argument is the main checkout", true, ""},
@@ -30,7 +30,7 @@ var verbs = []Verb{
 	{"shell-init", "mia shell-init <zsh|bash|fish>", "the shell function that makes `mia switch` change directory, and completion", true, ""},
 	{"gc", "mia gc [--merged] [--apply] [--days N] | --others [--apply] [path...]", "worktrees nobody has touched: clean, no session, not starred, quiet for N days; --merged: those whose branch is merged; --others: clean ones mia did not make", false, ""},
 	{"adopt", "mia adopt <worktree>", "take over a worktree created by hand", false, ""},
-	{"rm", "mia rm [--force] [--stop-running] <worktree>", "remove a worktree, its session and its name", false, ""},
+	{"rm", "mia rm [--force] [--stop-running] [--branch] <worktree>", "remove a worktree, its session and its name", false, ""},
 	{"window", "mia window [ls|open|select|new|close|read|send|press] [worktree] [window] [--editor] [-- command|text|keys]", "the windows of a worktree's session: land in one, pick one without landing, add a shell, close one, read or type into one, press keys in one without Enter", false, ""},
 	{"shell", "mia shell [--popup | --view <name>] [worktree]", "attach to a worktree's session; --view at this terminal's own size and window", false, ""},
 	{"run", "mia run <worktree>[@machine] <cmd…>", "run a command once in a worktree, here or on a machine", false, ""},

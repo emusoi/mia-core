@@ -17,6 +17,7 @@ you get that worktree.
 | `--shell` | attach to its session after |
 | `--bg` | return at once and run `setup` in a `setup` window of its session; a failed setup leaves a red signal |
 | `--from <ref>` | start the new branch at a commit, tag or branch instead |
+| `--name <name>` | call it that instead of the next free name |
 | `--on <machine>` | make the whole worktree on that machine: its git, session and agent live there |
 | `--stack` | a [stack](stacks.md) layer instead |
 
@@ -84,7 +85,8 @@ mia rm monduli
 
 removes the worktree, its session, its environment and its name. It refuses
 when there are uncommitted changes (`--force` discards them) or a session is
-running (`--stop-running` stops it). If environment cleanup fails, it keeps
+running (`--stop-running` stops it). `--branch` deletes the branch too, once
+it is merged into the base; otherwise it is kept and `mia rm` says so. If environment cleanup fails, it keeps
 the worktree and records so cleanup and removal can be retried.
 
 ```bash

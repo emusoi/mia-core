@@ -438,8 +438,9 @@ func cmdNew(a *app.App, args []string, asJSON bool) int {
 	on := takeValue(&args, "--on")
 	from := takeValue(&args, "--from")
 	bg := take(&args, "--bg")
-	if len(args) != 1 || ((from != "" || bg) && (asLayer || on != "")) {
-		return usageErr("mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--from <ref>] [--bg] [--shell] <branch>")
+	name := takeValue(&args, "--name")
+	if len(args) != 1 || ((from != "" || bg || name != "") && (asLayer || on != "")) {
+		return usageErr("mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--from <ref>] [--name <name>] [--bg] [--shell] <branch>")
 	}
 	if strings.HasPrefix(args[0], "-") {
 		return usageErr("mia new: unknown flag " + args[0])
@@ -465,7 +466,7 @@ func cmdNew(a *app.App, args []string, asJSON bool) int {
 	if bg {
 		a.Config.Setup = nil // run below, in the session, not here
 	}
-	record, err := a.NewFrom(args[0], from)
+	record, err := a.NewNamed(args[0], from, name)
 	if err != nil {
 		if record.Path == "" {
 			return fail(err)
@@ -729,8 +730,9 @@ func cmdAdopt(a *app.App, args []string, asJSON bool) int {
 func cmdRemove(a *app.App, args []string) int {
 	force := take(&args, "--force") || take(&args, "-f")
 	stopRunning := take(&args, "--stop-running")
+	dropBranch := take(&args, "--branch")
 	if len(args) != 1 {
-		return usageErr("mia rm [--force] [--stop-running] <worktree>")
+		return usageErr("mia rm [--force] [--stop-running] [--branch] <worktree>")
 	}
 	removal, err := a.PlanRemoval(args[0])
 	if err != nil {
@@ -740,10 +742,22 @@ func cmdRemove(a *app.App, args []string) int {
 		return fail(err)
 	}
 
+	branch := git.CurrentBranch(removal.Record.Path)
 	if err := a.Remove(removal, force, stopRunning); err != nil {
 		return fail(err)
 	}
 	fmt.Printf("removed %s\n", removal.Record.Name)
+	if dropBranch && branch != "" {
+		dropped, err := a.DropMergedBranch(branch)
+		if err != nil {
+			return fail(err)
+		}
+		if dropped {
+			fmt.Printf("deleted branch %s, merged into %s\n", branch, a.BaseBranch(a.Root))
+		} else {
+			fmt.Printf("kept branch %s: it is not merged into %s\n", branch, a.BaseBranch(a.Root))
+		}
+	}
 	return exitOK
 }
 

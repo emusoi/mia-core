@@ -425,3 +425,26 @@ func TestANewNameCannotHoldWhatTmuxRewritesButAnOldOneStillLoads(t *testing.T) {
 		t.Errorf("a record named before the rule no longer loads: %v", err)
 	}
 }
+
+func TestNewNamedTakesTheChosenNameAndRefusesABadOrTakenOne(t *testing.T) {
+	repo := gittest.New(t)
+	a := open(t, repo)
+	record, err := a.NewNamed("due-dates", "", "ruvuma")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.Name != "ruvuma" || record.Path != git.Resolve(repo.Root+".ruvuma") {
+		t.Fatalf("the chosen name and its folder: %+v", record)
+	}
+	if owner, _ := a.Names.Owner("ruvuma"); owner != record.Path {
+		t.Errorf("the name is registered to the worktree: %q", owner)
+	}
+	for name, want := range map[string]string{"ruvuma": "already", "a.b": "cannot hold"} {
+		if _, err := a.NewNamed("other-"+strings.ReplaceAll(name, ".", ""), "", name); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("--name %s: %v", name, err)
+		}
+	}
+	if again, err := a.NewNamed("due-dates", "", "kilwa"); err == nil || again.Name != "ruvuma" {
+		t.Errorf("a branch already checked out keeps its name and says --name was not used: %+v %v", again, err)
+	}
+}

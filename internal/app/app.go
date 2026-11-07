@@ -228,11 +228,20 @@ func (a *App) New(branch string) (model.Record, error) { return a.NewFrom(branch
 // NewFrom is New with the new branch starting at from, any commit-ish,
 // instead of base.
 func (a *App) NewFrom(branch, from string) (model.Record, error) {
+	return a.NewNamed(branch, from, "")
+}
+
+// NewNamed is NewFrom with the worktree's name chosen rather than handed
+// out; "" hands one out.
+func (a *App) NewNamed(branch, from, name string) (model.Record, error) {
 	if from != "" && git.RevParse(a.Root, from+"^{commit}") == "" {
 		return model.Record{}, fmt.Errorf("%s is not a commit, branch or tag here", from)
 	}
 	before, _ := a.Store.Load()
-	record, err := a.newWorktree(branch, from)
+	record, err := a.newWorktree(branch, from, name)
+	if err == nil && name != "" && record.Name != name {
+		err = fmt.Errorf("%s is already checked out as %s; --name %s was not used", branch, record.Name, name)
+	}
 	if record.Path != "" && !slices.ContainsFunc(before, func(one model.Record) bool { return one.Path == record.Path }) {
 		a.Emit("worktree.created", record, nil)
 	}
@@ -242,7 +251,7 @@ func (a *App) NewFrom(branch, from string) (model.Record, error) {
 // newWorktree makes a worktree for branch, a new branch starting at start
 // when given, else at origin's branch of that name when there is one, else
 // at base.
-func (a *App) newWorktree(branch, start string) (model.Record, error) {
+func (a *App) newWorktree(branch, start, chosen string) (model.Record, error) {
 	if branch == "" {
 		return model.Record{}, fmt.Errorf("`mia new <branch>` needs a branch name")
 	}
@@ -272,7 +281,7 @@ func (a *App) newWorktree(branch, start string) (model.Record, error) {
 		}
 	}
 
-	path, name, err := a.reserve()
+	path, name, err := a.reserve(chosen)
 	if err != nil {
 		return model.Record{}, err
 	}
@@ -311,7 +320,22 @@ func (a *App) newWorktree(branch, start string) (model.Record, error) {
 	return record, nil
 }
 
-func (a *App) reserve() (path, name string, err error) {
+// reserve is the folder and name for a new worktree: the one chosen, when
+// it is a usable name and free, else the next free one.
+func (a *App) reserve(chosen string) (path, name string, err error) {
+	if chosen != "" {
+		if err := model.CheckName(chosen); err != nil {
+			return "", "", err
+		}
+		path = a.Root + "." + chosen
+		if _, statErr := os.Stat(path); statErr == nil {
+			return "", "", fmt.Errorf("%s is taken: %s already exists", chosen, path)
+		}
+		if err := a.Names.Claim(chosen, path); err != nil {
+			return "", "", err
+		}
+		return path, chosen, nil
+	}
 	name, err = a.Names.AllocateFor(func(candidate string) (string, bool) {
 		final := a.Root + "." + candidate
 		if _, statErr := os.Stat(final); statErr == nil {
@@ -323,6 +347,16 @@ func (a *App) reserve() (path, name string, err error) {
 		return "", "", err
 	}
 	return a.Root + "." + name, name, nil
+}
+
+// DropMergedBranch deletes branch once the base holds it, and keeps it
+// otherwise; the bool says which happened.
+func (a *App) DropMergedBranch(branch string) (bool, error) {
+	base := a.BaseBranch(a.Root)
+	if branch == "" || branch == base || !git.IsAncestor(a.Root, branch, base) {
+		return false, nil
+	}
+	return true, git.DeleteBranch(a.Root, branch, true)
 }
 
 func (a *App) adopt(path string) (model.Record, error) {

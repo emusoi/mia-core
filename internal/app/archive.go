@@ -195,7 +195,7 @@ func (a *App) Fork(query, branch string) (model.Record, error) {
 		return model.Record{}, err
 	}
 	before, _ := a.Store.Load()
-	record, err := a.newWorktree(branch, head)
+	record, err := a.newWorktree(branch, head, "")
 	if record.Path != "" && !slices.ContainsFunc(before, func(one model.Record) bool { return one.Path == record.Path }) {
 		a.Emit("worktree.created", record, nil)
 	}
