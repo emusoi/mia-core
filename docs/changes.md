@@ -9,6 +9,19 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **Environments run as isolated Compose projects**, with `mia doctor`,
+  `mia env up --wait --recreate`, `mia env down --all`, and remote sync
+  that is safe: secrets stay behind unless `sync_secrets` says otherwise,
+  `mia env sync … preview|conflicts|restart` show and settle it, and a
+  change to the ignore rules asks for a restart instead of syncing wrongly.
+- **`mia stack sync`** fetches the base, forgets landed layers and restacks
+  the rest; mia still never pushes. **`mia gc --merged`** collects clean
+  worktrees whose branch the base already holds.
+- **Shared project settings** in a committed `.mia.toml`, and
+  `mia config show|validate` for the configuration in effect.
+- **`mia api capabilities`**: the API's version, queries and features, and
+  `--json` on the rest of the commands scripts read.
+- **The gateway browses apps directly over HTTP**: `mia env browse --direct`.
 - **`mia new <branch> --from <ref>`**: start the new branch at a commit,
   tag or branch instead of base. A branch that is only on origin, such as a
   pull request to review after `git fetch`, now starts at origin's branch

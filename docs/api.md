@@ -10,27 +10,26 @@ JSON.
 mia api capabilities
 ```
 
-The answer names the non-panel API version, available queries and feature
-markers introduced by newer builds:
+The answer names the API version, available queries and feature markers
+introduced by newer builds:
 
 ```json
 {
   "version": 1,
-  "queries": ["capabilities", "worktrees", "dashboard"],
+  "queries": ["capabilities", "worktrees", "machines"],
   "features": ["direct-http", "project-config", "doctor"]
 }
 ```
 
 The actual answer includes every query and feature, not this shortened list.
 Check capabilities before using a feature. Existing response shapes are not
-wrapped in a version envelope. Panels keep their own `version` field for the
-panel schema.
+wrapped in a version envelope.
 
 ## JSON commands
 
 | command | returns |
 |---|---|
-| `mia api <query>` | worktrees, panels, environments, stacks and base |
+| `mia api <query>` | worktrees, machines, here, repositories, environments, stacks and base |
 | `mia config show --json` | effective global, project and local configuration |
 | `mia doctor --json` | every check and an overall `ok`; failures still exit non-zero |
 | `mia gateway status --json` | `running`, `address`, `pac`, `ca`, `trust`, `differentBuild`, `routes` |
@@ -66,5 +65,4 @@ for usage errors.
 
 A verb declared by two enabled plugins is refused until all but one are
 disabled. A verb that shadows a core command is also reported by
-`mia plugin ls` and `mia doctor`. Dashboard key clashes remain visible on the
-dashboard and can be resolved with `[keys]` bindings.
+`mia plugin ls` and `mia doctor`.

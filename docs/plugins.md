@@ -53,8 +53,6 @@ Each verb must be one non-empty word and unique inside a plugin. If two
 enabled plugins declare the same verb, `mia <verb>` is refused until all but
 one are disabled. Declaring a core command's name is also reported. Check
 with `mia plugin ls` or `mia doctor`; neither silently picks an owner.
-Dashboard key clashes are separate: they are shown on the dashboard and can
-be rebound with `[keys]`.
 
 ## Events
 
