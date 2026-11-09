@@ -40,7 +40,7 @@ func (h Host) run(args ...string) (string, error) {
 	if h.SSH == "" {
 		return h.local(args...)
 	}
-	out, err := run.Tool{Binary: "tmux", SSH: h.SSH}.Combined(args...)
+	out, err := run.Tool{Binary: "tmux", SSH: h.SSH}.Combined(append([]string{"-u"}, args...)...)
 	return out, err
 }
 
