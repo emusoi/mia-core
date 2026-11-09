@@ -97,6 +97,12 @@ on GitHub; a tag without its section is not released.
 
 ### Changed
 
+- **Sessions are found when mia runs without a locale.** Under launchd
+  or systemd, as the phone's server runs it, tmux printed the tabs in
+  mia's pane listing as `_`, so mia saw no session and every worktree
+  looked idle. Every tmux client mia starts now passes `-u`.
+- **A listing makes one `git status` per worktree, not two,** when the
+  untracked check is due.
 - **Plugins' manifests are read once, not on every call.** mia kept
   running every plugin's `manifest` on each poll, event and radar —
   about 0.2s; it keeps each answer while the plugin's file is unchanged,
