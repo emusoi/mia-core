@@ -5,7 +5,7 @@ under **Unreleased**. A release renames that heading to its tag and date,
 `## v0.2.0 — 2026-11-09`, and the same section becomes the release's notes
 on GitHub; a tag without its section is not released.
 
-## Unreleased
+## v0.1.0 — 2026-11-09
 
 ### Added
 
