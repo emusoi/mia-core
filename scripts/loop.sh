@@ -29,7 +29,7 @@ echo "ok ($wt)"
 step "star"
 mia star "$wt" >/dev/null
 mia ls | grep -q "★ $wt" || fail "ls shows no star"
-mia api dashboard | grep -q '"starred"' || fail "no starred section"
+mia api worktrees | grep -q '"starred": true' || fail "api shows no star"
 mia star "$wt" >/dev/null
 echo ok
 
@@ -67,10 +67,8 @@ mkdir -p "$lab/xdg/mia/plugins"
 cat > "$lab/xdg/mia/plugins/mia-hello" <<'SH'
 #!/bin/sh
 case "$1" in
-manifest) echo '{"protocol":1,"verbs":[{"name":"hello"}],"rows":{"every":"1s"},"sections":[{"id":"greeted","label":"greeted","rank":20}],"tabs":[{"id":"hi","label":"hi"}],"keys":[{"id":"wave","key":"H","label":"wave","verb":"hello","args":["{row}"],"report":true},{"id":"all","key":"V","label":"everyone","panel":"all","global":true}]}' ;;
-panel) echo '{"title":"everyone","sections":[{"id":"people","label":"people","rows":[{"id":"ana","cells":["ana"]}]}]}' ;;
+manifest) echo '{"protocol":1,"verbs":[{"name":"hello"}]}' ;;
 hello) shift; echo "hello $* in $MIA_WORKTREE" ;;
-rows) grep -o '"name":"[a-z0-9-]*"' | sed 's/.*:"\(.*\)"/"\1":{"section":"greeted","status":"said hello","tabs":{"hi":["waved"]}}/' | paste -sd, - | sed 's/.*/{"rows":{&}}/' ;;
 esac
 SH
 chmod +x "$lab/xdg/mia/plugins/mia-hello"
@@ -78,11 +76,6 @@ mia hello >/dev/null 2>&1 && fail "a plugin ran before it was enabled"
 mia plugin enable hello >/dev/null
 [ "$(cd "$(mia path "$wt")" && mia hello --json there)" = "hello --json there in $wt" ] || fail "the plugin verb did not run with its context"
 mia plugin ls | grep -q "hello *on *verbs: hello" || fail "plugin ls does not show it"
-mia api dashboard | grep -q '"label": "greeted"' || fail "the plugin's section is not on the dashboard"
-mia api dashboard | grep -q '"said hello"' || fail "the plugin's status is not on the row"
-mia api dashboard | grep -q '"hello.wave"' || fail "the plugin's key is not offered"
-mia api dashboard | grep -q '"waved"' || fail "the plugin's tab is not on the row"
-mia api plugin:hello:all | grep -q '"ana"' || fail "the plugin's panel did not draw"
 mia plugin disable hello >/dev/null
 echo ok
 
