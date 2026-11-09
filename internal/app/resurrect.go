@@ -47,7 +47,11 @@ func tmuxServer() string {
 // computer goes down Resurrect can open them again. None is forgotten while
 // its worktree is there: one gone while its server still runs was closed on
 // purpose, and stays, marked so, for when it is wanted back by name.
-func (a *App) Remember() error {
+func (a *App) Remember() error { return a.remember(nil) }
+
+// remember is Remember, told which sessions Resurrect opened just now and
+// with what: their programs are still starting, so a look sees only shells.
+func (a *App) remember(opened map[string][]Window) error {
 	server := tmuxServer()
 	if server == "" {
 		return nil // no tmux: nothing to see, and what was seen stays
@@ -65,7 +69,16 @@ func (a *App) Remember() error {
 		before, had := saved[record.Name]
 		switch {
 		case session.Here().Exists(record.Name):
-			kept[record.Name] = remembered{Server: server, Windows: side{}.windows(record.Name, record.Path), Seen: time.Now()}
+			windows := side{}.windows(record.Name, record.Path)
+			if was, ok := opened[record.Name]; ok && len(was) == len(windows) {
+				for i := range was {
+					was[i].ID = windows[i].ID // opened in this order
+				}
+				keepClaudes(windows, was)
+			} else if had && before.Server == server {
+				keepClaudes(windows, before.Windows)
+			}
+			kept[record.Name] = remembered{Server: server, Windows: windows, Seen: time.Now()}
 		case had && before.Server == server && !before.Closed:
 			before.Closed = true // gone while its server runs: closed on purpose
 			kept[record.Name] = before
@@ -78,6 +91,25 @@ func (a *App) Remember() error {
 		return err
 	}
 	return writeAtomic(a.sessionsFile(), data)
+}
+
+// keepClaudes gives a window now at its shell the claude it was last seen
+// running, so a claude that ended before tmux went down still comes back.
+// One quit on purpose comes back too, until its window runs something else.
+func keepClaudes(now, before []Window) {
+	for i, w := range now {
+		if w.Command != "" {
+			continue
+		}
+		for _, was := range before {
+			if words := strings.Fields(was.Command); was.ID == w.ID && len(words) > 0 && filepath.Base(words[0]) == "claude" {
+				now[i].Command, now[i].Conversation = was.Command, was.Conversation
+				if shells[w.Name] {
+					now[i].Name = "claude" // not the shell tmux named it after
+				}
+			}
+		}
+	}
 }
 
 // Revived is a session Resurrect opened again.
@@ -151,7 +183,11 @@ func (a *App) Resurrect(dry bool, names ...string) ([]Revived, error) {
 		revived = append(revived, Revived{record.Name, windows})
 	}
 	if !dry && len(revived) > 0 {
-		return revived, a.Remember()
+		opened := map[string][]Window{}
+		for _, r := range revived {
+			opened[r.Name] = r.Windows
+		}
+		return revived, a.remember(opened)
 	}
 	return revived, nil
 }

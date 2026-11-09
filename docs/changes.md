@@ -5,6 +5,16 @@ under **Unreleased**. A release renames that heading to its tag and date,
 `## v0.2.0 — 2026-11-09`, and the same section becomes the release's notes
 on GitHub; a tag without its section is not released.
 
+## Unreleased
+
+### Fixed
+
+- **`mia resurrect` brings back a claude that ended before tmux did.** A
+  window back at its shell keeps the claude it ran, and the conversation,
+  until it runs something else; before, the next look forgot it and the
+  session came back as a bare shell. What it opens it now says: `brought
+  back <worktree>: …`.
+
 ## v0.1.0 — 2026-11-09
 
 ### Added

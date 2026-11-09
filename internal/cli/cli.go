@@ -285,7 +285,11 @@ func Run(args []string) int {
 			for _, w := range r.Windows {
 				what = append(what, strings.TrimSpace(w.Name+" "+w.Command))
 			}
-			fmt.Printf("%s: %s\n", r.Name, strings.Join(what, " · "))
+			did := "brought back"
+			if dry {
+				did = "would bring back"
+			}
+			fmt.Printf("%s %s: %s\n", did, r.Name, strings.Join(what, " · "))
 		}
 		if err == nil && len(revived) == 0 {
 			if len(rest) > 0 {

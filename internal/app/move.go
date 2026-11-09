@@ -51,6 +51,8 @@ type Window struct {
 	// Conversation is the claude session the window ran, so it can be
 	// resumed exactly; "" for anything else, or when claude did not say.
 	Conversation string `json:",omitempty"`
+	// ID is tmux's id of the window, the same for as long as its server runs.
+	ID string `json:",omitempty"`
 }
 
 // Moved is what a move made, for saying so.
@@ -228,17 +230,17 @@ func (s side) conversationOf(panePID string) string {
 }
 
 func (s side) windows(name, path string) []Window {
-	out, err := s.sh(`tmux list-windows -t "=mia-$1" -F '#{window_name}	#{pane_current_path}	#{pane_current_command}	#{pane_pid}' 2>/dev/null`, name)
+	out, err := s.sh(`tmux list-windows -t "=mia-$1" -F '#{window_name}	#{pane_current_path}	#{pane_current_command}	#{pane_pid}	#{window_id}' 2>/dev/null`, name)
 	if err != nil {
 		return nil
 	}
 	var windows []Window
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		f := strings.Split(line, "\t")
-		if len(f) != 4 {
+		if len(f) != 5 {
 			continue
 		}
-		w := Window{Name: f[0]}
+		w := Window{Name: f[0], ID: f[4]}
 		if rel, err := filepath.Rel(path, f[1]); err == nil && !strings.HasPrefix(rel, "..") {
 			w.Dir = rel
 		}

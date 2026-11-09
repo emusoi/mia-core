@@ -114,21 +114,36 @@ func TestAClaudeResumesTheConversationItHad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.NewWindow(wt, "claude", []string{filepath.Join(bin, "claude"), "300"}); err != nil {
+	// typed into the window's shell, as a person does, so the window outlives it
+	if _, err := a.NewWindow(wt, "claude", nil); err != nil {
 		t.Fatal(err)
 	}
+	exec.Command("tmux", "send-keys", "-t", "="+session.Name(wt.Name)+":claude", filepath.Join(bin, "claude")+" 300", "Enter").Run()
 	// claude says which session a process runs in sessions/<pid>.json
 	var pid string
 	for range 50 {
-		out, _ := exec.Command("tmux", "display", "-p", "-t", "="+session.Name(wt.Name)+":claude", "#{pane_pid}").Output()
-		pgid, _ := exec.Command("ps", "-o", "tpgid=", "-p", strings.TrimSpace(string(out))).Output()
-		if pid = strings.TrimSpace(string(pgid)); pid != "" && pid != "-1" {
+		out, _ := exec.Command("tmux", "display", "-p", "-t", "="+session.Name(wt.Name)+":claude", "#{pane_pid} #{pane_current_command}").Output()
+		shell, running, _ := strings.Cut(strings.TrimSpace(string(out)), " ")
+		pgid, _ := exec.Command("ps", "-o", "tpgid=", "-p", shell).Output()
+		if pid = strings.TrimSpace(string(pgid)); running == "claude" && pid != "" && pid != "-1" {
 			break
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 	os.MkdirAll(filepath.Join(claudeHome, "sessions"), 0o755)
 	os.WriteFile(filepath.Join(claudeHome, "sessions", pid+".json"), []byte(`{"pid":`+pid+`,"sessionId":"23f98c02-c52b"}`), 0o644)
+	if err := a.Remember(); err != nil {
+		t.Fatal(err)
+	}
+	// the claude ends before tmux does: its window, back at a shell, keeps it
+	exec.Command("kill", pid).Run()
+	for range 50 {
+		out, _ := exec.Command("tmux", "display", "-p", "-t", "="+session.Name(wt.Name)+":claude", "#{pane_current_command}").Output()
+		if strings.TrimSpace(string(out)) != "claude" {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 	if err := a.Remember(); err != nil {
 		t.Fatal(err)
 	}
@@ -140,5 +155,13 @@ func TestAClaudeResumesTheConversationItHad(t *testing.T) {
 	i := slices.IndexFunc(got[0].Windows, func(w app.Window) bool { return w.Name == "claude" })
 	if i < 0 || !strings.HasSuffix(got[0].Windows[i].Command, "300 --resume 23f98c02-c52b") {
 		t.Errorf("the claude window resumes its own conversation: %+v", got[0].Windows)
+	}
+	// brought back, it is remembered with its claude though that is yet to start
+	if _, err := a.Resurrect(false); err != nil {
+		t.Fatal(err)
+	}
+	back := a.Sessions()
+	if len(back) != 1 || !slices.ContainsFunc(back[0].Windows, func(w app.Window) bool { return strings.HasSuffix(w.Command, "--resume 23f98c02-c52b") }) {
+		t.Errorf("what was just opened is remembered as opened: %+v", back)
 	}
 }
