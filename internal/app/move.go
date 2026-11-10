@@ -357,34 +357,35 @@ func (s side) open(name, path string, windows []Window) error {
 // carrier, unpacking it under the home on the other side; the window then
 // restarts with what the carrier says, so the agent picks up where it was.
 func (a *App) carry(src, dst side, from, to string, windows []Window) []string {
+	toPath := to
+	if !dst.here() {
+		if home, err := dst.machine.Home(); err == nil && !filepath.IsAbs(to) {
+			toPath = filepath.Join(strings.TrimSpace(home), to)
+		}
+	}
 	var carried []string
-	for i, w := range windows {
-		words := strings.Fields(w.Command)
-		if len(words) == 0 {
-			continue // a shell: nothing to carry
-		}
-		program := filepath.Base(words[0])
-		script, ok := carriers[program]
-		if !ok {
-			continue
-		}
-		toPath := to
-		if !dst.here() {
-			if home, err := dst.machine.Home(); err == nil && !filepath.IsAbs(to) {
-				toPath = filepath.Join(strings.TrimSpace(home), to)
+	again := map[string]string{} // by program: one folder, one conversation each
+	for i := range windows {
+		for _, p := range windows[i].panes() {
+			program, _ := agentOf(p.Command)
+			script, ok := carriers[program]
+			if !ok {
+				continue // a shell, or a program with no conversation to carry
+			}
+			if _, done := again[program]; !done {
+				again[program] = ""
+				packed, err := src.bytesOf(script, from, toPath, "pack")
+				if err != nil || len(packed) == 0 || dst.feed(packed, `cd && tar -xf -`) != nil {
+					continue
+				}
+				command, _ := src.sh(script, from, toPath, "command")
+				again[program] = strings.TrimSpace(command)
+				carried = append(carried, program)
+			}
+			if again[program] != "" {
+				p.Command = again[program]
 			}
 		}
-		packed, err := src.bytesOf(script, from, toPath, "pack")
-		if err != nil || len(packed) == 0 {
-			continue
-		}
-		if err := dst.feed(packed, `cd && tar -xf -`); err != nil {
-			continue
-		}
-		if again, err := src.sh(script, from, toPath, "command"); err == nil && strings.TrimSpace(again) != "" {
-			windows[i].Command = strings.TrimSpace(again)
-		}
-		carried = append(carried, program)
 	}
 	return carried
 }

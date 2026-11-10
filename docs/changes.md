@@ -11,7 +11,8 @@ on GitHub; a tag without its section is not released.
 
 - **Split windows come back split.** mia remembers every pane of a window,
   not only the one in front: `mia resurrect` and `mia move` open each in
-  its folder with its program, laid out as it was.
+  its folder with its program, laid out as it was. `mia move` takes an
+  agent's conversation along from any pane, not only a window's first.
 
 - **Editors and dev servers are kept as agents are.** A pane back at its
   shell keeps `nvim`, `vim`, `hx` or a dev server (`npm run dev`, `pnpm

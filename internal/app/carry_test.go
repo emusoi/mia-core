@@ -98,3 +98,29 @@ func keys(m map[string]string) []string {
 	}
 	return out
 }
+
+// A conversation is carried for an agent in any pane, however ps shows it,
+// and once for a folder though two panes run the same agent.
+func TestCarryReachesEveryPaneOfAWindow(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	from, to := "/home/a/src/x.old", "/Users/b/src/x.new"
+	said := filepath.Join(home, ".claude/projects/-home-a-src-x-old/1.jsonl")
+	if err := os.MkdirAll(filepath.Dir(said), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(said, []byte(`{"cwd":"`+from+`"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	windows := []Window{{Name: "work", Splits: []Pane{{Command: "/opt/bin/claude --model opus"}, {Command: "claude"}, {Command: "npm run dev"}}}}
+	carried := (*App)(nil).carry(side{}, side{}, from, to, windows)
+	if len(carried) != 1 || carried[0] != "claude" {
+		t.Errorf("carried %v, wanted claude once", carried)
+	}
+	if s := windows[0].Splits; s[0].Command != "claude --continue" || s[1].Command != "claude --continue" || s[2].Command != "npm run dev" || windows[0].Command != "" {
+		t.Errorf("each claude pane continues, the rest as they were: %+v", windows[0])
+	}
+	if _, err := os.Stat(filepath.Join(home, ".claude/projects/-Users-b-src-x-new/1.jsonl")); err != nil {
+		t.Errorf("the conversation is under the new path: %v", err)
+	}
+}
