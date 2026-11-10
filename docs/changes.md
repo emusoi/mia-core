@@ -14,6 +14,11 @@ on GitHub; a tag without its section is not released.
   until it runs something else; before, the next look forgot it and the
   session came back as a bare shell. What it opens it now says: `brought
   back <worktree>: …`.
+- **Every agent goes on where it was, not only claude.** codex (`resume
+  --last`), pi, opencode and cursor-agent (`--continue`) and gemini
+  (`--resume latest`) each continue their folder's last conversation, are
+  known behind node or by a version's path as `ps` shows them, and are kept
+  by a window back at its shell as a claude is.
 
 ## v0.1.0 — 2026-11-09
 

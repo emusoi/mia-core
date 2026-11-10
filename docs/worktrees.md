@@ -128,9 +128,10 @@ its uncommitted and untracked work in; the first is left as it is.
 Every 30 seconds or so, while tmux shows mia's status line, mia notes each
 session's windows: their folders and what runs in them. When tmux or the
 computer goes down, `mia resurrect` opens each one again, its programs
-started anew and each claude resuming the very conversation it had — one
-that ended before tmux did too: its window, back at a shell, keeps it until
-it runs something else. mia
+started anew and each claude resuming the very conversation it had; codex,
+pi, opencode, gemini and cursor-agent go on with their folder's last. An
+agent that ended before tmux did comes back too: its window, back at a
+shell, keeps it until it runs something else. mia
 forgets none: a session you closed while tmux was running stays closed,
 but `mia resurrect <worktree>` brings it back, and `mia resurrect --list`
 shows every session it remembers — running, down or closed — and when it
