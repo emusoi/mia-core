@@ -43,3 +43,23 @@ func TestAnAgentContinuesItsConversation(t *testing.T) {
 		}
 	}
 }
+
+func TestWhatStaysIsKeptAndWhatFinishesIsNot(t *testing.T) {
+	for in, want := range map[string]string{
+		"claude --model opus":        "claude",
+		"node /usr/local/bin/gemini": "gemini",
+		"nvim main.go":               "nvim",
+		"/opt/homebrew/bin/nvim":     "nvim",
+		"npm run dev":                "npm",
+		"npm run build":              "",
+		"git push":                   "",
+		"make":                       "",
+		"tail -f log/dev.log":        "tail",
+		"tail":                       "",
+		"":                           "",
+	} {
+		if got := stays(in, []string{"tail -f"}); got != want {
+			t.Errorf("stays(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

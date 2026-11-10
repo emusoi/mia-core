@@ -31,6 +31,12 @@ type Config struct {
 
 	Editor string `toml:"editor" json:"editor,omitempty"`
 
+	// Keep names programs a pane keeps after they end, as it keeps an agent:
+	// "nvim", "npm run dev". mia resurrect starts them again. Editors and
+	// dev servers are kept already; a program that finishes — a build, a
+	// push — must not be named here, or it runs again.
+	Keep []string `toml:"keep" json:"keep,omitempty"`
+
 	Env env.Settings `toml:"env" json:"env"`
 
 	Tools env.Tools `toml:"tools" json:"tools"`

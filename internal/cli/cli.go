@@ -1188,6 +1188,7 @@ const starterConfig = `# mia — this repository's local configuration. Every ke
 # prefix = "you/"                  # put in front of every branch name
 # setup = ["npm", "install"]       # run once in a new worktree
 # editor = "nvim"
+# keep = ["tail -f"]               # programs a pane keeps after they end, with agents, editors and dev servers
 # [popup]                          # the tmux popup f opens over the list
 # width = "100%"
 # height = "100%"

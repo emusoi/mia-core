@@ -27,6 +27,7 @@ Keep credentials out of the committed file.
 | `clone` | files copied from the main checkout into new worktrees |
 | `commit_times` | date files by their last commit |
 | `editor` | your editor; otherwise `$EDITOR` |
+| `keep` | programs `mia resurrect` starts again even if they had ended, by their first words: `["tail -f"]`. Agents, `nvim`, `vim`, `hx` and the usual dev servers (`npm run dev`, `pnpm dev`, …) are kept already. Never one that finishes, like a build |
 | `names` | places to name worktrees after, used before mia's own |
 | `[launch]` | named windows: `logs = "tail -f log/dev.log"` |
 

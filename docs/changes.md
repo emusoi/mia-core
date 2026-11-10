@@ -13,6 +13,12 @@ on GitHub; a tag without its section is not released.
   not only the one in front: `mia resurrect` and `mia move` open each in
   its folder with its program, laid out as it was.
 
+- **Editors and dev servers are kept as agents are.** A pane back at its
+  shell keeps `nvim`, `vim`, `hx` or a dev server (`npm run dev`, `pnpm
+  dev`, …) it ran, and `mia resurrect` starts it again; `keep = ["tail
+  -f"]` in the config names more. What finishes — a build, a push — is
+  never run again.
+
 ### Fixed
 
 - **`mia resurrect` brings back a claude that ended before tmux did.** A

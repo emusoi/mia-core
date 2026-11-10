@@ -78,9 +78,9 @@ func (a *App) remember(opened map[string][]Window) error {
 						}
 					}
 				}
-				keepAgents(windows, was)
+				keepRunning(windows, was, a.Config.Keep)
 			} else if had && before.Server == server {
-				keepAgents(windows, before.Windows)
+				keepRunning(windows, before.Windows, a.Config.Keep)
 			}
 			kept[record.Name] = remembered{Server: server, Windows: windows, Seen: time.Now()}
 		case had && before.Server == server && !before.Closed:
@@ -97,10 +97,34 @@ func (a *App) remember(opened map[string][]Window) error {
 	return writeAtomic(a.sessionsFile(), data)
 }
 
-// keepAgents gives a pane now at its shell the agent it was last seen
-// running, so one that ended before tmux went down still comes back. One
-// quit on purpose comes back too, until its pane runs something else.
-func keepAgents(now, before []Window) {
+// kept is what a pane keeps after it ends without being told: editors and
+// dev servers, which run until stopped. The config's keep adds to it.
+var kept = []string{"nvim", "vim", "hx", "npm run dev", "npm start", "pnpm dev", "pnpm run dev", "bun dev", "bun run dev", "yarn dev"}
+
+// stays names the program a pane keeps after it ends — an agent, or one of
+// kept and keep, by its first words — and is "" for any other.
+func stays(command string, keep []string) string {
+	if name, _ := agentOf(command); name != "" {
+		return name
+	}
+	words := strings.Fields(command)
+	if len(words) == 0 {
+		return ""
+	}
+	words[0] = filepath.Base(words[0])
+	for _, k := range slices.Concat(kept, keep) {
+		if first := strings.Fields(k); len(first) > 0 && len(words) >= len(first) && slices.Equal(words[:len(first)], first) {
+			return words[0]
+		}
+	}
+	return ""
+}
+
+// keepRunning gives a pane now at its shell the program it was last seen
+// running, when that is one that stays: so an agent, an editor or a dev
+// server that ended before tmux went down still comes back. One quit on
+// purpose comes back too, until its pane runs something else.
+func keepRunning(now, before []Window, keep []string) {
 	was := map[string]Pane{}
 	for i := range before {
 		for _, p := range before[i].panes() {
@@ -109,7 +133,7 @@ func keepAgents(now, before []Window) {
 	}
 	for i := range now {
 		for _, p := range now[i].panes() {
-			name, _ := agentOf(was[p.ID].Command)
+			name := stays(was[p.ID].Command, keep)
 			if p.Command != "" || name == "" {
 				continue
 			}
