@@ -21,6 +21,11 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **A brought-back window is named by tmux again.** `mia resurrect` and
+  `mia move` gave every window its old name for good — a claude's version
+  number, `zsh` — and tmux stopped naming it. Only a window you named
+  keeps its name now.
+
 - **`mia resurrect` brings back a claude that ended before tmux did.** A
   window back at its shell keeps the claude it ran, and the conversation,
   until it runs something else; before, the next look forgot it and the

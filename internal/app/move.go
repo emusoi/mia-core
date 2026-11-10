@@ -61,6 +61,9 @@ type Window struct {
 	Pane
 	Splits []Pane `json:",omitempty"`
 	Layout string `json:",omitempty"` // tmux's, for a window that is split
+	// Auto is a window tmux names after what runs in it; one a person
+	// named keeps that name when it is opened again.
+	Auto bool `json:",omitempty"`
 }
 
 // panes is every pane of the window, the first first.
@@ -75,6 +78,9 @@ func (w *Window) panes() []*Pane {
 // What says the window in a line: its name and what each pane runs.
 func (w Window) What() string {
 	what := strings.TrimSpace(w.Name + " " + w.Command)
+	if w.Auto && w.Command != "" {
+		what = w.Command // its name only says the same
+	}
 	for _, p := range w.Splits {
 		if p.Command == "" {
 			p.Command = "shell"
@@ -259,7 +265,7 @@ func (s side) conversationOf(panePID string) string {
 }
 
 func (s side) windows(name, path string) []Window {
-	out, err := s.sh(`tmux list-panes -s -t "=mia-$1" -F '#{window_id}	#{window_name}	#{window_layout}	#{pane_current_path}	#{pane_current_command}	#{pane_pid}	#{pane_id}' 2>/dev/null`, name)
+	out, err := s.sh(`tmux list-panes -s -t "=mia-$1" -F '#{window_id}	#{window_name}	#{window_layout}	#{pane_current_path}	#{pane_current_command}	#{pane_pid}	#{pane_id}	#{automatic-rename}' 2>/dev/null`, name)
 	if err != nil {
 		return nil
 	}
@@ -267,7 +273,7 @@ func (s side) windows(name, path string) []Window {
 	window := "" // tmux lists a window's panes together, in order
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		f := strings.Split(line, "\t")
-		if len(f) != 7 {
+		if len(f) != 8 {
 			continue
 		}
 		p := Pane{ID: f[6]}
@@ -286,7 +292,7 @@ func (s side) windows(name, path string) []Window {
 		}
 		if f[0] != window {
 			window = f[0]
-			windows = append(windows, Window{Name: f[1], Pane: p})
+			windows = append(windows, Window{Name: f[1], Pane: p, Auto: f[7] == "1"})
 			continue
 		}
 		last := &windows[len(windows)-1]
@@ -314,13 +320,16 @@ func (s side) open(name, path string, windows []Window) error {
 		var first string
 		var err error
 		if i == 0 {
-			if first, err = s.sh(`tmux rename-window -t "=mia-$1:" "$2" && tmux display-message -p -t "=mia-$1:" '#{pane_id}'`, name, w.Name); err == nil {
+			if first, err = s.sh(`tmux display-message -p -t "=mia-$1:" '#{pane_id}'`, name); err == nil {
 				err = run(strings.TrimSpace(first), "cd "+shellQuote(dir))
 			}
 		} else {
-			first, err = s.sh(`tmux new-window -t "=mia-$1:" -n "$2" -c "$3" -P -F '#{pane_id}'`, name, w.Name, dir)
+			first, err = s.sh(`tmux new-window -t "=mia-$1:" -c "$2" -P -F '#{pane_id}'`, name, dir)
 		}
 		first = strings.TrimSpace(first)
+		if err == nil && !w.Auto {
+			_, err = s.sh(`tmux rename-window -t "$1" "$2"`, first, w.Name) // tmux names it no more
+		}
 		if err == nil {
 			err = run(first, w.Command)
 		}

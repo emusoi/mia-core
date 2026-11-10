@@ -43,6 +43,11 @@ func TestWhatWentDownWithTmuxComesBackAndWhatWasClosedStaysClosed(t *testing.T) 
 	if _, err := a.NewWindow(closed, "shell", nil); err != nil {
 		t.Fatal(err)
 	}
+	auto := func() string {
+		out, _ := exec.Command("tmux", "list-windows", "-t", "="+session.Name(kept.Name), "-F", "#{window_name}=#{automatic-rename}").Output()
+		return string(out)
+	}
+	before := auto() // the session's first window tmux names, agent a person did
 	// the agent window is split: a second pane runs beside it
 	if out, err := exec.Command("tmux", "split-window", "-d", "-t", "="+session.Name(kept.Name)+":agent", "sleep", "200").CombinedOutput(); err != nil {
 		t.Fatalf("split: %s", out)
@@ -72,6 +77,9 @@ func TestWhatWentDownWithTmuxComesBackAndWhatWasClosedStaysClosed(t *testing.T) 
 	}
 	if _, err := a.Resurrect(false); err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(before, "=1") || !strings.Contains(before, "agent=0") || strings.Count(auto(), "=1") != strings.Count(before, "=1") || !strings.Contains(auto(), "agent=0") {
+		t.Errorf("a window tmux named it names still, one a person named keeps its name: before %q, after %q", before, auto())
 	}
 	if panes, _ := exec.Command("tmux", "list-panes", "-t", "="+session.Name(kept.Name)+":agent").Output(); strings.Count(string(panes), "\n") != 2 {
 		t.Errorf("the agent window is split in two again:\n%s", panes)

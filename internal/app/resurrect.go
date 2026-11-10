@@ -133,14 +133,10 @@ func keepRunning(now, before []Window, keep []string) {
 	}
 	for i := range now {
 		for _, p := range now[i].panes() {
-			name := stays(was[p.ID].Command, keep)
-			if p.Command != "" || name == "" {
+			if p.Command != "" || stays(was[p.ID].Command, keep) == "" {
 				continue
 			}
 			p.Command, p.Conversation = was[p.ID].Command, was[p.ID].Conversation
-			if p == &now[i].Pane && shells[now[i].Name] {
-				now[i].Name = name // not the shell tmux named it after
-			}
 		}
 	}
 }
