@@ -22,6 +22,7 @@ const pollEvery = 30 * time.Second
 // waits on a machine: it reads their last answers and, when those are old,
 // starts one `mia machine poll` to refresh them.
 func cmdStatusLine(args []string) int {
+	quiet := take(&args, "--quiet") // a mia session's own line: nothing shown, the asking still done
 	path := ""
 	if len(args) > 0 {
 		path = args[0]
@@ -36,7 +37,9 @@ func cmdStatusLine(args []string) int {
 	if err != nil {
 		return exitOK // not a repository: mia has nothing to say here
 	}
-	fmt.Print(statusLine(a, path))
+	if !quiet {
+		fmt.Print(statusLine(a, path))
+	}
 	if a.PollDue(pollEvery) {
 		pollInBackground(a.Root)
 	}

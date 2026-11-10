@@ -125,7 +125,8 @@ its uncommitted and untracked work in; the first is left as it is.
 
 ## After a crash
 
-Every 30 seconds or so, while tmux shows mia's status line, mia notes each
+Every 30 seconds or so, while tmux shows mia's status line or a session of
+mia's is in front, mia notes each
 session's windows, and each pane a window is split into: their folders and
 what runs in them. When tmux or the
 computer goes down, `mia resurrect` opens each one again, its programs

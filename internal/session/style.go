@@ -2,6 +2,7 @@ package session
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/run"
@@ -14,7 +15,19 @@ var miaSessionStyle = [][2]string{
 	{"status-style", "fg=default,bg=default"},
 	{"status-left", " #[fg=default,bold]#S#[default]  "},
 	{"status-left-length", "40"},
-	{"status-right", ""},
+}
+
+// quietStatus is the right of a mia session's status line: nothing to see,
+// but mia runs there every few seconds, which is what has the session's
+// windows remembered and the machines asked while it is in front. Left
+// empty, a session was remembered only when the radar happened to open.
+// shortcut: here only; a session on a machine is remembered when its own
+// tmux shows mia's status line.
+func quietStatus(self string, remote bool) string {
+	if remote || self == "" || strings.HasSuffix(self, ".test") {
+		return ""
+	}
+	return "#(" + run.ShellJoin([]string{self, "status-line", "--quiet"}) + ` "#{pane_current_path}")`
 }
 
 var miaWindowStyle = [][2]string{
@@ -32,7 +45,9 @@ var miaWindowStyle = [][2]string{
 // ANSI palette supplies the light or dark colours for the status and borders.
 func (h Host) Style(worktree string) error {
 	target := Target(worktree, "")
-	if err := h.styleOptions(target, false, miaSessionStyle); err != nil {
+	self, _ := os.Executable()
+	style := append(miaSessionStyle[:len(miaSessionStyle):len(miaSessionStyle)], [2]string{"status-right", quietStatus(self, h.SSH != "")})
+	if err := h.styleOptions(target, false, style); err != nil {
 		return err
 	}
 	windows, err := h.run("list-windows", "-t", target, "-F", "#{window_id}")

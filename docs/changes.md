@@ -21,6 +21,10 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **A session is remembered while you work in it.** mia's sessions show
+  nothing on the right of their status line, and so never ran the look
+  that remembers them: what `mia resurrect` brought back was the session
+  as it stood when the radar last opened. They now run it unseen.
 - **A brought-back window is named by tmux again.** `mia resurrect` and
   `mia move` gave every window its old name for good — a claude's version
   number, `zsh` — and tmux stopped naming it. Only a window you named
