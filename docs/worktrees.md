@@ -126,7 +126,8 @@ its uncommitted and untracked work in; the first is left as it is.
 ## After a crash
 
 Every 30 seconds or so, while tmux shows mia's status line, mia notes each
-session's windows: their folders and what runs in them. When tmux or the
+session's windows, and each pane a window is split into: their folders and
+what runs in them. When tmux or the
 computer goes down, `mia resurrect` opens each one again, its programs
 started anew and each claude resuming the very conversation it had; codex,
 pi, opencode, gemini and cursor-agent go on with their folder's last. An

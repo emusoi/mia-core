@@ -71,8 +71,12 @@ func (a *App) remember(opened map[string][]Window) error {
 		case session.Here().Exists(record.Name):
 			windows := side{}.windows(record.Name, record.Path)
 			if was, ok := opened[record.Name]; ok && len(was) == len(windows) {
-				for i := range was {
-					was[i].ID = windows[i].ID // opened in this order
+				for i := range was { // opened in this order
+					if then, now := was[i].panes(), windows[i].panes(); len(then) == len(now) {
+						for j := range then {
+							then[j].ID = now[j].ID
+						}
+					}
 				}
 				keepAgents(windows, was)
 			} else if had && before.Server == server {
@@ -93,20 +97,25 @@ func (a *App) remember(opened map[string][]Window) error {
 	return writeAtomic(a.sessionsFile(), data)
 }
 
-// keepAgents gives a window now at its shell the agent it was last seen
+// keepAgents gives a pane now at its shell the agent it was last seen
 // running, so one that ended before tmux went down still comes back. One
-// quit on purpose comes back too, until its window runs something else.
+// quit on purpose comes back too, until its pane runs something else.
 func keepAgents(now, before []Window) {
-	for i, w := range now {
-		if w.Command != "" {
-			continue
+	was := map[string]Pane{}
+	for i := range before {
+		for _, p := range before[i].panes() {
+			was[p.ID] = *p
 		}
-		for _, was := range before {
-			if name, _ := agentOf(was.Command); was.ID == w.ID && name != "" {
-				now[i].Command, now[i].Conversation = was.Command, was.Conversation
-				if shells[w.Name] {
-					now[i].Name = name // not the shell tmux named it after
-				}
+	}
+	for i := range now {
+		for _, p := range now[i].panes() {
+			name, _ := agentOf(was[p.ID].Command)
+			if p.Command != "" || name == "" {
+				continue
+			}
+			p.Command, p.Conversation = was[p.ID].Command, was[p.ID].Conversation
+			if p == &now[i].Pane && shells[now[i].Name] {
+				now[i].Name = name // not the shell tmux named it after
 			}
 		}
 	}
@@ -170,7 +179,10 @@ func (a *App) Resurrect(dry bool, names ...string) ([]Revived, error) {
 		}
 		windows := slices.Clone(was.Windows)
 		for i := range windows {
-			windows[i].Command = again(windows[i].Command, windows[i].Conversation)
+			windows[i].Splits = slices.Clone(windows[i].Splits)
+			for _, p := range windows[i].panes() {
+				p.Command = again(p.Command, p.Conversation)
+			}
 		}
 		if !dry {
 			if err := a.ensureSession(session.Here(), record, record.Path); err != nil {

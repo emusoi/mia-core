@@ -43,16 +43,45 @@ func (s side) bytesOf(script string, args ...string) ([]byte, error) {
 	return runtime.Command(s.machine.SSH, append([]string{"sh", "-c", utf8 + script, "sh"}, args...)...).Output()
 }
 
-// Window is one window of a session, as a move recreates it.
-type Window struct {
-	Name    string
+// Pane is one pane of a window: where it is and what runs in it.
+type Pane struct {
 	Dir     string // under the worktree
 	Command string // what ran there; empty for a shell
-	// Conversation is the claude session the window ran, so it can be
+	// Conversation is the claude session the pane ran, so it can be
 	// resumed exactly; "" for anything else, or when claude did not say.
 	Conversation string `json:",omitempty"`
-	// ID is tmux's id of the window, the same for as long as its server runs.
+	// ID is tmux's id of the pane, the same for as long as its server runs.
 	ID string `json:",omitempty"`
+}
+
+// Window is one window of a session, as a move recreates it: its first
+// pane, and the others it was split into, laid out as they were.
+type Window struct {
+	Name string
+	Pane
+	Splits []Pane `json:",omitempty"`
+	Layout string `json:",omitempty"` // tmux's, for a window that is split
+}
+
+// panes is every pane of the window, the first first.
+func (w *Window) panes() []*Pane {
+	all := []*Pane{&w.Pane}
+	for i := range w.Splits {
+		all = append(all, &w.Splits[i])
+	}
+	return all
+}
+
+// What says the window in a line: its name and what each pane runs.
+func (w Window) What() string {
+	what := strings.TrimSpace(w.Name + " " + w.Command)
+	for _, p := range w.Splits {
+		if p.Command == "" {
+			p.Command = "shell"
+		}
+		what += " | " + p.Command
+	}
+	return what
 }
 
 // Moved is what a move made, for saying so.
@@ -230,55 +259,86 @@ func (s side) conversationOf(panePID string) string {
 }
 
 func (s side) windows(name, path string) []Window {
-	out, err := s.sh(`tmux list-windows -t "=mia-$1" -F '#{window_name}	#{pane_current_path}	#{pane_current_command}	#{pane_pid}	#{window_id}' 2>/dev/null`, name)
+	out, err := s.sh(`tmux list-panes -s -t "=mia-$1" -F '#{window_id}	#{window_name}	#{window_layout}	#{pane_current_path}	#{pane_current_command}	#{pane_pid}	#{pane_id}' 2>/dev/null`, name)
 	if err != nil {
 		return nil
 	}
 	var windows []Window
+	window := "" // tmux lists a window's panes together, in order
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		f := strings.Split(line, "\t")
-		if len(f) != 5 {
+		if len(f) != 7 {
 			continue
 		}
-		w := Window{Name: f[0], ID: f[4]}
-		if rel, err := filepath.Rel(path, f[1]); err == nil && !strings.HasPrefix(rel, "..") {
-			w.Dir = rel
+		p := Pane{ID: f[6]}
+		if rel, err := filepath.Rel(path, f[3]); err == nil && !strings.HasPrefix(rel, "..") {
+			p.Dir = rel
 		}
-		if !shells[f[2]] {
-			args, err := s.sh(`ps -o args= -p "$(ps -o tpgid= -p "$1" | tr -d ' ')"`, f[3])
-			w.Command = strings.TrimSpace(args)
-			if err != nil || w.Command == "" {
-				w.Command = f[2]
+		if !shells[f[4]] {
+			args, err := s.sh(`ps -o args= -p "$(ps -o tpgid= -p "$1" | tr -d ' ')"`, f[5])
+			p.Command = strings.TrimSpace(args)
+			if err != nil || p.Command == "" {
+				p.Command = f[4]
 			}
-			if words := strings.Fields(w.Command); len(words) > 0 && filepath.Base(words[0]) == "claude" {
-				w.Conversation = s.conversationOf(f[3])
+			if words := strings.Fields(p.Command); len(words) > 0 && filepath.Base(words[0]) == "claude" {
+				p.Conversation = s.conversationOf(f[5])
 			}
 		}
-		windows = append(windows, w)
+		if f[0] != window {
+			window = f[0]
+			windows = append(windows, Window{Name: f[1], Pane: p})
+			continue
+		}
+		last := &windows[len(windows)-1]
+		last.Splits, last.Layout = append(last.Splits, p), f[2]
 	}
 	return windows
 }
 
 // open gives the worktree's session there the windows it had, in order,
-// each started in its folder with its command typed in, so its shell stays
-// when the command ends.
+// each pane started in its folder with its command typed in, so its shell
+// stays when the command ends.
 func (s side) open(name, path string, windows []Window) error {
 	if _, err := s.sh(`tmux has-session -t "=mia-$1" 2>/dev/null || tmux new-session -d -s "mia-$1" -c "$2"`, name, path); err != nil {
 		return err
 	}
+	run := func(pane, command string) error {
+		if command == "" {
+			return nil
+		}
+		_, err := s.sh(`tmux send-keys -t "$1" "$2" Enter`, pane, command)
+		return err
+	}
 	for i, w := range windows {
 		dir := filepath.Join(path, w.Dir)
+		var first string
+		var err error
 		if i == 0 {
-			if _, err := s.sh(`tmux rename-window -t "=mia-$1:" "$2" && tmux send-keys -t "=mia-$1:$2" "$3" Enter`, name, w.Name, "cd "+shellQuote(dir)); err != nil {
-				return err
+			if first, err = s.sh(`tmux rename-window -t "=mia-$1:" "$2" && tmux display-message -p -t "=mia-$1:" '#{pane_id}'`, name, w.Name); err == nil {
+				err = run(strings.TrimSpace(first), "cd "+shellQuote(dir))
 			}
-		} else if _, err := s.sh(`tmux new-window -t "=mia-$1:" -n "$2" -c "$3"`, name, w.Name, dir); err != nil {
+		} else {
+			first, err = s.sh(`tmux new-window -t "=mia-$1:" -n "$2" -c "$3" -P -F '#{pane_id}'`, name, w.Name, dir)
+		}
+		first = strings.TrimSpace(first)
+		if err == nil {
+			err = run(first, w.Command)
+		}
+		if err != nil {
 			return err
 		}
-		if w.Command != "" {
-			if _, err := s.sh(`tmux send-keys -t "=mia-$1:$2" "$3" Enter`, name, w.Name, w.Command); err != nil {
+		for _, p := range w.Splits {
+			// evened out after each, so there is room for the next
+			pane, err := s.sh(`tmux split-window -d -t "$1" -c "$2" -P -F '#{pane_id}' && tmux select-layout -t "$1" tiled >/dev/null`, first, filepath.Join(path, p.Dir))
+			if err != nil {
+				break // no room for more: what fits is there
+			}
+			if err := run(strings.TrimSpace(pane), p.Command); err != nil {
 				return err
 			}
+		}
+		if len(w.Splits) > 0 {
+			_, _ = s.sh(`tmux select-layout -t "$1" "$2"`, first, w.Layout) // as it was, where it still fits
 		}
 	}
 	return nil

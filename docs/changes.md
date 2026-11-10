@@ -7,6 +7,12 @@ on GitHub; a tag without its section is not released.
 
 ## Unreleased
 
+### Added
+
+- **Split windows come back split.** mia remembers every pane of a window,
+  not only the one in front: `mia resurrect` and `mia move` open each in
+  its folder with its program, laid out as it was.
+
 ### Fixed
 
 - **`mia resurrect` brings back a claude that ended before tmux did.** A

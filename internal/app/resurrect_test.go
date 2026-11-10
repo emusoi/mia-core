@@ -43,6 +43,10 @@ func TestWhatWentDownWithTmuxComesBackAndWhatWasClosedStaysClosed(t *testing.T) 
 	if _, err := a.NewWindow(closed, "shell", nil); err != nil {
 		t.Fatal(err)
 	}
+	// the agent window is split: a second pane runs beside it
+	if out, err := exec.Command("tmux", "split-window", "-d", "-t", "="+session.Name(kept.Name)+":agent", "sleep", "200").CombinedOutput(); err != nil {
+		t.Fatalf("split: %s", out)
+	}
 	if err := a.Remember(); err != nil {
 		t.Fatal(err)
 	}
@@ -59,11 +63,18 @@ func TestWhatWentDownWithTmuxComesBackAndWhatWasClosedStaysClosed(t *testing.T) 
 	if err != nil || len(got) != 1 || got[0].Name != kept.Name {
 		t.Fatalf("only the session that went down with tmux comes back: %+v %v", got, err)
 	}
-	if i := slices.IndexFunc(got[0].Windows, func(w app.Window) bool { return w.Name == "agent" }); i < 0 || got[0].Windows[i].Command != "sleep 300" {
-		t.Errorf("its program runs again: %+v", got[0].Windows)
+	i := slices.IndexFunc(got[0].Windows, func(w app.Window) bool { return w.Name == "agent" })
+	if i < 0 || got[0].Windows[i].Command != "sleep 300" {
+		t.Fatalf("its program runs again: %+v", got[0].Windows)
+	}
+	if splits := got[0].Windows[i].Splits; len(splits) != 1 || splits[0].Command != "sleep 200" {
+		t.Errorf("and so does the pane beside it: %+v", got[0].Windows[i])
 	}
 	if _, err := a.Resurrect(false); err != nil {
 		t.Fatal(err)
+	}
+	if panes, _ := exec.Command("tmux", "list-panes", "-t", "="+session.Name(kept.Name)+":agent").Output(); strings.Count(string(panes), "\n") != 2 {
+		t.Errorf("the agent window is split in two again:\n%s", panes)
 	}
 	if !session.Here().HasWindow(kept.Name, "agent") || session.Here().Exists(closed.Name) {
 		t.Errorf("kept is back with its agent window, closed is not: %v", session.Here().Windows(kept.Name))

@@ -269,7 +269,7 @@ func Run(args []string) int {
 			for _, s := range a.Sessions() {
 				var what []string
 				for _, w := range s.Windows {
-					what = append(what, strings.TrimSpace(w.Name+" "+w.Command))
+					what = append(what, w.What())
 				}
 				seen := ""
 				if !s.Seen.IsZero() {
@@ -283,7 +283,7 @@ func Run(args []string) int {
 		for _, r := range revived {
 			var what []string
 			for _, w := range r.Windows {
-				what = append(what, strings.TrimSpace(w.Name+" "+w.Command))
+				what = append(what, w.What())
 			}
 			did := "brought back"
 			if dry {
