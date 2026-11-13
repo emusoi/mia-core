@@ -307,7 +307,10 @@ func (a *App) newWorktree(branch, start, chosen string) (model.Record, error) {
 	if branch == "" {
 		return model.Record{}, fmt.Errorf("`mia new <branch>` needs a branch name")
 	}
-	if a.Config.Prefix != "" && !strings.HasPrefix(branch, a.Config.Prefix) {
+	// The prefix names a new branch of yours. A branch that is there already (a teammate's
+	// pull request: testuser1/feature), here or on origin, is opened as it is named, not made
+	// anew as user/testuser1/feature from the base.
+	if a.Config.Prefix != "" && !strings.HasPrefix(branch, a.Config.Prefix) && !git.HasBranch(a.Root, branch) && git.RevParse(a.Root, "refs/remotes/origin/"+branch) == "" {
 		branch = a.Config.Prefix + branch
 	}
 	if !git.ValidBranch(a.Root, branch) {

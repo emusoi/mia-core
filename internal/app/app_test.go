@@ -448,3 +448,24 @@ func TestNewNamedTakesTheChosenNameAndRefusesABadOrTakenOne(t *testing.T) {
 		t.Errorf("a branch already checked out keeps its name and says --name was not used: %+v %v", again, err)
 	}
 }
+
+func TestThePrefixNamesOnlyANewBranch(t *testing.T) {
+	repo := gittest.New(t)
+	a := open(t, repo)
+	a.Config.Prefix = "user/"
+	repo.Git("branch", "testuser1/feature")
+	theirs, err := a.New("testuser1/feature")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := git.CurrentBranch(theirs.Path); got != "testuser1/feature" {
+		t.Errorf("a branch that is there opened as %q, want testuser1/feature", got)
+	}
+	mine, err := a.New("due-dates")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := git.CurrentBranch(mine.Path); got != "user/due-dates" {
+		t.Errorf("a new branch is %q, want user/due-dates", got)
+	}
+}
