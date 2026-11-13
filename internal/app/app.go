@@ -630,6 +630,12 @@ func (a *App) surveyRepository() (*listing, error) {
 	a.survey, a.trees = &stack.Survey{Base: base, Heads: heads}, trees
 	if ctx.baseHead = heads[base]; ctx.baseHead == "" {
 		ctx.baseHead = git.RevParse(a.Root, base)
+		// A remote base (origin/production) is not under refs/heads. Its head, known now, keys
+		// the answers kept about it (has a layer landed on it?), which were otherwise asked of
+		// git every time: a merge-base per layer on every listing.
+		if ctx.baseHead != "" {
+			heads[base] = ctx.baseHead
+		}
 	}
 	return ctx, nil
 }
