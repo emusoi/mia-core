@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/git"
 	"github.com/emusoi/mia-core/internal/gittest"
 )
@@ -26,5 +27,26 @@ func TestALayerMoveRefusesToCarryUncommittedWork(t *testing.T) {
 	}
 	if got := git.CurrentBranch(repo.Root); got != "main" {
 		t.Errorf("on %s after a refused move", got)
+	}
+}
+
+func TestTrackMakesABranchFromElsewhereALayer(t *testing.T) {
+	repo := gittest.New(t)
+	gittest.Isolate(t)
+	t.Chdir(repo.Root)
+	repo.Git("branch", "pr-a")
+	repo.Git("branch", "pr-b", "pr-a")
+	if code := Run([]string{"stack", "track", "pr-b", "pr-a"}); code != exitOK {
+		t.Fatalf("track exited %d", code)
+	}
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !a.Stacks().Member("pr-b") {
+		t.Error("pr-b is not a layer after track")
+	}
+	if code := Run([]string{"stack", "track", "no-such-branch", "pr-a"}); code == exitOK {
+		t.Error("tracked a branch that is not here")
 	}
 }

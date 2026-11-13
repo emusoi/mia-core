@@ -18,6 +18,21 @@ func cmdStack(a *app.App, args []string, asJSON bool) (code int) {
 	if len(args) > 0 {
 		sub = args[0]
 	}
+	// track records a branch made elsewhere (a pull request's, stacked on another's) as a layer
+	// on parent, so up, down, restack and a review of the stack follow it. It needs no worktree.
+	if sub == "track" {
+		if len(args) != 3 {
+			return usageErr("mia stack track <branch> <parent>")
+		}
+		if !git.HasBranch(a.Root, args[1]) {
+			return fail(fmt.Errorf("%s is not a branch here", args[1]))
+		}
+		if err := stackStore(a).Record(args[1], args[2]); err != nil {
+			return fail(err)
+		}
+		fmt.Printf("%s on %s\n", args[1], args[2])
+		return exitOK
+	}
 	record, err := a.RecordOrHere(in)
 	if err != nil {
 		return fail(err)
