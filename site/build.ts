@@ -109,22 +109,61 @@ function render(markdown: string): { html: string; title: string; headings: Head
   return { html, title, headings, lead };
 }
 
-const lit = [3, 14, 27, 31, 46, 52, 68, 75, 81, 99];
-const movers = new Map<number, number>([[3,-8.59],[7,-1.42],[11,-2.14],[14,-8.14],[16,-4.16],[17,-6.7],[20,-2.53],[24,-11.47],[27,-9.51],[29,-5.69],[31,-8.04],[33,-0.86],[37,-0.07],[46,-8.91],[47,-3.94],[49,-2.31],[52,-10.57],[56,-1.65],[61,-5.38],[64,-6.28],[68,-7.91],[71,-6.65],[75,-11.04],[76,-4.99],[81,-10.32],[91,-6.09],[93,-3.48],[99,-9.64]]);
+// The mark: mia is a hundred, ten by ten, one path through them (a step in each row). Still, the
+// path is lit; moving (the hero), the ripple the app shows while it loads: each step lands, and a
+// ring swells through the dots round it and settles, a round every 3 s. Each dot's curve is
+// worked out here, at build time, as CSS keyframes; reduced motion keeps the still mark.
+const PATH = [3, 4, 7, 1, 6, 2, 8, 5, 1, 9];
+const ROUND = 3;
+const lands = (r: number) => (r * 0.22) / ROUND;
+const swell = (r: number, c: number, x: number) => {
+  let v = 0;
+  for (let st = 0; st < 10; st++) {
+    const d = Math.hypot(r - st, c - PATH[st]);
+    if (d > 3.2 || d < 0.5) continue;
+    const at = lands(st) + d * 0.022, k = 1 - d / 3.4, dt = x - at;
+    v = Math.max(v, dt < -0.03 ? 0 : dt < 0 ? k * (1 + dt / 0.03) : Math.max(0, k * (1 - dt / 0.12)));
+  }
+  return v;
+};
+const step = (r: number, x: number) => {
+  const at = lands(r);
+  return x < at ? 0 : x < at + 0.02 ? (x - at) / 0.02 : x < 0.9 ? 1 : Math.max(0, 1 - (x - 0.9) / 0.08);
+};
+// Keyframes from a curve: every change kept with the point before it, so a plateau stays flat.
+const keyframes = (name: string, f: (x: number) => number) => {
+  const N = 120, pts = Array.from({ length: N + 1 }, (_, i) => [i / N, Math.round(f(i / N) * 100) / 100]);
+  const kept = pts.filter((p, i) => i === 0 || i === N || p[1] !== pts[i - 1][1] || p[1] !== pts[i + 1][1]);
+  return `@keyframes ${name}{${kept.map(([x, v]) => `${(x * 100).toFixed(2)}%{opacity:${v}}`).join("")}}`;
+};
+const ripple = (() => {
+  const rules: string[] = [];
+  for (let r = 0; r < 10; r++) {
+    for (let c = 0; c < 10; c++) {
+      if (Array.from({ length: 30 }, (_, i) => swell(r, c, i / 30)).some((v) => v > 0)) {
+        rules.push(`.hero .mark .s${r * 10 + c}{animation:rs${r * 10 + c} ${ROUND}s linear infinite}${keyframes(`rs${r * 10 + c}`, (x) => swell(r, c, x))}`);
+      }
+    }
+    rules.push(`.hero .mark .p${r}{animation:rp${r} ${ROUND}s linear infinite}${keyframes(`rp${r}`, (x) => step(r, x))}`);
+  }
+  return `@media (prefers-reduced-motion: no-preference){${rules.join("")}}`;
+})();
 
 const mark = (size: number, moving = false) => {
   const cells: string[] = [];
   for (let i = 0; i < 100; i++) {
-    const x = 76 + (i % 10) * 40;
-    const y = 76 + Math.floor(i / 10) * 40;
-    const on = lit.includes(i);
-    if (moving && movers.has(i)) {
-      cells.push(`<circle cx="${x}" cy="${y}" r="13" class="turn" style="--rest:${on ? 1 : 0.423};--delay:${movers.get(i)}s"/>`);
-    } else {
+    const [r, c] = [Math.floor(i / 10), i % 10];
+    const x = 76 + c * 40, y = 76 + r * 40;
+    const on = PATH[r] === c;
+    if (!moving) {
       cells.push(`<circle cx="${x}" cy="${y}" r="${on ? 13 : 5.5}"/>`);
+      continue;
     }
+    cells.push(`<circle cx="${x}" cy="${y}" r="5.5"/><circle class="sw s${i}" cx="${x}" cy="${y}" r="9"/>`);
+    if (on) cells.push(`<circle class="st p${r}" cx="${x}" cy="${y}" r="13"/>`);
   }
-  return `<svg class="mark" viewBox="0 0 512 512" width="${size}" height="${size}" role="img" aria-label="mia: a hundred dots, a few of them lit">${cells.join("")}</svg>`;
+  const style = moving ? `<style>${ripple}</style>` : "";
+  return `<svg class="mark" viewBox="0 0 512 512" width="${size}" height="${size}" role="img" aria-label="mia: a hundred dots, one path through them">${style}${cells.join("")}</svg>`;
 };
 
 const icon = {

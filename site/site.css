@@ -109,22 +109,17 @@ kbd {
 
 /* The mark: a hundred dots, a few of them lit. design/mia.buni is the source. */
 .mark circle { fill: var(--ink); }
-.mark .turn { transform-box: fill-box; transform-origin: center; transform: scale(var(--rest)); }
+/* The ripple's two layers (build.ts gives each dot its curve): the swell, unseen at rest, and the
+   path's steps, lit at rest so reduced motion shows the still mark. */
+.mark .sw { opacity: 0; fill-opacity: 0.55; }
+.mark .st { opacity: 1; }
 
 @media (prefers-reduced-motion: no-preference) {
   .hero .mark { animation: arrive 900ms cubic-bezier(0.19, 1, 0.22, 1) both; }
-  .hero .mark .turn { animation: turn 12s var(--delay) infinite; }
 }
 
 @keyframes arrive { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
 
-@keyframes turn {
-  0% { transform: scale(0.423); animation-timing-function: linear; }
-  55% { transform: scale(0.423); animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
-  60% { transform: scale(1); animation-timing-function: linear; }
-  95% { transform: scale(1); animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
-  100% { transform: scale(0.423); }
-}
 
 /* The front page. */
 .hero {
