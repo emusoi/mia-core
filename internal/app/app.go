@@ -44,6 +44,8 @@ type App struct {
 	survey     *stack.Survey
 	trees      []git.Worktree
 	dirtiness  sync.Map
+	dirtyOnce  sync.Once
+	dirtySeen  atomic.Bool
 	reach      sync.Map
 	hereOnce   sync.Once
 	here       string
@@ -70,16 +72,65 @@ type reachability struct {
 
 // ForgetDirtiness drops what was cached about each worktree's changes, so
 // the next listing looks again: gc must not remove what just changed.
-func (a *App) ForgetDirtiness() { a.dirtiness = sync.Map{} }
+func (a *App) ForgetDirtiness() {
+	a.dirtyOnce.Do(func() {}) // nor read back from disk
+	a.dirtiness = sync.Map{}
+}
 
 type dirtiness struct {
-	dirty          bool
-	at             time.Time
-	untracked      time.Time
-	untrackedDirty bool
+	Dirty          bool      `json:"dirty"`
+	At             time.Time `json:"at"`
+	Untracked      time.Time `json:"untracked"`
+	UntrackedDirty bool      `json:"untracked_dirty"`
+}
+
+// dirtyPath keeps what git status said of each worktree between processes: every caller of
+// `mia api worktrees` (the desk, the phone server, the radar) is a new process, and kept only in
+// memory the cache below was always empty — a git status in every worktree on every call.
+func (a *App) dirtyPath() string { return filepath.Join(a.MiaDir, "cache", "dirty.json") }
+
+func (a *App) loadDirtiness() {
+	a.dirtyOnce.Do(func() {
+		data, err := os.ReadFile(a.dirtyPath())
+		if err != nil {
+			return
+		}
+		var known map[string]dirtiness
+		if json.Unmarshal(data, &known) != nil {
+			return
+		}
+		for path, d := range known {
+			if time.Since(d.At) < time.Minute {
+				a.dirtiness.LoadOrStore(path, d)
+			}
+		}
+	})
+}
+
+func (a *App) saveDirtiness() {
+	if !a.dirtySeen.Load() {
+		return
+	}
+	known := map[string]dirtiness{}
+	a.dirtiness.Range(func(path, d any) bool {
+		if time.Since(d.(dirtiness).At) < time.Minute {
+			known[path.(string)] = d.(dirtiness)
+		}
+		return true
+	})
+	if data, err := json.Marshal(known); err == nil {
+		// written whole and renamed into place: another mia reading it sees the old or the new
+		_ = os.MkdirAll(filepath.Dir(a.dirtyPath()), 0o755)
+		temp := fmt.Sprintf("%s.%d", a.dirtyPath(), os.Getpid())
+		if os.WriteFile(temp, data, 0o644) == nil {
+			_ = os.Rename(temp, a.dirtyPath())
+		}
+	}
+	a.dirtySeen.Store(false)
 }
 
 func (a *App) dirtyOf(path string, worked bool) bool {
+	a.loadDirtiness()
 	ttl := 30 * time.Second
 	if worked {
 		ttl = 8 * time.Second
@@ -87,23 +138,24 @@ func (a *App) dirtyOf(path string, worked bool) bool {
 	var d dirtiness
 	if got, ok := a.dirtiness.Load(path); ok {
 		d = got.(dirtiness)
-		if time.Since(d.at) < ttl {
-			return d.dirty
+		if time.Since(d.At) < ttl {
+			return d.Dirty
 		}
 	}
 	var dirty bool
-	if time.Since(d.untracked) > 30*time.Second {
+	if time.Since(d.Untracked) > 30*time.Second {
 		// the full status answers tracked and untracked at once: a listing
 		// with nothing cached — the radar opening — runs it alone, not after
 		// a tracked-only one
 		dirty, _ = git.Dirty(path)
-		d.untrackedDirty, d.untracked = dirty, time.Now()
+		d.UntrackedDirty, d.Untracked = dirty, time.Now()
 	} else {
 		dirty, _ = git.DirtyTracked(path)
-		dirty = dirty || d.untrackedDirty
+		dirty = dirty || d.UntrackedDirty
 	}
-	d.dirty, d.at = dirty, time.Now()
+	d.Dirty, d.At = dirty, time.Now()
 	a.dirtiness.Store(path, d)
+	a.dirtySeen.Store(true)
 	return dirty
 }
 
@@ -589,6 +641,7 @@ func (a *App) Dev() dev.Main {
 func (a *App) finishSurvey() {
 	a.counts.Save()
 	a.saveFacts()
+	a.saveDirtiness()
 	a.survey, a.trees = nil, nil
 }
 

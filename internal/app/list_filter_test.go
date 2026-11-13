@@ -72,10 +72,11 @@ func TestNamedListsOnlySurveyTheSelectedWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if count := strings.Count(string(calls), "\n"); count != 4 {
-		t.Fatalf("named listing used %d subprocesses, want 4: %s", count, calls)
+	// At most the selected tree's: its status may also come from what the last listing kept.
+	if count := strings.Count(string(calls), "\n"); count > 4 {
+		t.Fatalf("named listing used %d subprocesses, want at most 4: %s", count, calls)
 	}
-	if count := strings.Count(string(calls), "git status --porcelain"); count != 1 {
+	if count := strings.Count(string(calls), "git status --porcelain"); count > 1 {
 		t.Fatalf("named listing probed %d statuses, want the selected tree only: %s", count, calls)
 	}
 }
