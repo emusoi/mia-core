@@ -368,6 +368,43 @@ func FetchBranch(dir, remote, branch string) error {
 	return err
 }
 
+// PullRequestHead fetches pull request n's head and says which remote had it and what commit
+// it is. The remote is the one named, else the first that has it: upstream before origin (in
+// a fork's checkout the pull requests are upstream's, and origin may have one of the same
+// number that is something else), then the rest.
+func PullRequestHead(dir string, n int, remote string) (from, sha string, err error) {
+	out, err := run(dir, "remote")
+	if err != nil {
+		return "", "", err
+	}
+	all := strings.Fields(out)
+	order := []string{remote}
+	if remote == "" {
+		order = nil
+		for _, first := range []string{"upstream", "origin"} {
+			if slices.Contains(all, first) {
+				order = append(order, first)
+			}
+		}
+		for _, name := range all {
+			if !slices.Contains(order, name) {
+				order = append(order, name)
+			}
+		}
+	} else if !slices.Contains(all, remote) {
+		return "", "", fmt.Errorf("no remote called %s here", remote)
+	}
+	for _, name := range order {
+		if _, err := run(dir, "fetch", "--quiet", name, fmt.Sprintf("refs/pull/%d/head", n)); err != nil {
+			continue
+		}
+		if sha := RevParse(dir, "FETCH_HEAD^{commit}"); sha != "" {
+			return name, sha, nil
+		}
+	}
+	return "", "", fmt.Errorf("no remote here has pull request %d (asked %s)", n, strings.Join(order, ", "))
+}
+
 func Upstream(dir, branch string) string {
 	out, err := run(dir, "rev-parse", "--abbrev-ref", "--symbolic-full-name", branch+"@{upstream}")
 	if err != nil {

@@ -2,6 +2,7 @@ package git_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -196,5 +197,42 @@ func TestChangedFiles(t *testing.T) {
 	files := git.ChangedFiles(repo.Root, "main", "feature")
 	if len(files) != 1 || files[0] != (git.FileStat{Path: "a.go", Added: 1}) {
 		t.Fatalf("ChangedFiles = %+v", files)
+	}
+}
+
+func TestAPullRequestsHeadComesFromTheRemoteThatHasIt(t *testing.T) {
+	// Two "forges": origin has no pull request 7, upstream does.
+	base := t.TempDir()
+	sh := func(dir string, args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=user", "GIT_AUTHOR_EMAIL=user@example.com", "GIT_COMMITTER_NAME=user", "GIT_COMMITTER_EMAIL=user@example.com")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	upstream, origin, here := filepath.Join(base, "upstream"), filepath.Join(base, "origin"), filepath.Join(base, "here")
+	sh(base, "init", "-q", "-b", "main", upstream)
+	sh(upstream, "commit", "-q", "--allow-empty", "-m", "start")
+	sh(base, "clone", "-q", "--bare", upstream, origin)
+	sh(base, "clone", "-q", origin, here)
+	sh(here, "remote", "add", "upstream", upstream)
+	sh(upstream, "commit", "-q", "--allow-empty", "-m", "the pull request's work")
+	want := sh(upstream, "rev-parse", "HEAD")
+	sh(upstream, "update-ref", "refs/pull/7/head", want)
+	sh(upstream, "reset", "-q", "--hard", "HEAD~1")
+
+	from, sha, err := git.PullRequestHead(here, 7, "")
+	if err != nil || from != "upstream" || sha != want {
+		t.Fatalf("got %s %s %v, want upstream %s", from, sha, err, want)
+	}
+	if _, _, err := git.PullRequestHead(here, 7, "origin"); err == nil {
+		t.Fatal("origin has no pull request 7, yet one was found there")
+	}
+	if _, _, err := git.PullRequestHead(here, 8, ""); err == nil {
+		t.Fatal("pull request 8 is nowhere, yet one was found")
 	}
 }

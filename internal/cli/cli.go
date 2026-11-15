@@ -443,8 +443,27 @@ func cmdNew(a *app.App, args []string, asJSON bool) int {
 	from := takeValue(&args, "--from")
 	bg := take(&args, "--bg")
 	name := takeValue(&args, "--name")
-	if len(args) != 1 || ((from != "" || bg || name != "") && (asLayer || on != "")) {
-		return usageErr("mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--from <ref>] [--name <name>] [--bg] [--shell] <branch>")
+	pr, remote := takeValue(&args, "--pr"), takeValue(&args, "--remote")
+	const usage = "mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--from <ref>] [--name <name>] [--bg] [--shell] <branch>\n       mia new --pr <number> [--remote <remote>] [--name <name>] [--bg] [--shell]"
+	// A pull request to read: a worktree at its head, as pr-<number>. Its branch is yours and
+	// tracks nothing, so nothing done there can be pushed to the author's fork by a slip.
+	var head string
+	if pr != "" {
+		number, err := strconv.Atoi(pr)
+		if err != nil || number <= 0 || len(args) != 0 || from != "" || asLayer || on != "" {
+			return usageErr(usage)
+		}
+		_, sha, err := git.PullRequestHead(a.Root, number, remote)
+		if err != nil {
+			return fail(err)
+		}
+		args, from, head = []string{"pr-" + pr}, sha, sha
+		if name == "" {
+			name = "pr-" + pr
+		}
+	}
+	if len(args) != 1 || remote != "" && pr == "" || ((from != "" || bg || name != "") && (asLayer || on != "")) {
+		return usageErr(usage)
 	}
 	if strings.HasPrefix(args[0], "-") {
 		return usageErr("mia new: unknown flag " + args[0])
@@ -476,6 +495,19 @@ func cmdNew(a *app.App, args []string, asJSON bool) int {
 			return fail(err)
 		}
 		fmt.Fprintf(os.Stderr, "mia: %v\n", err)
+	}
+	// Opened before, and the pull request has moved since: brought up to it when that loses
+	// nothing (no work of yours on top, nothing uncommitted); otherwise said, and left.
+	if head != "" && record.Path != "" && git.Head(record.Path) != head {
+		dirty, _ := git.Dirty(record.Path)
+		switch {
+		case dirty || !git.IsAncestor(record.Path, "HEAD", head):
+			fmt.Fprintf(os.Stderr, "mia: pull request %s has moved to %.8s; %s has work of its own, so it was left where it is\n", pr, head, record.Name)
+		default:
+			if err := git.FastForward(record.Path, head); err != nil {
+				fmt.Fprintf(os.Stderr, "mia: %v\n", err)
+			}
+		}
 	}
 	if bg && len(setup) > 0 && err == nil && !slices.ContainsFunc(before, func(one model.Record) bool { return one.Path == record.Path }) {
 		if err := setupInWindow(a, record, setup); err != nil {
