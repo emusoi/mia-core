@@ -624,27 +624,44 @@ func (a *App) List(names ...string) ([]Listing, error) {
 }
 
 // withoutGonePanes drops, and forgets, the signals set from a tmux pane
-// that is no longer there: an agent that asked and then died asks no more.
-// Only when tmux answered; with no word from it, nothing is known gone.
+// that is no longer there.
 func (a *App) withoutGonePanes(signals []signal.Signal, panes map[string][]session.Pane) []signal.Signal {
-	if panes == nil {
-		return signals
-	}
-	live := map[string]bool{}
-	for _, all := range panes {
-		for _, p := range all {
-			live[p.ID] = true
-		}
-	}
+	live := panesByID(panes)
 	kept := signals[:0]
 	for _, one := range signals {
-		if one.Pane != "" && !live[one.Pane] {
+		if paneGone(one, live) {
 			_ = a.Signals.Clear(one.Worktree, one.From)
 			continue
 		}
 		kept = append(kept, one)
 	}
 	return kept
+}
+
+// paneGone reports whether a signal was set from a tmux pane that is no
+// longer there: an agent that asked and then died asks no more. It is the
+// one rule for it, a listing's and standing's. Only when tmux answered;
+// with no word from it live is nil, and nothing is known gone.
+func paneGone(one signal.Signal, live map[string]session.Pane) bool {
+	if live == nil || one.Pane == "" {
+		return false
+	}
+	_, there := live[one.Pane]
+	return !there
+}
+
+// panesByID is every pane there is by its id; nil when tmux did not answer.
+func panesByID(panes map[string][]session.Pane) map[string]session.Pane {
+	if panes == nil {
+		return nil
+	}
+	live := map[string]session.Pane{}
+	for _, all := range panes {
+		for _, p := range all {
+			live[p.ID] = p
+		}
+	}
+	return live
 }
 
 func (a *App) surveyRepository() (*listing, error) {
