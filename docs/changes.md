@@ -9,6 +9,12 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **`mia window` takes `<worktree>@<machine>`**, as `mia run` and `mia
+  shell` do: list, open, read, type into or close the windows of a worktree
+  on another machine, answered by that machine's mia. It used to read the
+  whole word as a window's name in the worktree it was run from, and
+  `mia window new monduli@fedora` opened a window called that, here.
+
 - **`mia move --dry-run`** reads the worktree and says what would cross —
   the branch, how many files staged, changed and new, what git ignores and
   so stays, the windows that would open — after checking the machine

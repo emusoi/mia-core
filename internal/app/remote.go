@@ -344,6 +344,17 @@ func (a *App) RunOn(machine runtime.Machine, name string, argv []string) error {
 	return runtime.Interactive(machine.SSH, append([]string{"sh", "-c", script, "sh", dir, name}, argv...)...).Run()
 }
 
+// WindowOn asks the machine's own mia about the windows of a worktree
+// there: args are mia window's, the worktree named without its machine.
+func (a *App) WindowOn(machine runtime.Machine, args []string) error {
+	dir, err := a.RemoteDir()
+	if err != nil {
+		return err
+	}
+	script := utf8 + `cd "$1" && shift && exec ` + remoteMia + ` window "$@"`
+	return runtime.Interactive(machine.SSH, append([]string{"sh", "-c", script, "sh", dir}, args...)...).Run()
+}
+
 // AttachArgv is the command that opens the worktree's session on the
 // machine, in whatever terminal runs it: ssh, with a terminal, to its mia.
 func (a *App) AttachArgv(machine runtime.Machine, name string) ([]string, error) {

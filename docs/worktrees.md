@@ -175,7 +175,9 @@ answering, as it last reported them.
 While a terminal is there, fedora's radar lists this computer's worktrees
 too, told again every 30 seconds, and ⏎ on one hands the terminal back.
 
-`mia shell <worktree>@fedora` is its session there. Its branches arrive
+`mia shell <worktree>@fedora` is its session there, and `mia run` and
+every `mia window` verb take `<worktree>@fedora` too: fedora's own mia
+answers. Its branches arrive
 here as `fedora/<branch>` on every refresh; pushing them anywhere is yours.
 
 ## Moving a worktree

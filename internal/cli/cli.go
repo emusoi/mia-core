@@ -1276,7 +1276,44 @@ func subject(a *app.App, args []string, fallback string, subs ...string) (sub st
 	return sub, record, rest, err
 }
 
+// onMachine finds <worktree>@<machine> where a window verb names its
+// worktree, before any --, and gives the arguments back with the worktree
+// alone: what the machine's own mia is asked.
+func onMachine(args []string) (machine string, rest []string, ok bool) {
+	for i, arg := range args {
+		if arg == "--" || i > 1 {
+			break
+		}
+		if name, on, cut := strings.Cut(arg, "@"); cut && name != "" && on != "" {
+			rest = slices.Clone(args)
+			rest[i] = name
+			return on, rest, true
+		}
+	}
+	return "", args, false
+}
+
 func cmdWindow(a *app.App, args []string, asJSON bool) int {
+	if on, rest, ok := onMachine(args); ok {
+		machine, err := a.Runtimes.Get(on)
+		if err != nil {
+			return fail(err)
+		}
+		if machine.Name != runtime.Local {
+			if asJSON {
+				rest = append([]string{"--json"}, rest...)
+			}
+			if err := a.WindowOn(machine, rest); err != nil {
+				var exit *exec.ExitError
+				if errors.As(err, &exit) {
+					return exit.ExitCode() // the machine's mia has said why
+				}
+				return fail(err)
+			}
+			return exitOK
+		}
+		args = rest
+	}
 	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close", "read", "send", "press")
 	if err != nil {
 		return fail(err)
@@ -1383,7 +1420,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		fmt.Printf("%s: window %s closed\n", record.Name, name)
 		return exitOK
 	}
-	return usageErr("mia window [ls|open|select|new|close|read|send] [worktree] [window] [--editor] [-- command|text]")
+	return usageErr("mia window [ls|open|select|new|close|read|send|press] [worktree[@machine]] [window] [--editor] [-- command|text|keys]")
 }
 
 func configHere() config.Config {
