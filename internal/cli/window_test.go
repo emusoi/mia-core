@@ -2,6 +2,7 @@ package cli
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -103,5 +104,53 @@ func TestWindowVerbsOfAWorktreeOnAMachineGoToItsMia(t *testing.T) {
 	}
 	if session.Here().Exists(filepath.Base(repo.Root)) {
 		t.Fatal("a window was opened here for a worktree named on a machine")
+	}
+}
+
+// A window is its command: one whose command has finished is gone, and its
+// output with it. mia says so, rather than only that it opened.
+func TestAWindowWhoseCommandEndedIsSaidToHaveEnded(t *testing.T) {
+	gittest.Isolate(t)
+	socket, err := os.MkdirTemp("/tmp", "mia-window-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(socket) })
+	t.Setenv("TMUX_TMPDIR", socket)
+	t.Cleanup(func() { exec.Command("tmux", "kill-server").Run() })
+	repo := gittest.New(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := a.New("quick")
+	if err != nil {
+		t.Fatal(err)
+	}
+	said := func(args ...string) string {
+		t.Helper()
+		output, err := os.CreateTemp(t.TempDir(), "output")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer output.Close()
+		previous := os.Stdout
+		os.Stdout = output
+		code := cmdWindow(a, args, false)
+		os.Stdout = previous
+		if code != exitOK {
+			t.Fatalf("mia window %v exited %d", args, code)
+		}
+		data, err := os.ReadFile(output.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	if got := said("new", record.Name, "quick", "--", "true"); !strings.Contains(got, "window quick has ended already") {
+		t.Errorf("a window whose command finished at once:\n%s", got)
+	}
+	if got := said("new", record.Name, "stays", "--", "sleep", "300"); strings.Contains(got, "ended already") {
+		t.Errorf("a window whose command still runs:\n%s", got)
 	}
 }

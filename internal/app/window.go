@@ -115,11 +115,6 @@ func (a *App) KeysInWindow(record model.Record, window string, keys []string) er
 	return host.Keys(record.Name, window, keys)
 }
 
-func (a *App) WindowText(record model.Record, window string) string {
-	text, _ := a.ReadWindow(record, window)
-	return text
-}
-
 func (a *App) ReadWindow(record model.Record, window string) (string, error) {
 	host, window, err := a.windowNamed(record, window)
 	if err != nil {

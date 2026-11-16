@@ -1386,7 +1386,10 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		fmt.Printf("%s: window %s opened\n", record.Name, name)
 		if len(argv) > 0 {
 			time.Sleep(1500 * time.Millisecond)
-			if text := a.WindowText(record, name); text != "" {
+			if text, err := a.ReadWindow(record, name); err != nil {
+				// a window is its command, and goes when that ends
+				fmt.Printf("%s: window %s has ended already — its command finished, and its output went with the window; `mia run %s <command>` shows a command's output\n", record.Name, name, record.Name)
+			} else if text != "" {
 				fmt.Println(text)
 			}
 			_ = a.Remember() // again: a command started through a shell is in front only now
