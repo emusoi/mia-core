@@ -233,12 +233,10 @@ func agentNamed(table []Agent, name string) (Agent, bool) {
 
 // agentOf is the agent a command line runs and what it was given, "" for
 // anything else. ps shows some behind node, or with their launcher's own
-// arguments.
+// arguments; a window can be started with env before it.
 func agentOf(table []Agent, command string) (string, []string) {
 	words := strings.Fields(command)
-	if len(words) > 1 && (filepath.Base(words[0]) == "node" || filepath.Base(words[0]) == "bun") {
-		words = words[1:]
-	}
+	words = words[launcher(words):]
 	if len(words) == 0 {
 		return "", nil
 	}
@@ -255,6 +253,30 @@ func agentOf(table []Agent, command string) (string, []string) {
 	}
 	return "", nil
 }
+
+// launcher is how many words of a command line come before the one that
+// runs its agent: env, its flags and the variables it sets, variables set
+// as a shell sets them, and node or bun.
+func launcher(words []string) int {
+	at := 0
+	if len(words) > 0 && filepath.Base(words[0]) == "env" {
+		for at++; at < len(words) && strings.HasPrefix(words[at], "-"); at++ {
+			if words[at] == "-u" || words[at] == "--unset" {
+				at++ // the name it unsets
+			}
+		}
+	}
+	for at < len(words) && assignment.MatchString(words[at]) {
+		at++
+	}
+	if len(words)-at > 1 && (filepath.Base(words[at]) == "node" || filepath.Base(words[at]) == "bun") {
+		at++
+	}
+	return min(at, len(words))
+}
+
+// assignment is a variable set before a command, NAME=value.
+var assignment = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
 
 // agentIn is the agent a pane runs, by its command line and, failing that,
 // by the title the agent gave the pane.

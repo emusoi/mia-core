@@ -189,12 +189,9 @@ func (a *App) withFor(command, model, effort string) ([]string, Chosen, error) {
 }
 
 // agentAt is how many words come before what an agent is given: the one
-// that runs it, behind node or bun when ps shows it so.
+// that runs it, behind env, node or bun.
 func agentAt(words []string) int {
-	if len(words) > 1 && (filepath.Base(words[0]) == "node" || filepath.Base(words[0]) == "bun") {
-		return 2
-	}
-	return min(len(words), 1)
+	return min(len(words), launcher(words)+1)
 }
 
 // Chosen is the model and effort mia started a window's agent with, or

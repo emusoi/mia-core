@@ -259,7 +259,8 @@ func again(table []Agent, command, conversation string) string {
 	agent, _ := agentNamed(table, name)
 	start := name // by name: the path ps shows is one version's
 	if name == "claude" {
-		start = strings.Fields(command)[0]
+		words := strings.Fields(command)
+		start = strings.Join(words[:agentAt(words)], " ") // with the env it had
 	}
 	if name == "claude" && conversation != "" {
 		// whatever it resumed before, it resumes the one it had

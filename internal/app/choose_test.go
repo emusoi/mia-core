@@ -68,3 +68,34 @@ func TestAnAgentIsStartedWithWhatItHas(t *testing.T) {
 		}
 	}
 }
+
+// A window started as env with variables and then the agent runs that
+// agent, given what comes after its word: so the phone's are switched,
+// and --model goes after the agent's word, not env's.
+func TestAnAgentBehindEnvIsThatAgent(t *testing.T) {
+	for command, want := range map[string]string{
+		"env A=1 B=2 claude hi":             "claude",
+		"env -i -u HOME SAWA_AGENT=1 codex": "codex",
+		"A=1 /usr/local/bin/claude":         "claude",
+		"env":                               "",
+		"env A=1":                           "",
+		"env A=1 sh -c claude":              "",
+	} {
+		if got, _ := agentOf(builtin, command); got != want {
+			t.Errorf("agentOf(%q) = %q, want %q", command, got, want)
+		}
+	}
+	if got := put("env A=1 B=2 claude hi", []string{"--model", "sonnet"}); got != "env A=1 B=2 claude '--model' 'sonnet' hi" {
+		t.Errorf("put = %q", got)
+	}
+	argv, chosen, err := (&App{}).ArgvWith([]string{"env", "A=1", "B=2", "claude", "hi"}, "sonnet", "")
+	if err != nil || strings.Join(argv, " ") != "env A=1 B=2 claude --model sonnet hi" || chosen != (Chosen{Model: "sonnet"}) {
+		t.Errorf("started with = %q, %+v, %v", argv, chosen, err)
+	}
+	if _, _, err := (&App{}).ArgvWith([]string{"env"}, "sonnet", ""); err == nil {
+		t.Error("env alone was given a model")
+	}
+	if got := again(builtin, "env A=1 claude --resume old", "23f98c02"); got != "env A=1 claude --resume 23f98c02" {
+		t.Errorf("again = %q", got)
+	}
+}
