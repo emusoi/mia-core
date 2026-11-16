@@ -42,6 +42,14 @@ wrapped in a version envelope.
 | `mia gc --merged --json` | clean merged worktrees offered for removal, without removing them |
 | `mia stack sync --json` | fetched base, current layer, dropped landed layers and rebase count |
 
+In `mia api worktrees`, and in each machine's `worktrees` in `mia api
+machines`, two fields mean less than their names say. `adopted` is whether
+mia keeps the worktree: `true` for one made with `mia new` or taken over
+with `mia adopt`, `false` for one made by hand and for a main checkout
+that was never adopted. `where` is where the worktree's environment runs,
+as the mia that keeps the worktree says it: `local` is that mia's own
+computer, so beside `"machine": "fedora"` it means on fedora.
+
 `mia api stack [worktree]` and `mia stack show --json` are the same answer:
 the layers of the stack the worktree's branch is in, bottom first, each with
 `branch`, `parent`, `landed`, `ahead`, `needs_restack`, `current`,

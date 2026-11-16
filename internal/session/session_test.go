@@ -58,3 +58,14 @@ func TestAWindowNamedLikeAVersionIsTargetedByIndex(t *testing.T) {
 		t.Errorf("ref = %q, want the name", got)
 	}
 }
+
+// A view needs a terminal as any attach does: with none, mia says so in its
+// own words before it makes the view, not in tmux's after.
+func TestAViewWithoutATerminalSaysSo(t *testing.T) {
+	t.Setenv("TMUX_TMPDIR", t.TempDir()) // no server of anyone's
+	t.Setenv("TMUX", "")
+	err := session.Here().AttachView("nosuch", "phone")
+	if err == nil || !strings.Contains(err.Error(), "there is no terminal here to attach mia-nosuch to") {
+		t.Fatalf("a view with no terminal: %v", err)
+	}
+}

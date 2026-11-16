@@ -97,6 +97,9 @@ func (h Host) Attach(worktree string) error {
 // session goes when nothing is attached to it.
 func (h Host) AttachView(worktree, view string) error {
 	name, own := Name(worktree), Name(worktree)+"-"+view
+	if h.SSH == "" && !isTerminal(os.Stdout) {
+		return fmt.Errorf("there is no terminal here to attach %s to — `mia shell --view %s %s` from one", name, view, worktree)
+	}
 	if _, err := h.run("has-session", "-t", exact(own)); err != nil {
 		if out, err := h.run("new-session", "-d", "-s", own, "-t", exact(name)); err != nil {
 			return fmt.Errorf("open a %s view of %s: %s", view, worktree, strings.TrimSpace(out))
