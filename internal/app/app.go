@@ -651,7 +651,8 @@ func setterGone(one signal.Signal, live map[string]session.Pane, running map[int
 		_, there := live[one.Pane]
 		return !there
 	}
-	if one.Pid == 0 || running == nil {
+	// One that waits to be seen outlives its setter: a done is news after the agent has gone.
+	if one.Pid == 0 || running == nil || one.UntilSeen {
 		return false
 	}
 	now, there := running[one.Pid]
