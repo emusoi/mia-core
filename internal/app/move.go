@@ -114,7 +114,7 @@ func (a *App) Move(name, from, to string, dry bool, say io.Writer) (Moved, error
 		return Moved{}, err
 	}
 	if src.machine.Name == dst.machine.Name {
-		return Moved{}, fmt.Errorf("%s is %s already", name, strings.Replace(src.where(), "here", "on this computer", 1))
+		return Moved{}, fmt.Errorf("%s would move from %s to where it is — name the machine to take it to, or local: `mia machine list`", name, src.machine.Name)
 	}
 	if src.here() == dst.here() {
 		return Moved{}, fmt.Errorf("a worktree moves between this computer and a machine; %s to %s is two moves", from, to)

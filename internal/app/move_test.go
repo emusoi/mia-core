@@ -75,7 +75,7 @@ func TestUncommittedWorkCrossesWithItsIndex(t *testing.T) {
 	}
 }
 
-// A move to where the worktree already is says so, not that it is two moves.
+// A move to where the worktree already is says so, not that it is two moves, and what to name instead.
 func TestMoveToWhereItIsSaysSo(t *testing.T) {
 	gittest.Isolate(t)
 	repo := gittest.New(t)
@@ -84,7 +84,7 @@ func TestMoveToWhereItIsSaysSo(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = a.Move("monduli", "local", "local", false, io.Discard)
-	if err == nil || !strings.Contains(err.Error(), "monduli is on this computer already") {
+	if err == nil || !strings.Contains(err.Error(), "monduli would move from local to where it is") {
 		t.Fatalf("moving to where it is: %v", err)
 	}
 }
