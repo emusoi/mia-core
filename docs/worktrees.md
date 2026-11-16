@@ -188,7 +188,9 @@ The branch goes across, and so does what is not committed: changed files
 as a patch, new files as they are. The session's windows open again
 there, in the same folders, each with the command that was running in it
 typed in again — claude, nvim, a dev server. Only once all of that is
-there is the worktree removed where it was; its branch stays.
+there is the worktree removed where it was; its branch stays. What is
+staged stays staged. What git ignores does not cross: the move names it,
+and it goes with the worktree where it was.
 
 A running program starts again rather than continuing. One that keeps
 state can bring it along through an extension named `mia-carry-<program>`

@@ -10,6 +10,7 @@ import (
 
 // What is not committed crosses as it stands: what was staged is staged on the
 // other side, what was only changed is only changed, a new file is new.
+// What git ignores does not cross, and is named.
 func TestUncommittedWorkCrossesWithItsIndex(t *testing.T) {
 	gittest.Isolate(t)
 	repo := gittest.New(t)
@@ -44,6 +45,9 @@ func TestUncommittedWorkCrossesWithItsIndex(t *testing.T) {
 	work, err := local.uncommitted(from)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if said := work.staysBehind(); said != "not crossing, since git ignores them: debug.log" {
+		t.Errorf("what stays behind was said as %q", said)
 	}
 	if err := local.putUncommitted(to, work); err != nil {
 		t.Fatal(err)

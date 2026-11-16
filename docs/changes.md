@@ -9,6 +9,11 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **A move names what it leaves.** Files git ignores (`.env`, a build
+  folder) never crossed, and went with the worktree when it was removed
+  where it was, unsaid. `mia move` now names them before it takes
+  anything across.
+
 - **Split windows come back split.** mia remembers every pane of a window,
   not only the one in front: `mia resurrect` and `mia move` open each in
   its folder with its program, laid out as it was. `mia move` takes an

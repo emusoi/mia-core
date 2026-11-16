@@ -133,6 +133,9 @@ func (a *App) Move(name, from, to string, say io.Writer) (Moved, error) {
 		return Moved{}, err
 	}
 	windows := src.windows(name, path)
+	if stays := work.staysBehind(); stays != "" {
+		fmt.Fprintf(say, "%s — they go when %s is removed %s\n", stays, name, src.where())
+	}
 
 	fmt.Fprintf(say, "taking %s across\n", branch)
 	if err := a.carryBranch(src, dst, branch); err != nil {
@@ -185,6 +188,8 @@ type uncommitted struct {
 	staged  []byte // a patch from HEAD to the index
 	changed []byte // a patch from the index to the files
 	files   []byte // a tar of the files git does not know and does not ignore
+	// ignored is what git ignores there, a folder as one: it does not cross.
+	ignored []string
 }
 
 func (u uncommitted) none() bool {
@@ -212,7 +217,27 @@ func (s side) uncommitted(path string) (uncommitted, error) {
 			return u, err
 		}
 	}
+	ignored, err := s.sh(`cd "$1" && git -c core.quotepath=off ls-files --others --ignored --exclude-standard --directory`, path)
+	if err != nil {
+		return u, err
+	}
+	if ignored = strings.TrimSpace(ignored); ignored != "" {
+		u.ignored = strings.Split(ignored, "\n")
+	}
 	return u, nil
+}
+
+// staysBehind says what of the worktree does not cross, "" when all of it does.
+func (u uncommitted) staysBehind() string {
+	if len(u.ignored) == 0 {
+		return ""
+	}
+	named := u.ignored
+	more := ""
+	if len(named) > 4 {
+		named, more = named[:4], fmt.Sprintf(" and %d more", len(u.ignored)-4)
+	}
+	return fmt.Sprintf("not crossing, since git ignores them: %s%s", strings.Join(named, ", "), more)
 }
 
 // putUncommitted gives a clean worktree at the same commit that work.
