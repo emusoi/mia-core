@@ -17,7 +17,7 @@ const signalUsage = "mia signal <worktree|.> <kind> [text] [--style <style>] [--
 // kept and shown as its setter says, with no meaning of mia's own.
 func cmdSignal(a *app.App, args []string, asJSON bool) int {
 	if len(args) == 1 && (args[0] == "ls" || args[0] == "list") {
-		all, err := a.Signals.Load()
+		all, err := a.StandingSignals()
 		if err != nil {
 			return fail(err)
 		}

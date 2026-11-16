@@ -131,6 +131,14 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **`mia signal ls` no longer lists a signal whose setter is gone.** It
+  printed the signals file as it was, and what reads it — the Mac app
+  between full answers, and before it approves an ask — showed a dead
+  agent's `asks` and `busy` until the next full listing forgot them. It
+  now goes by the rule `mia ls`, the radar and `mia api standing` go by,
+  and forgets those it leaves out as `mia ls` does; a `--until seen`
+  signal still outlives its process.
+
 - **An ask from an agent killed in tmux no longer waits on you.** A
   signal set from a pane went only with the pane, and a pane outlives the
   agent killed in it, its shell left behind: claude's `asks` and `busy`

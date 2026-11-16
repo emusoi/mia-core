@@ -623,6 +623,17 @@ func (a *App) List(names ...string) ([]Listing, error) {
 	return listings, nil
 }
 
+// StandingSignals is every signal whose setter is still there, best first,
+// by the rule a listing goes by; those whose setter is gone are forgotten,
+// as a listing forgets them.
+func (a *App) StandingSignals() ([]signal.Signal, error) {
+	signals, err := a.Signals.Load()
+	if err != nil {
+		return nil, err
+	}
+	return a.withoutGoneSetters(signals, session.Here().AllPanes()), nil
+}
+
 // withoutGoneSetters drops, and forgets, the signals whose setter is gone.
 func (a *App) withoutGoneSetters(signals []signal.Signal, panes map[string][]session.Pane) []signal.Signal {
 	live, running := panesByID(panes), setters(signals)
@@ -643,7 +654,7 @@ func (a *App) withoutGoneSetters(signals []signal.Signal, panes map[string][]ses
 // gone. A pane outlives the agent killed in it, its shell left behind, so
 // the process is asked first, whether or not there is a pane; one with
 // neither recorded is never gone. It is the one rule for it, a listing's,
-// the radar's and standing's. Only when tmux, or ps, answered: with no word
+// mia signal ls's, the radar's and standing's. Only when tmux, or ps, answered: with no word
 // from it live, or running, is nil, and nothing is known gone by it.
 func setterGone(one signal.Signal, live map[string]session.Pane, running map[int]process) bool {
 	// One that waits to be seen outlives its process: a done is news after the agent has gone.
