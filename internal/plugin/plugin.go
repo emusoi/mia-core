@@ -25,6 +25,9 @@ const (
 
 var ManifestTimeout = 2 * time.Second
 
+// variable is the name of an environment variable.
+var variable = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
 type Verb struct {
 	Name  string `json:"name"`
 	Usage string `json:"usage,omitempty"`
@@ -48,6 +51,10 @@ type Agent struct {
 	WithEffort   []string `json:"with_effort,omitempty"`
 	SwitchModel  string   `json:"switch_model,omitempty"`
 	SwitchEffort string   `json:"switch_effort,omitempty"`
+
+	// AccountEnv is the variable that names the folder it keeps its
+	// sign-in in, for an agent that can have several accounts.
+	AccountEnv string `json:"account_env,omitempty"`
 }
 
 // Model is one an agent can be started with: its id, as the agent takes
@@ -294,6 +301,9 @@ func ReadManifest(path string) (Manifest, error) {
 		}
 		if _, err := regexp.Compile(m.Agent.Title); err != nil {
 			return Manifest{}, fmt.Errorf("agent title is not a regular expression: %w", err)
+		}
+		if m.Agent.AccountEnv != "" && !variable.MatchString(m.Agent.AccountEnv) {
+			return Manifest{}, fmt.Errorf("agent account_env %q is not the name of a variable", m.Agent.AccountEnv)
 		}
 	}
 	return m, nil

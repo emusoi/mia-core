@@ -210,13 +210,14 @@ esac
 func TestAPluginDeclaresAnAgentAndAnswersAboutIt(t *testing.T) {
 	h, dir := host(t)
 	write(t, dir, "echo", `case "$1" in
-manifest) echo '{"protocol":1,"agent":{"name":"echo","commands":["echo-agent"],"title":"^echo "}}' ;;
+manifest) echo '{"protocol":1,"agent":{"name":"echo","commands":["echo-agent"],"title":"^echo ","account_env":"ECHO_HOME"}}' ;;
 agent) shift; echo "asked $* by $MIA_PLUGIN" ;;
 esac
 `)
 	write(t, dir, "spaced", `echo '{"protocol":1,"agent":{"name":"two words"}}'`)
 	write(t, dir, "titled", `echo '{"protocol":1,"agent":{"name":"titled","title":"("}}'`)
-	h.Configured = []string{"echo", "spaced", "titled"}
+	write(t, dir, "homed", `echo '{"protocol":1,"agent":{"name":"homed","account_env":"ECHO HOME"}}'`)
+	h.Configured = []string{"echo", "spaced", "titled", "homed"}
 	all, err := h.List()
 	if err != nil {
 		t.Fatal(err)
@@ -224,7 +225,7 @@ esac
 	for _, p := range all {
 		switch p.Name {
 		case "echo":
-			if p.Problem != "" || p.Manifest.Agent == nil || p.Manifest.Agent.Name != "echo" || p.Manifest.Agent.Commands[0] != "echo-agent" {
+			if p.Problem != "" || p.Manifest.Agent == nil || p.Manifest.Agent.Name != "echo" || p.Manifest.Agent.Commands[0] != "echo-agent" || p.Manifest.Agent.AccountEnv != "ECHO_HOME" {
 				t.Fatalf("the agent it declares: %+v", p)
 			}
 			out, err := p.Ask(Context{MiaDir: t.TempDir()}, time.Second, "agent", "resume", "e1")
@@ -238,6 +239,10 @@ esac
 		case "titled":
 			if !strings.Contains(p.Problem, "regular expression") {
 				t.Errorf("a title that is no pattern is said so: %q", p.Problem)
+			}
+		case "homed":
+			if !strings.Contains(p.Problem, "not the name of a variable") {
+				t.Errorf("an account_env that is no variable is said so: %q", p.Problem)
 			}
 		}
 	}
