@@ -47,6 +47,13 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **A session is remembered when it is made or changed.** Only the status
+  line's look remembered sessions, so one made and used with no terminal —
+  by the desk, the phone, a script — was never remembered, and `mia
+  resurrect` knew nothing of it. `mia window new`, `close` and `open` and
+  `mia new` now remember too, and so does mia just before it kills a
+  session itself. A new worktree handed the name of a removed one starts
+  with no session of that one's to bring back.
 - **A move does not write over work already there.** When the branch was
   already checked out on the other side with uncommitted work — left by a
   move that stopped half way, or done there — its new files were

@@ -367,6 +367,11 @@ func (a *App) newWorktree(branch, start, chosen string) (model.Record, error) {
 	if err := a.Store.Put(record); err != nil {
 		return model.Record{}, err
 	}
+	// names are handed out again: the session of a removed worktree that had
+	// this one is not this worktree's to bring back
+	if err := a.forgetSession(record.Name); err != nil {
+		return record, fmt.Errorf("%s created, but the session remembered under its name stays: %w", record.Name, err)
+	}
 	if err := a.prepare(record.Path); err != nil {
 		return record, fmt.Errorf("%s created, but preparing it failed: %w", record.Name, err)
 	}
@@ -756,6 +761,7 @@ func (a *App) Remove(removal Removal, force, stopRunning bool) error {
 	if err := a.removeEnvironment(removal.Record); err != nil {
 		return err
 	}
+	_ = a.Remember() // the session as it is last seen, before it is killed
 	if err := a.sessionOf(removal.Record).Kill(removal.Record.Name); err != nil {
 		return err
 	}

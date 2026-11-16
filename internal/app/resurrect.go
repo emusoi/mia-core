@@ -98,6 +98,20 @@ func (a *App) remember(opened map[string][]Window) error {
 	return writeAtomic(a.sessionsFile(), data)
 }
 
+// forgetSession drops what is remembered of the session under a name.
+func (a *App) forgetSession(name string) error {
+	saved := a.readRemembered()
+	if _, ok := saved[name]; !ok {
+		return nil
+	}
+	delete(saved, name)
+	data, err := json.MarshalIndent(saved, "", "  ")
+	if err != nil {
+		return err
+	}
+	return writeAtomic(a.sessionsFile(), data)
+}
+
 // kept is what a pane keeps after it ends without being told: editors and
 // dev servers, which run until stopped. The config's keep adds to it.
 var kept = []string{"nvim", "vim", "hx", "npm run dev", "npm start", "pnpm dev", "pnpm run dev", "bun dev", "bun run dev", "yarn dev"}

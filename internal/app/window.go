@@ -33,6 +33,7 @@ func (a *App) OpenWindow(record model.Record, window string) error {
 	if err != nil {
 		return err
 	}
+	_ = a.Remember() // before landing: attaching may never come back here
 	return host.AttachWindow(record.Name, window)
 }
 
@@ -44,7 +45,18 @@ func (a *App) SelectWindow(record model.Record, window string) error {
 	return host.SelectWindow(record.Name, window)
 }
 
+// NewWindow opens a window in the worktree's session, starting the session
+// when there is none, and remembers the session as it is then: one made
+// with no status line to poll it comes back all the same.
 func (a *App) NewWindow(record model.Record, window string, argv []string) (string, error) {
+	name, err := a.newWindow(record, window, argv)
+	if err == nil {
+		_ = a.Remember() // the window is open; what could not be written is seen at the next look
+	}
+	return name, err
+}
+
+func (a *App) newWindow(record model.Record, window string, argv []string) (string, error) {
 	dir, err := a.SessionDir(record)
 	if err != nil {
 		return "", err
@@ -69,7 +81,11 @@ func (a *App) CloseWindow(record model.Record, window string) error {
 	if err != nil {
 		return err
 	}
-	return host.KillWindow(record.Name, window)
+	if err := host.KillWindow(record.Name, window); err != nil {
+		return err
+	}
+	_ = a.Remember() // without the window, so it is not brought back
+	return nil
 }
 
 func (a *App) SendToWindow(record model.Record, window, text string) error {

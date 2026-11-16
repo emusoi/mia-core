@@ -235,3 +235,94 @@ func TestASessionOfARemovedWorktreeIsNotBroughtBack(t *testing.T) {
 		}
 	}
 }
+
+// A session is remembered when mia makes or changes it, not only when the
+// status line next polls: one made and used with no terminal comes back.
+func TestASessionIsRememberedWhenItIsMadeOrChanged(t *testing.T) {
+	gittest.Isolate(t)
+	socket, err := os.MkdirTemp("/tmp", "mia-resurrect-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(socket) })
+	t.Setenv("TMUX_TMPDIR", socket)
+	t.Cleanup(func() { exec.Command("tmux", "kill-server").Run() })
+	repo := gittest.New(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := a.New("headless")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, seconds := range map[string]string{"agent": "300", "extra": "200"} {
+		if _, err := a.NewWindow(record, name, []string{"sleep", seconds}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := a.CloseWindow(record, "extra"); err != nil {
+		t.Fatal(err)
+	}
+	exec.Command("tmux", "kill-session", "-t", "="+session.Name(record.Name)).Run()
+	got, err := a.Resurrect(true, record.Name)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("a session nothing polled is remembered all the same: %+v %v", got, err)
+	}
+	if !slices.ContainsFunc(got[0].Windows, func(w app.Window) bool { return w.Name == "agent" && w.Command == "sleep 300" }) {
+		t.Errorf("its window comes back with its program: %+v", got[0].Windows)
+	}
+	if slices.ContainsFunc(got[0].Windows, func(w app.Window) bool { return w.Name == "extra" }) {
+		t.Errorf("the window that was closed is not one to bring back: %+v", got[0].Windows)
+	}
+}
+
+// What mia kills it looks at first: the session of a worktree being removed
+// is remembered as it was then. And the next worktree, handed the same name,
+// starts with no session of its own to bring back.
+func TestARemovedWorktreesSessionIsSeenLastAndNotInherited(t *testing.T) {
+	gittest.Isolate(t)
+	socket, err := os.MkdirTemp("/tmp", "mia-resurrect-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(socket) })
+	t.Setenv("TMUX_TMPDIR", socket)
+	t.Cleanup(func() { exec.Command("tmux", "kill-server").Run() })
+	repo := gittest.New(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gone, err := a.New("gone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.NewWindow(gone, "agent", []string{"sleep", "300"}); err != nil {
+		t.Fatal(err)
+	}
+	// a window mia did not make, and so has not seen
+	if out, err := exec.Command("tmux", "new-window", "-d", "-t", "="+session.Name(gone.Name)+":", "-n", "late", "sleep", "100").CombinedOutput(); err != nil {
+		t.Fatalf("window: %s", out)
+	}
+	removal, err := a.PlanRemoval(gone.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Remove(removal, false, true); err != nil {
+		t.Fatal(err)
+	}
+	if kept, _ := os.ReadFile(filepath.Join(repo.MiaDir(), "sessions.json")); !strings.Contains(string(kept), `"late"`) {
+		t.Errorf("the session was not looked at before it was killed:\n%s", kept)
+	}
+	next, err := a.New("next")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.Name != gone.Name {
+		t.Skipf("%s was not handed the name %s again", next.Name, gone.Name)
+	}
+	if got, err := a.Resurrect(true, next.Name); err == nil || !strings.Contains(err.Error(), "remembers no session") {
+		t.Errorf("a new worktree was handed the session of the one removed before it: %+v %v", got, err)
+	}
+}

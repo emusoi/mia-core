@@ -522,6 +522,7 @@ func cmdNew(a *app.App, args []string, asJSON bool) int {
 			fmt.Fprintf(os.Stderr, "%s: setting up in its setup window\n", record.Name)
 		}
 	}
+	_ = a.Remember() // its session, when its setup opened one, and what is left of the others
 	if asJSON {
 		return emit(record)
 	}
@@ -1388,6 +1389,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 			if text := a.WindowText(record, name); text != "" {
 				fmt.Println(text)
 			}
+			_ = a.Remember() // again: a command started through a shell is in front only now
 		}
 		return exitOK
 	case "read":
