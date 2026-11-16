@@ -50,7 +50,7 @@ func (a *App) pluginAgents() []Agent {
 [ -x "$p" ] || exit 0
 exec "$p" agent carry "$@"`,
 		}
-		agent.Models, agent.Efforts = declared.Models, declared.Efforts
+		agent.Models, agent.Efforts, agent.AccountEnv = declared.Models, declared.Efforts, declared.AccountEnv
 		if len(declared.WithModel) > 0 || len(declared.WithEffort) > 0 {
 			agent.with = words(declared.WithModel, declared.WithEffort)
 		}

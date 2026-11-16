@@ -20,12 +20,14 @@ import (
 // them is where the files are and what a line means.
 type transcripts struct {
 	agent string
-	// files is the transcripts that may be the folders'; deep adds those of
-	// subagents, which belong to their parent's conversation.
-	files func(in folders, deep bool) []string
-	// find is the transcripts of one conversation: one, or one for each
-	// folder it was copied to, and none when there is none.
-	find func(in folders, id string) []string
+	// files is the transcripts in an account's folder that may be the
+	// folders'; deep adds those of subagents, which belong to their
+	// parent's conversation.
+	files func(home string, in folders, deep bool) []string
+	// find is the transcripts in an account's folder of one conversation:
+	// one, or one for each folder it was copied to, and none when there is
+	// none.
+	find func(home string, in folders, id string) []string
 	// id is the conversation a transcript is of, from its name.
 	id func(path string) string
 	// decode reads one line.
@@ -204,8 +206,23 @@ func (t transcripts) keep(all map[string]*scan) {
 	}
 }
 
+// all is the transcripts in every account's folder of the agent that may be
+// the folders', each with the account it is in.
+func (t transcripts) all(in folders, deep bool) ([]string, map[string]string) {
+	var files []string
+	accounts := map[string]string{}
+	for _, h := range homesOf(t.agent) {
+		for _, file := range t.files(h.dir, in, deep) {
+			if _, seen := accounts[file]; !seen {
+				files, accounts[file] = append(files, file), h.account
+			}
+		}
+	}
+	return files, accounts
+}
+
 func (t transcripts) heads(in folders) ([]Head, error) {
-	files := t.files(in, false)
+	files, accounts := t.all(in, false)
 	was := t.kept()
 	now := make(map[string]*scan, len(files)) // of the files there are: what is kept of one that went is dropped
 	changed := make([]bool, len(files))
@@ -241,7 +258,7 @@ func (t transcripts) heads(in folders) ([]Head, error) {
 		if !in.holds(s.Cwd) || s.end().N == 0 {
 			continue // someone else's, or nothing said in it yet
 		}
-		heads = append(heads, Head{ID: t.id(file), Agent: t.agent, Cwd: s.Cwd, Asked: s.Asked, Said: s.Said,
+		heads = append(heads, Head{ID: t.id(file), Agent: t.agent, Account: accounts[file], Cwd: s.Cwd, Asked: s.Asked, Said: s.Said,
 			Started: s.Started, Active: s.Modified, Turns: s.Asks})
 	}
 	return heads, nil
@@ -251,10 +268,17 @@ func (t transcripts) turns(in folders, id, cwd string, after int) ([]Turn, bool,
 	if strings.ContainsAny(id, `/\*?[`) {
 		return nil, false, nil
 	}
-	// one copied to another folder is there once for each, under one id:
-	// the one made in cwd is read, or with none the last written to, as it
-	// is the first in a list
-	files := t.find(in, id)
+	// one copied to another folder, or another account, is there once for
+	// each, under one id: the one made in cwd is read, or with none the
+	// last written to, as it is the first in a list
+	var files []string
+	for _, h := range homesOf(t.agent) {
+		for _, file := range t.find(h.dir, in, id) {
+			if !slices.Contains(files, file) {
+				files = append(files, file)
+			}
+		}
+	}
 	written := func(file string) time.Time {
 		info, err := os.Stat(file)
 		if err != nil {
@@ -312,7 +336,7 @@ func (t transcripts) turns(in folders, id, cwd string, after int) ([]Turn, bool,
 
 func (t transcripts) search(in folders, text string, limit int) ([]Recalled, error) {
 	needle := strings.ToLower(text)
-	files := t.files(in, true)
+	files, accounts := t.all(in, true)
 	written := map[string]time.Time{}
 	for _, file := range files {
 		if info, err := os.Stat(file); err == nil {
@@ -341,7 +365,7 @@ func (t transcripts) search(in folders, text string, limit int) ([]Recalled, err
 			if (turn.Kind != turnAsked && turn.Kind != turnSaid) || !strings.Contains(strings.ToLower(turn.Text), needle) {
 				return
 			}
-			r := &Recalled{Conversation: Conversation{Session: id, File: file, At: turn.At}, Agent: t.agent, N: turn.N, Line: around(turn.Text, needle)}
+			r := &Recalled{Conversation: Conversation{Session: id, File: file, At: turn.At, Account: accounts[file]}, Agent: t.agent, N: turn.N, Line: around(turn.Text, needle)}
 			if subagent {
 				r.N = 0 // not a turn of the conversation itself
 			}

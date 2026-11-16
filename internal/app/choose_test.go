@@ -26,7 +26,7 @@ func TestAnAgentIsStartedWithWhatItHas(t *testing.T) {
 		{pi, "anthropic/claude-opus-5", "max", []string{"--model", "anthropic/claude-opus-5", "--thinking", "max"}, []string{"/model anthropic/claude-opus-5", "/thinking max"}},
 	} {
 		with, chosen, err := choose(c.agent, c.agent.Name, c.model, c.effort)
-		if err != nil || !slices.Equal(with, c.with) || chosen != (Chosen{c.model, c.effort}) {
+		if err != nil || !slices.Equal(with, c.with) || chosen != (Chosen{Model: c.model, Effort: c.effort}) {
 			t.Errorf("%s started with %s %s: %v, %+v, %v", c.agent.Name, c.model, c.effort, with, chosen, err)
 		}
 		if to := c.agent.to(c.model, c.effort); !slices.Equal(to, c.to) {
@@ -88,11 +88,11 @@ func TestAnAgentBehindEnvIsThatAgent(t *testing.T) {
 	if got := put("env A=1 B=2 claude hi", []string{"--model", "sonnet"}); got != "env A=1 B=2 claude '--model' 'sonnet' hi" {
 		t.Errorf("put = %q", got)
 	}
-	argv, chosen, err := (&App{}).ArgvWith([]string{"env", "A=1", "B=2", "claude", "hi"}, "sonnet", "")
+	argv, chosen, err := (&App{}).ArgvWith([]string{"env", "A=1", "B=2", "claude", "hi"}, "sonnet", "", "")
 	if err != nil || strings.Join(argv, " ") != "env A=1 B=2 claude --model sonnet hi" || chosen != (Chosen{Model: "sonnet"}) {
 		t.Errorf("started with = %q, %+v, %v", argv, chosen, err)
 	}
-	if _, _, err := (&App{}).ArgvWith([]string{"env"}, "sonnet", ""); err == nil {
+	if _, _, err := (&App{}).ArgvWith([]string{"env"}, "sonnet", "", ""); err == nil {
 		t.Error("env alone was given a model")
 	}
 	if got := again(builtin, "env A=1 claude --resume old", "23f98c02"); got != "env A=1 claude --resume 23f98c02" {

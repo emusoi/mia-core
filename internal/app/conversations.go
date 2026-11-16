@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -152,15 +153,26 @@ func (a *App) markRunning(heads []Head, records []model.Record) {
 				out, _ := run.Local("sh").Capture("-c", agent.held, "sh", strconv.Itoa(pane.PID))
 				held = sessionIn(out)
 			}
+			kept := chosen[chosenKey(session.Name(record.Name), pane.PID)]
+			account := kept.Account
+			if account == "" && agent.AccountEnv != "" {
+				account = DefaultAccount
+			}
 			var its *Head
 			for i := range heads {
 				h := &heads[i]
 				if h.Agent != name || h.Worktree != record.Name || h.Running {
 					continue
 				}
+				if held == "" && h.Account != "" && h.Account != account {
+					continue // another account's: not the one this window can have open
+				}
 				if held != "" && h.ID == held {
-					its = h
-					break
+					// a copy on another account has the same id: the window's own is the one
+					if its == nil || h.Account == account {
+						its = h
+					}
+					continue
 				}
 				if held == "" && (its == nil || h.Active.After(its.Active)) {
 					its = h
@@ -168,8 +180,10 @@ func (a *App) markRunning(heads []Head, records []model.Record) {
 			}
 			if its != nil {
 				its.Running, its.Window = true, &WindowRef{Index: pane.Index, Name: pane.Window}
-				kept := chosen[chosenKey(session.Name(record.Name), pane.PID)]
 				its.Model, its.Effort = kept.Model, kept.Effort
+				if its.Account == "" && agent.AccountEnv != "" {
+					its.Account = account // a plugin's agent, which does not say whose folder it is in
+				}
 			}
 		}
 	}
@@ -250,12 +264,15 @@ type Resumed struct {
 	Window   WindowRef `json:"window"`
 	Command  string    `json:"command,omitempty"`
 	Already  bool      `json:"already"` // a window had it open: nothing was opened
-	Copied   bool      `json:"copied"`  // it was made in another folder, and copied to this one's
+	Copied   bool      `json:"copied"`  // it was made in another folder or account, and copied to this one's
 	// Model and Effort are what mia started the agent with, or the window
 	// that had it open was started with or last switched to; left out when
 	// mia did not choose them.
 	Model  string `json:"model,omitempty"`
 	Effort string `json:"effort,omitempty"`
+	// Account is the one the agent was started on, or the window that had
+	// it open runs on; left out for an agent mia keeps no accounts of.
+	Account string `json:"account,omitempty"`
 }
 
 // ResumeConversation opens a window in a worktree's session with the agent
@@ -263,8 +280,11 @@ type Resumed struct {
 // another when told. One a window already has open is left as it is. Of a
 // conversation that was copied to another worktree, from names the
 // worktree whose copy is meant. The agent is started with a model and an
-// effort, those given or the configured ones, as a window's is.
-func (a *App) ResumeConversation(id, from, in, model, effort string) (Resumed, error) {
+// effort, those given or the configured ones, as a window's is, and on an
+// account: the one given, or the one the repository starts the agent's
+// sessions on. One made on another account is copied into that one's
+// folder first, and stays where it was too.
+func (a *App) ResumeConversation(id, from, in, model, effort, account string) (Resumed, error) {
 	heads, problems := a.Conversations(Wanted{})
 	at := slices.IndexFunc(heads, func(h Head) bool { return h.ID == id && (from == "" || h.Worktree == from) })
 	if at < 0 {
@@ -309,7 +329,18 @@ func (a *App) ResumeConversation(id, from, in, model, effort string) (Resumed, e
 		if model != "" || effort != "" {
 			return Resumed{}, fmt.Errorf("window %s of %s has it open already — `mia window model %s %s <model>` switches it, or stop it first", open.Window.Name, record.Name, record.Name, open.Window.Name)
 		}
-		return Resumed{Worktree: record.Name, Window: *open.Window, Already: true, Model: open.Model, Effort: open.Effort}, nil
+		if account != "" && account != cmp.Or(open.Account, DefaultAccount) {
+			return Resumed{}, fmt.Errorf("window %s of %s has it open already, on %s — end %s there first, then resume it on %s", open.Window.Name, record.Name, cmp.Or(open.Account, DefaultAccount), agent.Name, account)
+		}
+		return Resumed{Worktree: record.Name, Window: *open.Window, Already: true, Model: open.Model, Effort: open.Effort, Account: open.Account}, nil
+	}
+	account, err = a.account(agent, account, a.placeAccount(agent))
+	if err != nil {
+		return Resumed{}, err
+	}
+	on := "" // the account it is taken up on, by name, for an agent with accounts
+	if agent.AccountEnv != "" {
+		on = cmp.Or(account, DefaultAccount)
 	}
 	command, err := agent.resume(id)
 	if err != nil {
@@ -322,22 +353,32 @@ func (a *App) ResumeConversation(id, from, in, model, effort string) (Resumed, e
 	if len(with) > 0 {
 		command = put(command, with)
 	}
-	done := Resumed{Worktree: record.Name, Model: chosen.Model, Effort: chosen.Effort}
-	switch {
-	case head.Worktree == record.Name && head.Cwd != record.Path:
-		command = "cd " + shellQuote(head.Cwd) + " && " + command // made in a folder under the worktree
-	case head.Worktree != record.Name && agent.byFolder && agent.carrier != "":
-		// kept under its folder's name: taken up from another only once a
-		// copy is there, as when a worktree moves. One already there, from
-		// the last time, has what was said since and is left alone.
-		there := slices.ContainsFunc(heads, func(h Head) bool { return h.ID == id && h.Agent == head.Agent && h.Worktree == record.Name })
+	chosen.Account = account
+	command = withAccount(agent, account, command)
+	done := Resumed{Worktree: record.Name, Model: chosen.Model, Effort: chosen.Effort, Account: on}
+	to := record.Path
+	if head.Worktree == record.Name {
+		to = head.Cwd
+		if head.Cwd != record.Path {
+			command = "cd " + shellQuote(head.Cwd) + " && " + command // made in a folder under the worktree
+		}
+	}
+	elsewhere := head.Worktree != record.Name && agent.byFolder          // kept under its folder's name
+	otherAccount := head.Account != "" && on != "" && head.Account != on // kept in another account's folder
+	if (elsewhere || otherAccount) && agent.carrier != "" {
+		// taken up there only once a copy is there, as when a worktree
+		// moves. One already there, from the last time, has what was said
+		// since and is left alone.
+		there := slices.ContainsFunc(heads, func(h Head) bool {
+			return h.ID == id && h.Agent == head.Agent && h.Worktree == record.Name && (on == "" || h.Account == on)
+		})
 		if !there {
 			local := side{}
-			packed, err := local.bytesOf(agent.carrier, head.Cwd, record.Path, "pack", id)
+			packed, err := local.bytesOf(carrierOf(agent, head.Account), head.Cwd, to, "pack", id)
 			if err != nil || len(packed) == 0 {
 				return Resumed{}, fmt.Errorf("the conversation could not be copied to %s", record.Name)
 			}
-			if err := local.feed(packed, `cd && tar -xf -`); err != nil {
+			if err := local.feed(packed, landing(agent, account)); err != nil {
 				return Resumed{}, err
 			}
 			done.Copied = true

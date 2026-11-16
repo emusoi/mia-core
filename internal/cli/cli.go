@@ -114,6 +114,8 @@ func Run(args []string) int {
 		return cmdDoctor(rest, asJSON)
 	case "main":
 		return cmdMain(rest)
+	case "account", "accounts":
+		return cmdAccount(rest, asJSON)
 	case "api":
 		if len(rest) > 0 && (rest[0] == "main" || rest[0] == "standing") { // the person's, from anywhere
 			return cmdAPIMain(rest)
@@ -126,6 +128,20 @@ func Run(args []string) int {
 			a := app.Outside()
 			a.Config, a.Plugins = c, pluginHost(c)
 			return emit(a.AgentModels())
+		}
+		if len(rest) > 0 && rest[0] == "accounts" { // the person's, from anywhere
+			projects := take(&rest, "--projects")
+			if len(rest) > 1 {
+				return usageErr("mia api accounts [--projects]")
+			}
+			a, err := atAccounts()
+			if err != nil {
+				return fail(err)
+			}
+			if projects {
+				return emit(a.Projects())
+			}
+			return emit(a.Accounts())
 		}
 		if len(rest) > 0 && rest[0] == "setups" { // the person's, from anywhere: a repository's by default, when in one
 			return cmdAPISetups(rest[1:])
@@ -1340,13 +1356,13 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 	if i := slices.Index(args, "--"); i >= 0 {
 		argv, args = args[i+1:], args[:i]
 	}
-	model, effort := takeValue(&args, "--model"), takeValue(&args, "--effort")
-	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close", "read", "send", "press", "key", "model")
+	model, effort, account := takeValue(&args, "--model"), takeValue(&args, "--effort"), takeValue(&args, "--account")
+	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close", "read", "send", "press", "key", "model", "account")
 	if err != nil {
 		return fail(err)
 	}
 	editor := take(&args, "--editor")
-	if (model != "" || effort != "") && sub != "new" && sub != "model" {
+	if (model != "" || effort != "") && sub != "new" && sub != "model" || account != "" && sub != "new" {
 		return usageErr(windowUsage)
 	}
 	name := strings.Join(args, " ")
@@ -1379,13 +1395,13 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		var chosen app.Chosen
 		var agent string
 		command, launched := a.Config.Launch[name]
-		if !launched && len(argv) == 0 && !editor && (model != "" || effort != "") {
+		if !launched && len(argv) == 0 && !editor && (model != "" || effort != "" || account != "") {
 			command, launched = a.AgentCommand(name), true // the window is named for the agent it runs
 		}
 		if launched && len(argv) == 0 && !editor {
 			var err error
 			agent = a.AgentOf(command)
-			if command, chosen, err = a.CommandWith(command, model, effort); err != nil {
+			if command, chosen, err = a.CommandWith(command, model, effort, account); err != nil {
 				return fail(err)
 			}
 			if argv, err = a.LaunchArgv(record, command); err != nil {
@@ -1394,10 +1410,10 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		} else if len(argv) > 0 {
 			var err error
 			agent = a.AgentOf(strings.Join(argv, " "))
-			if argv, chosen, err = a.ArgvWith(argv, model, effort); err != nil {
+			if argv, chosen, err = a.ArgvWith(argv, model, effort, account); err != nil {
 				return fail(err)
 			}
-		} else if model != "" || effort != "" {
+		} else if model != "" || effort != "" || account != "" {
 			return usageErr(windowUsage)
 		}
 		if editor {
@@ -1470,6 +1486,12 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		}
 		fmt.Printf("%s: window %s switched to %s\n", record.Name, window, said(now))
 		return exitOK
+	case "account":
+		window, chosen, ok := strings.Cut(name, " ")
+		if !ok || chosen == "" || strings.Contains(chosen, " ") || len(argv) > 0 {
+			return usageErr("mia window account [worktree] <window> <account>")
+		}
+		return exitFor(a.AccountOfWindow(record, window, chosen))
 	case "close":
 		if name == "" {
 			return usageErr("mia window close [worktree] <window>")
@@ -1483,7 +1505,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 	return usageErr(windowUsage)
 }
 
-const windowUsage = "mia window [ls|open|select|new|close|read|send|press|key|model] [worktree[@machine]] [window] [--editor] [--model <model>] [--effort <effort>] [-- command|text|keys]"
+const windowUsage = "mia window [ls|open|select|new|close|read|send|press|key|model|account] [worktree[@machine]] [window] [--editor] [--model <model>] [--effort <effort>] [--account <account>] [-- command|text|keys]"
 
 // said is a model and an effort as a line says them: sonnet, effort high.
 func said(chosen app.Chosen) string {

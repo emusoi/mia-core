@@ -18,7 +18,7 @@ var groupOf = map[string]string{
 	"dash": "Working", "stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working",
 	"env":    "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
-	"api": "Records", "signal": "Records", "radar": "Working", "tmux": "Working", "move": "Worktrees", "resurrect": "Worktrees", "why": "Records", "recall": "Records", "conversation": "Records", "archive": "Worktrees", "fork": "Worktrees", "unarchive": "Worktrees", "plugin": "Records", "doctor": "Records", "main": "Working",
+	"api": "Records", "signal": "Records", "radar": "Working", "tmux": "Working", "move": "Worktrees", "resurrect": "Worktrees", "why": "Records", "recall": "Records", "conversation": "Records", "archive": "Worktrees", "fork": "Worktrees", "unarchive": "Worktrees", "plugin": "Records", "doctor": "Records", "main": "Working", "account": "Working",
 }
 
 var verbs = []Verb{
@@ -31,7 +31,7 @@ var verbs = []Verb{
 	{"gc", "mia gc [--merged] [--apply] [--days N] | --others [--apply] [path...]", "worktrees nobody has touched: clean, no session, not starred, quiet for N days; --merged: those whose branch is merged; --others: clean ones mia did not make", false, ""},
 	{"adopt", "mia adopt <worktree>", "take over a worktree created by hand", false, ""},
 	{"rm", "mia rm [--force] [--stop-running] [--branch] <worktree>", "remove a worktree, its session and its name", false, ""},
-	{"window", windowUsage, "the windows of a worktree's session: land in one, pick one without landing, add a shell or an agent — with a model and an effort — close one, read or type into one, type into one without Enter, press a key by name (C-c, Escape), switch an agent's model while it runs", false, ""},
+	{"window", windowUsage, "the windows of a worktree's session: land in one, pick one without landing, add a shell or an agent — with a model, an effort and an account — close one, read or type into one, type into one without Enter, press a key by name (C-c, Escape), switch an agent's model while it runs; account says how to put one on another account", false, ""},
 	{"shell", "mia shell [--popup | --view <name>] [worktree]", "attach to a worktree's session; --view at this terminal's own size and window", false, ""},
 	{"run", "mia run <worktree>[@machine] <cmd…>", "run a command once in a worktree, here or on a machine", false, ""},
 	{"dev", "mia dev [<worktree> [--follow]|off]", "lend the main checkout's running dev server a worktree's files; the one time mia writes into a working tree", false, ""},
@@ -47,8 +47,9 @@ var verbs = []Verb{
 	{"archive", "mia archive [--stop-running] <worktree> · ls", "put a worktree away: everything in it, uncommitted and untracked work too, kept under refs/mia/archive; its branch stays", false, ""},
 	{"unarchive", "mia unarchive <name>", "bring an archived worktree back as it was, under its old name when free", false, ""},
 	{"recall", "mia recall <text…>", "the agent conversations here that mention it — claude's, codex's, pi's — newest first, and how to resume each", true, ""},
-	{"conversation", "mia conversation resume <id> [--worktree <name>] [--in <worktree>] [--model <model>] [--effort <effort>]", "open a window with the agent taking a conversation up again, in the worktree it was made in or another, started with a model and an effort as `mia window new` starts one; --worktree picks the copy of one that is in several; `mia api conversations` lists them", false, ""},
+	{"conversation", "mia conversation resume <id> [--worktree <name>] [--in <worktree>] [--model <model>] [--effort <effort>] [--account <account>]", "open a window with the agent taking a conversation up again, in the worktree it was made in or another, started with a model and an effort and on an account as `mia window new` starts one — one made on another account is copied to it; --worktree picks the copy of one that is in several; `mia api conversations` lists them", false, ""},
 	{"main", mainUsage, "the main agent: the one you talk to, which runs the others — one for you, in a session of its own, no repository's; start --agent starts another agent than the configured one, this once; say types a message into it, press types keys with no Enter (pick a numbered option), interrupt stops it mid-work, model switches its model while it runs", false, ""},
+	{"account", accountUsage, "an agent's logins: each a folder of its own the agent keeps its sign-in and conversations in, the agent's usual one called default; add makes one and opens a window to sign in to it with the agent's own login; mia never reads, copies or moves a sign-in", false, ""},
 	{"why", "mia why <file:line|commit>", "the claude conversation that made a commit, or the line's last commit: what you asked, and how to resume it", true, ""},
 	{"radar", "mia radar [--new]", "the popup that shows and finds everything; --new makes a worktree", false, ""},
 	{"tmux", "mia tmux [install|uninstall|menu <client>]", "mia's part of the tmux status line, its two popups and its menu, printed, added to ~/.tmux.conf, or taken out; menu draws prefix m", true, ""},

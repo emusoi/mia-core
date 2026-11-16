@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/git"
@@ -67,6 +68,9 @@ type Pane struct {
 	Conversation string `json:",omitempty"`
 	// ID is tmux's id of the pane, the same for as long as its server runs.
 	ID string `json:",omitempty"`
+	// Account is the account mia started the agent in it on; "" for the
+	// default, or anything else.
+	Account string `json:",omitempty"`
 }
 
 // Window is one window of a session, as a move recreates it: its first
@@ -153,7 +157,7 @@ func (a *App) Move(name, from, to string, dry bool, say io.Writer) (Moved, error
 	if err != nil {
 		return Moved{}, err
 	}
-	windows := src.windows(a.agents(), name, path)
+	windows := src.windows(a.agents(), name, path, src.chosen(a))
 	if stays := work.staysBehind(); stays != "" {
 		fmt.Fprintf(say, "%s — they go when %s is removed %s\n", stays, name, src.where())
 	}
@@ -198,12 +202,15 @@ func (a *App) Move(name, from, to string, dry bool, say io.Writer) (Moved, error
 			return moved, fmt.Errorf("%w (%s is untouched %s)", err, name, src.where())
 		}
 	}
-	moved.Carried = a.carry(src, dst, path, moved.Path, windows)
+	moved.Carried = a.carry(src, dst, path, moved.Path, windows, say)
 	ridden := a.ride(src, dst, path, moved.Path, say)
 	moved.Carried = append(moved.Carried, ridden...)
 	fmt.Fprintf(say, "opening its windows %s: %d\n", dst.where(), len(windows))
 	if err := dst.open(moved.Name, moved.Path, windows); err != nil {
 		return moved, err
+	}
+	if dst.here() {
+		a.keepAccounts(moved.Name, windows)
 	}
 	fmt.Fprintf(say, "removing %s %s; its branch %s stays there too\n", name, src.where(), branch)
 	if _, err := src.sh(`cd "$1" && `+src.mia+` rm --force --stop-running "$2"`, src.repo, name); err != nil {
@@ -500,9 +507,24 @@ func sessionIn(written string) string {
 	return running.SessionID
 }
 
-// windows is the session's windows: name, folder under the worktree, and
-// the command running there when it is not just a shell.
-func (s side) windows(table []Agent, name, path string) []Window {
+// chosen is what the side's mia keeps of the windows of the repository
+// there: what it started each agent with.
+func (s side) chosen(a *App) map[string]Chosen {
+	if s.here() {
+		return a.chosen()
+	}
+	kept := map[string]Chosen{}
+	out, err := s.bytesOf(`cat "$(git -C "$1" rev-parse --path-format=absolute --git-common-dir)/mia/chosen.json" 2>/dev/null`, s.repo)
+	if err == nil {
+		_ = json.Unmarshal(out, &kept) // unreadable is as nothing kept
+	}
+	return kept
+}
+
+// windows is the session's windows: name, folder under the worktree, the
+// command running there when it is not just a shell, and the account mia
+// started an agent there on, from what is kept of each window.
+func (s side) windows(table []Agent, name, path string, kept map[string]Chosen) []Window {
 	out, err := s.sh(`tmux list-panes -s -t "=mia-$1" -F '#{window_id}	#{window_name}	#{window_layout}	#{pane_current_path}	#{pane_current_command}	#{pane_pid}	#{pane_id}	#{automatic-rename}' 2>/dev/null`, name)
 	if err != nil {
 		return nil
@@ -532,6 +554,9 @@ func (s side) windows(table []Agent, name, path string) []Window {
 		}
 		if f[0] != window {
 			window = f[0]
+			if pid, err := strconv.Atoi(f[5]); err == nil && p.Command != "" {
+				p.Account = kept[chosenKey("mia-"+name, pid)].Account
+			}
 			windows = append(windows, Window{Name: f[1], Pane: p, Auto: f[7] == "1"})
 			continue
 		}
@@ -595,9 +620,11 @@ func (s side) open(name, path string, windows []Window) error {
 }
 
 // carry brings each window's conversation along when its program has a
-// carrier, unpacking it under the home on the other side; the window then
-// restarts with what the carrier says, so the agent picks up where it was.
-func (a *App) carry(src, dst side, from, to string, windows []Window) []string {
+// carrier, unpacking it on the other side in the account of the same name
+// there, or the default one when there is none of that name; the window
+// then restarts with what the carrier says, on that account, so the agent
+// picks up where it was. A sign-in never crosses.
+func (a *App) carry(src, dst side, from, to string, windows []Window, say io.Writer) []string {
 	toPath := to
 	if !dst.here() {
 		if home, err := dst.machine.Home(); err == nil && !filepath.IsAbs(to) {
@@ -605,31 +632,57 @@ func (a *App) carry(src, dst side, from, to string, windows []Window) []string {
 		}
 	}
 	var carried []string
-	again := map[string]string{} // by program: one folder, one conversation each
+	again := map[string]string{}  // by program and account: one folder, one conversation each
+	landed := map[string]string{} // by program and account: the account's folder there; "" for the default
 	for i := range windows {
 		for _, p := range windows[i].panes() {
 			program, _ := agentOf(a.agents(), p.Command)
 			agent, _ := agentNamed(a.agents(), program)
-			script := agent.carrier
-			if script == "" {
-				continue // a shell, or a program with no conversation to carry
+			key := program + "/" + p.Account
+			if _, done := landed[key]; !done && program != "" {
+				landed[key] = dst.accountHome(agent, p.Account, say)
 			}
-			if _, done := again[program]; !done {
-				again[program] = ""
-				packed, err := src.bytesOf(script, from, toPath, "pack")
-				if err != nil || len(packed) == 0 || dst.feed(packed, `cd && tar -xf -`) != nil {
-					continue
+			if script := agent.carrier; script != "" {
+				if _, done := again[key]; !done {
+					again[key] = ""
+					account := p.Account
+					if landed[key] == "" {
+						account = ""
+					}
+					packed, err := src.bytesOf(carrierOf(agent, p.Account), from, toPath, "pack")
+					if err == nil && len(packed) > 0 && dst.feed(packed, landing(agent, account)) == nil {
+						command, _ := src.sh(carrierOf(agent, p.Account), from, toPath, "command")
+						again[key] = strings.TrimSpace(command)
+						if !slices.Contains(carried, program) {
+							carried = append(carried, program)
+						}
+					}
 				}
-				command, _ := src.sh(script, from, toPath, "command")
-				again[program] = strings.TrimSpace(command)
-				carried = append(carried, program)
+				if again[key] != "" {
+					p.Command = again[key]
+				}
 			}
-			if again[program] != "" {
-				p.Command = again[program]
+			if home := landed[key]; home != "" {
+				p.Command = agent.AccountEnv + "=" + shellQuote(home) + " " + p.Command
 			}
 		}
 	}
 	return carried
+}
+
+// accountHome is the folder on the side of an agent's account of that
+// name, "" for the default one: a named account the side has not is the
+// default there, and said so.
+func (s side) accountHome(agent Agent, account string, say io.Writer) string {
+	if account == "" || account == DefaultAccount || agent.AccountEnv == "" {
+		return ""
+	}
+	home, err := s.sh(accountShell(agent, account) + `; [ -d "$home" ] && printf %s "$home"`)
+	if err != nil || home == "" {
+		fmt.Fprintf(say, "there is no %s account %s %s, so %s starts on the default one, its conversation with it\n", agent.Name, account, s.where(), agent.Name)
+		return ""
+	}
+	return home
 }
 
 // ride carries what rides with the worktree: each rider packs on the side

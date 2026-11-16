@@ -70,7 +70,7 @@ func (a *App) remember(opened map[string][]Window) error {
 		before, had := saved[record.Name]
 		switch {
 		case session.Here().Exists(record.Name):
-			windows := side{}.windows(a.agents(), record.Name, record.Path)
+			windows := side{}.windows(a.agents(), record.Name, record.Path, a.chosen())
 			if was, ok := opened[record.Name]; ok && len(was) == len(windows) {
 				for i := range was { // opened in this order
 					if then, now := was[i].panes(), windows[i].panes(); len(then) == len(now) {
@@ -224,6 +224,13 @@ func (a *App) Resurrect(dry bool, names ...string) ([]Revived, error) {
 			windows[i].Splits = slices.Clone(windows[i].Splits)
 			for _, p := range windows[i].panes() {
 				p.Command = again(a.agents(), p.Command, p.Conversation)
+				if name, _ := agentOf(a.agents(), p.Command); name != "" && p.Account != "" {
+					agent, _ := agentNamed(a.agents(), name)
+					if !slices.Contains(accountsOf(agent), p.Account) {
+						p.Account = "" // removed since: the default one
+					}
+					p.Command = withAccount(agent, p.Account, p.Command)
+				}
 			}
 		}
 		if !dry {
@@ -233,6 +240,7 @@ func (a *App) Resurrect(dry bool, names ...string) ([]Revived, error) {
 			if err := (side{}).open(record.Name, record.Path, windows); err != nil {
 				return revived, err
 			}
+			a.keepAccounts(record.Name, windows)
 		}
 		revived = append(revived, Revived{record.Name, windows})
 	}

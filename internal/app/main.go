@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cmp"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -82,6 +83,10 @@ type MainState struct {
 	// left out when it is not running, or mia did not choose them.
 	Model  string `json:"model,omitempty"`
 	Effort string `json:"effort,omitempty"`
+	// Account is the account of its agent it runs on, default for the
+	// agent's own; left out when it is not running, or for an agent mia
+	// keeps no accounts of.
+	Account string `json:"account,omitempty"`
 }
 
 // mainHere, in the environment, makes mia answer for the main agent of the
@@ -187,14 +192,18 @@ func (a *App) Main() MainState {
 			(session.AgentTitle(pane.Title) == "" && !pane.Activity.IsZero() && time.Since(pane.Activity) < workingFor)
 		kept := a.chosen()[chosenKey(session.Name(mainName), pane.PID)]
 		state.Model, state.Effort = kept.Model, kept.Effort
+		if agent.AccountEnv != "" {
+			state.Account = cmp.Or(kept.Account, DefaultAccount)
+		}
 	}
-	state.Conversation = a.mainConversation(agent, pane.PID)
+	state.Conversation = a.mainConversation(agent, pane.PID, state.Account)
 	return state
 }
 
 // mainConversation is the conversation the agent has open in the pane, when
-// it says, and otherwise the one of its folder last written to.
-func (a *App) mainConversation(agent Agent, pid int) string {
+// it says, and otherwise the one of its folder last written to: of the
+// account named, when one is.
+func (a *App) mainConversation(agent Agent, pid int, account string) string {
 	if agent.talks == nil {
 		return ""
 	}
@@ -206,6 +215,9 @@ func (a *App) mainConversation(agent Agent, pid int) string {
 	}
 	in, _ := a.where()
 	heads, _ := agent.talks.heads(in)
+	if account != "" {
+		heads = slices.DeleteFunc(heads, func(h Head) bool { return h.Account != "" && h.Account != account })
+	}
 	if len(heads) == 0 {
 		return ""
 	}
@@ -223,12 +235,24 @@ func (a *App) mainSet(agent Agent) []config.Agent {
 	return set
 }
 
+// mainAccount is the account the main agent is started on when none is
+// given: [main]'s, for the agent [main] names, and failing that its
+// agent's own in [agents]; "" for the default.
+func (a *App) mainAccount(agent Agent, account string) (string, error) {
+	set := []string{a.Config.Agents[agent.Name].Account}
+	if configured, err := a.mainAgent(); err == nil && configured.Name == agent.Name {
+		set = slices.Insert(set, 0, a.Config.Main.Account)
+	}
+	return a.account(agent, account, set...)
+}
+
 // StartMain makes the main agent's folder and session when they are not
 // there and starts the agent in it, going on with its last conversation
-// when it has one, with a model and an effort: those given, or the
-// configured ones. One that runs already is left as it is. Named, the
-// agent is that one of the table for this start, whatever [main] says.
-func (a *App) StartMain(name, model, effort string) (MainState, error) {
+// on the account it starts on when it has one, with a model and an
+// effort: those given, or the configured ones. One that runs already is
+// left as it is. Named, the agent is that one of the table for this
+// start, whatever [main] says.
+func (a *App) StartMain(name, model, effort, account string) (MainState, error) {
 	agent, err := a.mainAgent()
 	if name != "" {
 		var known bool
@@ -241,6 +265,10 @@ func (a *App) StartMain(name, model, effort string) (MainState, error) {
 		return MainState{}, err
 	}
 	if err := allowed(agent, model, effort, a.mainSet(agent)...); err != nil {
+		return MainState{}, err
+	}
+	given := account
+	if account, err = a.mainAccount(agent, account); err != nil {
 		return MainState{}, err
 	}
 	host := a.mainHost()
@@ -268,10 +296,17 @@ func (a *App) StartMain(name, model, effort string) (MainState, error) {
 		if model != "" || effort != "" {
 			return MainState{}, errors.New("the main agent runs already — `mia main model <model>` switches it")
 		}
+		if given != "" {
+			return MainState{}, errors.New("the main agent runs already, and takes its account when it starts — `mia main stop` first")
+		}
 		return a.Main(), nil
 	}
+	on := ""
+	if agent.AccountEnv != "" {
+		on = cmp.Or(account, DefaultAccount)
+	}
 	command := agent.start()
-	if last := a.mainConversation(agent, 0); last != "" && agent.resume != nil {
+	if last := a.mainConversation(agent, 0, on); last != "" && agent.resume != nil {
 		if command, err = agent.resume(last); err != nil {
 			return MainState{}, fmt.Errorf("agent %s: %w", agent.Name, err)
 		}
@@ -283,6 +318,8 @@ func (a *App) StartMain(name, model, effort string) (MainState, error) {
 	if len(with) > 0 {
 		command = put(command, with)
 	}
+	chosen.Account = account
+	command = withAccount(agent, account, command)
 	if err := host.Ensure(mainName, a.Root); err != nil {
 		return MainState{}, err
 	}

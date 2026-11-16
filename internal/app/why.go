@@ -31,6 +31,9 @@ type Conversation struct {
 	At      time.Time `json:"at"`
 	Asked   string    `json:"asked"` // the last thing you said before it
 	Made    bool      `json:"made"`  // git commit printed it there; otherwise first seen there
+	// Account is the agent's account whose folder it is in: default for
+	// its usual one.
+	Account string `json:"account,omitempty"`
 }
 
 // Why finds the conversation behind a commit, or behind the commit that
@@ -46,8 +49,10 @@ func (a *App) Why(target string) (Why, error) {
 	why := Why{Commit: commit, Subject: subject}
 	seconds, _ := strconv.ParseInt(stamp, 10, 64)
 	files := transcriptsMentioning(a.Root, commit[:7], time.Unix(seconds, 0))
+	homes := homesOf("claude")
 	for _, file := range files {
 		if c, ok := conversationIn(file, commit[:7]); ok {
+			c.Account = accountIn(homes, file)
 			why.Conversations = append(why.Conversations, c)
 		}
 	}

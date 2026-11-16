@@ -33,6 +33,9 @@ type AgentModels struct {
 	Effort string `json:"effort"`
 	// Live: it can be switched to another while it runs.
 	Live bool `json:"live"`
+	// AccountEnv is the variable that names the folder of each of its
+	// accounts; "" for an agent mia keeps no accounts of.
+	AccountEnv string `json:"account_env"`
 }
 
 // AgentModels is every agent mia knows, a plugin's too.
@@ -41,7 +44,7 @@ func (a *App) AgentModels() []AgentModels {
 	for _, agent := range a.agents() {
 		set := a.Config.Agents[agent.Name]
 		all = append(all, AgentModels{Name: agent.Name, Models: modelsOf(agent, set), Efforts: effortsOf(agent, set),
-			Model: set.Model, Effort: set.Effort, Live: agent.to != nil})
+			Model: set.Model, Effort: set.Effort, Live: agent.to != nil, AccountEnv: agent.AccountEnv})
 	}
 	return all
 }
@@ -145,14 +148,19 @@ func (a *App) AgentOf(command string) string {
 }
 
 // CommandWith is a command line with the agent it runs started with a
-// model and an effort, those given or the configured ones. One that runs
-// no agent is left as it is, and refused a model or an effort.
-func (a *App) CommandWith(command, model, effort string) (string, Chosen, error) {
-	with, chosen, err := a.withFor(command, model, effort)
-	if err != nil || len(with) == 0 {
+// model and an effort, those given or the configured ones, and on an
+// account: the one given, or the one the repository starts the agent's
+// sessions on. One that runs no agent is left as it is, and refused a
+// model, an effort or an account.
+func (a *App) CommandWith(command, model, effort, account string) (string, Chosen, error) {
+	agent, with, chosen, err := a.withFor(command, model, effort, account)
+	if err != nil || agent.Name == "" {
 		return command, chosen, err
 	}
-	return put(command, with), chosen, nil
+	if len(with) > 0 {
+		command = put(command, with)
+	}
+	return withAccount(agent, chosen.Account, command), chosen, nil
 }
 
 // put puts words into a command line after those that run its agent.
@@ -166,26 +174,44 @@ func put(command string, with []string) string {
 	return strings.TrimSpace(strings.Join(head, " ") + " " + run.ShellJoin(with) + " " + rest)
 }
 
-// ArgvWith is CommandWith of a command given word by word.
-func (a *App) ArgvWith(argv []string, model, effort string) ([]string, Chosen, error) {
-	with, chosen, err := a.withFor(strings.Join(argv, " "), model, effort)
-	if err != nil || len(with) == 0 {
+// ArgvWith is CommandWith of a command given word by word: an account is
+// set by env before it.
+func (a *App) ArgvWith(argv []string, model, effort, account string) ([]string, Chosen, error) {
+	agent, with, chosen, err := a.withFor(strings.Join(argv, " "), model, effort, account)
+	if err != nil || agent.Name == "" {
 		return argv, chosen, err
 	}
-	at := agentAt(argv)
-	return slices.Concat(argv[:at], with, argv[at:]), chosen, nil
+	if len(with) > 0 {
+		at := agentAt(argv)
+		argv = slices.Concat(argv[:at], with, argv[at:])
+	}
+	if chosen.Account != "" {
+		argv = slices.Concat([]string{"env", agent.AccountEnv + "=" + homeOf(agent, chosen.Account)}, argv)
+	}
+	return argv, chosen, nil
 }
 
-func (a *App) withFor(command, model, effort string) ([]string, Chosen, error) {
+// withFor is the agent a command line runs, the words that start it with
+// a model and an effort, and what is chosen of the three; no agent for a
+// command line that runs none.
+func (a *App) withFor(command, model, effort, account string) (Agent, []string, Chosen, error) {
 	name, _ := agentOf(a.agents(), command)
 	if name == "" {
-		if model != "" || effort != "" {
-			return nil, Chosen{}, fmt.Errorf("`%s` runs no agent mia knows — a model is an agent's", command)
+		if model != "" || effort != "" || account != "" {
+			return Agent{}, nil, Chosen{}, fmt.Errorf("`%s` runs no agent mia knows — a model and an account are an agent's", command)
 		}
-		return nil, Chosen{}, nil
+		return Agent{}, nil, Chosen{}, nil
 	}
 	agent, _ := agentNamed(a.agents(), name)
-	return choose(agent, command, model, effort, a.Config.Agents[name])
+	with, chosen, err := choose(agent, command, model, effort, a.Config.Agents[name])
+	if err != nil {
+		return agent, nil, Chosen{}, err
+	}
+	if account == "" && agent.AccountEnv != "" && strings.Contains(command, agent.AccountEnv+"=") {
+		return agent, with, chosen, nil // the command line says its own
+	}
+	chosen.Account, err = a.account(agent, account, a.placeAccount(agent))
+	return agent, with, chosen, err
 }
 
 // agentAt is how many words come before what an agent is given: the one
@@ -195,10 +221,12 @@ func agentAt(words []string) int {
 }
 
 // Chosen is the model and effort mia started a window's agent with, or
-// last switched it to; "" for one it did not choose.
+// last switched it to, and the account it started it with; "" for one it
+// did not choose.
 type Chosen struct {
-	Model  string `json:"model,omitempty"`
-	Effort string `json:"effort,omitempty"`
+	Model   string `json:"model,omitempty"`
+	Effort  string `json:"effort,omitempty"`
+	Account string `json:"account,omitempty"`
 }
 
 // chosenPath keeps them by window, the window as its session's name and
@@ -209,12 +237,15 @@ func (a *App) chosenPath() string { return filepath.Join(a.MiaDir, "chosen.json"
 func chosenKey(sessionName string, pid int) string { return sessionName + ":" + strconv.Itoa(pid) }
 
 // chosen is what mia keeps of every window; nothing when it keeps none.
-func (a *App) chosen() map[string]Chosen {
+func (a *App) chosen() map[string]Chosen { return chosenIn(a.MiaDir) }
+
+// chosenIn is what is kept of every window in a folder of mia's.
+func chosenIn(dir string) map[string]Chosen {
 	kept := map[string]Chosen{}
-	if a.MiaDir == "" {
+	if dir == "" {
 		return kept
 	}
-	if data, err := os.ReadFile(a.chosenPath()); err == nil {
+	if data, err := os.ReadFile(filepath.Join(dir, "chosen.json")); err == nil {
 		_ = json.Unmarshal(data, &kept) // unreadable is as nothing kept
 	}
 	return kept

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,15 +11,15 @@ import (
 )
 
 // ── claude ──────────────────────────────────────────────────────────────
-// ~/.claude/projects/<the folder's path, every other character a ->/<id>.jsonl
+// <its folder, ~/.claude>/projects/<the folder's path, every other character a ->/<id>.jsonl
 
-func claudeFiles(in folders, deep bool) []string {
+func claudeFiles(home string, in folders, deep bool) []string {
 	name := func(path string) string { return projectPrefix.ReplaceAllString(path, "-") }
-	return jsonl(dirsOf(in, claudeProjects(), name, func(root string) string { return name(root) + "*" }), deep)
+	return jsonl(dirsOf(in, filepath.Join(home, "projects"), name, func(root string) string { return name(root) + "*" }), deep)
 }
 
-func claudeFind(in folders, id string) []string {
-	return slices.DeleteFunc(claudeFiles(in, false), func(file string) bool { return claudeID(file) != id })
+func claudeFind(home string, in folders, id string) []string {
+	return slices.DeleteFunc(claudeFiles(home, in, false), func(file string) bool { return claudeID(file) != id })
 }
 
 func claudeID(path string) string { return strings.TrimSuffix(filepath.Base(path), ".jsonl") }
@@ -131,25 +130,17 @@ func claudeLine(line []byte, about *about) []Turn {
 }
 
 // ── codex ───────────────────────────────────────────────────────────────
-// ~/.codex/sessions/<y>/<m>/<d>/rollout-<time>-<id>.jsonl, every folder's
-// together: the folder is in the session_meta line the file starts with.
+// <its folder, ~/.codex>/sessions/<y>/<m>/<d>/rollout-<time>-<id>.jsonl,
+// every folder's together: the folder is in the session_meta line the
+// file starts with.
 
-func codexSessions() string {
-	dir := os.Getenv("CODEX_HOME")
-	if dir == "" {
-		home, _ := os.UserHomeDir()
-		dir = filepath.Join(home, ".codex")
-	}
-	return filepath.Join(dir, "sessions")
-}
-
-func codexFiles(folders, bool) []string {
-	files, _ := filepath.Glob(filepath.Join(codexSessions(), "*", "*", "*", "rollout-*.jsonl"))
+func codexFiles(home string, _ folders, _ bool) []string {
+	files, _ := filepath.Glob(filepath.Join(home, "sessions", "*", "*", "*", "rollout-*.jsonl"))
 	return files
 }
 
-func codexFind(_ folders, id string) []string {
-	files, _ := filepath.Glob(filepath.Join(codexSessions(), "*", "*", "*", "rollout-*-"+id+".jsonl"))
+func codexFind(home string, _ folders, id string) []string {
+	files, _ := filepath.Glob(filepath.Join(home, "sessions", "*", "*", "*", "rollout-*-"+id+".jsonl"))
 	return files
 }
 
@@ -292,20 +283,15 @@ func patchTurn(patch string, at time.Time) Turn {
 }
 
 // ── pi ──────────────────────────────────────────────────────────────────
-// ~/.pi/agent/sessions/-<the folder's path, / as ->--/<time>_<id>.jsonl
+// <its folder, ~/.pi/agent>/sessions/-<the folder's path, / as ->--/<time>_<id>.jsonl
 
-func piSessions() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".pi", "agent", "sessions")
-}
-
-func piFiles(in folders, _ bool) []string {
+func piFiles(home string, in folders, _ bool) []string {
 	name := func(path string) string { return "-" + strings.ReplaceAll(path, "/", "-") + "--" }
-	return jsonl(dirsOf(in, piSessions(), name, func(root string) string { return "-" + strings.ReplaceAll(root, "/", "-") + "*--" }), false)
+	return jsonl(dirsOf(in, filepath.Join(home, "sessions"), name, func(root string) string { return "-" + strings.ReplaceAll(root, "/", "-") + "*--" }), false)
 }
 
-func piFind(in folders, id string) []string {
-	return slices.DeleteFunc(piFiles(in, false), func(file string) bool { return piID(file) != id })
+func piFind(home string, in folders, id string) []string {
+	return slices.DeleteFunc(piFiles(home, in, false), func(file string) bool { return piID(file) != id })
 }
 
 func piID(path string) string {

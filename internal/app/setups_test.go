@@ -51,14 +51,14 @@ func TestSetupsAreTheUsualFirstThenTheLastUsed(t *testing.T) {
 	gittest.Isolate(t)
 	day := func(n int) time.Time { return time.Date(2026, 11, n, 10, 0, 0, 0, time.UTC) }
 	history := []Use{
-		{"claude", "sonnet", "medium", "mia-phone", "duluti", "local", day(1)},
-		{"claude", "sonnet", "medium", "mia-phone", "goba", "local", day(2)},
-		{"claude", "opus", "high", "mia-phone", "olasiti", "local", day(3)},
-		{"claude", "opus", "high", "mia-phone", "sakina", "fedora", day(4)},
-		{"claude", "sonnet", "medium", "mia-desk", "kijenge", "local", day(5)},
-		{"claude", "opus", "high", "mia-phone", "olasiti", "local", day(6)},
-		{"codex", "5.1-codex", "high", "mia-phone", "duluti", "local", day(7)},
-		{"claude", "", "", "mia-phone", "goba", "local", day(8)}, // nothing chosen: written by hand, or by an older mia
+		{"claude", "sonnet", "medium", "mia-phone", "duluti", "local", day(1), ""},
+		{"claude", "sonnet", "medium", "mia-phone", "goba", "local", day(2), ""},
+		{"claude", "opus", "high", "mia-phone", "olasiti", "local", day(3), "work"}, // an account is kept for the history, and is no part of a setup
+		{"claude", "opus", "high", "mia-phone", "sakina", "fedora", day(4), ""},
+		{"claude", "sonnet", "medium", "mia-desk", "kijenge", "local", day(5), ""},
+		{"claude", "opus", "high", "mia-phone", "olasiti", "local", day(6), ""},
+		{"codex", "5.1-codex", "high", "mia-phone", "duluti", "local", day(7), ""},
+		{"claude", "", "", "mia-phone", "goba", "local", day(8), ""}, // nothing chosen: written by hand, or by an older mia
 	}
 	data, _ := json.Marshal(history)
 	if err := os.MkdirAll(filepath.Dir(usesPath()), 0o755); err != nil {

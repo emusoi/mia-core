@@ -341,7 +341,7 @@ func TestResumingAPluginAgentsConversationOpensItsWindowOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	done, err := a.ResumeConversation("e2", "", "", "", "")
+	done, err := a.ResumeConversation("e2", "", "", "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +362,7 @@ func TestResumingAPluginAgentsConversationOpensItsWindowOnce(t *testing.T) {
 	if running.ID != "e2" || !running.Running || running.Window == nil || running.Window.Name != "echo" {
 		t.Fatalf("the newest of the agent's there is the one its window has: %+v", running)
 	}
-	again, err := a.ResumeConversation("e2", "", "", "", "")
+	again, err := a.ResumeConversation("e2", "", "", "", "", "")
 	if err != nil || !again.Already || again.Window.Name != "echo" {
 		t.Errorf("a second time says a window has it: %+v %v", again, err)
 	}
@@ -386,13 +386,13 @@ func TestAConversationIsResumedWithAModel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.ResumeConversation("e2", "", "", "shout", ""); err == nil || !strings.Contains(err.Error(), "loud, soft") {
+	if _, err := a.ResumeConversation("e2", "", "", "shout", "", ""); err == nil || !strings.Contains(err.Error(), "loud, soft") {
 		t.Fatalf("a model it has not, with those it has: %v", err)
 	}
 	if session.Here().HasWindow(record.Name, "echo") {
 		t.Fatal("a window was opened for a model it has not")
 	}
-	done, err := a.ResumeConversation("e2", "", "", "loud", "high")
+	done, err := a.ResumeConversation("e2", "", "", "loud", "high", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -413,10 +413,10 @@ func TestAConversationIsResumedWithAModel(t *testing.T) {
 	if setups := a.Setups(""); len(setups) == 0 || setups[0].Agent != "echo" || setups[0].Model != "loud" || setups[0].Effort != "high" || setups[0].Last.Worktree != record.Name {
 		t.Errorf("written down as a setup used: %+v", setups)
 	}
-	if _, err := a.ResumeConversation("e2", "", "", "soft", ""); err == nil || !strings.Contains(err.Error(), "mia window model") {
+	if _, err := a.ResumeConversation("e2", "", "", "soft", "", ""); err == nil || !strings.Contains(err.Error(), "mia window model") {
 		t.Errorf("one a window has open is not started again with another: %v", err)
 	}
-	if again, err := a.ResumeConversation("e2", "", "", "", ""); err != nil || !again.Already || again.Model != "loud" {
+	if again, err := a.ResumeConversation("e2", "", "", "", "", ""); err != nil || !again.Already || again.Model != "loud" {
 		t.Errorf("asked again with none, the window that has it: %+v %v", again, err)
 	}
 	if windows := session.Here().Windows(record.Name); len(windows) != 2 {
@@ -443,10 +443,10 @@ func TestResumingAClaudeConversationInAnotherWorktreeCopiesItThere(t *testing.T)
 	put(t, filepath.Join(claudeDir(one.Path), "c9.jsonl"), claudeSays(one.Path, "user", `"start it here"`, ""))
 	put(t, filepath.Join(claudeDir(repo.Root+".gone"), "c2.jsonl"), claudeSays(repo.Root+".gone", "user", `"try the other way"`, ""))
 
-	if _, err := a.ResumeConversation("c2", "", "", "", ""); err == nil || !strings.Contains(err.Error(), "--in") || !strings.Contains(err.Error(), "gone") {
+	if _, err := a.ResumeConversation("c2", "", "", "", "", ""); err == nil || !strings.Contains(err.Error(), "--in") || !strings.Contains(err.Error(), "gone") {
 		t.Errorf("one whose worktree is gone is refused, with what to do: %v", err)
 	}
-	done, err := a.ResumeConversation("c9", "", two.Name, "", "")
+	done, err := a.ResumeConversation("c9", "", two.Name, "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -462,7 +462,7 @@ func TestResumingAClaudeConversationInAnotherWorktreeCopiesItThere(t *testing.T)
 	}
 	// what is said there since is not written over by a second resume
 	put(t, filepath.Join(claudeDir(two.Path), "c9.jsonl"), claudeSays(two.Path, "user", `"and go on here"`, ""))
-	again, err := a.ResumeConversation("c9", "", two.Name, "", "")
+	again, err := a.ResumeConversation("c9", "", two.Name, "", "", "")
 	if err != nil || again.Copied {
 		t.Fatalf("a second resume there: %+v %v", again, err)
 	}
@@ -472,7 +472,7 @@ func TestResumingAClaudeConversationInAnotherWorktreeCopiesItThere(t *testing.T)
 	if again.Window.Name != "claude-2" {
 		t.Errorf("a window beside the first: %+v", again)
 	}
-	back, err := a.ResumeConversation("c9", "", one.Name, "", "")
+	back, err := a.ResumeConversation("c9", "", one.Name, "", "", "")
 	if err != nil || back.Copied || back.Worktree != one.Name {
 		t.Errorf("where it was made it is as it was: %+v %v", back, err)
 	}
@@ -496,11 +496,11 @@ func TestResumingAClaudeConversationInAnotherWorktreeCopiesItThere(t *testing.T)
 		t.Errorf("listed once for each folder, told apart by worktree and cwd: %+v", heads)
 	}
 	// resumed with no worktree named it is the last written to, two's; named, one's own
-	named, err := a.ResumeConversation("c9", one.Name, "", "", "")
+	named, err := a.ResumeConversation("c9", one.Name, "", "", "", "")
 	if err != nil || named.Worktree != one.Name || named.Copied {
 		t.Errorf("the copy in the worktree named: %+v %v", named, err)
 	}
-	if _, err := a.ResumeConversation("c9", "nowhere", "", "", ""); err == nil || !strings.Contains(err.Error(), "nowhere") {
+	if _, err := a.ResumeConversation("c9", "nowhere", "", "", "", ""); err == nil || !strings.Contains(err.Error(), "nowhere") {
 		t.Errorf("resumed from a worktree it is not in: %v", err)
 	}
 }

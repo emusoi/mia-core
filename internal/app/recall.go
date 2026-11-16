@@ -122,18 +122,14 @@ func around(text, needle string) string {
 }
 
 // transcriptDirs is claude's project folders for the repository and its
-// worktrees: claude names each after its path, every other character a -,
-// and a worktree <root>.<name> starts the same.
+// worktrees, in each of its accounts' folders: claude names each after its
+// path, every other character a -, and a worktree <root>.<name> starts the
+// same.
 func transcriptDirs(root string) []string {
-	dirs, _ := filepath.Glob(filepath.Join(claudeProjects(), projectPrefix.ReplaceAllString(root, "-")+"*"))
-	return dirs
-}
-
-func claudeProjects() string {
-	dir := os.Getenv("CLAUDE_CONFIG_DIR")
-	if dir == "" {
-		home, _ := os.UserHomeDir()
-		dir = filepath.Join(home, ".claude")
+	var dirs []string
+	for _, h := range homesOf("claude") {
+		found, _ := filepath.Glob(filepath.Join(h.dir, "projects", projectPrefix.ReplaceAllString(root, "-")+"*"))
+		dirs = append(dirs, found...)
 	}
-	return filepath.Join(dir, "projects")
+	return dirs
 }

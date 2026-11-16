@@ -21,7 +21,9 @@ import (
 // where, in a history of the person's that keeps the last usesKept: the
 // setups a person uses, the usual one first, are what a picker offers.
 
-// Use is one start or switch of an agent with a model or an effort.
+// Use is one start or switch of an agent with a model or an effort, and
+// the account it was started on, kept for the history: a setup is no
+// account's.
 type Use struct {
 	Agent  string `json:"agent"`
 	Model  string `json:"model"`
@@ -32,6 +34,7 @@ type Use struct {
 	Worktree   string    `json:"worktree"`
 	Machine    string    `json:"machine"`
 	At         time.Time `json:"at"`
+	Account    string    `json:"account,omitempty"`
 }
 
 // usesKept is how many uses the history keeps; the oldest go first.
@@ -62,7 +65,7 @@ func (a *App) used(agent, worktree, machine string, chosen Chosen) error {
 		return err
 	}
 	defer unlock()
-	all := append(uses(), Use{Agent: agent, Model: chosen.Model, Effort: chosen.Effort,
+	all := append(uses(), Use{Agent: agent, Model: chosen.Model, Effort: chosen.Effort, Account: chosen.Account,
 		Repository: filepath.Base(a.Root), Worktree: worktree, Machine: machine, At: time.Now().UTC()})
 	data, err := json.Marshal(all[max(0, len(all)-usesKept):])
 	if err != nil {

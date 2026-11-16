@@ -59,6 +59,21 @@ type Agent struct {
 	// to is the lines typed into its window to switch it while it runs;
 	// nil for one that cannot.
 	to func(model, effort string) []string
+
+	// AccountEnv is the variable that names the folder it keeps its
+	// sign-in, its settings and its conversations in: one folder for each
+	// account. Empty for an agent mia keeps no accounts of.
+	AccountEnv string
+	// home is that folder when the variable is not set, under the home
+	// directory; empty for one mia does not know it of.
+	home string
+	// signedIn is the file in that folder that is there once someone has
+	// signed in; empty for one mia cannot tell by a file.
+	signedIn string
+	// keychain is where it may keep a sign-in out of its folder — the
+	// systems it may, by Go's name for them — so that no file there says
+	// nothing.
+	keychain []string
 }
 
 // start is the word that runs it.
@@ -165,8 +180,16 @@ func fixed(format string) func(string) (string, error) {
 var builtin = []Agent{
 	{Name: "claude", goOn: "--continue", has: []string{"-c", "--continue", "-r", "--resume"},
 		resume: fixed("claude --resume %s"), byFolder: true, carrier: carriers["claude"], notes: "CLAUDE.md",
+		// on macOS its sign-in is in the Keychain, under a name made from the
+		// folder's path when the variable is set
+		AccountEnv: "CLAUDE_CONFIG_DIR", home: ".claude", signedIn: ".credentials.json", keychain: []string{"darwin"},
 		// claude writes the session of each of its processes to sessions/<pid>.json
-		held:  `pid="$(ps -o tpgid= -p "$1" | tr -d ' ')"; cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions/$pid.json" 2>/dev/null`,
+		// in the folder of the account it runs on: its own, or one of mia's
+		held: `pid="$(ps -o tpgid= -p "$1" | tr -d ' ')"
+home="${CLAUDE_CONFIG_DIR:-}"; case "$home" in "" | "${XDG_CONFIG_HOME:-$HOME/.config}/mia/accounts/"*) home="$HOME/.claude" ;; esac
+for h in "$home" "${XDG_CONFIG_HOME:-$HOME/.config}/mia/accounts/claude/"*; do
+	[ -f "$h/sessions/$pid.json" ] && exec cat "$h/sessions/$pid.json"
+done`,
 		talks: transcripts{agent: "claude", files: claudeFiles, find: claudeFind, id: claudeID, decode: claudeLine},
 		// the aliases it takes for the latest of each, and /model and /effort in it
 		Models:  []plugin.Model{{ID: "opus", Label: "Opus"}, {ID: "sonnet", Label: "Sonnet"}, {ID: "haiku", Label: "Haiku"}, {ID: "fable", Label: "Fable"}},
@@ -174,6 +197,8 @@ var builtin = []Agent{
 		with:    words([]string{"--model", "%s"}, []string{"--effort", "%s"}), to: typing("/model %s", "/effort %s")},
 	{Name: "codex", goOn: "resume --last", has: []string{"resume"},
 		resume: fixed("codex resume %s"), carrier: carriers["codex"],
+		// auth.json, or the system's keyring when its config says so
+		AccountEnv: "CODEX_HOME", home: ".codex", signedIn: "auth.json", keychain: []string{"darwin", "linux", "windows"},
 		talks: transcripts{agent: "codex", files: codexFiles, find: codexFind, id: codexID, decode: codexLine},
 		// -c takes a value that is no TOML as it is; /model in it takes its effort with --reasoning
 		Models:  []plugin.Model{{ID: "gpt-6-luna", Label: "GPT-6 Luna"}, {ID: "gpt-5.6-terra", Label: "GPT-5.6 Terra"}, {ID: "gpt-5.6-luna", Label: "GPT-5.6 Luna"}},
@@ -188,6 +213,7 @@ var builtin = []Agent{
 		}},
 	{Name: "pi", goOn: "--continue", has: []string{"-c", "--continue", "-r", "--resume", "--session"},
 		resume: fixed("pi --session %s"), byFolder: true, carrier: carriers["pi"],
+		AccountEnv: "PI_CODING_AGENT_DIR", home: ".pi/agent", signedIn: "auth.json",
 		talks: transcripts{agent: "pi", files: piFiles, find: piFind, id: piID, decode: piLine},
 		// provider/id, as /model in it takes one exactly; its effort is its thinking level
 		Models: []plugin.Model{{ID: "anthropic/claude-opus-5", Label: "Claude Opus 5"}, {ID: "anthropic/claude-sonnet-5", Label: "Claude Sonnet 5"},
@@ -295,8 +321,11 @@ func agentIn(table []Agent, command, title string) string {
 // Head is one conversation in a list: who it was with, where, what was
 // first asked and last said, and whether a window has it open now.
 type Head struct {
-	ID       string     `json:"id"`
-	Agent    string     `json:"agent"`
+	ID    string `json:"id"`
+	Agent string `json:"agent"`
+	// Account is the agent's account whose folder it is in, default for its
+	// usual one; left out for an agent mia keeps no accounts of.
+	Account  string     `json:"account,omitempty"`
 	Cwd      string     `json:"cwd"`
 	Worktree string     `json:"worktree"` // its name; "" when the folder is none of this repository's
 	Gone     bool       `json:"gone"`     // its folder is no more
