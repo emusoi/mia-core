@@ -32,11 +32,11 @@ func cmdMove(a *app.App, args []string) int {
 		fmt.Printf("would open %d window(s) there: %s\nnothing was moved\n", len(what), strings.Join(what, " · "))
 		return exitOK
 	}
-	where := args[1]
+	where, there := args[1], "there"
 	if where == runtime.Local {
-		where = "this computer"
+		where, there = "this computer", "here"
 	}
-	fmt.Printf("%s — moved to %s, %d window(s) open there", moved.Name, where, len(moved.Windows))
+	fmt.Printf("%s — moved to %s, %d window(s) open %s", moved.Name, where, len(moved.Windows), there)
 	if len(moved.Carried) > 0 {
 		fmt.Printf(", carrying %s", strings.Join(moved.Carried, ", "))
 	}

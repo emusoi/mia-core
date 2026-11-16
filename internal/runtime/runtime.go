@@ -153,6 +153,9 @@ func Run(target string, argv ...string) (string, error) {
 	tool := run.Tool{Binary: argv[0], SSH: target, Detail: run.FirstLine}
 	out, err := tool.Capture(argv[1:]...)
 	if err != nil {
+		if target == "" {
+			return "", err // here: there is no machine to name
+		}
 		return "", fmt.Errorf("%s: %s", target, err)
 	}
 	return out, nil

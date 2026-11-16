@@ -113,11 +113,17 @@ func (a *App) Move(name, from, to string, dry bool, say io.Writer) (Moved, error
 	if err != nil {
 		return Moved{}, err
 	}
+	if src.machine.Name == dst.machine.Name {
+		return Moved{}, fmt.Errorf("%s is %s already", name, strings.Replace(src.where(), "here", "on this computer", 1))
+	}
 	if src.here() == dst.here() {
 		return Moved{}, fmt.Errorf("a worktree moves between this computer and a machine; %s to %s is two moves", from, to)
 	}
 	path, err := src.sh(`cd "$1" && `+src.mia+` path "$2"`, src.repo, name)
 	if err != nil {
+		if strings.Contains(err.Error(), "no worktree called") { // its mia answered: it is not there
+			return Moved{}, fmt.Errorf("there is no worktree called %s %s — `mia ls` shows what is here, `mia api machines` what is on each machine", name, src.where())
+		}
 		return Moved{}, err
 	}
 	path = strings.TrimSpace(path)

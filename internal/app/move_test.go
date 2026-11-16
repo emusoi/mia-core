@@ -1,8 +1,10 @@
 package app
 
 import (
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/emusoi/mia-core/internal/gittest"
@@ -70,5 +72,27 @@ func TestUncommittedWorkCrossesWithItsIndex(t *testing.T) {
 	}
 	if staged := repo.GitIn(to, "diff", "--cached", "--", "kept.txt"); staged == "" || repo.GitIn(to, "diff", "--", "kept.txt") == "" {
 		t.Errorf("kept.txt should be staged and changed beyond that there")
+	}
+}
+
+// A move to where the worktree already is says so, not that it is two moves.
+func TestMoveToWhereItIsSaysSo(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	a, err := Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = a.Move("monduli", "local", "local", false, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "monduli is on this computer already") {
+		t.Fatalf("moving to where it is: %v", err)
+	}
+}
+
+// What a command here said when it failed is the error, with no machine's name before it.
+func TestAFailureHereNamesNoMachine(t *testing.T) {
+	_, err := side{}.sh("echo no such thing >&2; exit 1")
+	if err == nil || err.Error() != "no such thing" {
+		t.Fatalf("error = %v", err)
 	}
 }
