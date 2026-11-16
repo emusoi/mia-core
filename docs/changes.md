@@ -32,6 +32,10 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **`mia run <worktree>@<machine>` from a script is quiet.** Started with
+  no terminal — by the desk, the phone, a script — it asked ssh for one
+  anyway, and every call printed "Pseudo-terminal will not be allocated";
+  a failing command's exit status was said twice.
 - **`mia resurrect` of a removed worktree says it is gone.** It said
   "already running" and exited 0, and `--list` kept showing the session as
   closed until the next look.

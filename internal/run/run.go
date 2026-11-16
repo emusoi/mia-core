@@ -234,9 +234,15 @@ func contains(list []string, want string) bool {
 	return false
 }
 
+// isTerminal says whether a person is at the file. /dev/null is a device
+// too, and is what a script or another program gives the ones it starts.
 func isTerminal(file *os.File) bool {
 	info, err := file.Stat()
-	return err == nil && info.Mode()&os.ModeCharDevice != 0
+	if err != nil || info.Mode()&os.ModeCharDevice == 0 {
+		return false
+	}
+	null, err := os.Stat(os.DevNull)
+	return err != nil || !os.SameFile(info, null)
 }
 
 func FirstLine(text string) string {

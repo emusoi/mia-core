@@ -847,17 +847,20 @@ func cmdRun(a *app.App, args []string) int {
 		return usageErr("mia run <worktree>[@machine] <command...>")
 	}
 	run := func() error { return a.Run(args[0], args[1:]) }
+	there := false
 	if name, on, ok := strings.Cut(args[0], "@"); ok && name != "" {
 		machine, err := a.Runtimes.Get(on)
 		if err != nil {
 			return fail(err)
 		}
-		run = func() error { return a.RunOn(machine, name, args[1:]) }
+		run, there = func() error { return a.RunOn(machine, name, args[1:]) }, true
 	}
 	if err := run(); err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
-			fmt.Fprintln(os.Stderr, "mia:", err)
+			if !there { // the machine's mia has said it already
+				fmt.Fprintln(os.Stderr, "mia:", err)
+			}
 			return exit.ExitCode()
 		}
 		return fail(err)

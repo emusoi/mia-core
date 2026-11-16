@@ -1,6 +1,7 @@
 package run
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -83,4 +84,17 @@ func asFailure(err error, into **Failure) bool {
 		err = unwrapped.Unwrap()
 	}
 	return false
+}
+
+// A program started by a script or another program has /dev/null to read from: a
+// device, and no terminal. ssh told to make one there complains on every call.
+func TestDevNullIsNoTerminal(t *testing.T) {
+	null, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer null.Close()
+	if isTerminal(null) {
+		t.Fatal("/dev/null was taken for a terminal")
+	}
 }
