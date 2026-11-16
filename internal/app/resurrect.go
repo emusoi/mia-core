@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/emusoi/mia-core/internal/model"
 	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/session"
 )
@@ -158,8 +159,12 @@ type Session struct {
 // Sessions is every remembered session, the latest seen first.
 func (a *App) Sessions() []Session {
 	server := tmuxServer()
+	records, _ := a.Store.Load()
 	var all []Session
 	for name, was := range a.readRemembered() {
+		if !slices.ContainsFunc(records, func(r model.Record) bool { return r.Name == name }) {
+			continue // its worktree was removed since: there is nothing to open it in
+		}
 		state := "down"
 		switch {
 		case server != "" && session.Here().Exists(name):
@@ -188,6 +193,9 @@ func (a *App) Resurrect(dry bool, names ...string) ([]Revived, error) {
 	for _, name := range names {
 		if _, ok := saved[name]; !ok {
 			return nil, fmt.Errorf("mia remembers no session of %s", name)
+		}
+		if !slices.ContainsFunc(records, func(r model.Record) bool { return r.Name == name }) {
+			return nil, fmt.Errorf("%s was removed, and its session with it — its branch stays: `mia new <branch>` makes a worktree of it again", name)
 		}
 	}
 	var revived []Revived

@@ -184,3 +184,54 @@ func TestAClaudeResumesTheConversationItHad(t *testing.T) {
 		t.Errorf("what was just opened is remembered as opened: %+v", back)
 	}
 }
+
+// A session whose worktree was removed is not one to bring back: resurrect
+// says the worktree is gone, not that it is already running, and the list
+// leaves it out.
+func TestASessionOfARemovedWorktreeIsNotBroughtBack(t *testing.T) {
+	gittest.Isolate(t)
+	socket, err := os.MkdirTemp("/tmp", "mia-resurrect-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(socket) })
+	t.Setenv("TMUX_TMPDIR", socket)
+	t.Cleanup(func() { exec.Command("tmux", "kill-server").Run() })
+	repo := gittest.New(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gone, err := a.New("gone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stays, err := a.New("stays")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, record := range []struct{ name, path string }{{gone.Name, gone.Path}, {stays.Name, stays.Path}} {
+		if out, err := exec.Command("tmux", "new-session", "-d", "-s", session.Name(record.name), "-c", record.path).CombinedOutput(); err != nil {
+			t.Fatalf("session: %s", out)
+		}
+	}
+	if err := a.Remember(); err != nil {
+		t.Fatal(err)
+	}
+	removal, err := a.PlanRemoval(gone.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Remove(removal, false, true); err != nil {
+		t.Fatal(err)
+	}
+	revived, err := a.Resurrect(false, gone.Name)
+	if err == nil || !strings.Contains(err.Error(), "was removed") || len(revived) != 0 {
+		t.Fatalf("resurrecting a removed worktree: %v, %v", revived, err)
+	}
+	for _, s := range a.Sessions() {
+		if s.Name == gone.Name {
+			t.Errorf("the list still has %s, whose worktree is gone", s.Name)
+		}
+	}
+}

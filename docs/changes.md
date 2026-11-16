@@ -32,6 +32,9 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **`mia resurrect` of a removed worktree says it is gone.** It said
+  "already running" and exited 0, and `--list` kept showing the session as
+  closed until the next look.
 - **`mia unarchive` and `mia fork` keep what was staged, staged.** Both
   brought the work back with nothing staged. The archive now keeps the
   index beside the files, as `git stash` does; archives made before this
