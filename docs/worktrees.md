@@ -118,7 +118,8 @@ mia fork monduli second-try    # a second worktree beside it
 uncommitted and untracked work too, as a commit under
 `refs/mia/archive/<name>`, then removes the worktree; its branch stays,
 and the stash is never touched. `unarchive` makes it again on that branch,
-under its old name when that is free, with the work uncommitted as it was.
+under its old name when that is free, with the work uncommitted as it was,
+what was staged staged again. What git ignores is not kept.
 
 `fork` starts a new branch where a worktree is, not at base, and copies
 its uncommitted and untracked work in; the first is left as it is.

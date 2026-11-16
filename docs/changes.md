@@ -32,6 +32,10 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **`mia unarchive` and `mia fork` keep what was staged, staged.** Both
+  brought the work back with nothing staged. The archive now keeps the
+  index beside the files, as `git stash` does; archives made before this
+  come back as they always did.
 - **A move keeps what was staged, staged.** `mia move` took everything
   not committed across as one patch, so on the other side nothing was
   staged: a file added with `git add` arrived untracked, a `git rm`

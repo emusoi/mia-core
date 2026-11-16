@@ -126,3 +126,60 @@ func TestAForkStartsWhereTheWorktreeIsWithItsWork(t *testing.T) {
 		t.Error("a fork onto a branch that exists is refused")
 	}
 }
+
+// What was staged is staged again when the worktree comes back, and in a fork
+// of it: the index is part of how it was.
+func TestArchiveAndForkKeepWhatWasStaged(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	repo.Write("keep.txt", "one\n")
+	repo.Write("gone.txt", "bye\n")
+	repo.Commit("two files")
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := a.New("work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	write := func(name, text string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(record.Path, name), []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("keep.txt", "one\nstaged\n")
+	write("added.txt", "added\n")
+	repo.GitIn(record.Path, "add", "keep.txt", "added.txt")
+	repo.GitIn(record.Path, "rm", "-q", "gone.txt")
+	write("keep.txt", "one\nstaged\nnot staged\n")
+	write("new.txt", "fresh\n")
+	status := func(dir string) string { return repo.GitIn(dir, "status", "--porcelain") }
+	was := status(record.Path)
+
+	fork, err := a.Fork(record.Name, "second-try")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if is := status(fork.Path); is != was {
+		t.Errorf("the fork's status:\n%s\nwanted, as where it came from:\n%s", is, was)
+	}
+	if is := status(record.Path); is != was {
+		t.Errorf("forking changed the first:\n%s\nwas:\n%s", is, was)
+	}
+
+	if _, err := a.Archive(record.Name, false); err != nil {
+		t.Fatal(err)
+	}
+	back, err := a.Unarchive(record.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if is := status(back.Path); is != was {
+		t.Errorf("back from the archive its status is:\n%s\nwanted, as it was:\n%s", is, was)
+	}
+	if data, _ := os.ReadFile(filepath.Join(back.Path, "keep.txt")); string(data) != "one\nstaged\nnot staged\n" {
+		t.Errorf("keep.txt came back as %q", data)
+	}
+}

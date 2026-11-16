@@ -59,8 +59,9 @@ func (a *App) Archive(query string, stopRunning bool) (Archived, error) {
 }
 
 // snapshot is a commit of everything in the worktree that git does not
-// ignore, on top of HEAD; HEAD itself when nothing differs. The worktree,
-// its index and its stash are left as they are.
+// ignore, on top of HEAD; HEAD itself when nothing differs. What is staged
+// rides as a second parent. The worktree, its index and its stash are left
+// as they are.
 func snapshot(dir, message string) (string, error) {
 	head := git.RevParse(dir, "HEAD")
 	index, err := os.CreateTemp("", "mia-archive-index-*")
@@ -81,10 +82,26 @@ func snapshot(dir, message string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if headTree := git.RevParse(dir, "HEAD^{tree}"); tree == headTree {
+	// what is staged, as a tree: none while a merge is unresolved, and then
+	// the index is not kept
+	staged, _ := run.Tool{Binary: "git", Dir: dir}.Capture("write-tree")
+	headTree := git.RevParse(dir, "HEAD^{tree}")
+	if staged == headTree {
+		staged = ""
+	}
+	if tree == headTree && staged == "" {
 		return head, nil
 	}
-	return g.Capture("commit-tree", tree, "-p", head, "-m", message)
+	parents := []string{"-p", head}
+	if staged != "" {
+		// as git stash keeps it: a second parent that holds the index
+		index, err := g.Capture("commit-tree", staged, "-p", head, "-m", "index of "+message)
+		if err != nil {
+			return "", err
+		}
+		parents = append(parents, "-p", index)
+	}
+	return g.Capture(append(append([]string{"commit-tree", tree}, parents...), "-m", message)...)
 }
 
 // Archives is every archive kept, newest first.
@@ -165,14 +182,23 @@ func (a *App) Unarchive(name string) (model.Record, error) {
 }
 
 // putBack makes a clean worktree hold a snapshot's work, uncommitted: the
-// files go from HEAD to the snapshot, then the index back to HEAD.
+// files go from HEAD to the snapshot, then the index back to what was
+// staged when it was taken, HEAD when nothing was.
 func putBack(dir, saved string) error {
 	g := run.Tool{Binary: "git", Dir: dir}
 	if _, err := g.Capture("read-tree", "-m", "-u", "HEAD", saved); err != nil {
 		return err
 	}
-	_, err := g.Capture("reset", "-q")
-	return err
+	staged := git.RevParse(dir, saved+"^2")
+	if staged == "" {
+		_, err := g.Capture("reset", "-q")
+		return err
+	}
+	if _, err := g.Capture("read-tree", staged); err != nil {
+		return err
+	}
+	_, _ = g.Capture("update-index", "-q", "--refresh") // says which files differ by failing
+	return nil
 }
 
 // Fork makes a worktree on a new branch starting where another worktree
