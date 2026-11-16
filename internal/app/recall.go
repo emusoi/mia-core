@@ -15,9 +15,12 @@ import (
 type Recalled struct {
 	Conversation
 	Agent string `json:"agent"` // whose conversation it is: claude, codex, pi, a plugin's
-	N     int    `json:"n"`     // the turn it came up in, to open the conversation at; 0 when in a subagent's
-	Yours bool   `json:"yours"` // you said it; otherwise the agent did
-	Line  string `json:"line"`  // the words around it
+	// Worktree is the one its folder is or is in, as a list of
+	// conversations names it: which copy n counts in, of one that was copied.
+	Worktree string `json:"worktree"`
+	N        int    `json:"n"`     // the turn it came up in, to open the conversation at; 0 when in a subagent's
+	Yours    bool   `json:"yours"` // you said it; otherwise the agent did
+	Line     string `json:"line"`  // the words around it
 }
 
 // Recall is the agent conversations of the repository and its worktrees
@@ -25,7 +28,7 @@ type Recalled struct {
 // your own words over the agent's. None is an empty list, not nil: it is
 // printed as JSON.
 func (a *App) Recall(text string, limit int) []Recalled {
-	in, _ := a.where()
+	in, records := a.where()
 	found := []Recalled{}
 	for _, agent := range a.agents() {
 		if agent.talks == nil {
@@ -37,6 +40,9 @@ func (a *App) Recall(text string, limit int) []Recalled {
 	sort.SliceStable(found, func(i, j int) bool { return found[i].At.After(found[j].At) })
 	if limit > 0 && len(found) > limit {
 		found = found[:limit]
+	}
+	for i := range found {
+		found[i].Worktree, _ = a.worktreeOf(found[i].Cwd, records)
 	}
 	return found
 }

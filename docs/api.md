@@ -116,8 +116,10 @@ has, and mia reads only what was written since.
 
 What the agent thought, what its tools gave back and what the system told
 it are left out. `mia recall <text…> --json` gives each conversation that
-mentions the text with its `agent` and `n`, the turn to open it at; `n` is
-0 for words that were a subagent's.
+mentions the text with its `agent`, its `worktree` and `n`, the turn to
+open it at; `n` is 0 for words that were a subagent's. A conversation that
+was copied to another worktree is given once for each folder that mentions
+it, and `n` counts in that one's.
 
 ## The main agent
 

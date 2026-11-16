@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -18,13 +19,8 @@ func claudeFiles(in folders, deep bool) []string {
 	return jsonl(dirsOf(in, claudeProjects(), name, func(root string) string { return name(root) + "*" }), deep)
 }
 
-func claudeFind(in folders, id string) string {
-	for _, file := range claudeFiles(in, false) {
-		if claudeID(file) == id {
-			return file
-		}
-	}
-	return ""
+func claudeFind(in folders, id string) []string {
+	return slices.DeleteFunc(claudeFiles(in, false), func(file string) bool { return claudeID(file) != id })
 }
 
 func claudeID(path string) string { return strings.TrimSuffix(filepath.Base(path), ".jsonl") }
@@ -152,8 +148,9 @@ func codexFiles(folders, bool) []string {
 	return files
 }
 
-func codexFind(_ folders, id string) string {
-	return firstFile(filepath.Join(codexSessions(), "*", "*", "*", "rollout-*-"+id+".jsonl"))
+func codexFind(_ folders, id string) []string {
+	files, _ := filepath.Glob(filepath.Join(codexSessions(), "*", "*", "*", "rollout-*-"+id+".jsonl"))
+	return files
 }
 
 // codexID is what follows rollout-<2026-01-02T03-04-05>- in the name.
@@ -307,13 +304,8 @@ func piFiles(in folders, _ bool) []string {
 	return jsonl(dirsOf(in, piSessions(), name, func(root string) string { return "-" + strings.ReplaceAll(root, "/", "-") + "*--" }), false)
 }
 
-func piFind(in folders, id string) string {
-	for _, file := range piFiles(in, false) {
-		if piID(file) == id {
-			return file
-		}
-	}
-	return ""
+func piFind(in folders, id string) []string {
+	return slices.DeleteFunc(piFiles(in, false), func(file string) bool { return piID(file) != id })
 }
 
 func piID(path string) string {

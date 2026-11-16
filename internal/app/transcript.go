@@ -23,8 +23,9 @@ type transcripts struct {
 	// files is the transcripts that may be the folders'; deep adds those of
 	// subagents, which belong to their parent's conversation.
 	files func(in folders, deep bool) []string
-	// find is the transcript of one conversation, "" when there is none.
-	find func(in folders, id string) string
+	// find is the transcripts of one conversation: one, or one for each
+	// folder it was copied to, and none when there is none.
+	find func(in folders, id string) []string
 	// id is the conversation a transcript is of, from its name.
 	id func(path string) string
 	// decode reads one line.
@@ -250,52 +251,62 @@ func (t transcripts) turns(in folders, id string, after int) ([]Turn, bool, erro
 	if strings.ContainsAny(id, `/\*?[`) {
 		return nil, false, nil
 	}
-	file := t.find(in, id)
-	if file == "" {
-		return nil, false, nil
+	// one copied to another folder is there once for each, under one id:
+	// the last written to is the one read, as it is the first in a list
+	files := t.find(in, id)
+	written := func(file string) time.Time {
+		info, err := os.Stat(file)
+		if err != nil {
+			return time.Time{}
+		}
+		return info.ModTime()
 	}
+	slices.SortStableFunc(files, func(x, y string) int { return written(y).Compare(written(x)) })
 	all := t.kept()
-	s := all[file]
-	if s == nil {
-		s = &scan{}
-		all[file] = s
-	}
-	var turns []Turn
-	collect := func(turn Turn) {
-		if turn.Kind == turnAnswer {
-			for i := range turns {
-				if turns[i].N == turn.Question {
-					turns[i].Answer = turn.Text
+	for _, file := range files {
+		s := all[file]
+		if s == nil {
+			s = &scan{}
+			all[file] = s
+		}
+		var turns []Turn
+		collect := func(turn Turn) {
+			if turn.Kind == turnAnswer {
+				for i := range turns {
+					if turns[i].N == turn.Question {
+						turns[i].Answer = turn.Text
+					}
 				}
 			}
-		}
-		if turn.N > after {
-			turns = append(turns, turn)
-		}
-	}
-	// what is new is read once, for the list as well; a view that has kept
-	// up needs nothing older
-	from := s.end()
-	if t.advance(file, s, nil, collect) {
-		t.keep(all)
-	}
-	if !in.holds(s.Cwd) {
-		return nil, false, nil
-	}
-	if after < from.N {
-		// further back than the last read: from the latest place at or before it
-		start := mark{}
-		for _, m := range s.Marks {
-			if m.N <= after {
-				start = m
+			if turn.N > after {
+				turns = append(turns, turn)
 			}
 		}
-		turns = nil
-		if _, err := t.read(file, start, &about{}, collect, nil); err != nil {
-			return nil, true, err
+		// what is new is read once, for the list as well; a view that has kept
+		// up needs nothing older
+		from := s.end()
+		if t.advance(file, s, nil, collect) {
+			t.keep(all)
 		}
+		if !in.holds(s.Cwd) {
+			continue
+		}
+		if after < from.N {
+			// further back than the last read: from the latest place at or before it
+			start := mark{}
+			for _, m := range s.Marks {
+				if m.N <= after {
+					start = m
+				}
+			}
+			turns = nil
+			if _, err := t.read(file, start, &about{}, collect, nil); err != nil {
+				return nil, true, err
+			}
+		}
+		return turns, true, nil
 	}
-	return turns, true, nil
+	return nil, false, nil
 }
 
 func (t transcripts) search(in folders, text string, limit int) ([]Recalled, error) {
@@ -310,16 +321,18 @@ func (t transcripts) search(in folders, text string, limit int) ([]Recalled, err
 	sort.SliceStable(files, func(i, j int) bool { return written[files[i]].After(written[files[j]]) })
 	// newest first, stopping once there are enough: a common word is in
 	// nearly every transcript, and the old ones would come last anyway
-	best := map[string]Recalled{}
+	// One for each transcript, its subagents' with it. A conversation copied
+	// to another folder is two, under one id, and each numbers its own turns.
+	best := map[string]Recalled{} // by the transcript's path, less .jsonl
 	for _, file := range holding(files, text, true) {
 		if limit > 0 && len(best) >= limit {
 			break
 		}
 		// a subagent's transcript is its parent's conversation, and the one
 		// asking in it is the agent that sent it
-		id, subagent := t.id(file), false
+		id, subagent, home := t.id(file), false, strings.TrimSuffix(file, ".jsonl")
 		if dir := filepath.Dir(file); filepath.Base(dir) == "subagents" {
-			id, subagent = filepath.Base(filepath.Dir(dir)), true
+			id, subagent, home = filepath.Base(filepath.Dir(dir)), true, filepath.Dir(dir)
 		}
 		var yours, theirs *Recalled
 		var is about
@@ -345,8 +358,8 @@ func (t transcripts) search(in folders, text string, limit int) ([]Recalled, err
 			continue
 		}
 		r.Cwd = is.Cwd
-		if b, ok := best[id]; !ok || (r.Yours && !b.Yours) || (r.Yours == b.Yours && r.At.After(b.At)) {
-			best[id] = *r
+		if b, ok := best[home]; !ok || (r.Yours && !b.Yours) || (r.Yours == b.Yours && r.At.After(b.At)) {
+			best[home] = *r
 		}
 	}
 	return slices.Collect(maps.Values(best)), nil
@@ -370,16 +383,6 @@ func jsonl(dirs []string, deep bool) []string {
 		})
 	}
 	return files
-}
-
-// firstFile is the first file any of the patterns names.
-func firstFile(patterns ...string) string {
-	for _, p := range patterns {
-		if found, _ := filepath.Glob(p); len(found) > 0 {
-			return found[0]
-		}
-	}
-	return ""
 }
 
 // dirsOf is an agent's folders for a repository's conversations: those

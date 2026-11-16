@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -421,5 +422,59 @@ func TestResumingAClaudeConversationInAnotherWorktreeCopiesItThere(t *testing.T)
 	back, err := a.ResumeConversation("c9", one.Name)
 	if err != nil || back.Copied || back.Worktree != one.Name {
 		t.Errorf("where it was made it is as it was: %+v %v", back, err)
+	}
+}
+
+// A conversation taken up in another worktree is a copy there, under the
+// same id, and the two go their own ways. The turn recall names has to be
+// one that reading the conversation gives.
+func TestRecallNamesATurnOfTheCopyThatIsRead(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	claudeDir := agentHomes(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// alpha sorts first and was written to first; beta was copied from it and went on
+	alpha, err := a.NewNamed("task-alpha", "", "alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	beta, err := a.NewNamed("task-beta", "", "beta")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, at := range []string{alpha.Path, beta.Path} {
+		put(t, filepath.Join(claudeDir(at), "c7.jsonl"),
+			`{"type":"mode","mode":"default"}`,
+			claudeSays(at, "user", `"start it here"`, ""),
+			`{"type":"attachment","cwd":`+quoted(at)+`}`,
+			claudeSays(at, "assistant", `[{"type":"text","text":"Started."}]`, ""))
+	}
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(filepath.Join(claudeDir(alpha.Path), "c7.jsonl"), old, old); err != nil {
+		t.Fatal(err)
+	}
+	put(t, filepath.Join(claudeDir(beta.Path), "c7.jsonl"),
+		claudeSays(beta.Path, "user", `"reply with the single word ok"`, ""),
+		claudeSays(beta.Path, "assistant", `[{"type":"text","text":"ok"}]`, ""))
+
+	found := a.Recall("single word", 10)
+	if len(found) != 1 || found[0].Session != "c7" || found[0].Worktree != "beta" || found[0].N != 3 || !found[0].Yours {
+		t.Fatalf("recalled = %+v", found)
+	}
+	turns, err := a.ConversationTurns("c7", 0)
+	if err != nil || kinds(turns) != "1:asked 2:said 3:asked 4:said" {
+		t.Fatalf("the last written to is the one read: %s %v", kinds(turns), err)
+	}
+	if at := turns[found[0].N-1]; at.N != found[0].N || at.Text != "reply with the single word ok" {
+		t.Errorf("turn %d is %+v, not what recall found", found[0].N, at)
+	}
+	// said in both: each copy is told with its own worktree, and counts its own turns
+	both := a.Recall("start it here", 10)
+	slices.SortFunc(both, func(x, y app.Recalled) int { return strings.Compare(x.Worktree, y.Worktree) })
+	if len(both) != 2 || both[0].Worktree != "alpha" || both[1].Worktree != "beta" || both[0].N != 1 || both[1].N != 1 {
+		t.Errorf("one for each folder it lives in: %+v", both)
 	}
 }
