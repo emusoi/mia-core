@@ -25,11 +25,15 @@ func cmdMove(a *app.App, args []string) int {
 		return fail(err)
 	}
 	if dry {
+		there := "there"
+		if args[1] == runtime.Local {
+			there = "here"
+		}
 		var what []string
 		for _, w := range moved.Windows {
 			what = append(what, w.What())
 		}
-		fmt.Printf("would open %d window(s) there: %s\nnothing was moved\n", len(what), strings.Join(what, " · "))
+		fmt.Printf("would open %d window(s) %s: %s\nnothing was moved\n", len(what), there, strings.Join(what, " · "))
 		return exitOK
 	}
 	where, there := args[1], "there"

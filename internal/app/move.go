@@ -167,7 +167,7 @@ func (a *App) Move(name, from, to string, dry bool, say io.Writer) (Moved, error
 		if _, err := dst.sh(`cd "$1" && `+dst.mia+` rename "$2" "$3"`, dst.repo, moved.Name, name); err == nil {
 			moved.Name = name
 		} else {
-			fmt.Fprintf(say, "%s is taken there; it is %s now\n", name, moved.Name)
+			fmt.Fprintf(say, "%s is another worktree's name %s; it is %s now\n", name, dst.where(), moved.Name)
 		}
 	}
 	if p, err := dst.sh(`cd "$1" && `+dst.mia+` path "$2"`, dst.repo, moved.Name); err == nil {
@@ -182,11 +182,11 @@ func (a *App) Move(name, from, to string, dry bool, say io.Writer) (Moved, error
 	moved.Carried = a.carry(src, dst, path, moved.Path, windows)
 	ridden := a.ride(src, dst, path, moved.Path, say)
 	moved.Carried = append(moved.Carried, ridden...)
-	fmt.Fprintf(say, "opening its windows there: %d\n", len(windows))
+	fmt.Fprintf(say, "opening its windows %s: %d\n", dst.where(), len(windows))
 	if err := dst.open(moved.Name, moved.Path, windows); err != nil {
 		return moved, err
 	}
-	fmt.Fprintf(say, "removing %s where it was; %s stays there\n", name, branch)
+	fmt.Fprintf(say, "removing %s %s; its branch %s stays there too\n", name, src.where(), branch)
 	if _, err := src.sh(`cd "$1" && `+src.mia+` rm --force --stop-running "$2"`, src.repo, name); err != nil {
 		return moved, fmt.Errorf("it is there now, but removing it here failed: %w", err)
 	}
@@ -419,7 +419,8 @@ func (s side) open(name, path string, windows []Window) error {
 		var first string
 		var err error
 		if i == 0 {
-			if first, err = s.sh(`tmux display-message -p -t "=mia-$1:" '#{pane_id}'`, name); err == nil {
+			// the session starts in the worktree: only a folder under it is gone to
+			if first, err = s.sh(`tmux display-message -p -t "=mia-$1:" '#{pane_id}'`, name); err == nil && dir != path {
 				err = run(strings.TrimSpace(first), "cd "+shellQuote(dir))
 			}
 		} else {
