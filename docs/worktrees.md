@@ -150,9 +150,28 @@ mia why 882b0e5                   # or behind a commit
 mia recall retry loop             # every conversation that mentions it
 ```
 
-Both read claude's own transcripts of this repository and its worktrees,
-so nothing is recorded as you work, and both say what you asked there and
-how to `claude --resume` it.
+Both read the agents' own transcripts of this repository and its
+worktrees, so nothing is recorded as you work, and both say what you asked
+there and how to resume it. `mia why` reads claude's; `mia recall` reads
+claude's, codex's and pi's, and those of any agent a
+[plugin adds](plugins.md#an-agent).
+
+```bash
+mia conversation resume 23f98c02-…              # a window where it was made, the agent taking it up
+mia conversation resume 23f98c02-… --in monduli # or in another worktree
+```
+
+`mia conversation resume` opens a window in the worktree's session running
+the agent's own resume — `claude --resume <id>`, `codex resume <id>`,
+`pi --session <id>`. A conversation a window already has open is left as it
+is, and said so. One whose worktree is gone is refused, with how to bring
+the worktree back; `--in` takes it up in another instead. claude and pi
+keep a conversation under its folder's name, so for another worktree mia
+first copies it under that folder's, its path rewritten, as a move does;
+the first stays where it was.
+
+`mia api conversations` lists them all and `mia api conversation <id>`
+reads one as turns: see [Automation](api.md#conversations).
 
 ## On another machine
 

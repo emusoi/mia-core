@@ -9,6 +9,24 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **Conversations.** `mia api conversations` lists the agent conversations
+  of the repository, its main checkout and every worktree — one that was
+  removed too — with what was first asked and last said, and whether a
+  window has it open; `mia api conversation <id> [--after <n>]` reads one
+  as turns for a chat view: what was asked and said, each tool in a line,
+  questions and their answers, commits made. `mia conversation resume <id>
+  [--in <worktree>]` opens a window with the agent taking it up again,
+  where it was made or in another worktree. All of it for claude, codex
+  and pi, from their own transcripts, with nothing recorded as they work.
+
+- **`mia recall` reads codex's and pi's conversations too**, and with
+  `--json` says each one's `agent` and `n`, the turn it came up in.
+
+- **A plugin can add an agent.** Its manifest declares the agent and what
+  means it in a window, and mia asks the plugin for its conversations,
+  their turns, a search, the resume command and the carry for a move, as
+  it has them built in for claude, codex and pi.
+
 - **`mia window key <worktree> <window> -- C-c`** presses a key by tmux's
   name for it — `C-c`, `Escape`, `Enter`, `Up` — so an agent or a dev
   server can be stopped, or a menu moved through, without closing the
@@ -46,6 +64,11 @@ on GitHub; a tag without its section is not released.
   never run again.
 
 ### Fixed
+
+- **A move carries claude's conversation from a path with an underscore
+  or a space in it.** claude names a folder's conversations after its
+  path with every character but a letter or a digit as a `-`; the carrier
+  changed only `/` and `.`, and looked in a folder that was not there.
 
 - **A session is remembered when it is made or changed.** Only the status
   line's look remembered sessions, so one made and used with no terminal —

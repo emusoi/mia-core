@@ -30,7 +30,7 @@ wrapped in a version envelope.
 
 | command | returns |
 |---|---|
-| `mia api <query>` | worktrees, machines, here, repositories, environments, stacks and base |
+| `mia api <query>` | worktrees, machines, here, repositories, environments, stacks, base and conversations |
 | `mia config show --json` | effective global, project and local configuration |
 | `mia doctor --json` | every check and an overall `ok`; failures still exit non-zero |
 | `mia gateway status --json` | `running`, `address`, `pac`, `ca`, `trust`, `differentBuild`, `routes` |
@@ -61,6 +61,63 @@ checked out in none.
 [{"branch":"api","parent":"main","landed":false,"ahead":2,"needs_restack":false,"current":true,"worktree":"monduli"},
  {"branch":"ui","parent":"api","landed":false,"ahead":1,"needs_restack":true,"current":false}]
 ```
+
+## Conversations
+
+`mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]`
+is the agent conversations of the repository — its main checkout and every
+worktree, one that was removed too — the last written to first. mia reads
+the agents' own transcripts, so nothing is recorded as they work.
+
+```json
+[{"id":"23f98c02-c52b-4de9-8c69-b322eb153bff","agent":"claude",
+  "cwd":"/Users/user/src/app.monduli","worktree":"monduli","gone":false,
+  "asked":"make the list faster","said":"It is faster now: one read for each file.",
+  "started":"2026-11-02T10:00:00Z","active":"2026-11-02T10:41:07Z","turns":4,
+  "running":true,"window":{"index":2,"name":"claude"}}]
+```
+
+| field | is |
+|---|---|
+| `agent` | whose it is: `claude`, `codex`, `pi`, or the name of an agent a plugin adds |
+| `worktree` | the worktree `cwd` is or is in; a removed one by what followed the main checkout's path; empty when none of this repository's |
+| `gone` | the folder is no more |
+| `asked`, `said` | the first thing the person asked and the last thing the agent said, each on one line, cut at 200 characters |
+| `active` | when it was last written to |
+| `turns` | how many things the person asked |
+| `running`, `window` | a window of that worktree's session runs this agent with this conversation; `window` is left out otherwise |
+
+Which conversation a window has open, claude says itself. Of any other
+agent it is the newest of that agent's in the worktree, so two of one
+agent in one worktree are told apart only by which was written to last.
+
+`mia api conversation <id> [--after <n>]` is one conversation as turns, in
+order, each with a number `n` that only grows. `--after` gives the turns
+with a greater `n`: a view that polls asks for what came after the last it
+has, and mia reads only what was written since.
+
+```json
+[{"n":1,"kind":"asked","at":"2026-11-02T10:00:00Z","text":"make the list faster"},
+ {"n":2,"kind":"said","at":"2026-11-02T10:00:04Z","text":"I will **look** at where the time goes."},
+ {"n":3,"kind":"tool","at":"2026-11-02T10:00:05Z","text":"Edited view.lua +12 −3","name":"Edit","file":"/Users/user/src/app.monduli/view.lua"},
+ {"n":4,"kind":"question","at":"2026-11-02T10:00:09Z","text":"Which one?","options":["Fast","Small"],"answer":"Fast"},
+ {"n":5,"kind":"answer","at":"2026-11-02T10:00:30Z","text":"Fast","question":4},
+ {"n":6,"kind":"commit","at":"2026-11-02T10:01:00Z","hash":"abc1234","subject":"The list is faster"}]
+```
+
+| kind | is |
+|---|---|
+| `asked` | what the person said: `text` |
+| `said` | what the agent said: `text`, markdown as written |
+| `tool` | what the agent did, in a line — `Ran go test ./...`, `Read 3 files` — with the tool's `name`, and `file` when it is one file's |
+| `question` | the agent asked the person to choose: `text`, `options`, and `answer` once it is given |
+| `answer` | the person chose: `text`, and `question`, the `n` of the turn it answers — so a view that already has the question learns of it |
+| `commit` | the agent made a commit: `hash` and `subject` |
+
+What the agent thought, what its tools gave back and what the system told
+it are left out. `mia recall <text…> --json` gives each conversation that
+mentions the text with its `agent` and `n`, the turn to open it at; `n` is
+0 for words that were a subagent's.
 
 `mia dev <worktree> --json` reports the new lent state; `mia dev off --json`
 reports `{"lent": false}`. `--follow` cannot be combined with `--json`.

@@ -24,7 +24,8 @@
 | `mia archive [--stop-running] <worktree>` | put it away: everything in it, uncommitted and untracked work too, kept under `refs/mia/archive/<name>`; the worktree goes, its branch stays |
 | `mia archive ls` | what is archived |
 | `mia unarchive <name>` | bring it back as it was, under its old name when that is free |
-| `mia recall <text…>` | the claude conversations of this repository and its worktrees that mention it, newest first: the words around it, and how to resume each |
+| `mia recall <text…>` | the agent conversations of this repository and its worktrees that mention it — claude's, codex's, pi's — newest first: the words around it, and how to resume each |
+| `mia conversation resume <id> [--in <worktree>]` | open a window with the agent taking the conversation up again, in the worktree it was made in or in another |
 | `mia why <file:line\|commit>` | the claude conversation that made a commit, or the line's last commit: what you asked, and how to resume it |
 | `mia resurrect [--dry-run] [--list] [<worktree>...]` | after tmux or the computer went down, open each session again — or any one named, closed on purpose or not: its windows in their folders, their programs restarted, each claude resuming its own conversation; `--list` shows every session remembered |
 | `mia gc [--apply\|--ask] [--days N]` | find, or remove, idle worktrees: clean, no session, not starred, untouched for N days (14); `--ask` shows them and removes on `y` |
@@ -68,6 +69,8 @@
 | `mia doctor` | check tools, config, gateway, machines, plugins and environment drift |
 | `mia api <query>` | state as JSON |
 | `mia api capabilities` | API version, queries and feature markers |
+| `mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]` | the agent conversations of the repository and its worktrees, the last written to first |
+| `mia api conversation <id> [--after <n>]` | one conversation as turns, for a chat view |
 | `mia help vocabulary` | the words |
 | `mia help tmux` | what `mia tmux install` adds: the radar, a new worktree, the menu, the status line |
 
