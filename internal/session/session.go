@@ -626,6 +626,25 @@ func (h Host) HasWindow(worktree, window string) bool {
 	return false
 }
 
+// KeepOnExit keeps a window, with what its command printed, once the
+// command ends; not kept, it is as tmux's own options say again.
+func (h Host) KeepOnExit(worktree, window string, keep bool) error {
+	args := []string{"set-option", "-w", "-t", Target(worktree, window), "remain-on-exit", "on"}
+	if !keep {
+		args = []string{"set-option", "-w", "-u", "-t", Target(worktree, window), "remain-on-exit"}
+	}
+	if out, err := h.run(args...); err != nil {
+		return fmt.Errorf("keep %s of %s: %s", window, worktree, strings.TrimSpace(out))
+	}
+	return nil
+}
+
+// Ended reports whether the command of a window kept on exit has ended.
+func (h Host) Ended(worktree, window string) bool {
+	out, err := h.run("display-message", "-p", "-t", Target(worktree, window), "#{pane_dead}")
+	return err == nil && strings.TrimSpace(out) == "1"
+}
+
 func (h Host) NameFirstWindow(worktree, window string) error {
 	if out, err := h.run("rename-window", "-t", exact(Name(worktree))+":^", window); err != nil {
 		return fmt.Errorf("name %s's first window: %s", worktree, strings.TrimSpace(out))

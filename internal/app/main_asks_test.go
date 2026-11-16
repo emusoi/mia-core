@@ -144,6 +144,26 @@ func TestTheMainAgentThatAsksFirstIsNotTypedInto(t *testing.T) {
 	shows(t, "main", "asker", "where do things stand\nwhere do things stand")
 }
 
+// An agent that ends as it starts is said to have ended, with what it said.
+func TestAMainAgentThatEndsAtOnceSaysWhy(t *testing.T) {
+	gittest.Isolate(t)
+	ownTmux(t)
+	manifests := fakeAgents(t, map[string]string{"quitter": "#!/bin/sh\nsleep 0.3\necho 'there is no model called loud'\nexit 1\n"})
+	put(t, filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "config.toml"), "[main]", `agent = "quitter"`)
+	a, err := app.AtMain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Plugins = plugins(t, manifests)
+	_, err = a.StartMain("", "", "", "")
+	if err == nil || !strings.Contains(err.Error(), "quitter ended as soon as it started, saying:\n") || !strings.Contains(err.Error(), "there is no model called loud") {
+		t.Fatalf("started: %v", err)
+	}
+	if session.Here().HasWindow("main", "quitter") {
+		t.Error("the window it ended in is left")
+	}
+}
+
 // A main agent that ends as it is typed into is not running, and is said
 // so: not a window that could not be pasted into.
 func TestAMainAgentThatEndsAsItIsSwitchedIsNotRunning(t *testing.T) {

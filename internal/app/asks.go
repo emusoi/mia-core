@@ -227,3 +227,49 @@ func pressAnswer(host session.Host, worktree, window, keys string) error {
 	time.Sleep(typedApart) // the agent is given time to take the key before Enter
 	return host.Keys(worktree, window, []string{"Enter"})
 }
+
+// settleFor is how long an agent just started is watched before its start
+// is said: one that asks something first, or ends, does it by then.
+const settleFor = 3 * time.Second
+
+// settle watches a window just started until it asks something, ends, or
+// has drawn the same for a second, settleFor at most. It is kept on exit
+// meanwhile, so an agent that ends leaves what it said: its last lines
+// when it ended, and the window is closed then.
+func settle(host session.Host, worktree, window string) (said string, ended bool) {
+	kept := host.KeepOnExit(worktree, window, true) == nil
+	var screen string
+	still := time.Now()
+	for start := time.Now(); time.Since(start) < settleFor; time.Sleep(100 * time.Millisecond) {
+		now, err := host.Capture(worktree, window, false)
+		if ended = err != nil || host.Ended(worktree, window); ended {
+			// tmux's line that says so scrolls what it printed up out of the screen
+			if back, err := host.CaptureBack(worktree, window, false, session.GeometryHeight); err == nil {
+				screen = back
+			}
+			break
+		}
+		if _, on := asksOn(now); on {
+			break
+		}
+		if now != screen || strings.TrimSpace(now) == "" {
+			screen, still = now, time.Now()
+		} else if time.Since(still) >= time.Second {
+			break
+		}
+	}
+	if kept {
+		_ = host.KeepOnExit(worktree, window, false)
+	}
+	if !ended {
+		return "", false
+	}
+	_ = host.KillWindow(worktree, window)
+	var last []string
+	for _, line := range strings.Split(screen, "\n") {
+		if line = strings.TrimRight(line, " "); strings.TrimSpace(line) != "" && !strings.HasPrefix(line, "Pane is dead") {
+			last = append(last, "  "+line)
+		}
+	}
+	return strings.Join(last[max(0, len(last)-6):], "\n"), true
+}

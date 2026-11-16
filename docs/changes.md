@@ -140,7 +140,8 @@ on GitHub; a tag without its section is not released.
   `model` type nothing and say what it asks and how to answer, `mia main
   press <n>`, which moves the cursor where the agent takes no digit;
   `mia window send` into a worktree's window that asks is refused the
-  same way. One that
+  same way. `mia main start` watches the agent for up to three seconds
+  and says what it asks, or that it ended, with its last lines. One that
   ends as it is typed into is not running, as one stopped is. mia
   answers no question itself. See [The main agent](main.md#when-it-asks-first).
 

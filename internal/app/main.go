@@ -342,9 +342,12 @@ func (a *App) StartMain(name, model, effort, account string) (MainState, error) 
 	if err := host.StartWindowWith("MIA_MAIN=1", mainName, a.Root, agent.Name, []string{shell, "-lc", command}); err != nil {
 		return MainState{}, err
 	}
-	time.Sleep(time.Second)
+	said, ended := settle(host, mainName, agent.Name)
 	_, pane, running := a.mainWindow(host)
-	if !running {
+	if ended || !running {
+		if said != "" {
+			return MainState{}, fmt.Errorf("%s ended as soon as it started, saying:\n%s", agent.Name, said)
+		}
 		return MainState{}, fmt.Errorf("%s ended as soon as it started — `%s` in %s shows why", agent.Name, command, a.Root)
 	}
 	if chosen != (Chosen{}) {

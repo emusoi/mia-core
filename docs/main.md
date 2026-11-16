@@ -21,6 +21,12 @@ Each answers from any folder. `mia main start` twice starts one: an agent
 that already runs is left as it is. Stopped and started again, it goes on
 with its last conversation.
 
+`mia main start` watches the agent for up to three seconds before it says
+it started: until it asks something, ends, or has drawn the same for a
+second. One that asks first is said to — claude, in a folder it has not
+seen, asks whether you trust it — and one that ended is said to have, with
+the last lines it printed, exit 1, its window closed.
+
 ## Where it lives
 
 | | |
