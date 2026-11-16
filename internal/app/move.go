@@ -190,7 +190,11 @@ func (a *App) Move(name, from, to string, dry bool, say io.Writer) (Moved, error
 	}
 	if !work.none() {
 		fmt.Fprintln(say, "putting back its uncommitted changes")
-		if err := dst.putUncommitted(moved.Path, work); err != nil {
+		err := dst.putUncommitted(moved.Path, work)
+		if dst.here() {
+			a.forgetDirtinessOf(moved.Path) // listed clean since it was made, perhaps
+		}
+		if err != nil {
 			return moved, fmt.Errorf("%w (%s is untouched %s)", err, name, src.where())
 		}
 	}

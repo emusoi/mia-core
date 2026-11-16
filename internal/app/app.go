@@ -77,6 +77,36 @@ func (a *App) ForgetDirtiness() {
 	a.dirtiness = sync.Map{}
 }
 
+// forgetDirtinessOf drops what is kept about one worktree's changes, here
+// and where the next process reads it: mia has just changed the worktree
+// itself, and the kept answer is from before. How long an answer is kept
+// is as it was.
+// ponytail: a listing that read the file before this and writes it after
+// puts the old answer back, for what is left of its time; a mark in the
+// file that outlives the entry if that is ever seen.
+func (a *App) forgetDirtinessOf(path string) {
+	a.dirtiness.Delete(path)
+	data, err := os.ReadFile(a.dirtyPath())
+	if err != nil {
+		return // nothing is kept
+	}
+	var known map[string]dirtiness
+	if json.Unmarshal(data, &known) != nil {
+		return // not read by loadDirtiness either
+	}
+	if _, kept := known[path]; !kept {
+		return
+	}
+	delete(known, path)
+	if data, err = json.Marshal(known); err != nil {
+		return
+	}
+	temp := fmt.Sprintf("%s.%d", a.dirtyPath(), os.Getpid())
+	if os.WriteFile(temp, data, 0o644) == nil {
+		_ = os.Rename(temp, a.dirtyPath())
+	}
+}
+
 type dirtiness struct {
 	Dirty          bool      `json:"dirty"`
 	At             time.Time `json:"at"`

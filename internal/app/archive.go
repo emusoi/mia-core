@@ -173,7 +173,9 @@ func (a *App) Unarchive(name string) (model.Record, error) {
 		}
 	}
 	if saved != base {
-		if err := putBack(record.Path, saved); err != nil {
+		err := putBack(record.Path, saved)
+		a.forgetDirtinessOf(record.Path) // listed clean since it was made, perhaps
+		if err != nil {
 			return record, err
 		}
 	}
@@ -229,7 +231,8 @@ func (a *App) Fork(query, branch string) (model.Record, error) {
 		return record, err
 	}
 	if saved != head {
-		return record, putBack(record.Path, saved)
+		err = putBack(record.Path, saved)
+		a.forgetDirtinessOf(record.Path) // listed clean since it was made, perhaps
 	}
-	return record, nil
+	return record, err
 }

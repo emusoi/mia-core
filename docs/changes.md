@@ -61,6 +61,11 @@ on GitHub; a tag without its section is not released.
 - **`mia api stack` names each layer's worktree.** It left out `worktree`,
   which `mia stack show --json` gives for the same layer; the two are now
   one answer.
+- **A fork is not listed clean with its work in it.** A listing that
+  looked at a worktree while mia was still making it kept "clean" for up
+  to 30 seconds after `mia fork`, `mia unarchive` or a move here had put
+  uncommitted work into it. mia now drops what was kept about a worktree
+  when it changes it; how long an answer is kept is as it was.
 - **A move does not write over work already there.** When the branch was
   already checked out on the other side with uncommitted work — left by a
   move that stopped half way, or done there — its new files were
