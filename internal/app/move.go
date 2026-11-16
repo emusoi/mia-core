@@ -128,19 +128,9 @@ func (a *App) Move(name, from, to string, say io.Writer) (Moved, error) {
 	branch = strings.TrimSpace(branch)
 
 	fmt.Fprintf(say, "reading %s: its changes and its windows\n", name)
-	patch, err := src.bytesOf(`cd "$1" && git diff --binary HEAD`, path)
+	work, err := src.uncommitted(path)
 	if err != nil {
 		return Moved{}, err
-	}
-	untracked, err := src.sh(`cd "$1" && git ls-files --others --exclude-standard`, path)
-	if err != nil {
-		return Moved{}, err
-	}
-	var files []byte
-	if strings.TrimSpace(untracked) != "" {
-		if files, err = src.bytesOf(`cd "$1" && git ls-files --others --exclude-standard -z | COPYFILE_DISABLE=1 tar --null -cf - -T -`, path); err != nil {
-			return Moved{}, err
-		}
 	}
 	windows := src.windows(name, path)
 
@@ -167,15 +157,10 @@ func (a *App) Move(name, from, to string, say io.Writer) (Moved, error) {
 	if p, err := dst.sh(`cd "$1" && `+dst.mia+` path "$2"`, dst.repo, moved.Name); err == nil {
 		moved.Path = strings.TrimSpace(p)
 	}
-	if len(bytes.TrimSpace(patch)) > 0 {
+	if !work.none() {
 		fmt.Fprintln(say, "putting back its uncommitted changes")
-		if err := dst.feed(patch, `cd "$1" && git apply --binary`, moved.Path); err != nil {
-			return moved, fmt.Errorf("apply the uncommitted changes there (%s is untouched here): %w", name, err)
-		}
-	}
-	if len(files) > 0 {
-		if err := dst.feed(files, `cd "$1" && tar -xf -`, moved.Path); err != nil {
-			return moved, fmt.Errorf("copy the new files there (%s is untouched here): %w", name, err)
+		if err := dst.putUncommitted(moved.Path, work); err != nil {
+			return moved, fmt.Errorf("%w (%s is untouched %s)", err, name, src.where())
 		}
 	}
 	moved.Carried = a.carry(src, dst, path, moved.Path, windows)
@@ -193,6 +178,69 @@ func (a *App) Move(name, from, to string, say io.Writer) (Moved, error) {
 		_, _ = src.sh(`cd "$1" && shift && `+riders[name], src.repo, path, moved.Path, "done", dst.label())
 	}
 	return moved, nil
+}
+
+// uncommitted is a worktree's work that no commit holds, as it crosses.
+type uncommitted struct {
+	staged  []byte // a patch from HEAD to the index
+	changed []byte // a patch from the index to the files
+	files   []byte // a tar of the files git does not know and does not ignore
+}
+
+func (u uncommitted) none() bool {
+	return len(bytes.TrimSpace(u.staged)) == 0 && len(bytes.TrimSpace(u.changed)) == 0 && len(u.files) == 0
+}
+
+// uncommitted reads the worktree's uncommitted work: what is staged and
+// what is changed beyond that apart, so the index is the same on the other
+// side, not everything unstaged.
+func (s side) uncommitted(path string) (uncommitted, error) {
+	var u uncommitted
+	var err error
+	if u.staged, err = s.bytesOf(`cd "$1" && git diff --binary --cached HEAD`, path); err != nil {
+		return u, err
+	}
+	if u.changed, err = s.bytesOf(`cd "$1" && git diff --binary`, path); err != nil {
+		return u, err
+	}
+	untracked, err := s.sh(`cd "$1" && git ls-files --others --exclude-standard`, path)
+	if err != nil {
+		return u, err
+	}
+	if strings.TrimSpace(untracked) != "" {
+		if u.files, err = s.bytesOf(`cd "$1" && git ls-files --others --exclude-standard -z | COPYFILE_DISABLE=1 tar --null -cf - -T -`, path); err != nil {
+			return u, err
+		}
+	}
+	return u, nil
+}
+
+// putUncommitted gives a clean worktree at the same commit that work.
+func (s side) putUncommitted(path string, u uncommitted) error {
+	if len(bytes.TrimSpace(u.staged)) > 0 {
+		if err := s.feed(u.staged, `cd "$1" && git apply --binary --index`, path); err != nil {
+			return fmt.Errorf("apply the staged changes: %w", err)
+		}
+	}
+	if len(bytes.TrimSpace(u.changed)) > 0 {
+		if err := s.feed(u.changed, `cd "$1" && git apply --binary`, path); err != nil {
+			return fmt.Errorf("apply the uncommitted changes: %w", err)
+		}
+	}
+	if len(u.files) > 0 {
+		if err := s.feed(u.files, `cd "$1" && tar -xf -`, path); err != nil {
+			return fmt.Errorf("copy the new files: %w", err)
+		}
+	}
+	return nil
+}
+
+// where says the side in a sentence: "here", or "on fedora".
+func (s side) where() string {
+	if s.here() {
+		return "here"
+	}
+	return "on " + s.machine.Name
 }
 
 // label is what the other side calls this one: the machine's name, or this

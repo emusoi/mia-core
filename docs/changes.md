@@ -22,6 +22,11 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **A move keeps what was staged, staged.** `mia move` took everything
+  not committed across as one patch, so on the other side nothing was
+  staged: a file added with `git add` arrived untracked, a `git rm`
+  arrived as a deletion not staged. What is staged and what is changed
+  beyond that now cross apart, and `git status` reads the same there.
 - **A move from a Mac leaves no `._` files beside the conversation.**
   macOS tar packed an AppleDouble file for every file and folder of an
   agent's conversation, which Linux unpacked as `._<id>.jsonl` beside the

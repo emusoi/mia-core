@@ -1,0 +1,67 @@
+package app
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/emusoi/mia-core/internal/gittest"
+)
+
+// What is not committed crosses as it stands: what was staged is staged on the
+// other side, what was only changed is only changed, a new file is new.
+func TestUncommittedWorkCrossesWithItsIndex(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	repo.Write("kept.txt", "one\n")
+	repo.Write("gone.txt", "gone\n")
+	repo.Write("staged-gone.txt", "gone\n")
+	repo.Write("tool.sh", "#!/bin/sh\n")
+	repo.Write(".gitignore", "*.log\n")
+	repo.Commit("files")
+	from, to := repo.Worktree("from", "work"), repo.Detached("to")
+	write := func(name, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(from, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("kept.txt", "one\nstaged\n")
+	write("staged-new.txt", "new\n")
+	repo.GitIn(from, "add", "kept.txt", "staged-new.txt")
+	write("kept.txt", "one\nstaged\nnot staged\n")
+	repo.GitIn(from, "rm", "-q", "staged-gone.txt")
+	if err := os.Remove(filepath.Join(from, "gone.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(from, "tool.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write("a new file é.txt", "untracked\n")
+	write("debug.log", "ignored\n")
+
+	local := side{}
+	work, err := local.uncommitted(from)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := local.putUncommitted(to, work); err != nil {
+		t.Fatal(err)
+	}
+	status := func(dir string) string {
+		return repo.GitIn(dir, "-c", "core.quotepath=off", "status", "--porcelain")
+	}
+	if was, is := status(from), status(to); was != is {
+		t.Errorf("status there:\n%s\nwanted, as here:\n%s", is, was)
+	}
+	for _, name := range []string{"kept.txt", "staged-new.txt", "a new file é.txt"} {
+		was, _ := os.ReadFile(filepath.Join(from, name))
+		is, err := os.ReadFile(filepath.Join(to, name))
+		if err != nil || string(was) != string(is) {
+			t.Errorf("%s there is %q (%v), here %q", name, is, err, was)
+		}
+	}
+	if staged := repo.GitIn(to, "diff", "--cached", "--", "kept.txt"); staged == "" || repo.GitIn(to, "diff", "--", "kept.txt") == "" {
+		t.Errorf("kept.txt should be staged and changed beyond that there")
+	}
+}
