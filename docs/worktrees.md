@@ -78,6 +78,81 @@ says a window runs is what it started it with or last switched it to,
 not what the agent says: switched by hand in the agent, mia does not
 know.
 
+## An agent's account
+
+An agent can have several accounts — two claude logins, two codex ones —
+and each session's agent starts on one. An account is a folder of the
+agent's own that it keeps its sign-in, its settings and its
+conversations in, named to it by a variable:
+
+| agent | variable | its own folder, the account called `default` |
+|---|---|---|
+| claude | `CLAUDE_CONFIG_DIR` | `~/.claude` |
+| codex | `CODEX_HOME` | `~/.codex` |
+| pi | `PI_CODING_AGENT_DIR` | `~/.pi/agent` |
+
+An agent a [plugin adds](plugins.md#an-agent) has accounts when its
+manifest names its variable, `account_env`. mia leaves the agent's own
+folder as it is; every other account is a folder of mia's,
+`~/.config/mia/accounts/<agent>/<name>`, made with mode 0700.
+
+```bash
+mia account add claude work              # its folder, and a window running claude on it
+mia account add codex spare --in monduli # the window in a worktree's session instead
+mia account ls                           # every account, signed in or not, and what runs on it
+mia account use claude work              # this repository's claude sessions start on work from now on
+mia account use claude default           # and back to what the config says
+mia window new monduli claude --account default   # this one on its own folder, this once
+mia account rename claude work team
+mia account rm claude team
+```
+
+`mia account add` makes the folder and opens a window running the agent
+on it — in a session of mia's own, `mia-accounts`, unless `--in` names a
+worktree — and says what it opened. The person signs in there, with the
+agent's own login: mia never reads, copies or moves a sign-in, a
+password or a token.
+
+Each repository starts each agent's sessions on one account: the one
+`mia account use` last said for it, kept by mia in
+`~/.config/mia/accounts.json` and never written into a config; failing
+that, `account` under `[agents.<name>]` in the config, the repository's
+own or the user-wide one; failing that, the default. `--account` on
+`mia window new`, `mia conversation resume` and `mia main start` starts
+one on another, that once: the next start in that worktree is on the
+repository's again. What mia started a window on is kept for the
+window, as its model is.
+
+An agent takes its account when it starts, so one that runs is not put
+on another: `mia window account <worktree> <window> <account>` says how —
+end the agent there, then `mia conversation resume <id> --account
+<account>`. mia stops nothing itself.
+
+A conversation lives in the folder of the account it was made on, and
+mia looks in every account's folder for one: `mia api conversations`,
+`mia recall` and `mia why` say which `account` each is in. Taken up on
+another account, a conversation is copied into that account's folder,
+as one taken up in another worktree is copied under that folder's name;
+the one it was copied from stays.
+
+Whether an account is signed in, `logged_in`, is read from whether the
+file the agent writes then is there — claude's `.credentials.json`,
+codex's and pi's `auth.json` — never from what is in it. On macOS claude
+keeps its sign-in in the Keychain instead, under a name made from the
+folder's path — `Claude Code-credentials` for its own folder,
+`Claude Code-credentials-<8 hex of the path's SHA-256>` for any other —
+and codex can keep its in the system's keyring when its config says so.
+mia does not look there, so such an account says `unknown`; one whose
+folder is empty, as it is until the agent first runs there, says `no`.
+For the same reason, a renamed claude account asks to be signed in to
+again on macOS, and the old Keychain item stays.
+
+`mia account rm` removes the folder, and the conversations in it — one
+that holds any is refused without `--force`. It is refused while a
+window runs the agent on it, and for `default`. mia signs nothing out:
+a sign-in the agent keeps elsewhere, in the Keychain, stays there until
+the person signs out in the agent first.
+
 ## Names
 
 Each worktree gets the name of a place, like `monduli`. A place is easier to
@@ -159,7 +234,9 @@ session's windows, and each pane a window is split into: their folders and
 what runs in them. When tmux or the
 computer goes down, `mia resurrect` opens each one again, its programs
 started anew and each claude resuming the very conversation it had; codex,
-pi, opencode, gemini and cursor-agent go on with their folder's last. An
+pi, opencode, gemini and cursor-agent go on with their folder's last. Each
+starts on the account it ran on, or the default one when that account was
+removed since. An
 agent that ended before tmux did comes back too: its window, back at a
 shell, keeps it until it runs something else. mia
 forgets none: a session you closed while tmux was running stays closed,
@@ -263,3 +340,9 @@ on your PATH: mia asks it to `pack <from> <to>` — a tar of files under the
 home, which is unpacked on the other side — and how to `command` it to
 start again. `scripts/mia-carry-claude` carries claude's conversation and
 restarts it with `claude --continue`.
+
+A window's agent that runs on an account starts again on the account of
+the same name there, and its conversation is carried into that
+account's folder; with none of that name there, on the default one, and
+the move says so. A sign-in never crosses: sign in to the account on
+each machine.

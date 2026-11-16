@@ -80,6 +80,7 @@ the agents' own transcripts, so nothing is recorded as they work.
 | field | is |
 |---|---|
 | `agent` | whose it is: `claude`, `codex`, `pi`, or the name of an agent a plugin adds |
+| `account` | the agent's [account](worktrees.md#an-agents-account) whose folder it is in, `default` for the agent's own; of a plugin's agent, the one its running window was started on. Left out for an agent mia keeps no accounts of |
 | `worktree` | the worktree `cwd` is or is in; a removed one by what followed the main checkout's path; empty when none of this repository's |
 | `gone` | the folder is no more |
 | `asked`, `said` | the first thing the person asked and the last thing the agent said, each on one line, cut at 200 characters |
@@ -88,13 +89,15 @@ the agents' own transcripts, so nothing is recorded as they work.
 | `running`, `window` | a window of that worktree's session runs this agent with this conversation; `window` is left out otherwise |
 | `model`, `effort` | of a running one, what mia started its window's agent with or last switched it to — see [Agents](#agents); left out when mia chose none |
 
-A conversation taken up in another worktree was copied there, so it is
-listed once for each folder it lives in: the same `id`, told apart by
-`worktree` and `cwd`, each with its own turns from where they parted.
+A conversation taken up in another worktree, or on another account, was
+copied there, so it is listed once for each folder it lives in: the same
+`id`, told apart by `worktree`, `cwd` and `account`, each with its own
+turns from where they parted.
 
 Which conversation a window has open, claude says itself. Of any other
-agent it is the newest of that agent's in the worktree, so two of one
-agent in one worktree are told apart only by which was written to last.
+agent it is the newest of that agent's in the worktree on the account
+the window was started on, so two of one agent in one worktree and
+account are told apart only by which was written to last.
 
 `mia api conversation <id> [--worktree <name>] [--after <n>]` is one
 conversation as turns, in order, each with a number `n` that only grows.
@@ -127,7 +130,8 @@ it are left out. `mia recall <text…> --json` gives each conversation that
 mentions the text with its `agent`, its `worktree` and `n`, the turn to
 open it at; `n` is 0 for words that were a subagent's. A conversation that
 was copied to another worktree is given once for each folder that mentions
-it, and `n` counts in that one's.
+it, and `n` counts in that one's. Each says its `account`, as the list
+does; so does each conversation `mia why --json` gives.
 
 ## The main agent
 
@@ -153,6 +157,7 @@ any folder, and starts and writes nothing.
 | `working` | it is doing something now: claude's pane title says so, and of another agent, that its window wrote in the last three seconds |
 | `since` | when its session was started; left out when it is not running |
 | `model`, `effort` | what mia started it with or last switched it to, as [Agents](#agents) says; left out when it is not running, or mia chose none |
+| `account` | the [account](#accounts) it runs on, `default` for its agent's own; left out when it is not running, or for an agent mia keeps no accounts of |
 
 When `[main] machine` names another machine, `mia api main` and
 `mia api main turns` are that machine's answers, asked over ssh: `home`,
@@ -208,8 +213,8 @@ repository, with that repository's config.
   "models":[{"id":"opus","label":"Opus"},{"id":"sonnet","label":"Sonnet"},
             {"id":"haiku","label":"Haiku"},{"id":"fable","label":"Fable"}],
   "efforts":["low","medium","high","xhigh","max"],
-  "model":"opus","effort":"","live":true},
- {"name":"opencode","models":[],"efforts":[],"model":"","effort":"","live":false}]
+  "model":"opus","effort":"","live":true,"account_env":"CLAUDE_CONFIG_DIR"},
+ {"name":"opencode","models":[],"efforts":[],"model":"","effort":"","live":false,"account_env":""}]
 ```
 
 | field | is |
@@ -218,6 +223,7 @@ repository, with that repository's config.
 | `efforts` | its effort levels, how hard it thinks; empty when it has none mia knows |
 | `model`, `effort` | what the config starts it with, `[agents.<name>]`; empty when it says none, and the agent's own default is used |
 | `live` | it can be switched to another model while it runs |
+| `account_env` | the variable that names the folder of each of its [accounts](#accounts); empty for an agent mia keeps no accounts of |
 
 A model the config names that the list has not is in the list too.
 Start one with `mia window new <worktree> <agent> --model <id> --effort
@@ -233,6 +239,10 @@ To restart an agent with another model, stop it — `mia window key
 started with, or those of the window that has it open already; resumed
 with `--model` or `--effort` while a window has it open, it is refused.
 A mia that can is one whose `mia api capabilities` has `resume-model`.
+
+`mia conversation resume --json` also says the `account` the agent was
+started on, and `copied` when the conversation was copied into that
+account's folder first.
 
 The `model` and `effort` that `mia api conversations` and `mia api main`
 give a running window are what mia started it with or last switched it
@@ -280,6 +290,56 @@ resume`, `mia main start` and `mia main model` writes down a use, in
 started it; a start with no `--model` or `--effort` writes down what the
 config started the agent with, and nothing when it says none. The last 500 are kept. The main
 agent's are in the repository `main`, its folder's name, worktree `main`.
+Each use also keeps the `account` the agent was started on, when it was
+not the default, for the history: a setup is an agent, a model and an
+effort, whatever account they were used on.
+
+## Accounts
+
+`mia api accounts` is every [account](worktrees.md#an-agents-account) of
+every agent mia keeps accounts of, by agent, each agent's own first. It
+answers from any folder, and starts and writes nothing. A capabilities
+list with `accounts` has it.
+
+```json
+[{"agent":"claude","name":"default","home":"/Users/user/.claude","default":true,
+  "logged_in":"unknown","sessions":["main","goba"]},
+ {"agent":"claude","name":"work","home":"/Users/user/.config/mia/accounts/claude/work","default":false,
+  "logged_in":"unknown","sessions":["olasiti"]},
+ {"agent":"codex","name":"default","home":"/Users/user/.codex","default":true,
+  "logged_in":"yes","sessions":[]},
+ {"agent":"pi","name":"default","home":"/Users/user/.pi/agent","default":true,
+  "logged_in":"no","sessions":[]}]
+```
+
+| field | is |
+|---|---|
+| `name` | `default` for the agent's own folder, or the name it was added under |
+| `home` | its folder: the agent's own, as its variable or its usual place says, or mia's `accounts/<agent>/<name>`; empty for the default of a plugin's agent, whose folder mia does not know |
+| `logged_in` | `yes` when the file the agent writes once signed in is there, `no` when it is not and the agent keeps a sign-in nowhere else — or nothing at all is in the folder yet — and `unknown` when mia cannot tell: claude on macOS, which keeps it in the Keychain, codex, which may keep it in a keyring, and a plugin's agent. Only whether a file is there is read |
+| `sessions` | the worktrees with a window that runs the agent on it now — `main` for the main agent, `accounts` for a window signing in to it — on this computer |
+
+`mia api accounts --projects` is which account each repository starts
+each agent's sessions on: every repository mia has named a worktree in,
+the one asked from, and any `mia account use` named.
+
+```json
+[{"repository":"mia-desk","agent":"claude","account":"work","from":"mia"},
+ {"repository":"mia-desk","agent":"codex","account":"default","from":"default"},
+ {"repository":"mia-phone","agent":"claude","account":"personal","from":"config"}]
+```
+
+| `from` | is |
+|---|---|
+| `mia` | `mia account use` said it, kept in mia's own state |
+| `config` | `[agents.<name>] account` in the repository's config, or the user-wide one |
+| `default` | nothing says one: the agent's own folder |
+
+Accounts are each machine's own: a folder there, signed in to there.
+Each machine answers for itself — `mia api accounts` asked on it, over
+ssh — and an app that shows them together keeps them apart by machine.
+An account of one name on two machines is the same only by its name,
+which is what `mia move` goes by.
 
 ## Standing
 

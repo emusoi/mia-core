@@ -94,6 +94,17 @@ machine's mia's, as every `mia main …` is.
 switched it to: not read from the agent, so one switched by hand in it is
 not known.
 
+## Its account
+
+It is started on `[main] account`, or its agent's own under
+[`[agents]`](configuration.md#agents), or the agent's own folder, unless
+`mia main start --account <name>` says another of the
+[accounts](worktrees.md#an-agents-account) `mia account ls` lists. It
+goes on with the last conversation of its folder on that account. One
+that runs already is refused another: an agent takes its account when
+it starts, so `mia main stop` first. `mia api main` says the `account`
+it runs on.
+
 ## What it may answer
 
 Its notes say it in a few lines. A permission prompt for work the task

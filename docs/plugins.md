@@ -93,6 +93,20 @@ starts it with one and `mia window model` switches it:
 
 Each is optional; an agent with no `with_model` is started with no model.
 
+An agent that keeps its sign-in in a folder a variable names can have
+[several accounts](worktrees.md#an-agents-account), each its own folder:
+
+```json
+{"protocol":1,"agent":{"name":"echo","commands":["echo-agent"],"account_env":"ECHO_HOME"}}
+```
+
+mia then starts it with `ECHO_HOME` set to the folder of the account
+chosen, and with nothing set for its own one, `default`. mia does not
+know where that one is, or whether anyone signed in, so `mia api
+accounts` gives it no `home` and says `unknown`. Its conversations are
+the plugin's to find, in every account's folder; `mia move` carries them
+with the plugin's own `carry`, as it carries any.
+
 A worktree that was removed is not among the folders, but it was at
 `<main checkout>.<name>`: list its conversations too and mia shows them as
 gone. Each call has five seconds. One that fails or prints something else

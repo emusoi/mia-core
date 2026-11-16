@@ -17,6 +17,12 @@
 | `mia window …` | its session's windows |
 | `mia window new <worktree> <agent> [--model <m>] [--effort <e>] [-- command]` | a window running an agent, started with a model and an effort |
 | `mia window model <worktree> <window> <model> [--effort <e>]` | switch the agent in a window to another model while it runs |
+| `mia window new <worktree> <agent> --account <a>` | a window running an agent on another account than the repository's, this once |
+| `mia window account <worktree> <window> <a>` | says how to put a running agent on another account: end it, then resume its conversation with `--account` |
+| `mia account [ls]` | every agent's accounts: its own folder, `default`, and the ones added — signed in or not, and what runs on each |
+| `mia account add <agent> <name> [--in <worktree>]` | a new account's folder, and a window running the agent on it to sign in to with the agent's own login |
+| `mia account use <agent> <name> [--repository <r>]` | the account a repository starts the agent's sessions on from now on; `default` gives it back to the config |
+| `mia account rename <agent> <name> <new>`, `mia account rm [--force] <agent> <name>` | rename or remove one; one a window runs on is refused, and so is `default` |
 | `mia rename <worktree> <name>` | rename it |
 | `mia star [worktree]` | star or unstar it |
 | `mia setup [worktree]` | run setup again |
@@ -27,7 +33,7 @@
 | `mia archive ls` | what is archived |
 | `mia unarchive <name>` | bring it back as it was, under its old name when that is free |
 | `mia recall <text…>` | the agent conversations of this repository and its worktrees that mention it — claude's, codex's, pi's — newest first: the words around it, and how to resume each |
-| `mia conversation resume <id> [--worktree <name>] [--in <worktree>] [--model <m>] [--effort <e>]` | open a window with the agent taking the conversation up again, in the worktree it was made in or in another, started with a model and an effort; `--worktree` picks the copy of one that is in several |
+| `mia conversation resume <id> [--worktree <name>] [--in <worktree>] [--model <m>] [--effort <e>] [--account <a>]` | open a window with the agent taking the conversation up again, in the worktree it was made in or in another, started with a model and an effort, on the repository's account or the one named — copied into that account's folder when it was made on another; `--worktree` picks the copy of one that is in several |
 | `mia why <file:line\|commit>` | the claude conversation that made a commit, or the line's last commit: what you asked, and how to resume it |
 | `mia resurrect [--dry-run] [--list] [<worktree>...]` | after tmux or the computer went down, open each session again — or any one named, closed on purpose or not: its windows in their folders, their programs restarted, each claude resuming its own conversation; `--list` shows every session remembered |
 | `mia gc [--apply\|--ask] [--days N]` | find, or remove, idle worktrees: clean, no session, not starred, untouched for N days (14); `--ask` shows them and removes on `y` |
@@ -72,9 +78,10 @@
 | `mia api <query>` | state as JSON |
 | `mia api capabilities` | API version, queries and feature markers |
 | `mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]` | the agent conversations of the repository and its worktrees, the last written to first |
+| `mia api accounts [--projects]` | every agent's accounts, or which one each repository starts each agent's sessions on |
 | `mia api conversation <id> [--worktree <name>] [--after <n>]` | one conversation as turns, for a chat view; `--worktree` picks the copy of one that is in several |
 | `mia main [status]` | the [main agent](main.md): whether it runs, and what it is doing |
-| `mia main start [--agent <name>] [--model <m>] [--effort <e>]` | make its folder and session when they are not there and start the agent, going on with its last conversation; one that runs is left as it is. `--agent` starts another than `[main] agent`, this once |
+| `mia main start [--agent <name>] [--model <m>] [--effort <e>] [--account <a>]` | make its folder and session when they are not there and start the agent, going on with its last conversation; one that runs is left as it is. `--agent` starts another than `[main] agent`, this once |
 | `mia main stop` | end its session; its folder and conversations stay |
 | `mia main say <text…>` | type a message into it and submit it |
 | `mia main press <keys…>` | type keys into it with no Enter after: `mia main press 1` picks an option when it is the main agent that asks |

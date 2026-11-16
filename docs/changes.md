@@ -9,6 +9,21 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **Accounts.** An agent can have several logins, each a folder of its
+  own it keeps its sign-in and conversations in — claude's
+  `CLAUDE_CONFIG_DIR`, codex's `CODEX_HOME`, pi's `PI_CODING_AGENT_DIR`,
+  a plugin's `account_env`; its usual folder is `default`. `mia account
+  add <agent> <name>` makes one and opens a window for the person to sign
+  in with the agent's own login; mia never reads, copies or moves a
+  sign-in. Each repository starts each agent on one — `mia account use`,
+  `[agents.<name>] account`, or the default — and `--account` on `mia
+  window new`, `mia conversation resume` and `mia main start` starts one
+  on another, this once. Conversations are found in every account's
+  folder and say their `account`; one resumed on another account is
+  copied there, and `mia move` carries one into the account of the same
+  name on the other side. `mia api accounts [--projects]`. See [An agent's
+  account](worktrees.md#an-agents-account) and [Accounts](api.md#accounts).
+
 - **Setups.** `mia api setups` is the agents, models and efforts a
   person has used, as one, each with how often, in how many worktrees and
   where last, the repository's usual one first, then the last used; what
