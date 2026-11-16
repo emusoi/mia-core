@@ -38,7 +38,7 @@ func repositoriesOf(owners map[string]string) []Repository {
 		if _, err := os.Stat(path); err != nil {
 			continue
 		}
-		common, err := git.CommonDir(path)
+		_, common, err := git.Repository(path) // by its files: a git for each worktree is most of a second
 		if err != nil || filepath.Base(common) != ".git" {
 			continue
 		}

@@ -65,6 +65,10 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **`mia api repos` runs no git.** It asked git about every worktree mia
+  has named, one after another: most of a second with fifty of them. Each
+  repository is now found from its files, in a hundredth.
+
 - **A move carries claude's conversation from a path with an underscore
   or a space in it.** claude names a folder's conversations after its
   path with every character but a letter or a digit as a `-`; the carrier
