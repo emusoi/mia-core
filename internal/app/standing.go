@@ -146,14 +146,14 @@ type stood struct {
 }
 
 // standingIn is one repository's worktrees that stand somewhere, each by
-// its best signal. A signal set from a pane that is gone is passed over
-// by the rule a listing passes over it by, and left for a listing to forget.
+// its best signal. A signal whose setter is gone is passed over by the
+// rule a listing passes over it by, and left for a listing to forget.
 func (a *App) standingIn(repo Repository, panes map[string][]session.Pane) []stood {
 	signals, err := signal.Store{Dir: filepath.Join(repo.Path, ".git", "mia")}.Load()
 	if err != nil {
 		return nil
 	}
-	from := panesByID(panes)
+	from, running := panesByID(panes), setters(signals)
 	in := map[string]string{} // a pane's id → its session
 	for name, its := range panes {
 		for _, pane := range its {
@@ -164,7 +164,7 @@ func (a *App) standingIn(repo Repository, panes map[string][]session.Pane) []sto
 	var found []stood
 	seen := map[string]bool{}
 	for _, one := range signals { // best first
-		if seen[one.Worktree] || paneGone(one, from) {
+		if seen[one.Worktree] || setterGone(one, from, running) {
 			continue
 		}
 		pane, live := from[one.Pane]

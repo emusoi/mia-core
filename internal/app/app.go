@@ -615,7 +615,7 @@ func (a *App) List(names ...string) ([]Listing, error) {
 	}
 	wg.Wait()
 	if signals, err := a.Signals.Load(); err == nil {
-		signals = a.withoutGonePanes(signals, ctx.panes)
+		signals = a.withoutGoneSetters(signals, ctx.panes)
 		for i := range listings {
 			listings[i].Signals = signal.Of(signals, listings[i].Name)
 		}
@@ -623,13 +623,12 @@ func (a *App) List(names ...string) ([]Listing, error) {
 	return listings, nil
 }
 
-// withoutGonePanes drops, and forgets, the signals set from a tmux pane
-// that is no longer there.
-func (a *App) withoutGonePanes(signals []signal.Signal, panes map[string][]session.Pane) []signal.Signal {
-	live := panesByID(panes)
+// withoutGoneSetters drops, and forgets, the signals whose setter is gone.
+func (a *App) withoutGoneSetters(signals []signal.Signal, panes map[string][]session.Pane) []signal.Signal {
+	live, running := panesByID(panes), setters(signals)
 	kept := signals[:0]
 	for _, one := range signals {
-		if paneGone(one, live) {
+		if setterGone(one, live, running) {
 			_ = a.Signals.Clear(one.Worktree, one.From)
 			continue
 		}
@@ -638,16 +637,25 @@ func (a *App) withoutGonePanes(signals []signal.Signal, panes map[string][]sessi
 	return kept
 }
 
-// paneGone reports whether a signal was set from a tmux pane that is no
-// longer there: an agent that asked and then died asks no more. It is the
-// one rule for it, a listing's and standing's. Only when tmux answered;
-// with no word from it live is nil, and nothing is known gone.
-func paneGone(one signal.Signal, live map[string]session.Pane) bool {
-	if live == nil || one.Pane == "" {
+// setterGone reports whether what set a signal is no longer there: an
+// agent that asked and then died asks no more. Set from a tmux pane, that
+// is the pane; set from none, the process recorded with it, and one with
+// neither is never gone. It is the one rule for it, a listing's and
+// standing's. Only when tmux, or ps, answered: with no word from it live,
+// or running, is nil, and nothing is known gone.
+func setterGone(one signal.Signal, live map[string]session.Pane, running map[int]process) bool {
+	if one.Pane != "" {
+		if live == nil {
+			return false
+		}
+		_, there := live[one.Pane]
+		return !there
+	}
+	if one.Pid == 0 || running == nil {
 		return false
 	}
-	_, there := live[one.Pane]
-	return !there
+	now, there := running[one.Pid]
+	return !there || !sameStart(now.started, one.Started)
 }
 
 // panesByID is every pane there is by its id; nil when tmux did not answer.

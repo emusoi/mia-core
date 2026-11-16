@@ -87,6 +87,13 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **An ask from an agent outside tmux no longer waits on you after the
+  agent is gone.** `mia signal .` run with no `TMUX_PANE` at all records
+  the process behind it, the agent whose hook it is, and the signal goes
+  when that process does, as one set from a pane goes with its pane: in
+  `mia ls`, the radar and `mia api standing`. Signals set before this, and
+  one set with `TMUX_PANE=` emptied, record none and stay as they did.
+
 - **`mia api repos` runs no git.** It asked git about every worktree mia
   has named, one after another: most of a second with fifty of them. Each
   repository is now found from its files, in a hundredth.

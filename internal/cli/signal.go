@@ -52,7 +52,13 @@ func cmdSignal(a *app.App, args []string, asJSON bool) int {
 	one := signal.Signal{Worktree: record.Name, Kind: args[1], Text: strings.Join(args[2:], " "),
 		Style: style, Rank: signal.DefaultRank, From: from, At: time.Now(), Yes: yes}
 	if worktree == "" {
-		one.Pane = os.Getenv("TMUX_PANE") // set from inside: the radar can answer there
+		pane, said := os.LookupEnv("TMUX_PANE")
+		one.Pane = pane // set from inside: the radar can answer there
+		if !said {
+			// outside tmux there is no pane to go by: the agent whose hook
+			// this is stands behind it. TMUX_PANE= emptied asks for neither.
+			one.Pid, one.Started = a.Setter()
+		}
 	}
 	if one.From == "" {
 		one.From = "you"
