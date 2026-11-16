@@ -208,7 +208,9 @@ func (a *App) askMachine(machine runtime.Machine, dir string, linked bool) Machi
 	cache := filepath.Join(a.MiaDir, "remote", machine.Name+".json")
 	script, at := probeScript, "."
 	if linked {
-		script = "(" + probeScript + ")\necho " + worktreesMark + "\ncd \"$1\" && " + remoteMia + " api worktrees"
+		script = "(" + probeScript + ")\necho " + worktreesMark + "\n" +
+			// the machine answers whether or not the repository is still there: without it, it has no worktrees of it
+			"{ cd \"$1\" 2>/dev/null && " + remoteMia + " api worktrees; } || true"
 		at = dir
 	}
 	// a machine that did not answer is not asked again for 30s, so one that
