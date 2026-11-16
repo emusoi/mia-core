@@ -12,7 +12,9 @@ import (
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/gittest"
 	"github.com/emusoi/mia-core/internal/names"
+	"github.com/emusoi/mia-core/internal/runtime"
 	"github.com/emusoi/mia-core/internal/session"
+	"github.com/emusoi/mia-core/internal/signal"
 )
 
 // mainHome is where the main agent's folder is under the test's config home.
@@ -174,5 +176,122 @@ func TestTheMainAgentsTurnsSayWhatItDid(t *testing.T) {
 	// the conversation read as any other is as it was
 	if plain, err := a.ConversationTurns("c1", 0); err != nil || kinds(plain) != "1:asked 2:tool 3:tool 4:said" || plain[1].Verb != "" {
 		t.Errorf("as a conversation = %s, %v", kinds(plain), err)
+	}
+}
+
+func TestStandingIsEveryRepositorysAgentsAndEachMachineAskedForItsOwn(t *testing.T) {
+	// a repository in a temporary folder is not one mia lists: under the real home, as its own test has it
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home")
+	}
+	dir, err := os.MkdirTemp(home, ".mia-standing-test-")
+	if err != nil {
+		t.Skip(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	gittest.Isolate(t)
+	root := filepath.Join(dir, "shop")
+	for _, args := range [][]string{{"init", "-q", "-b", "main", root}, {"-C", root, "-c", "user.name=user", "-c", "user.email=user@example.com", "commit", "-q", "--allow-empty", "-m", "first"}} {
+		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	shop, err := app.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"kilwa", "duluti", "themi", "sekei"} {
+		if _, err := shop.NewNamed("task-"+name, "", name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	at := time.Date(2026, 11, 3, 9, 0, 0, 0, time.UTC)
+	for _, one := range []signal.Signal{
+		{Worktree: "kilwa", Kind: "asks", Text: "wants to use Bash", Rank: 10, From: "claude", Yes: "1", At: at},
+		{Worktree: "kilwa", Kind: "busy", Rank: 60, From: "tests", At: at},
+		{Worktree: "duluti", Kind: "done", Rank: 30, From: "claude", UntilSeen: true, At: at},
+		{Worktree: "themi", Kind: "busy", Rank: 60, From: "codex", At: at},
+		{Worktree: "sekei", Kind: "note", Text: "tests green", Rank: 60, From: "note", At: at},
+	} {
+		if err := shop.Signals.Set(one); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// two machines: one whose mia answers, one that is off
+	bin := t.TempDir()
+	asked := filepath.Join(bin, "asked")
+	put(t, filepath.Join(bin, "ssh"), "#!/bin/sh", `echo asked >> `+asked, `case " $* " in`,
+		`*" fedora.invalid "*) echo '{"waiting":[{"repository":"api","root":"/home/user/api","worktree":"sakina","machine":"local","agent":"codex","kind":"asks","line":"which one?","options":["Fast","Small"],"since":"2026-11-02T10:00:00Z"}],"working":[],"done_unread":[],"counts":{"waiting":1,"working":0,"done_unread":0},"machines":[{"name":"local","answers":true}]}' ;;`,
+		`*) echo "ssh: connect to host box.invalid port 22: Operation timed out" >&2; exit 255 ;;`, "esac")
+	if err := os.Chmod(filepath.Join(bin, "ssh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	machines := runtime.Store{Path: filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "runtimes.json")}
+	for _, name := range []string{"box", "fedora"} {
+		if err := machines.Add(runtime.Machine{Name: name, SSH: name + ".invalid"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a, err := app.AtMain()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	here, err := a.Standing(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if here.Counts.Waiting != 1 || here.Counts.Working != 1 || here.Counts.DoneUnread != 1 || len(here.Machines) != 1 {
+		t.Fatalf("here = %+v", here)
+	}
+	waiting := here.Waiting[0]
+	if waiting.Repository != "shop" || waiting.Root != shop.Root || waiting.Worktree != "kilwa" || waiting.Machine != "local" || waiting.Agent != "claude" ||
+		waiting.Kind != "asks" || waiting.Line != "wants to use Bash" || waiting.Yes != "1" || !waiting.Since.Equal(at) {
+		t.Errorf("waiting = %+v", waiting)
+	}
+	if here.Working[0].Worktree != "themi" || here.Working[0].Agent != "codex" || here.DoneUnread[0].Worktree != "duluti" {
+		t.Errorf("working = %+v, done and unread = %+v", here.Working, here.DoneUnread)
+	}
+	if _, err := os.Stat(asked); err == nil {
+		t.Error("a machine was asked when only this one was wanted")
+	}
+
+	all, err := a.Standing(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the longest wait first, each with its machine
+	if all.Counts.Waiting != 2 || all.Waiting[0].Worktree != "sakina" || all.Waiting[0].Machine != "fedora" || len(all.Waiting[0].Options) != 2 || all.Waiting[1].Machine != "local" {
+		t.Fatalf("waiting everywhere = %+v", all.Waiting)
+	}
+	if len(all.Machines) != 3 || all.Machines[0] != (app.Answered{Name: "local", Answers: true}) ||
+		all.Machines[1].Name != "box" || all.Machines[1].Answers || !strings.Contains(all.Machines[1].Detail, "timed out") ||
+		all.Machines[2] != (app.Answered{Name: "fedora", Answers: true}) {
+		t.Fatalf("machines = %+v", all.Machines)
+	}
+	// one that did not answer is not asked again at once, and is still named
+	if again, err := a.Standing(true); err != nil || len(again.Machines) != 3 || again.Machines[1].Answers || again.Machines[1].Detail == "" {
+		t.Fatalf("asked again = %+v, %v", again.Machines, err)
+	}
+	if log, _ := os.ReadFile(asked); strings.Count(string(log), "asked") != 3 {
+		t.Errorf("ssh ran %d times, want 3: the machine that is off once", strings.Count(string(log), "asked"))
+	}
+
+	if err := a.SeeStanding("shop/duluti"); err != nil {
+		t.Fatal(err)
+	}
+	if seen, _ := a.Standing(false); seen.Counts.DoneUnread != 0 || seen.Counts.Waiting != 1 {
+		t.Errorf("seen, and still unread: %+v", seen.Counts)
+	}
+	if err := a.SeeStanding(shop.Root + "/kilwa"); err != nil {
+		t.Errorf("a repository by its path: %v", err)
+	}
+	for _, bad := range []string{"nowhere/kilwa", "shop/nobody", "kilwa"} {
+		if err := a.SeeStanding(bad); err == nil {
+			t.Errorf("--seen %s was taken", bad)
+		}
 	}
 }

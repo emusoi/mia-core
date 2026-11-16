@@ -9,9 +9,9 @@ import (
 	"github.com/emusoi/mia-core/internal/gittest"
 )
 
-// The main agent is a person's, not one repository's: an app asks from
-// wherever its server was started.
-func TestTheMainAgentAnswersOutsideARepository(t *testing.T) {
+// The main agent and where every agent stands are a person's, not one
+// repository's: an app asks from wherever its server was started.
+func TestTheMainAgentAndStandingAnswerOutsideARepository(t *testing.T) {
 	gittest.Isolate(t)
 	t.Chdir(t.TempDir())
 
@@ -26,7 +26,15 @@ func TestTheMainAgentAnswersOutsideARepository(t *testing.T) {
 	if _, code = answered(t, "main", "turns", "--after", "soon"); code != exitUsage {
 		t.Errorf("--after soon exited %d", code)
 	}
-	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "main") || !slices.Contains(caps.Features, "main-agent") {
+	data, code = answered(t, "standing")
+	var standing app.Standing
+	if err := json.Unmarshal(data, &standing); err != nil || code != exitOK || standing.Waiting == nil || standing.Working == nil || standing.DoneUnread == nil || len(standing.Machines) != 1 {
+		t.Fatalf("api standing = %s, exit %d, %v", data, code, err)
+	}
+	if _, code = answered(t, "standing", "--seen", "nowhere/kilwa"); code != exitFailed {
+		t.Errorf("--seen of a repository there is not exited %d", code)
+	}
+	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "main") || !slices.Contains(caps.Queries, "standing") || !slices.Contains(caps.Features, "main-agent") {
 		t.Errorf("capabilities = %+v", caps)
 	}
 

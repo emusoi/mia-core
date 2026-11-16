@@ -97,3 +97,14 @@ func TestAMiaVerbTheMainAgentRanIsSaidAsWhatItDid(t *testing.T) {
 		t.Errorf("what the agent said: %+v", turn)
 	}
 }
+
+func TestTheNumberedChoicesOnAScreenAreItsLastRun(t *testing.T) {
+	screen := "1. read the file\n2. change it\n\n Do you want to proceed?\n ❯ 1. Yes\n   2. Yes, and don't ask again for mia commands\n      in this folder\n   3. No, and tell Claude what to do differently (esc)\n"
+	want := []string{"Yes", "Yes, and don't ask again for mia commands", "No, and tell Claude what to do differently (esc)"}
+	if got := optionsOn(screen); !reflect.DeepEqual(got, want) {
+		t.Errorf("options = %q", got)
+	}
+	if got := optionsOn("It took 3. Then it stopped.\n1. only one\n"); got != nil {
+		t.Errorf("prose with a number in it: %q", got)
+	}
+}

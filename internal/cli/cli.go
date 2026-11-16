@@ -115,7 +115,7 @@ func Run(args []string) int {
 	case "main":
 		return cmdMain(rest)
 	case "api":
-		if len(rest) > 0 && rest[0] == "main" { // the person's, from anywhere
+		if len(rest) > 0 && (rest[0] == "main" || rest[0] == "standing") { // the person's, from anywhere
 			return cmdAPIMain(rest)
 		}
 		if len(rest) == 1 && rest[0] == "repos" { // every repository, from anywhere

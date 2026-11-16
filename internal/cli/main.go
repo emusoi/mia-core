@@ -12,6 +12,7 @@ import (
 const (
 	mainUsage      = "mia main [status|start|stop|say <text…>|interrupt]"
 	mainTurnsUsage = "mia api main [turns [--after <n>]]"
+	standingUsage  = "mia api standing [--here] [--seen <repository>/<worktree>[@<machine>]]"
 )
 
 // atMain is mia where the main agent lives, which is no repository.
@@ -90,14 +91,31 @@ func sayMain(state app.MainState, asJSON bool) int {
 	return exitOK
 }
 
-// cmdAPIMain is the query that is about no repository's worktrees but the
-// person's: the main agent, and its conversation.
+// cmdAPIMain is the queries that are about no repository's worktrees but
+// the person's: the main agent, and where every agent stands.
 func cmdAPIMain(args []string) int {
 	a, err := atMain()
 	if err != nil {
 		return fail(err)
 	}
-	rest := args[1:]
+	query, rest := args[0], args[1:]
+	if query == "standing" {
+		here := take(&rest, "--here")
+		seen := takeValue(&rest, "--seen")
+		if len(rest) > 0 {
+			return usageErr(standingUsage)
+		}
+		if seen != "" {
+			if err := a.SeeStanding(seen); err != nil {
+				return fail(err)
+			}
+		}
+		standing, err := a.Standing(!here)
+		if err != nil {
+			return fail(err)
+		}
+		return emit(standing)
+	}
 	if len(rest) == 0 {
 		return emit(a.Main())
 	}
