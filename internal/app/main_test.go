@@ -32,11 +32,12 @@ func TestTheMainAgentIsStartedOnceSpokenToAndStopped(t *testing.T) {
 	t.Setenv("TMUX_TMPDIR", socket)
 	t.Cleanup(func() { exec.Command("tmux", "kill-server").Run() })
 	bin := t.TempDir()
-	put(t, filepath.Join(bin, "echo-agent"), "#!/bin/sh", `echo "echo-agent $*"`, "exec cat")
+	put(t, filepath.Join(bin, "echo-agent"), "#!/bin/sh", `echo "echo-agent $*"`, `echo "main=$MIA_MAIN worktree=${MIA_WORKTREE-none}"`, "exec cat")
 	if err := os.Chmod(filepath.Join(bin, "echo-agent"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("MIA_WORKTREE", "kilwa") // started from a worktree's window
 	put(t, filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "config.toml"), "[main]", `agent = "echo"`)
 
 	open := func() *app.App {
@@ -87,6 +88,7 @@ func TestTheMainAgentIsStartedOnceSpokenToAndStopped(t *testing.T) {
 		return ""
 	}
 	read("echo-agent e2")
+	read("main=1 worktree=none") // it is the main agent's window, and no worktree's
 
 	windows := session.Here().Windows("main")
 	if again, err := open().StartMain(); err != nil || !again.Running || !slices.Equal(session.Here().Windows("main"), windows) {

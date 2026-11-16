@@ -594,14 +594,22 @@ func (h Host) Windows(worktree string) []string {
 	return names
 }
 
+// StartWindow starts a window of a worktree's session, which is told the
+// worktree it is in by MIA_WORKTREE.
 func (h Host) StartWindow(worktree, dir, window string, argv []string) error {
+	return h.StartWindowWith("MIA_WORKTREE="+worktree, worktree, dir, window, argv)
+}
+
+// StartWindowWith is StartWindow with env, NAME=value, in the window's
+// environment in place of MIA_WORKTREE: for a session that is no worktree's.
+func (h Host) StartWindowWith(env, worktree, dir, window string, argv []string) error {
 	if err := h.Ensure(worktree, dir); err != nil {
 		return err
 	}
 	if h.HasWindow(worktree, window) {
 		return nil
 	}
-	args := append([]string{"new-window", "-d", "-t", exact(Name(worktree)), "-n", window, "-c", dir, "-e", "MIA_WORKTREE=" + worktree, "--"}, argv...)
+	args := append([]string{"new-window", "-d", "-t", exact(Name(worktree)), "-n", window, "-c", dir, "-e", env, "--"}, argv...)
 	if out, err := h.run(args...); err != nil {
 		return fmt.Errorf("start %s in %s: %s", window, worktree, strings.TrimSpace(out))
 	}

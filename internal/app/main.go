@@ -205,8 +205,9 @@ func (a *App) StartMain() (MainState, error) {
 		shell = "/bin/sh"
 	}
 	// by a login shell, for its PATH, and with nothing after: the window is
-	// the agent, and goes when it ends
-	if err := host.StartWindow(mainName, a.Root, agent.Name, []string{shell, "-lc", command}); err != nil {
+	// the agent, and goes when it ends. It is told it is the main agent's by
+	// MIA_MAIN, and has no MIA_WORKTREE: it is no worktree's.
+	if err := host.StartWindowWith("MIA_MAIN=1", mainName, a.Root, agent.Name, []string{shell, "-lc", command}); err != nil {
 		return MainState{}, err
 	}
 	time.Sleep(time.Second)

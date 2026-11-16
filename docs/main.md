@@ -24,6 +24,7 @@ with its last conversation.
 | its folder | `~/.config/mia/main`, which mia makes and no repository holds |
 | its session | `mia-main` in tmux, with the agent in a window named for it: `tmux attach -t mia-main` |
 | its name | `main` is taken in the name registry, so no worktree can be given it and its session |
+| its environment | `MIA_MAIN=1`, and no `MIA_WORKTREE`: it is no worktree |
 | its notes | `CLAUDE.md` for claude, `AGENTS.md` for another, written by mia at every start: who it is, the verbs it runs the others with, and what it may answer |
 
 The window is the agent and goes when the agent ends, so a window named
