@@ -22,10 +22,11 @@ type Recalled struct {
 
 // Recall is the agent conversations of the repository and its worktrees
 // that mention text, newest first, one line each from where it came up —
-// your own words over the agent's.
+// your own words over the agent's. None is an empty list, not nil: it is
+// printed as JSON.
 func (a *App) Recall(text string, limit int) []Recalled {
 	in, _ := a.where()
-	var found []Recalled
+	found := []Recalled{}
 	for _, agent := range a.agents() {
 		if agent.talks == nil {
 			continue

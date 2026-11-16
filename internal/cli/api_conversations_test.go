@@ -14,13 +14,19 @@ import (
 // answered is what a mia api query printed, and how it exited.
 func answered(t *testing.T, args ...string) ([]byte, int) {
 	t.Helper()
+	return printed(t, append([]string{"api"}, args...)...)
+}
+
+// printed is what mia printed when run with args, and how it exited.
+func printed(t *testing.T, args ...string) ([]byte, int) {
+	t.Helper()
 	output, err := os.CreateTemp(t.TempDir(), "output")
 	if err != nil {
 		t.Fatal(err)
 	}
 	previous := os.Stdout
 	os.Stdout = output
-	code := Run(append([]string{"api"}, args...))
+	code := Run(args)
 	os.Stdout = previous
 	output.Close()
 	data, _ := os.ReadFile(output.Name())
@@ -38,6 +44,9 @@ func TestConversationsAPIListsThemAndReadsOneAsTurns(t *testing.T) {
 	data, code := answered(t, "conversations")
 	if code != exitOK || string(data) != "[]\n" {
 		t.Fatalf("none is an empty list: %q, exit %d", data, code)
+	}
+	if data, code := printed(t, "recall", "--json", "nothing", "says", "this"); code != exitOK || string(data) != "[]\n" {
+		t.Fatalf("nothing recalled is an empty list: %q, exit %d", data, code)
 	}
 	project := filepath.Join(claude, "projects", regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(repo.Root, "-"))
 	if err := os.MkdirAll(project, 0o755); err != nil {
