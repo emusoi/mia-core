@@ -81,6 +81,7 @@
 | `mia main interrupt` | stop it mid-work |
 | `mia api main` | where the main agent stands, from any folder |
 | `mia api main turns [--after <n>]` | its conversation as turns, each of mia's verbs it ran said as what it did |
+| `mia api setups [--repository <name> \| --all]` | the agent · model · effort setups used, the repository's usual first, from any folder |
 | `mia api standing [--here] [--seen <repository>/<worktree>]` | every agent in every repository, and on every machine: which wait on you, which work, which finished unseen |
 | `mia help vocabulary` | the words |
 | `mia help tmux` | what `mia tmux install` adds: the radar, a new worktree, the menu, the status line |

@@ -9,6 +9,14 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **Setups.** `mia api setups` is the agents, models and efforts a
+  person has used, as one, each with how often, in how many worktrees and
+  where last, the repository's usual one first, then the last used; what
+  the config starts agents with comes after, for someone who has chosen
+  nothing yet. Each start and switch with a model is written down for it.
+  From any folder: in a repository, that one's; `--repository <name>` or
+  `--all` for others. See [Setups](api.md#setups).
+
 - **An agent's model.** `mia window new <worktree> <agent> --model
   <model> --effort <effort>` starts an agent with them, and `mia window
   model <worktree> <window> <model> [--effort <effort>]` switches one

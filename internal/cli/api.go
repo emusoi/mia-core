@@ -3,10 +3,12 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/config"
 	"github.com/emusoi/mia-core/internal/git"
 	"github.com/emusoi/mia-core/internal/stack"
 )
@@ -113,9 +115,10 @@ func cmdAPI(a *app.App, args []string) int {
 	}
 }
 
-var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base", "conversations", "conversation", "main", "standing", "agents"}
+var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base", "conversations", "conversation", "main", "standing", "agents", "setups"}
 
 const (
+	setupsUsage        = "mia api setups [--repository <name> | --all]"
 	conversationsUsage = "mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]"
 	conversationUsage  = "mia api conversation <id> [--worktree <name>] [--after <n>]"
 )
@@ -138,7 +141,29 @@ func apiCapabilities() capabilities {
 		Queries: apiQueryList,
 		Features: []string{
 			"direct-http", "project-config", "doctor", "environment-readiness", "environment-drift",
-			"local-sessions", "conversations", "main-agent", "standing", "remote-sync-preview", "sync-conflicts", "safe-cleanup", "stack-sync", "merged-gc", "compose-environments", "agent-models",
+			"local-sessions", "conversations", "main-agent", "standing", "remote-sync-preview", "sync-conflicts", "safe-cleanup", "stack-sync", "merged-gc", "compose-environments", "agent-models", "setups",
 		},
 	}
+}
+
+// cmdAPISetups is the setups the person has used, from any folder: in a
+// repository, that repository's unless --all or --repository says
+// otherwise; outside one, every repository's.
+func cmdAPISetups(args []string) int {
+	all, repository := take(&args, "--all"), takeValue(&args, "--repository")
+	if len(args) > 0 || (all && repository != "") {
+		return usageErr(setupsUsage)
+	}
+	a := app.Outside()
+	here, _ := os.Getwd()
+	if in, err := app.Open(here); err == nil {
+		a = in
+		if !all && repository == "" {
+			repository = filepath.Base(in.Root)
+		}
+	} else if a.Config, err = config.Load(""); err != nil {
+		return fail(err)
+	}
+	a.Plugins = pluginHost(a.Config)
+	return emit(a.Setups(repository))
 }

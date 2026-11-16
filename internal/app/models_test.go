@@ -99,6 +99,13 @@ func TestAnAgentsWindowIsStartedWithAModelAndSwitched(t *testing.T) {
 		t.Errorf("the model alone: %+v, %v", now, err)
 	}
 
+	// each start and switch is a setup used there, the later used first of a tie
+	setups := a.Setups(filepath.Base(a.Root))
+	if len(setups) != 4 || !setups[0].Usual || setups[0].Model != "loud" || setups[0].Effort != "high" || setups[0].Last.Worktree != record.Name || setups[0].Last.Machine != "local" ||
+		setups[1].Model != "soft" || setups[2].Model != "loud" || setups[2].Effort != "low" || setups[3] != (app.Setup{Agent: "echo", Effort: "low"}) {
+		t.Errorf("setups = %+v", setups)
+	}
+
 	if _, err := a.NewWindow(record, "shell", []string{"sh"}); err != nil {
 		t.Fatal(err)
 	}
@@ -147,5 +154,10 @@ func TestTheMainAgentIsStartedWithAModelAndSwitched(t *testing.T) {
 	screenOf(t, "main", "echo", "/model loud\n/model loud")
 	if state := open().Main(); state.Model != "loud" || state.Effort != "high" {
 		t.Errorf("as switched: %+v", state)
+	}
+	// the main agent's setups are in its folder's name, main
+	if setups := open().Setups("main"); len(setups) != 3 || !setups[0].Usual || setups[0].Model != "loud" || setups[0].Last.Worktree != "main" ||
+		setups[1].Model != "soft" || setups[1].Effort != "high" || setups[2] != (app.Setup{Agent: "echo", Model: "soft"}) {
+		t.Errorf("setups = %+v", setups)
 	}
 }

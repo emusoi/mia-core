@@ -127,6 +127,9 @@ func Run(args []string) int {
 			a.Config, a.Plugins = c, pluginHost(c)
 			return emit(a.AgentModels())
 		}
+		if len(rest) > 0 && rest[0] == "setups" { // the person's, from anywhere: a repository's by default, when in one
+			return cmdAPISetups(rest[1:])
+		}
 		if len(rest) == 1 && rest[0] == "repos" { // every repository, from anywhere
 			repos, err := app.Repositories()
 			if err != nil {

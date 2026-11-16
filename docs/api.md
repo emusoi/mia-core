@@ -232,6 +232,45 @@ to, kept by mia for the window: not read from the agent. One switched by
 hand in the agent is not known, and a window mia chose nothing for has
 neither.
 
+## Setups
+
+`mia api setups` is the setups the person has used — an agent, a model
+and an effort, as one — each with how often and where last, for a picker
+to offer the ones they use. It answers from any folder: in a repository,
+that repository's; outside one, every repository's. `--repository <name>`
+asks for the one named, by its main checkout's folder name, and `--all`
+for every one.
+
+```json
+[{"agent":"claude","model":"opus","effort":"high","uses":7,"sessions":6,
+  "last":{"repository":"mia-phone","worktree":"goba","machine":"local","at":"2026-11-15T10:00:00Z"},
+  "usual":true},
+ {"agent":"claude","model":"sonnet","effort":"medium","uses":2,"sessions":2,
+  "last":{"repository":"mia-phone","worktree":"olasiti","machine":"fedora","at":"2026-11-12T16:20:00Z"},
+  "usual":false},
+ {"agent":"codex","model":"","effort":"low","uses":0,"sessions":0,"usual":false}]
+```
+
+| field | is |
+|---|---|
+| `agent`, `model`, `effort` | the setup; `""` for a model or an effort mia did not choose, so the agent's own |
+| `uses` | how many times an agent was started with it or switched to it |
+| `sessions` | in how many worktrees |
+| `last` | where it was used last: the `repository`, the `worktree`, the `machine` it runs on — `local` for this one — and `at`; left out for one never used |
+| `usual` | the one used in the most of the repository's worktrees, the later used of a tie; none when every repository is asked |
+
+The usual one comes first, then the last used first. After them come
+what the config starts agents with, `[main]` and `[agents.<name>]`, that
+were not used there, with `uses` 0: someone who has chosen nothing yet
+still has those.
+
+Every `mia window new … --model`, `mia window model`, `mia main start`
+and `mia main model` writes down a use, in `setups.json` in the user-wide
+config folder of the machine whose mia started it; a start with no
+`--model` or `--effort` writes down what the config started the agent
+with, and nothing when it says none. The last 500 are kept. The main
+agent's are in the repository `main`, its folder's name, worktree `main`.
+
 ## Standing
 
 `mia api standing` is every agent in every repository `mia api repos`
