@@ -228,6 +228,8 @@ type WindowRef struct {
 //	question the agent asked the person to choose: text, options, and answer once given
 //	answer   what the person chose, when they did: text, and question, the turn it answers
 //	commit   a commit the agent made: hash and subject
+//	did      the main agent ran one of mia's verbs that change something: text,
+//	         verb, and the repository, worktree and machine the command names
 type Turn struct {
 	N        int       `json:"n"`
 	Kind     string    `json:"kind"`
@@ -241,9 +243,17 @@ type Turn struct {
 	Hash     string    `json:"hash,omitempty"`
 	Subject  string    `json:"subject,omitempty"`
 
+	Verb       string `json:"verb,omitempty"`
+	Repository string `json:"repository,omitempty"`
+	Worktree   string `json:"worktree,omitempty"`
+	Machine    string `json:"machine,omitempty"`
+
 	// ref ties a question to its answer while a transcript is read: the id
 	// the agent gave the asking.
 	ref string
+	// command is the whole of what a shell tool ran, and cwd the folder the
+	// agent was in then, when its transcript says: what a did is read from.
+	command, cwd string
 }
 
 const (
@@ -253,6 +263,7 @@ const (
 	turnQuestion = "question"
 	turnAnswer   = "answer"
 	turnCommit   = "commit"
+	turnDid      = "did"
 )
 
 // oneLine is text on one line, cut to what a list shows.

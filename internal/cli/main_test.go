@@ -20,6 +20,12 @@ func TestTheMainAgentAnswersOutsideARepository(t *testing.T) {
 	if err := json.Unmarshal(data, &state); err != nil || code != exitOK || state.Running || state.Agent != "claude" || state.Session != "mia-main" || state.Home == "" {
 		t.Fatalf("api main = %s, exit %d, %v", data, code, err)
 	}
+	if data, code = answered(t, "main", "turns", "--after", "3"); code != exitOK || string(data) != "[]\n" {
+		t.Fatalf("no conversation is no turns: %q, exit %d", data, code)
+	}
+	if _, code = answered(t, "main", "turns", "--after", "soon"); code != exitUsage {
+		t.Errorf("--after soon exited %d", code)
+	}
 	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "main") || !slices.Contains(caps.Features, "main-agent") {
 		t.Errorf("capabilities = %+v", caps)
 	}

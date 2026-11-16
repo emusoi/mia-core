@@ -21,7 +21,8 @@ import (
 
 // The main agent is the one a person talks to, which runs the others: one
 // for the person, on one machine, in a session of its own that is no
-// worktree's. Its folder is mia's, under the user-wide config.
+// worktree's. Its folder is mia's, under the user-wide config, and what it
+// did is read from its own conversation.
 
 // mainName is its session's, mia-main, held in the name registry so that
 // no worktree is given it.
@@ -245,4 +246,23 @@ func (a *App) InterruptMain() error {
 	}
 	agent, _ := agentNamed(a.agents(), window.Name)
 	return host.Keys(mainName, window.Name, []string{agent.stopKey()})
+}
+
+// MainTurns is the main agent's conversation as turns, those after turn
+// number after, with each of mia's verbs it ran that changed something
+// said as what it did.
+func (a *App) MainTurns(after int) ([]Turn, error) {
+	state := a.Main()
+	if state.Conversation == "" {
+		return []Turn{}, nil
+	}
+	turns, err := a.ConversationTurns(state.Conversation, after)
+	if err != nil {
+		return nil, err
+	}
+	places := a.places()
+	for i := range turns {
+		turns[i] = a.did(turns[i], places)
+	}
+	return turns, nil
 }

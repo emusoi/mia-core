@@ -126,7 +126,9 @@ func claudeLine(line []byte, about *about) []Turn {
 				}
 				continue
 			}
-			turns = append(turns, toolTurn(b.Name, input, e.Timestamp))
+			turn := toolTurn(b.Name, input, e.Timestamp)
+			turn.cwd = e.Cwd
+			turns = append(turns, turn)
 		}
 	}
 	return readsTogether(turns)
@@ -436,7 +438,7 @@ func toolTurn(name string, in toolInput, at time.Time) Turn {
 	}
 	switch strings.ToLower(name) {
 	case "bash", "shell", "exec_command", "shell_command":
-		turn.Text = "Ran " + short(in.Command)
+		turn.Text, turn.command = "Ran "+short(in.Command), in.Command
 	case "edit", "multiedit", "notebookedit":
 		added, removed := changed(in.OldString, in.NewString)
 		for _, e := range in.Edits {

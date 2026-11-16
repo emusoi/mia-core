@@ -3,12 +3,16 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/app"
 )
 
-const mainUsage = "mia main [status|start|stop|say <text…>|interrupt]"
+const (
+	mainUsage      = "mia main [status|start|stop|say <text…>|interrupt]"
+	mainTurnsUsage = "mia api main [turns [--after <n>]]"
+)
 
 // atMain is mia where the main agent lives, which is no repository.
 func atMain() (*app.App, error) {
@@ -87,14 +91,30 @@ func sayMain(state app.MainState, asJSON bool) int {
 }
 
 // cmdAPIMain is the query that is about no repository's worktrees but the
-// person's: the main agent.
+// person's: the main agent, and its conversation.
 func cmdAPIMain(args []string) int {
-	if len(args) != 1 {
-		return usageErr("mia api main")
-	}
 	a, err := atMain()
 	if err != nil {
 		return fail(err)
 	}
-	return emit(a.Main())
+	rest := args[1:]
+	if len(rest) == 0 {
+		return emit(a.Main())
+	}
+	after := 0
+	if value := takeValue(&rest, "--after"); value != "" {
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return usageErr(mainTurnsUsage)
+		}
+		after = n
+	}
+	if len(rest) != 1 || rest[0] != "turns" {
+		return usageErr(mainTurnsUsage)
+	}
+	turns, err := a.MainTurns(after)
+	if err != nil {
+		return fail(err)
+	}
+	return emit(turns)
 }

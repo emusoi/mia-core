@@ -129,3 +129,50 @@ func TestAnAgentNoOneKnowsIsNotStartedAsTheMainOne(t *testing.T) {
 		t.Error("its folder was made for an agent there is not")
 	}
 }
+
+// What the main agent did is read from its own conversation, and only
+// where the main agent's turns are asked for.
+func TestTheMainAgentsTurnsSayWhatItDid(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	claudeDir := agentHomes(t)
+	if err := os.MkdirAll(mainHome(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	a, err := app.AtMain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := a.MainTurns(0); err != nil || len(got) != 0 {
+		t.Fatalf("with no conversation yet: %+v, %v", got, err)
+	}
+	ran := func(command string) string {
+		return claudeSays(a.Root, "assistant", `[{"type":"tool_use","id":"t","name":"Bash","input":{"command":`+quoted(command)+`}}]`, "")
+	}
+	put(t, filepath.Join(claudeDir(a.Root), "c1.jsonl"),
+		claudeSays(a.Root, "user", `"answer kijenge, then say where things stand"`, ""),
+		ran("cd "+repo.Root+" && mia window press kijenge claude -- 1"),
+		ran("mia api standing"),
+		claudeSays(a.Root, "assistant", `[{"type":"text","text":"kijenge goes on."}]`, ""))
+
+	if state := a.Main(); state.Running || state.Conversation != "c1" || state.Agent != "claude" {
+		t.Fatalf("not running, with a conversation to go on with: %+v", state)
+	}
+	turns, err := a.MainTurns(0)
+	if err != nil || kinds(turns) != "1:asked 2:did 3:tool 4:said" {
+		t.Fatalf("turns = %s, %v", kinds(turns), err)
+	}
+	if did := turns[1]; did.Verb != "window press" || did.Text != "Answered kijenge: 1" || did.Repository != filepath.Base(repo.Root) || did.Worktree != "kijenge" {
+		t.Errorf("did = %+v", did)
+	}
+	if turns[2].Text != "Ran mia api standing" {
+		t.Errorf("a verb that reads = %+v", turns[2])
+	}
+	if later, err := a.MainTurns(2); err != nil || kinds(later) != "3:tool 4:said" {
+		t.Errorf("after 2 = %s, %v", kinds(later), err)
+	}
+	// the conversation read as any other is as it was
+	if plain, err := a.ConversationTurns("c1", 0); err != nil || kinds(plain) != "1:asked 2:tool 3:tool 4:said" || plain[1].Verb != "" {
+		t.Errorf("as a conversation = %s, %v", kinds(plain), err)
+	}
+}
