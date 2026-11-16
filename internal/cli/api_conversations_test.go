@@ -64,6 +64,12 @@ func TestConversationsAPIListsThemAndReadsOneAsTurns(t *testing.T) {
 	if err := json.Unmarshal(data, &heads); err != nil || code != exitOK || len(heads) != 1 || heads[0].ID != "c1" || heads[0].Asked != "make the list faster" || heads[0].Turns != 1 {
 		t.Fatalf("conversations = %s, exit %d, %v", data, code, err)
 	}
+	// when it started is the agent's to say and when it was last written to the disk's: both said one way
+	var times []map[string]any
+	utc := regexp.MustCompile(`^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,3})?Z$`)
+	if err := json.Unmarshal(data, &times); err != nil || !utc.MatchString(times[0]["started"].(string)) || !utc.MatchString(times[0]["active"].(string)) {
+		t.Errorf("started %v and active %v are not both UTC to the millisecond", times[0]["started"], times[0]["active"])
+	}
 	data, code = answered(t, "conversation", "c1", "--after", "1")
 	var turns []app.Turn
 	if err := json.Unmarshal(data, &turns); err != nil || code != exitOK || len(turns) != 1 || turns[0].N != 2 || turns[0].Kind != "said" || turns[0].Text != "It is faster." {

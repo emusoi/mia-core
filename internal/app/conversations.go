@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/model"
 	"github.com/emusoi/mia-core/internal/run"
@@ -64,6 +65,8 @@ func (a *App) Conversations(want Wanted) (heads []Head, problems []string) {
 	}
 	for i := range heads {
 		heads[i].Worktree, heads[i].Gone = a.worktreeOf(heads[i].Cwd, records)
+		// one format for both, whatever the agent's file and the disk said
+		heads[i].Started, heads[i].Active = instant(heads[i].Started), instant(heads[i].Active)
 	}
 	a.markRunning(heads, records)
 	if want.Worktree != "" {
@@ -75,6 +78,9 @@ func (a *App) Conversations(want Wanted) (heads []Head, problems []string) {
 	}
 	return heads, problems
 }
+
+// instant is a time as a list says it: in UTC, to the millisecond.
+func instant(t time.Time) time.Time { return t.UTC().Truncate(time.Millisecond) }
 
 // worktreeOf is the name of the worktree a folder is or is in, and whether
 // the folder is gone. A worktree that was removed is known by what follows

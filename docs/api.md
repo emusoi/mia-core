@@ -83,7 +83,7 @@ the agents' own transcripts, so nothing is recorded as they work.
 | `worktree` | the worktree `cwd` is or is in; a removed one by what followed the main checkout's path; empty when none of this repository's |
 | `gone` | the folder is no more |
 | `asked`, `said` | the first thing the person asked and the last thing the agent said, each on one line, cut at 200 characters |
-| `active` | when it was last written to |
+| `started`, `active` | when the first thing in it was said and when it was last written to, both in UTC as RFC 3339, to the millisecond at most |
 | `turns` | how many things the person asked |
 | `running`, `window` | a window of that worktree's session runs this agent with this conversation; `window` is left out otherwise |
 
