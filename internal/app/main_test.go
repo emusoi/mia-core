@@ -68,7 +68,7 @@ func TestTheMainAgentIsStartedOnceSpokenToAndStopped(t *testing.T) {
 		t.Fatalf("started: %+v", state)
 	}
 	notes, _ := os.ReadFile(filepath.Join(mainHome(), "AGENTS.md"))
-	if !strings.Contains(string(notes), "mia-captain") || !strings.Contains(string(notes), "answers later prompts too") {
+	if strings.Contains(string(notes), "skill") || !strings.Contains(string(notes), "mia api standing") || !strings.Contains(string(notes), "answers later prompts too") {
 		t.Errorf("its folder tells it %q", notes)
 	}
 	registry := names.Store{Path: filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "names.json")}
