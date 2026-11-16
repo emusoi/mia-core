@@ -72,6 +72,27 @@ mia then asks the plugin for what it has built in for the others:
 | `mia-<name> agent resume <id>` | the command line that takes the conversation up again |
 | `mia-<name> agent carry <from> <to> pack\|command [<id>]` | for `mia move`: `pack` prints a tar of files under the home that hold the conversation of the folder `<from>`, rewritten for `<to>`, and nothing when there is none; `command` prints what to type in the window there |
 
+An agent can also say which models and efforts it can be started with,
+and how, so that `mia api agents` lists them, `mia window new … --model`
+starts it with one and `mia window model` switches it:
+
+```json
+{"protocol":1,"agent":{"name":"echo","commands":["echo-agent"],
+  "models":[{"id":"loud","label":"Loud"},{"id":"soft","label":"Soft"}],
+  "efforts":["low","high"],
+  "with_model":["--model","%s"],"with_effort":["--effort","%s"],
+  "switch_model":"/model %s","switch_effort":"/effort %s"}}
+```
+
+| field | is |
+|---|---|
+| `models` | what it can be started with: `id` as the agent takes it, `label` to show |
+| `efforts` | its effort levels; none when left out |
+| `with_model`, `with_effort` | the words put after the one that runs it, `%s` being the one chosen: `echo-agent --model loud` |
+| `switch_model`, `switch_effort` | the line typed into its window, and Enter, to switch it while it runs; left out, it cannot be, and `mia window model` says to restart it |
+
+Each is optional; an agent with no `with_model` is started with no model.
+
 A worktree that was removed is not among the folders, but it was at
 `<main checkout>.<name>`: list its conversations too and mia shows them as
 gone. Each call has five seconds. One that fails or prints something else

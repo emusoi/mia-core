@@ -9,6 +9,22 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **An agent's model.** `mia window new <worktree> <agent> --model
+  <model> --effort <effort>` starts an agent with them, and `mia window
+  model <worktree> <window> <model> [--effort <effort>]` switches one
+  while it runs, typing what the agent takes — claude's `/model` and
+  `/effort`, codex's `/model … --reasoning=…`, pi's `/model` and
+  `/thinking`; one that cannot be switched so is refused, to be restarted
+  with `--model`. `mia main start --model …` and `mia main model …` do the
+  same for the main agent. `mia api agents` lists, from any folder, each
+  agent's models and efforts, what the config starts it with and whether
+  it can be switched while it runs; `[agents.<name>] model` and `effort`,
+  and `[main] model` and `effort`, are what an agent is started with when
+  nothing else is said. `mia api conversations` and `mia api main` give a
+  running window the `model` and `effort` mia started it with or last
+  switched it to. A plugin's agent says its own in its manifest. See
+  [Agents](api.md#agents).
+
 - **The main agent.** `mia main start` gives a person one agent to talk
   to, which runs the others: a session of its own, `mia-main`, in a folder
   mia makes under the user-wide config, with notes that say who it is and

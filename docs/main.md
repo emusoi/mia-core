@@ -7,9 +7,11 @@ on the machine that is always on, and it is no repository's.
 
 ```bash
 mia main start        # its folder and session when they are not there, and the agent in it
+mia main start --model opus --effort high   # started with a model and an effort
 mia main              # whether it runs, and what it is doing
 mia main say start goba on the login bug, and tell me when it asks something
 mia main press 2      # a key with no Enter: pick an option when it asks you to choose
+mia main model sonnet # switch it to another model while it runs
 mia main interrupt    # stop it mid-work
 mia main stop         # end its session; its folder and conversations stay
 ```
@@ -63,6 +65,23 @@ too. How it is started, how it goes on with a conversation, which file it
 reads its notes from and which key stops it are that agent's own, kept
 where mia keeps everything it knows of an agent. An agent mia cannot read
 the conversations of is started anew each time, and has no turns to show.
+
+## Its model
+
+It is started with `[main] model` and `[main] effort`, or its agent's own
+under [`[agents]`](configuration.md#agents), unless `mia main start
+--model <model> --effort <effort>` says others; a model or an effort its
+agent does not have is refused, with those it has. One that runs already
+is not started again with them: `mia main model <model> [--effort
+<effort>]` switches it, pasting into it what its agent takes — claude's
+`/model sonnet` and `/effort high` — each with Enter after. An agent that
+cannot be switched while it runs is refused, to be restarted with
+`--model`; mia does not restart it. From another machine, both are that
+machine's mia's, as every `mia main …` is.
+
+`mia api main` says the `model` and `effort` mia started it with or last
+switched it to: not read from the agent, so one switched by hand in it is
+not known.
 
 ## What it may answer
 

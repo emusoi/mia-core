@@ -22,15 +22,15 @@ introduced by newer builds:
 ```
 
 The actual answer includes every query and feature, not this shortened list.
-`capabilities`, `machines`, `here`, `repos`, `main` and `standing` answer
-from any folder; the other queries are about a repository and need one. Check capabilities before using a feature. Existing response shapes are not
+`capabilities`, `machines`, `here`, `repos`, `main`, `standing` and
+`agents` answer from any folder; the other queries are about a repository and need one. Check capabilities before using a feature. Existing response shapes are not
 wrapped in a version envelope.
 
 ## JSON commands
 
 | command | returns |
 |---|---|
-| `mia api <query>` | worktrees, machines, here, repositories, environments, stacks, base, conversations, the main agent and standing |
+| `mia api <query>` | worktrees, machines, here, repositories, environments, stacks, base, conversations, the main agent, standing and agents |
 | `mia config show --json` | effective global, project and local configuration |
 | `mia doctor --json` | every check and an overall `ok`; failures still exit non-zero |
 | `mia gateway status --json` | `running`, `address`, `pac`, `ca`, `trust`, `differentBuild`, `routes` |
@@ -86,6 +86,7 @@ the agents' own transcripts, so nothing is recorded as they work.
 | `started`, `active` | when the first thing in it was said and when it was last written to, both in UTC as RFC 3339, to the millisecond at most |
 | `turns` | how many things the person asked |
 | `running`, `window` | a window of that worktree's session runs this agent with this conversation; `window` is left out otherwise |
+| `model`, `effort` | of a running one, what mia started its window's agent with or last switched it to — see [Agents](#agents); left out when mia chose none |
 
 A conversation taken up in another worktree was copied there, so it is
 listed once for each folder it lives in: the same `id`, told apart by
@@ -151,6 +152,7 @@ any folder, and starts and writes nothing.
 | `conversation` | the one it has open — claude says which — or, of another agent and when it is not running, the last written to in its folder; empty when there is none, or mia cannot read that agent's |
 | `working` | it is doing something now: claude's pane title says so, and of another agent, that its window wrote in the last three seconds |
 | `since` | when its session was started; left out when it is not running |
+| `model`, `effort` | what mia started it with or last switched it to, as [Agents](#agents) says; left out when it is not running, or mia chose none |
 
 When `[main] machine` names another machine, `mia api main` and
 `mia api main turns` are that machine's answers, asked over ssh: `home`,
@@ -194,6 +196,41 @@ a redirection, a variable, a substitution or a third command stays a
 only reads — `mia api …`, `mia ls`, `mia window read` — one with
 `--dry-run`, and one typed in a way its usage does not have.
 `mia api conversation <id>` gives the same conversation with no `did` in it.
+
+## Agents
+
+`mia api agents` is every agent mia knows, one a plugin adds too, with
+what it can be started with. It answers from any folder; in a
+repository, with that repository's config.
+
+```json
+[{"name":"claude",
+  "models":[{"id":"opus","label":"Opus"},{"id":"sonnet","label":"Sonnet"},
+            {"id":"haiku","label":"Haiku"},{"id":"fable","label":"Fable"}],
+  "efforts":["low","medium","high","xhigh","max"],
+  "model":"opus","effort":"","live":true},
+ {"name":"opencode","models":[],"efforts":[],"model":"","effort":"","live":false}]
+```
+
+| field | is |
+|---|---|
+| `models` | what it can be started with: `id` as the agent takes it, `label` to show. Empty for an agent mia knows none of |
+| `efforts` | its effort levels, how hard it thinks; empty when it has none mia knows |
+| `model`, `effort` | what the config starts it with, `[agents.<name>]`; empty when it says none, and the agent's own default is used |
+| `live` | it can be switched to another model while it runs |
+
+A model the config names that the list has not is in the list too.
+Start one with `mia window new <worktree> <agent> --model <id> --effort
+<level>` and switch one that runs with `mia window model <worktree>
+<window> <id> [--effort <level>]`; the main agent with `mia main start
+--model …` and `mia main model …`. A model or an effort not in its list is
+refused, with the list.
+
+The `model` and `effort` that `mia api conversations` and `mia api main`
+give a running window are what mia started it with or last switched it
+to, kept by mia for the window: not read from the agent. One switched by
+hand in the agent is not known, and a window mia chose nothing for has
+neither.
 
 ## Standing
 

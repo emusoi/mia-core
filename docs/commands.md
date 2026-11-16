@@ -15,6 +15,8 @@
 | `mia path [worktree]` | print its path |
 | `mia open [worktree]` | open it in your editor |
 | `mia window …` | its session's windows |
+| `mia window new <worktree> <agent> [--model <m>] [--effort <e>] [-- command]` | a window running an agent, started with a model and an effort |
+| `mia window model <worktree> <window> <model> [--effort <e>]` | switch the agent in a window to another model while it runs |
 | `mia rename <worktree> <name>` | rename it |
 | `mia star [worktree]` | star or unstar it |
 | `mia setup [worktree]` | run setup again |

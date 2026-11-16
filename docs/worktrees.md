@@ -53,6 +53,31 @@ mia window close monduli logs
 Name windows you start often under `[launch]` in the config, then
 `mia window new monduli logs`.
 
+## An agent's model
+
+An agent in a window is started with a model and an effort, and switched
+to others while it runs:
+
+```bash
+mia window new monduli claude --model sonnet --effort high   # claude, in a window named for it
+mia window new monduli claude --model opus -- claude "fix the login page"
+mia window model monduli claude haiku --effort low           # typed into it: /model haiku, /effort low
+```
+
+With no command, a window named for an agent runs that agent. With one,
+the words that choose go after the word that runs it: `claude --model
+sonnet …`. A model or an effort the agent does not have is refused, with
+those it has; `mia api agents` lists them. Left out, they are the ones
+`[agents.<name>]` in the config gives, for every agent mia starts in a
+window — unless its command already says one.
+
+`mia window model` types what the agent takes for it into its window, as
+a paste, and Enter. An agent that cannot be switched while it runs is
+refused: restart it with `--model`. mia does not restart it. What mia
+says a window runs is what it started it with or last switched it to,
+not what the agent says: switched by hand in the agent, mia does not
+know.
+
 ## Names
 
 Each worktree gets the name of a place, like `monduli`. A place is easier to

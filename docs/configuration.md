@@ -96,6 +96,30 @@ In the user-wide config, as a person has one [main agent](main.md):
 |---|---|
 | `[main] agent` | which agent it is: `claude` when left out, or any agent mia knows, one a plugin adds too |
 | `[main] machine` | the machine it lives on, by the name `mia machine list` gives it: `mia main …`, `mia api main` and `mia api main turns` are then run there over ssh. This machine when left out, or `local` |
+| `[main] model`, `[main] effort` | what it is started with when `mia main start` says none; its agent's own under `[agents]` when left out |
+
+## `[agents]`
+
+What an agent mia starts is started with when nothing else is said, each
+under its name:
+
+```toml
+[agents.claude]
+model = "opus"
+effort = "high"
+
+[agents.codex]
+model = "gpt-5.6-luna"
+```
+
+| key | meaning |
+|---|---|
+| `model` | one of the agent's models, as `mia api agents` lists them, or another the agent takes, which is then one of its choices too |
+| `effort` | one of its efforts, the same way |
+
+It is used for a window that starts the agent, `mia window new`, unless
+its command already says one, and for the [main agent](main.md) when
+`[main]` says none.
 
 ## Plugins
 
