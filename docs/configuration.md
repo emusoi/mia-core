@@ -88,6 +88,14 @@ unpublished; use `expose` instead. The Compose plugin must support
 | `[dotfiles] setup` | run in every environment |
 | `[dotfiles] machine` | files for other machines' home |
 
+## `[main]`
+
+In the user-wide config, as a person has one [main agent](main.md):
+
+| key | meaning |
+|---|---|
+| `[main] agent` | which agent it is: `claude` when left out, or any agent mia knows, one a plugin adds too |
+
 ## Plugins
 
 ```toml

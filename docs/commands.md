@@ -71,6 +71,14 @@
 | `mia api capabilities` | API version, queries and feature markers |
 | `mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]` | the agent conversations of the repository and its worktrees, the last written to first |
 | `mia api conversation <id> [--after <n>]` | one conversation as turns, for a chat view |
+| `mia main [status]` | the [main agent](main.md): whether it runs, and what it is doing |
+| `mia main start` | make its folder and session when they are not there and start the agent, going on with its last conversation; one that runs is left as it is |
+| `mia main stop` | end its session; its folder and conversations stay |
+| `mia main say <text…>` | type a message into it and submit it |
+| `mia main interrupt` | stop it mid-work |
+| `mia api main` | where the main agent stands, from any folder |
+| `mia api main turns [--after <n>]` | its conversation as turns, each of mia's verbs it ran said as what it did |
+| `mia api standing [--here] [--seen <repository>/<worktree>]` | every agent in every repository, and on every machine: which wait on you, which work, which finished unseen |
 | `mia help vocabulary` | the words |
 | `mia help tmux` | what `mia tmux install` adds: the radar, a new worktree, the menu, the status line |
 

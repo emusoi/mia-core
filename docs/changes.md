@@ -9,6 +9,23 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **The main agent.** `mia main start` gives a person one agent to talk
+  to, which runs the others: a session of its own, `mia-main`, in a folder
+  mia makes under the user-wide config, with notes that say who it is and
+  what it may answer. `mia main say <text…>` types a message into it,
+  `mia main interrupt` stops it mid-work, `mia main stop` ends it; started
+  again it goes on with its last conversation. `[main] agent` says which
+  agent it is, a plugin's too. `mia api main` is where it stands and
+  `mia api main turns` its conversation, each of mia's verbs it ran said
+  as what it did: "Started goba on mia-desk · claude", "Told olasiti:
+  rebase onto main", "Moved sakina to fedora". See [The main agent](main.md).
+
+- **`mia api standing`** is every agent in every repository on the
+  machine, and on each machine added: which wait on you, with the line
+  that says why and the numbered options on its screen, which work, and
+  which finished unseen. A machine that does not answer is named, not an
+  error. `--seen <repository>/<worktree>` marks one seen.
+
 - **Conversations.** `mia api conversations` lists the agent conversations
   of the repository, its main checkout and every worktree — one that was
   removed too — with what was first asked and last said, and whether a
