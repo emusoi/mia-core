@@ -62,7 +62,7 @@ func TestTheMainAgentIsStartedOnceSpokenToAndStopped(t *testing.T) {
 		t.Errorf("a key pressed in a main agent that is not running: %v", err)
 	}
 
-	state, err := open().StartMain()
+	state, err := open().StartMain("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestTheMainAgentIsStartedOnceSpokenToAndStopped(t *testing.T) {
 	read("main=1 worktree=none") // it is the main agent's window, and no worktree's
 
 	windows := session.Here().Windows("main")
-	if again, err := open().StartMain(); err != nil || !again.Running || !slices.Equal(session.Here().Windows("main"), windows) {
+	if again, err := open().StartMain("", ""); err != nil || !again.Running || !slices.Equal(session.Here().Windows("main"), windows) {
 		t.Fatalf("started again: %+v, %v, windows %v then %v", again, err, windows, session.Here().Windows("main"))
 	}
 	if err := open().SayToMain("where do things stand --json -h"); err != nil {
@@ -136,7 +136,7 @@ func TestAnAgentNoOneKnowsIsNotStartedAsTheMainOne(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.StartMain(); err == nil || !strings.Contains(err.Error(), "nobody") {
+	if _, err := a.StartMain("", ""); err == nil || !strings.Contains(err.Error(), "nobody") {
 		t.Fatalf("started nobody: %v", err)
 	}
 	if _, err := os.Stat(mainHome()); err == nil {

@@ -78,6 +78,10 @@ type MainState struct {
 	Working bool `json:"working"`
 	// Since is when its session was started.
 	Since time.Time `json:"since,omitzero"`
+	// Model and Effort are what mia started it with or last switched it to;
+	// left out when it is not running, or mia did not choose them.
+	Model  string `json:"model,omitempty"`
+	Effort string `json:"effort,omitempty"`
 }
 
 // mainHere, in the environment, makes mia answer for the main agent of the
@@ -181,6 +185,8 @@ func (a *App) Main() MainState {
 		// claude says it in its pane's title; of another, writing is the sign
 		state.Working = session.Spinning(pane.Title) ||
 			(session.AgentTitle(pane.Title) == "" && !pane.Activity.IsZero() && time.Since(pane.Activity) < workingFor)
+		kept := a.chosen()[chosenKey(session.Name(mainName), pane.PID)]
+		state.Model, state.Effort = kept.Model, kept.Effort
 	}
 	state.Conversation = a.mainConversation(agent, pane.PID)
 	return state
@@ -206,12 +212,22 @@ func (a *App) mainConversation(agent Agent, pid int) string {
 	return slices.MaxFunc(heads, func(x, y Head) int { return x.Active.Compare(y.Active) }).ID
 }
 
+// mainSet is what the main agent is started with when nothing else is
+// said: [main]'s, and failing that its agent's own.
+func (a *App) mainSet(agent Agent) []config.Agent {
+	return []config.Agent{{Model: a.Config.Main.Model, Effort: a.Config.Main.Effort}, a.Config.Agents[agent.Name]}
+}
+
 // StartMain makes the main agent's folder and session when they are not
 // there and starts the agent in it, going on with its last conversation
-// when it has one. One that runs already is left as it is.
-func (a *App) StartMain() (MainState, error) {
+// when it has one, with a model and an effort: those given, or the
+// configured ones. One that runs already is left as it is.
+func (a *App) StartMain(model, effort string) (MainState, error) {
 	agent, err := a.mainAgent()
 	if err != nil {
+		return MainState{}, err
+	}
+	if err := allowed(agent, model, effort, a.mainSet(agent)...); err != nil {
 		return MainState{}, err
 	}
 	host := a.mainHost()
@@ -233,6 +249,9 @@ func (a *App) StartMain() (MainState, error) {
 		}
 	}
 	if _, _, running := a.mainWindow(host); running {
+		if model != "" || effort != "" {
+			return MainState{}, errors.New("the main agent runs already — `mia main model <model>` switches it")
+		}
 		return a.Main(), nil
 	}
 	command := agent.start()
@@ -240,6 +259,13 @@ func (a *App) StartMain() (MainState, error) {
 		if command, err = agent.resume(last); err != nil {
 			return MainState{}, fmt.Errorf("agent %s: %w", agent.Name, err)
 		}
+	}
+	with, chosen, err := choose(agent, command, model, effort, a.mainSet(agent)...)
+	if err != nil {
+		return MainState{}, err
+	}
+	if len(with) > 0 {
+		command = put(command, with)
 	}
 	if err := host.Ensure(mainName, a.Root); err != nil {
 		return MainState{}, err
@@ -258,8 +284,14 @@ func (a *App) StartMain() (MainState, error) {
 		return MainState{}, err
 	}
 	time.Sleep(time.Second)
-	if _, _, running := a.mainWindow(host); !running {
+	_, pane, running := a.mainWindow(host)
+	if !running {
 		return MainState{}, fmt.Errorf("%s ended as soon as it started — `%s` in %s shows why", agent.Name, command, a.Root)
+	}
+	if chosen != (Chosen{}) {
+		if err := a.keep(host, mainName, pane.PID, chosen); err != nil {
+			return MainState{}, err
+		}
 	}
 	return a.Main(), nil
 }
@@ -295,6 +327,23 @@ func (a *App) PressInMain(keys string) error {
 		return errMainDown
 	}
 	return host.Press(mainName, window.Name, keys)
+}
+
+// SwitchMain switches the main agent to another model, and effort when
+// one is given, as SwitchWindow does a worktree's agent.
+func (a *App) SwitchMain(model, effort string) (Chosen, error) {
+	host := a.mainHost()
+	window, pane, running := a.mainWindow(host)
+	if !running {
+		return Chosen{}, errMainDown
+	}
+	agent, _ := agentNamed(a.agents(), window.Name)
+	was := a.chosen()[chosenKey(session.Name(mainName), pane.PID)]
+	chosen, err := switchTo(host, mainName, window.Name, agent, model, effort, was, a.mainSet(agent)...)
+	if err != nil {
+		return Chosen{}, err
+	}
+	return chosen, a.keep(host, mainName, pane.PID, chosen)
 }
 
 // InterruptMain presses the key that stops the main agent mid-work.

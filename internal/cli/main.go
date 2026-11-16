@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	mainUsage      = "mia main [status|start|stop|say <text…>|press <keys…>|interrupt]"
+	mainUsage      = "mia main [status|start [--model <model>] [--effort <effort>]|stop|say <text…>|press <keys…>|interrupt|model <model> [--effort <effort>]]"
 	mainTurnsUsage = "mia api main [turns [--after <n>]]"
 	standingUsage  = "mia api standing [--here] [--seen <repository>/<worktree>[@<machine>]]"
 )
@@ -42,7 +42,17 @@ func cmdMain(args []string) int {
 	// what is said to it and the keys pressed in it are taken as they are typed
 	typed := sub == "say" || sub == "press"
 	asJSON := !typed && take(&args, "--json")
-	if !slices.Contains([]string{"status", "start", "stop", "say", "press", "interrupt"}, sub) || (!typed && len(args) > 0) {
+	var model, effort string
+	if sub == "start" || sub == "model" {
+		model, effort = takeValue(&args, "--model"), takeValue(&args, "--effort")
+	}
+	if sub == "model" {
+		if model != "" || len(args) != 1 || strings.HasPrefix(args[0], "-") {
+			return usageErr("mia main model <model> [--effort <effort>]")
+		}
+		model, args = args[0], nil
+	}
+	if !slices.Contains([]string{"status", "start", "stop", "say", "press", "interrupt", "model"}, sub) || (!typed && len(args) > 0) {
 		return usageErr(mainUsage)
 	}
 	text := ""
@@ -66,7 +76,15 @@ func cmdMain(args []string) int {
 		switch {
 		case typed:
 			ask = append(ask, "--", text)
-		case state:
+		case sub == "model":
+			ask = append(ask, model)
+		case model != "":
+			ask = append(ask, "--model", model)
+		}
+		if effort != "" {
+			ask = append(ask, "--effort", effort)
+		}
+		if state {
 			ask = append(ask, "--json")
 		}
 		out, err := a.OnMainMachine(machine, false, ask...)
@@ -84,7 +102,7 @@ func cmdMain(args []string) int {
 	case "status":
 		return sayMain(a.Main(), asJSON)
 	case "start":
-		state, err := a.StartMain()
+		state, err := a.StartMain(model, effort)
 		if err != nil {
 			return fail(err)
 		}
@@ -99,6 +117,13 @@ func cmdMain(args []string) int {
 		return exitFor(a.SayToMain(text))
 	case "press":
 		return exitFor(a.PressInMain(text))
+	case "model":
+		chosen, err := a.SwitchMain(model, effort)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Printf("the main agent is switched to %s\n", said(chosen))
+		return exitOK
 	}
 	return exitFor(a.InterruptMain())
 }

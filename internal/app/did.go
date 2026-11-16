@@ -187,7 +187,7 @@ func deedOf(table []Agent, args []string) (deed, bool) {
 		}
 		return deed{verb: verb, worktree: worktree, say: started(agent)}, true
 	case "window new":
-		words, _, _, command, ok := arguments(rest, nil, []string{"--editor", "--json"})
+		words, _, _, command, ok := arguments(rest, []string{"--model", "--effort"}, []string{"--editor", "--json"})
 		if !ok || len(words) != 2 || len(command) == 0 {
 			return deed{}, false
 		}

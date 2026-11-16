@@ -1332,14 +1332,19 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		}
 		args = rest
 	}
-	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close", "read", "send", "press", "key")
+	// what comes after -- is the window's command, or what is typed: no flag of mia's
+	var argv []string
+	if i := slices.Index(args, "--"); i >= 0 {
+		argv, args = args[i+1:], args[:i]
+	}
+	model, effort := takeValue(&args, "--model"), takeValue(&args, "--effort")
+	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close", "read", "send", "press", "key", "model")
 	if err != nil {
 		return fail(err)
 	}
 	editor := take(&args, "--editor")
-	var argv []string
-	if i := slices.Index(args, "--"); i >= 0 {
-		argv, args = args[i+1:], args[:i]
+	if (model != "" || effort != "") && sub != "new" && sub != "model" {
+		return usageErr(windowUsage)
 	}
 	name := strings.Join(args, " ")
 	switch sub {
@@ -1367,11 +1372,27 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		}
 		return exitFor(a.SelectWindow(record, name))
 	case "new":
-		if command, ok := a.Config.Launch[name]; ok && len(argv) == 0 && !editor {
+		// an agent is started with a model and an effort: those given, or the configured ones
+		var chosen app.Chosen
+		command, launched := a.Config.Launch[name]
+		if !launched && len(argv) == 0 && !editor && (model != "" || effort != "") {
+			command, launched = a.AgentCommand(name), true // the window is named for the agent it runs
+		}
+		if launched && len(argv) == 0 && !editor {
 			var err error
+			if command, chosen, err = a.CommandWith(command, model, effort); err != nil {
+				return fail(err)
+			}
 			if argv, err = a.LaunchArgv(record, command); err != nil {
 				return fail(err)
 			}
+		} else if len(argv) > 0 {
+			var err error
+			if argv, chosen, err = a.ArgvWith(argv, model, effort); err != nil {
+				return fail(err)
+			}
+		} else if model != "" || effort != "" {
+			return usageErr(windowUsage)
 		}
 		if editor {
 			command := a.Config.EditorCommand()
@@ -1389,6 +1410,11 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		name, err := a.NewWindow(record, name, argv)
 		if err != nil {
 			return fail(err)
+		}
+		if chosen != (app.Chosen{}) {
+			if err := a.KeepChosen(record, name, chosen); err != nil {
+				fmt.Fprintf(os.Stderr, "mia: %s: window %s opened, and what it was started with is not kept: %v\n", record.Name, name, err)
+			}
 		}
 		fmt.Printf("%s: window %s opened\n", record.Name, name)
 		if len(argv) > 0 {
@@ -1427,6 +1453,17 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 			return usageErr("mia window key [worktree] <window> -- <key>…   (tmux's names: C-c, Escape, Enter, Up)")
 		}
 		return exitFor(a.KeysInWindow(record, name, argv))
+	case "model":
+		window, chosen, ok := strings.Cut(name, " ")
+		if !ok || chosen == "" || strings.Contains(chosen, " ") || len(argv) > 0 || model != "" {
+			return usageErr("mia window model [worktree] <window> <model> [--effort <effort>]")
+		}
+		now, err := a.SwitchWindow(record, window, chosen, effort)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Printf("%s: window %s switched to %s\n", record.Name, window, said(now))
+		return exitOK
 	case "close":
 		if name == "" {
 			return usageErr("mia window close [worktree] <window>")
@@ -1437,7 +1474,17 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		fmt.Printf("%s: window %s closed\n", record.Name, name)
 		return exitOK
 	}
-	return usageErr("mia window [ls|open|select|new|close|read|send|press|key] [worktree[@machine]] [window] [--editor] [-- command|text|keys]")
+	return usageErr(windowUsage)
+}
+
+const windowUsage = "mia window [ls|open|select|new|close|read|send|press|key|model] [worktree[@machine]] [window] [--editor] [--model <model>] [--effort <effort>] [-- command|text|keys]"
+
+// said is a model and an effort as a line says them: sonnet, effort high.
+func said(chosen app.Chosen) string {
+	if chosen.Effort == "" {
+		return chosen.Model
+	}
+	return chosen.Model + ", effort " + chosen.Effort
 }
 
 func configHere() config.Config {

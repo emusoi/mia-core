@@ -51,6 +51,7 @@ func TestAMiaVerbTheMainAgentRanIsSaidAsWhatItDid(t *testing.T) {
 		{"", `cd /src/mia-desk && mia agent run goba claude`, did{"did", "agent run", "Started goba on mia-desk · claude", "mia-desk", "goba", ""}},
 		{"", `cd /src/mia-desk && mia agent run --task 'fix the login page' goba`, did{"did", "agent run", "Started goba on mia-desk", "mia-desk", "goba", ""}},
 		{"", `cd /src/mia-desk && mia window new goba codex -- codex 'fix the login page'`, did{"did", "window new", "Started goba on mia-desk · codex", "mia-desk", "goba", ""}},
+		{"", `cd /src/mia-desk && mia window new goba claude --model sonnet --effort high -- claude 'fix it'`, did{"did", "window new", "Started goba on mia-desk · claude", "mia-desk", "goba", ""}},
 		{"", `cd /src/mia-desk && mia agent send olasiti claude -- rebase onto main`, did{"did", "agent send", "Told olasiti: rebase onto main", "mia-desk", "olasiti", ""}},
 		{"", `cd /src/mia-desk && mia window send olasiti@fedora claude -- 'rebase onto main'`, did{"did", "window send", "Told olasiti: rebase onto main", "mia-desk", "olasiti", "fedora"}},
 		{"", `cd /src/mia-desk && mia window press kijenge claude -- 1`, did{"did", "window press", "Answered kijenge: 1", "mia-desk", "kijenge", ""}},

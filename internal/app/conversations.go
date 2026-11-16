@@ -120,6 +120,7 @@ func (a *App) markRunning(heads []Head, records []model.Record) {
 		return
 	}
 	table := a.agents()
+	chosen := a.chosen()
 	// every process of a Mac takes ps a tenth of a second: asked only for a
 	// pane whose program tmux knows by its launcher's name
 	behind := sync.OnceValue(foreground)
@@ -167,6 +168,8 @@ func (a *App) markRunning(heads []Head, records []model.Record) {
 			}
 			if its != nil {
 				its.Running, its.Window = true, &WindowRef{Index: pane.Index, Name: pane.Window}
+				kept := chosen[chosenKey(session.Name(record.Name), pane.PID)]
+				its.Model, its.Effort = kept.Model, kept.Effort
 			}
 		}
 	}

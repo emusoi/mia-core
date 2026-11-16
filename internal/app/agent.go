@@ -285,6 +285,10 @@ type Head struct {
 	Turns    int        `json:"turns"`           // how many things the person asked
 	Running  bool       `json:"running"`
 	Window   *WindowRef `json:"window,omitempty"` // the window that has it open, when running
+	// Model and Effort are the window's, as mia started it or last switched
+	// it; left out when mia did not choose them.
+	Model  string `json:"model,omitempty"`
+	Effort string `json:"effort,omitempty"`
 }
 
 // WindowRef names a window of a worktree's session.

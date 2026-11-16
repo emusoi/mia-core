@@ -42,4 +42,13 @@ func TestTheAgentsAndTheirModelsAnswerFromAnywhere(t *testing.T) {
 	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "agents") || !slices.Contains(caps.Features, "agent-models") {
 		t.Errorf("capabilities = %+v", caps)
 	}
+	// a model is an agent's to switch, and the main agent's is refused only because nothing runs
+	for _, wrong := range [][]string{{"main", "model"}, {"main", "model", "a", "b"}, {"main", "model", "--effort", "high"}} {
+		if code := Run(wrong); code != exitUsage {
+			t.Errorf("%v exited %d", wrong, code)
+		}
+	}
+	if code := Run([]string{"main", "model", "sonnet", "--effort", "high"}); code != exitFailed {
+		t.Errorf("a main agent that is not running switched: exit %d", code)
+	}
 }
