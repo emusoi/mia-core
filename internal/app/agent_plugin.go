@@ -50,6 +50,13 @@ func (a *App) pluginAgents() []Agent {
 [ -x "$p" ] || exit 0
 exec "$p" agent carry "$@"`,
 		}
+		agent.Models, agent.Efforts = declared.Models, declared.Efforts
+		if len(declared.WithModel) > 0 || len(declared.WithEffort) > 0 {
+			agent.with = words(declared.WithModel, declared.WithEffort)
+		}
+		if declared.SwitchModel != "" {
+			agent.to = typing(declared.SwitchModel, declared.SwitchEffort)
+		}
 		if declared.Title != "" {
 			agent.Title, _ = regexp.Compile(declared.Title) // the manifest was read only if it compiles
 		}

@@ -66,6 +66,16 @@ type Config struct {
 	// Main is the main agent's: a person has one, so it belongs in the
 	// user-wide config.
 	Main Main `toml:"main" json:"main"`
+
+	// Agents is each coding agent's own, by its name: [agents.claude].
+	Agents map[string]Agent `toml:"agents" json:"agents,omitempty"`
+}
+
+// Agent is what an agent is started with when mia starts it and nothing
+// else is said: a model and an effort, each from those it has.
+type Agent struct {
+	Model  string `toml:"model" json:"model,omitempty"`
+	Effort string `toml:"effort" json:"effort,omitempty"`
 }
 
 type Main struct {
@@ -74,6 +84,10 @@ type Main struct {
 	// Machine is the machine it lives on, by the name `mia api machines`
 	// gives it; this one when empty.
 	Machine string `toml:"machine" json:"machine,omitempty"`
+	// Model and Effort it is started with; its agent's own in [agents]
+	// when empty.
+	Model  string `toml:"model" json:"model,omitempty"`
+	Effort string `toml:"effort" json:"effort,omitempty"`
 }
 
 type Keys []string

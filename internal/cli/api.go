@@ -113,7 +113,7 @@ func cmdAPI(a *app.App, args []string) int {
 	}
 }
 
-var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base", "conversations", "conversation", "main", "standing"}
+var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base", "conversations", "conversation", "main", "standing", "agents"}
 
 const (
 	conversationsUsage = "mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]"
@@ -138,7 +138,7 @@ func apiCapabilities() capabilities {
 		Queries: apiQueryList,
 		Features: []string{
 			"direct-http", "project-config", "doctor", "environment-readiness", "environment-drift",
-			"local-sessions", "conversations", "main-agent", "standing", "remote-sync-preview", "sync-conflicts", "safe-cleanup", "stack-sync", "merged-gc", "compose-environments",
+			"local-sessions", "conversations", "main-agent", "standing", "remote-sync-preview", "sync-conflicts", "safe-cleanup", "stack-sync", "merged-gc", "compose-environments", "agent-models",
 		},
 	}
 }

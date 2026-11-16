@@ -1,8 +1,8 @@
 #!/bin/sh
 # The smallest agent plugin: an agent called echo, with two invented
-# conversations in the last folder it is asked about.
+# conversations in the last folder it is asked about, and two models.
 case "$1" in
-manifest) echo '{"protocol":1,"agent":{"name":"echo","commands":["echo-agent"],"title":"^echo-agent "}}' ;;
+manifest) echo '{"protocol":1,"agent":{"name":"echo","commands":["echo-agent"],"title":"^echo-agent ","models":[{"id":"loud","label":"Loud"},{"id":"soft","label":"Soft"}],"efforts":["low","high"],"with_model":["--model","%s"],"with_effort":["--effort","%s"],"switch_model":"/model %s","switch_effort":"/effort %s"}}' ;;
 agent)
 	case "$2" in
 	conversations)

@@ -118,6 +118,15 @@ func Run(args []string) int {
 		if len(rest) > 0 && (rest[0] == "main" || rest[0] == "standing") { // the person's, from anywhere
 			return cmdAPIMain(rest)
 		}
+		if len(rest) > 0 && rest[0] == "agents" { // every agent, from anywhere: a repository's config too, when in one
+			if len(rest) > 1 {
+				return usageErr("mia api agents")
+			}
+			c := configHere()
+			a := app.Outside()
+			a.Config, a.Plugins = c, pluginHost(c)
+			return emit(a.AgentModels())
+		}
 		if len(rest) == 1 && rest[0] == "repos" { // every repository, from anywhere
 			repos, err := app.Repositories()
 			if err != nil {

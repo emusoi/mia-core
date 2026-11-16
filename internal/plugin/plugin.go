@@ -37,6 +37,24 @@ type Agent struct {
 	Name     string   `json:"name"`               // the plugin's own when empty
 	Commands []string `json:"commands,omitempty"` // first words of a command line that mean it; its name when none
 	Title    string   `json:"title,omitempty"`    // a regular expression a pane's title matches when it runs there
+
+	// The models and efforts it can be started with, and how: each %s in
+	// with_model and with_effort, words put after the one that runs it, is
+	// the one chosen. switch_model and switch_effort are the lines typed
+	// into its window to switch it while it runs; none when it cannot.
+	Models       []Model  `json:"models,omitempty"`
+	Efforts      []string `json:"efforts,omitempty"`
+	WithModel    []string `json:"with_model,omitempty"`
+	WithEffort   []string `json:"with_effort,omitempty"`
+	SwitchModel  string   `json:"switch_model,omitempty"`
+	SwitchEffort string   `json:"switch_effort,omitempty"`
+}
+
+// Model is one an agent can be started with: its id, as the agent takes
+// it, and a name to show.
+type Model struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
 }
 
 // Manifest is what a plugin says it does: the commands it adds, the

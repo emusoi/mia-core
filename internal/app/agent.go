@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/emusoi/mia-core/internal/plugin"
 )
 
 // Agent is everything mia knows that is one coding agent's own: how to tell
@@ -45,6 +47,18 @@ type Agent struct {
 	// stop is the key that stops it mid-work, as tmux names it; Escape
 	// when empty.
 	stop string
+
+	// Models are the models it can be started with or switched to, and
+	// Efforts how hard it can be made to think; either is empty for one
+	// mia knows none of.
+	Models  []plugin.Model
+	Efforts []string
+	// with is the words, put after the one that runs it, that start it
+	// with a model and an effort, either "" when none is chosen.
+	with func(model, effort string) []string
+	// to is the lines typed into its window to switch it while it runs;
+	// nil for one that cannot.
+	to func(model, effort string) []string
 }
 
 // start is the word that runs it.
@@ -104,6 +118,43 @@ func (f folders) holds(cwd string) bool {
 	})
 }
 
+// words starts an agent that takes its model and its effort each as
+// words of its own: %s in either is the one chosen.
+func words(model, effort []string) func(string, string) []string {
+	fill := func(words []string, chosen string) []string {
+		var filled []string
+		for _, word := range words {
+			filled = append(filled, strings.ReplaceAll(word, "%s", chosen))
+		}
+		return filled
+	}
+	return func(m, e string) []string {
+		var said []string
+		if m != "" {
+			said = append(said, fill(model, m)...)
+		}
+		if e != "" {
+			said = append(said, fill(effort, e)...)
+		}
+		return said
+	}
+}
+
+// typing switches a running agent that has a command for each: %s in
+// either is the one chosen, and one it has no command for is not typed.
+func typing(model, effort string) func(string, string) []string {
+	return func(m, e string) []string {
+		var typed []string
+		if m != "" && model != "" {
+			typed = append(typed, strings.ReplaceAll(model, "%s", m))
+		}
+		if e != "" && effort != "" {
+			typed = append(typed, strings.ReplaceAll(effort, "%s", e))
+		}
+		return typed
+	}
+}
+
 func fixed(format string) func(string) (string, error) {
 	return func(id string) (string, error) { return strings.ReplaceAll(format, "%s", id), nil }
 }
@@ -116,13 +167,33 @@ var builtin = []Agent{
 		resume: fixed("claude --resume %s"), byFolder: true, carrier: carriers["claude"], notes: "CLAUDE.md",
 		// claude writes the session of each of its processes to sessions/<pid>.json
 		held:  `pid="$(ps -o tpgid= -p "$1" | tr -d ' ')"; cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions/$pid.json" 2>/dev/null`,
-		talks: transcripts{agent: "claude", files: claudeFiles, find: claudeFind, id: claudeID, decode: claudeLine}},
+		talks: transcripts{agent: "claude", files: claudeFiles, find: claudeFind, id: claudeID, decode: claudeLine},
+		// the aliases it takes for the latest of each, and /model and /effort in it
+		Models:  []plugin.Model{{ID: "opus", Label: "Opus"}, {ID: "sonnet", Label: "Sonnet"}, {ID: "haiku", Label: "Haiku"}, {ID: "fable", Label: "Fable"}},
+		Efforts: []string{"low", "medium", "high", "xhigh", "max"},
+		with:    words([]string{"--model", "%s"}, []string{"--effort", "%s"}), to: typing("/model %s", "/effort %s")},
 	{Name: "codex", goOn: "resume --last", has: []string{"resume"},
 		resume: fixed("codex resume %s"), carrier: carriers["codex"],
-		talks: transcripts{agent: "codex", files: codexFiles, find: codexFind, id: codexID, decode: codexLine}},
+		talks: transcripts{agent: "codex", files: codexFiles, find: codexFind, id: codexID, decode: codexLine},
+		// -c takes a value that is no TOML as it is; /model in it takes its effort with --reasoning
+		Models:  []plugin.Model{{ID: "gpt-6-luna", Label: "GPT-6 Luna"}, {ID: "gpt-5.6-terra", Label: "GPT-5.6 Terra"}, {ID: "gpt-5.6-luna", Label: "GPT-5.6 Luna"}},
+		Efforts: []string{"low", "medium", "high", "xhigh", "max"},
+		with:    words([]string{"-m", "%s"}, []string{"-c", "model_reasoning_effort=%s"}),
+		to: func(model, effort string) []string {
+			line := "/model " + model
+			if effort != "" {
+				line += " --reasoning=" + effort
+			}
+			return []string{line}
+		}},
 	{Name: "pi", goOn: "--continue", has: []string{"-c", "--continue", "-r", "--resume", "--session"},
 		resume: fixed("pi --session %s"), byFolder: true, carrier: carriers["pi"],
-		talks: transcripts{agent: "pi", files: piFiles, find: piFind, id: piID, decode: piLine}},
+		talks: transcripts{agent: "pi", files: piFiles, find: piFind, id: piID, decode: piLine},
+		// provider/id, as /model in it takes one exactly; its effort is its thinking level
+		Models: []plugin.Model{{ID: "anthropic/claude-opus-5", Label: "Claude Opus 5"}, {ID: "anthropic/claude-sonnet-5", Label: "Claude Sonnet 5"},
+			{ID: "openai-codex/gpt-5.6-sol", Label: "GPT-5.6 Sol"}, {ID: "openai-codex/gpt-5.6-luna", Label: "GPT-5.6 Luna"}},
+		Efforts: []string{"off", "minimal", "low", "medium", "high", "xhigh", "max"},
+		with:    words([]string{"--model", "%s"}, []string{"--thinking", "%s"}), to: typing("/model %s", "/thinking %s")},
 	{Name: "opencode", goOn: "--continue", has: []string{"-c", "--continue", "-s", "--session"}},
 	{Name: "gemini", goOn: "--resume latest", has: []string{"-r", "--resume"}},
 	{Name: "cursor-agent", goOn: "--continue", has: []string{"--continue", "--resume", "resume"}},
