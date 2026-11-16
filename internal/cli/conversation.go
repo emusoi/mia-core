@@ -7,12 +7,13 @@ import (
 )
 
 func cmdConversation(a *app.App, args []string, asJSON bool) int {
-	const usage = "mia conversation resume <id> [--worktree <name>] [--in <worktree>]"
+	const usage = "mia conversation resume <id> [--worktree <name>] [--in <worktree>] [--model <model>] [--effort <effort>]"
 	from, in := takeValue(&args, "--worktree"), takeValue(&args, "--in")
+	model, effort := takeValue(&args, "--model"), takeValue(&args, "--effort")
 	if len(args) != 2 || args[0] != "resume" {
 		return usageErr(usage)
 	}
-	done, err := a.ResumeConversation(args[1], from, in)
+	done, err := a.ResumeConversation(args[1], from, in, model, effort)
 	if err != nil {
 		return fail(err)
 	}

@@ -23,10 +23,12 @@ on GitHub; a tag without its section is not released.
   while it runs, typing what the agent takes — claude's `/model` and
   `/effort`, codex's `/model … --reasoning=…`, pi's `/model` and
   `/thinking`; one that cannot be switched so is refused, to be restarted
-  with `--model`. `mia main start --model …` and `mia main model …` do the
-  same for the main agent. `mia api agents` lists, from any folder, each
-  agent's models and efforts, what the config starts it with and whether
-  it can be switched while it runs; `[agents.<name>] model` and `effort`,
+  with `--model`. `mia conversation resume <id> --model … --effort …`
+  takes a conversation up again with them: how an app restarts an agent
+  with another, once it is stopped. `mia main start --model …` and `mia
+  main model …` do the same for the main agent. `mia api agents` lists,
+  from any folder, each agent's models and efforts, what the config
+  starts it with and whether it can be switched while it runs; `[agents.<name>] model` and `effort`,
   and `[main] model` and `effort`, are what an agent is started with when
   nothing else is said. `mia api conversations` and `mia api main` give a
   running window the `model` and `effort` mia started it with or last

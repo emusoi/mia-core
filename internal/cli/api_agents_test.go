@@ -39,7 +39,7 @@ func TestTheAgentsAndTheirModelsAnswerFromAnywhere(t *testing.T) {
 	if _, code := answered(t, "agents", "claude"); code != exitUsage {
 		t.Errorf("api agents with more exited %d", code)
 	}
-	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "agents") || !slices.Contains(caps.Features, "agent-models") {
+	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "agents") || !slices.Contains(caps.Features, "agent-models") || !slices.Contains(caps.Features, "resume-model") {
 		t.Errorf("capabilities = %+v", caps)
 	}
 	// a model is an agent's to switch, and the main agent's is refused only because nothing runs

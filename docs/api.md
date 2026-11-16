@@ -222,9 +222,17 @@ repository, with that repository's config.
 A model the config names that the list has not is in the list too.
 Start one with `mia window new <worktree> <agent> --model <id> --effort
 <level>` and switch one that runs with `mia window model <worktree>
-<window> <id> [--effort <level>]`; the main agent with `mia main start
---model …` and `mia main model …`. A model or an effort not in its list is
-refused, with the list.
+<window> <id> [--effort <level>]`; take a conversation up again with one
+with `mia conversation resume <id> --model <id> --effort <level>`; the
+main agent with `mia main start --model …` and `mia main model …`. A
+model or an effort not in its list is refused, with the list.
+
+To restart an agent with another model, stop it — `mia window key
+<worktree> <window> -- C-c` — and resume its conversation with the model.
+`mia conversation resume --json` says the `model` and `effort` it was
+started with, or those of the window that has it open already; resumed
+with `--model` or `--effort` while a window has it open, it is refused.
+A mia that can is one whose `mia api capabilities` has `resume-model`.
 
 The `model` and `effort` that `mia api conversations` and `mia api main`
 give a running window are what mia started it with or last switched it
@@ -266,11 +274,11 @@ still has those. One of them with no model is there for its effort; one
 that says neither, or names an agent mia does not start with a model and
 an effort — opencode, or one no enabled plugin adds — is left out.
 
-Every `mia window new … --model`, `mia window model`, `mia main start`
-and `mia main model` writes down a use, in `setups.json` in the user-wide
-config folder of the machine whose mia started it; a start with no
-`--model` or `--effort` writes down what the config started the agent
-with, and nothing when it says none. The last 500 are kept. The main
+Every `mia window new … --model`, `mia window model`, `mia conversation
+resume`, `mia main start` and `mia main model` writes down a use, in
+`setups.json` in the user-wide config folder of the machine whose mia
+started it; a start with no `--model` or `--effort` writes down what the
+config started the agent with, and nothing when it says none. The last 500 are kept. The main
 agent's are in the repository `main`, its folder's name, worktree `main`.
 
 ## Standing

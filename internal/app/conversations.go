@@ -251,14 +251,20 @@ type Resumed struct {
 	Command  string    `json:"command,omitempty"`
 	Already  bool      `json:"already"` // a window had it open: nothing was opened
 	Copied   bool      `json:"copied"`  // it was made in another folder, and copied to this one's
+	// Model and Effort are what mia started the agent with, or the window
+	// that had it open was started with or last switched to; left out when
+	// mia did not choose them.
+	Model  string `json:"model,omitempty"`
+	Effort string `json:"effort,omitempty"`
 }
 
 // ResumeConversation opens a window in a worktree's session with the agent
 // taking the conversation up again: in the worktree it was made in, or in
 // another when told. One a window already has open is left as it is. Of a
 // conversation that was copied to another worktree, from names the
-// worktree whose copy is meant.
-func (a *App) ResumeConversation(id, from, in string) (Resumed, error) {
+// worktree whose copy is meant. The agent is started with a model and an
+// effort, those given or the configured ones, as a window's is.
+func (a *App) ResumeConversation(id, from, in, model, effort string) (Resumed, error) {
 	heads, problems := a.Conversations(Wanted{})
 	at := slices.IndexFunc(heads, func(h Head) bool { return h.ID == id && (from == "" || h.Worktree == from) })
 	if at < 0 {
@@ -299,13 +305,24 @@ func (a *App) ResumeConversation(id, from, in string) (Resumed, error) {
 	if same := slices.IndexFunc(heads, func(h Head) bool {
 		return h.ID == id && h.Agent == head.Agent && h.Worktree == record.Name && h.Running && h.Window != nil
 	}); same >= 0 {
-		return Resumed{Worktree: record.Name, Window: *heads[same].Window, Already: true}, nil
+		open := heads[same]
+		if model != "" || effort != "" {
+			return Resumed{}, fmt.Errorf("window %s of %s has it open already — `mia window model %s %s <model>` switches it, or stop it first", open.Window.Name, record.Name, record.Name, open.Window.Name)
+		}
+		return Resumed{Worktree: record.Name, Window: *open.Window, Already: true, Model: open.Model, Effort: open.Effort}, nil
 	}
 	command, err := agent.resume(id)
 	if err != nil {
 		return Resumed{}, fmt.Errorf("agent %s: %w", agent.Name, err)
 	}
-	done := Resumed{Worktree: record.Name}
+	with, chosen, err := choose(agent, command, model, effort, a.Config.Agents[agent.Name])
+	if err != nil {
+		return Resumed{}, err
+	}
+	if len(with) > 0 {
+		command = put(command, with)
+	}
+	done := Resumed{Worktree: record.Name, Model: chosen.Model, Effort: chosen.Effort}
 	switch {
 	case head.Worktree == record.Name && head.Cwd != record.Path:
 		command = "cd " + shellQuote(head.Cwd) + " && " + command // made in a folder under the worktree
@@ -342,6 +359,11 @@ func (a *App) ResumeConversation(id, from, in string) (Resumed, error) {
 	for _, w := range host.WindowsOf(record.Name) {
 		if w.Name == window {
 			done.Window.Index = w.Index
+		}
+	}
+	if chosen != (Chosen{}) {
+		if err := a.KeepChosen(record, window, agent.Name, chosen); err != nil {
+			return done, fmt.Errorf("%s: window %s opened, and what it was started with is not kept: %w", record.Name, window, err)
 		}
 	}
 	return done, nil

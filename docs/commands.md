@@ -27,7 +27,7 @@
 | `mia archive ls` | what is archived |
 | `mia unarchive <name>` | bring it back as it was, under its old name when that is free |
 | `mia recall <text…>` | the agent conversations of this repository and its worktrees that mention it — claude's, codex's, pi's — newest first: the words around it, and how to resume each |
-| `mia conversation resume <id> [--worktree <name>] [--in <worktree>]` | open a window with the agent taking the conversation up again, in the worktree it was made in or in another; `--worktree` picks the copy of one that is in several |
+| `mia conversation resume <id> [--worktree <name>] [--in <worktree>] [--model <m>] [--effort <e>]` | open a window with the agent taking the conversation up again, in the worktree it was made in or in another, started with a model and an effort; `--worktree` picks the copy of one that is in several |
 | `mia why <file:line\|commit>` | the claude conversation that made a commit, or the line's last commit: what you asked, and how to resume it |
 | `mia resurrect [--dry-run] [--list] [<worktree>...]` | after tmux or the computer went down, open each session again — or any one named, closed on purpose or not: its windows in their folders, their programs restarted, each claude resuming its own conversation; `--list` shows every session remembered |
 | `mia gc [--apply\|--ask] [--days N]` | find, or remove, idle worktrees: clean, no session, not starred, untouched for N days (14); `--ask` shows them and removes on `y` |

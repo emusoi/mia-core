@@ -184,6 +184,7 @@ claude's, codex's and pi's, and those of any agent a
 ```bash
 mia conversation resume 23f98c02-…              # a window where it was made, the agent taking it up
 mia conversation resume 23f98c02-… --in monduli # or in another worktree
+mia conversation resume 23f98c02-… --model sonnet --effort high
 ```
 
 `mia conversation resume` opens a window in the worktree's session running
@@ -196,6 +197,14 @@ first copies it under that folder's, its path rewritten, as a move does;
 the first stays where it was. From then on the conversation is in both,
 each going its own way: `mia conversation resume <id>` takes up the one
 last written to, and `--worktree <name>` the one in that worktree.
+
+The agent is started with a model and an effort as [a window's
+is](#an-agents-model): `--model` and `--effort`, or `[agents.<name>]`'s
+when left out, the words put after the one that runs it — `claude
+--model sonnet --resume <id>`. One it does not have is refused, with
+those it has, and nothing is opened. One a window has open already is not
+started again with another: `mia window model` switches it, or stop it —
+`mia window key <worktree> <window> -- C-c` — and resume it again.
 
 `mia api conversations` lists them all and `mia api conversation <id>`
 reads one as turns: see [Automation](api.md#conversations).
