@@ -1314,7 +1314,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		}
 		args = rest
 	}
-	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close", "read", "send", "press")
+	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close", "read", "send", "press", "key")
 	if err != nil {
 		return fail(err)
 	}
@@ -1410,6 +1410,11 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 			return usageErr("mia window press [worktree] <window> -- <keys>")
 		}
 		return exitFor(a.PressInWindow(record, name, strings.Join(argv, " ")))
+	case "key":
+		if name == "" || len(argv) == 0 {
+			return usageErr("mia window key [worktree] <window> -- <key>…   (tmux's names: C-c, Escape, Enter, Up)")
+		}
+		return exitFor(a.KeysInWindow(record, name, argv))
 	case "close":
 		if name == "" {
 			return usageErr("mia window close [worktree] <window>")
@@ -1420,7 +1425,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		fmt.Printf("%s: window %s closed\n", record.Name, name)
 		return exitOK
 	}
-	return usageErr("mia window [ls|open|select|new|close|read|send|press] [worktree[@machine]] [window] [--editor] [-- command|text|keys]")
+	return usageErr("mia window [ls|open|select|new|close|read|send|press|key] [worktree[@machine]] [window] [--editor] [-- command|text|keys]")
 }
 
 func configHere() config.Config {

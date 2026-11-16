@@ -89,6 +89,16 @@ func (a *App) PressInWindow(record model.Record, window, keys string) error {
 	return host.Press(record.Name, window, keys)
 }
 
+// KeysInWindow presses keys in a window by tmux's names for them — C-c,
+// Escape, Enter, Up — where PressInWindow types text as it is.
+func (a *App) KeysInWindow(record model.Record, window string, keys []string) error {
+	host, window, err := a.windowNamed(record, window)
+	if err != nil {
+		return err
+	}
+	return host.Keys(record.Name, window, keys)
+}
+
 func (a *App) WindowText(record model.Record, window string) string {
 	text, _ := a.ReadWindow(record, window)
 	return text

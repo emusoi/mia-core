@@ -45,6 +45,8 @@ mia window new monduli --editor      # your editor
 mia window new monduli logs -- tail -f log/dev.log
 mia window read monduli logs         # what it shows
 mia window send monduli logs -- q    # type a line into it
+mia window press monduli agent -- 2  # type without Enter: an agent's menu
+mia window key monduli agent -- C-c  # a key by name: stop what runs, keep the window's session
 mia window close monduli logs
 ```
 

@@ -31,7 +31,7 @@ var verbs = []Verb{
 	{"gc", "mia gc [--merged] [--apply] [--days N] | --others [--apply] [path...]", "worktrees nobody has touched: clean, no session, not starred, quiet for N days; --merged: those whose branch is merged; --others: clean ones mia did not make", false, ""},
 	{"adopt", "mia adopt <worktree>", "take over a worktree created by hand", false, ""},
 	{"rm", "mia rm [--force] [--stop-running] [--branch] <worktree>", "remove a worktree, its session and its name", false, ""},
-	{"window", "mia window [ls|open|select|new|close|read|send|press] [worktree[@machine]] [window] [--editor] [-- command|text|keys]", "the windows of a worktree's session: land in one, pick one without landing, add a shell, close one, read or type into one, press keys in one without Enter", false, ""},
+	{"window", "mia window [ls|open|select|new|close|read|send|press|key] [worktree[@machine]] [window] [--editor] [-- command|text|keys]", "the windows of a worktree's session: land in one, pick one without landing, add a shell, close one, read or type into one, type into one without Enter, press a key by name (C-c, Escape)", false, ""},
 	{"shell", "mia shell [--popup | --view <name>] [worktree]", "attach to a worktree's session; --view at this terminal's own size and window", false, ""},
 	{"run", "mia run <worktree>[@machine] <cmd…>", "run a command once in a worktree, here or on a machine", false, ""},
 	{"dev", "mia dev [<worktree> [--follow]|off]", "lend the main checkout's running dev server a worktree's files; the one time mia writes into a working tree", false, ""},

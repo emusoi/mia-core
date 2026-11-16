@@ -151,3 +151,49 @@ func TestRenamingAWorktreeRenamesItsSession(t *testing.T) {
 		t.Error("the session kept the old name, so the worktree lost it")
 	}
 }
+
+// A key by its name stops what runs in a window and leaves the session: C-c
+// to an agent or a dev server, which typing the letters "C-c" never did.
+func TestAKeyByNameReachesWhatRunsInAWindow(t *testing.T) {
+	gittest.Isolate(t)
+	socket, err := os.MkdirTemp("/tmp", "mia-key-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(socket) })
+	dir := filepath.Join(socket, "stopper")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMUX_TMPDIR", socket)
+	t.Setenv("TMUX", "")
+	t.Cleanup(func() { exec.Command("tmux", "kill-server").Run() })
+	a := &app.App{Root: dir}
+	record := model.Record{Name: "stopper", Path: dir}
+	if _, err := a.NewWindow(record, "shell", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.NewWindow(record, "agent", []string{"sleep", "300"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.KeysInWindow(record, "agent", []string{"C-c"}); err != nil {
+		t.Fatal(err)
+	}
+	stopped := false
+	for range 250 {
+		if _, err := a.ReadWindow(record, "agent"); err != nil {
+			stopped = true // its program ended, and its window with it
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !stopped {
+		t.Fatal("C-c did not reach the program in the window")
+	}
+	if _, err := a.ReadWindow(record, "shell"); err != nil {
+		t.Fatalf("the session's other window went too: %v", err)
+	}
+	if err := a.KeysInWindow(record, "nobody", []string{"Enter"}); err == nil {
+		t.Error("a key to a window that isn't there succeeded")
+	}
+}

@@ -9,6 +9,12 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **`mia window key <worktree> <window> -- C-c`** presses a key by tmux's
+  name for it — `C-c`, `Escape`, `Enter`, `Up` — so an agent or a dev
+  server can be stopped, or a menu moved through, without closing the
+  window or the session. `press` types its text as it is, and typed the
+  letters `C-c`.
+
 - **`mia window` takes `<worktree>@<machine>`**, as `mia run` and `mia
   shell` do: list, open, read, type into or close the windows of a worktree
   on another machine, answered by that machine's mia. It used to read the

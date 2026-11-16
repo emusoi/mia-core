@@ -306,6 +306,15 @@ func (h Host) Press(worktree, window, text string) error {
 	return nil
 }
 
+// Keys presses keys in a window by name, as tmux names them: C-c, Escape,
+// Enter, Up. What is no key's name is typed as it is.
+func (h Host) Keys(worktree, window string, keys []string) error {
+	if out, err := h.run(append([]string{"send-keys", "-t", Target(worktree, window)}, keys...)...); err != nil {
+		return fmt.Errorf("press in %s: %s", worktree, strings.TrimSpace(out))
+	}
+	return nil
+}
+
 // Answer types text into one pane of the worktree's session, Enter after it
 // when enter. A pane that is no longer the session's is refused: its id may
 // have gone to something else.
