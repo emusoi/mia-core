@@ -292,6 +292,9 @@ func (a *App) StartMain(model, effort string) (MainState, error) {
 		if err := a.keep(host, mainName, pane.PID, chosen); err != nil {
 			return MainState{}, err
 		}
+		if err := a.used(agent.Name, mainName, runtime.Local, chosen); err != nil {
+			return MainState{}, err
+		}
 	}
 	return a.Main(), nil
 }
@@ -343,7 +346,10 @@ func (a *App) SwitchMain(model, effort string) (Chosen, error) {
 	if err != nil {
 		return Chosen{}, err
 	}
-	return chosen, a.keep(host, mainName, pane.PID, chosen)
+	if err := a.keep(host, mainName, pane.PID, chosen); err != nil {
+		return chosen, err
+	}
+	return chosen, a.used(agent.Name, mainName, runtime.Local, chosen)
 }
 
 // InterruptMain presses the key that stops the main agent mid-work.

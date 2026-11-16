@@ -137,6 +137,13 @@ func (a *App) AgentCommand(name string) string {
 	return name
 }
 
+// AgentOf is the name of the agent a command line runs; "" for none mia
+// knows.
+func (a *App) AgentOf(command string) string {
+	name, _ := agentOf(a.agents(), command)
+	return name
+}
+
 // CommandWith is a command line with the agent it runs started with a
 // model and an effort, those given or the configured ones. One that runs
 // no agent is left as it is, and refused a model or an effort.
@@ -250,12 +257,15 @@ func (a *App) keep(host session.Host, worktree string, pid int, chosen Chosen) e
 }
 
 // KeepChosen remembers what the agent in a worktree's new window was
-// started with.
-func (a *App) KeepChosen(record model.Record, window string, chosen Chosen) error {
+// started with, and writes it down as a setup used there.
+func (a *App) KeepChosen(record model.Record, window, agent string, chosen Chosen) error {
 	host := a.sessionOf(record)
 	for _, one := range host.WindowsOf(record.Name) {
 		if one.Name == window {
-			return a.keep(host, record.Name, one.PID, chosen)
+			if err := a.keep(host, record.Name, one.PID, chosen); err != nil {
+				return err
+			}
+			return a.used(agent, record.Name, machineOf(record), chosen)
 		}
 	}
 	return nil
@@ -294,7 +304,10 @@ func (a *App) SwitchWindow(record model.Record, window, model, effort string) (C
 	if err != nil {
 		return Chosen{}, err
 	}
-	return chosen, a.keep(host, record.Name, pane.PID, chosen)
+	if err := a.keep(host, record.Name, pane.PID, chosen); err != nil {
+		return chosen, err
+	}
+	return chosen, a.used(name, record.Name, machineOf(record), chosen)
 }
 
 // typedApart is how long an agent is given to take one line typed into it

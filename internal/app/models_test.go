@@ -61,7 +61,7 @@ func TestAnAgentsWindowIsStartedWithAModelAndSwitched(t *testing.T) {
 	if _, err := a.NewWindow(record, "echo", argv); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.KeepChosen(record, "echo", chosen); err != nil {
+	if err := a.KeepChosen(record, "echo", "echo", chosen); err != nil {
 		t.Fatal(err)
 	}
 	screenOf(t, record.Name, "echo", "echo-agent --model loud --effort low say it")

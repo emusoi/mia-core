@@ -1374,12 +1374,14 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 	case "new":
 		// an agent is started with a model and an effort: those given, or the configured ones
 		var chosen app.Chosen
+		var agent string
 		command, launched := a.Config.Launch[name]
 		if !launched && len(argv) == 0 && !editor && (model != "" || effort != "") {
 			command, launched = a.AgentCommand(name), true // the window is named for the agent it runs
 		}
 		if launched && len(argv) == 0 && !editor {
 			var err error
+			agent = a.AgentOf(command)
 			if command, chosen, err = a.CommandWith(command, model, effort); err != nil {
 				return fail(err)
 			}
@@ -1388,6 +1390,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 			}
 		} else if len(argv) > 0 {
 			var err error
+			agent = a.AgentOf(strings.Join(argv, " "))
 			if argv, chosen, err = a.ArgvWith(argv, model, effort); err != nil {
 				return fail(err)
 			}
@@ -1412,7 +1415,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 			return fail(err)
 		}
 		if chosen != (app.Chosen{}) {
-			if err := a.KeepChosen(record, name, chosen); err != nil {
+			if err := a.KeepChosen(record, name, agent, chosen); err != nil {
 				fmt.Fprintf(os.Stderr, "mia: %s: window %s opened, and what it was started with is not kept: %v\n", record.Name, name, err)
 			}
 		}
