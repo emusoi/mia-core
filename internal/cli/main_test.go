@@ -50,6 +50,14 @@ func TestTheMainAgentAndStandingAnswerOutsideARepository(t *testing.T) {
 	if code := Run([]string{"main", "say"}); code != exitUsage {
 		t.Errorf("say with nothing to say exited %d", code)
 	}
+	if code := Run([]string{"main", "press", "1"}); code != exitFailed {
+		t.Errorf("a key pressed in a main agent that is not running exited %d", code)
+	}
+	for _, none := range [][]string{{"main", "press"}, {"main", "press", "--"}} {
+		if code := Run(none); code != exitUsage {
+			t.Errorf("%v, no key to press, exited %d", none, code)
+		}
+	}
 	if code := Run([]string{"main", "restart"}); code != exitUsage {
 		t.Errorf("a verb main has not exited %d", code)
 	}
@@ -111,7 +119,7 @@ case "$command" in
 *"'api' 'main' 'turns'"*) echo '[{"n":3,"kind":"said","text":"goba is on it"}]' ;;
 *"'api' 'main'"*|*"'main' 'status' '--json'"*) echo '{"running":true,"agent":"claude","machine":"local","home":"/home/user/.config/mia/main","session":"mia-main","window":{"index":1,"name":"claude"},"conversation":"c1","working":true}' ;;
 *"'main' 'status'"*) echo "claude is the main agent, working, in window claude of mia-main since Nov 2 10:00" ;;
-*"'main' 'say'"*) ;;
+*"'main' 'say'"*|*"'main' 'press'"*) ;;
 *) echo "mia: the main agent is not running — \` + "`mia main start\\`" + `" >&2; exit 1 ;;
 esac
 `
@@ -157,8 +165,11 @@ esac
 	if code := Run([]string{"main", "say", "start goba", "--json", "and it's -h"}); code != exitOK {
 		t.Errorf("said to it there exited %d", code)
 	}
+	if code := Run([]string{"main", "press", "2"}); code != exitOK {
+		t.Errorf("a key pressed in it there exited %d", code)
+	}
 	// each asked of its own mia, told to answer for its own machine; what is said goes as it was typed
-	for _, want := range []string{"MIA_MAIN_HERE=1 $HOME/.local/bin/mia", "'api' 'main' 'turns' '--after' '2'", `'main' 'say' '--' 'start goba --json and it'\''s -h'`} {
+	for _, want := range []string{"MIA_MAIN_HERE=1 $HOME/.local/bin/mia", "'api' 'main' 'turns' '--after' '2'", `'main' 'say' '--' 'start goba --json and it'\''s -h'`, "'main' 'press' '--' '2'"} {
 		if !strings.Contains(asked(), want) {
 			t.Errorf("fedora was not asked %s:\n%s", want, asked())
 		}

@@ -13,6 +13,8 @@ on GitHub; a tag without its section is not released.
   to, which runs the others: a session of its own, `mia-main`, in a folder
   mia makes under the user-wide config, with notes that say who it is and
   what it may answer. `mia main say <text…>` types a message into it,
+  `mia main press 1` presses a key in it with no Enter, to pick an option
+  when it is the one that asks,
   `mia main interrupt` stops it mid-work, `mia main stop` ends it; started
   again it goes on with its last conversation. `[main] agent` says which
   agent it is, a plugin's too, and `[main] machine` the machine it lives

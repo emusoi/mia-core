@@ -75,6 +75,7 @@
 | `mia main start` | make its folder and session when they are not there and start the agent, going on with its last conversation; one that runs is left as it is |
 | `mia main stop` | end its session; its folder and conversations stay |
 | `mia main say <text…>` | type a message into it and submit it |
+| `mia main press <keys…>` | type keys into it with no Enter after: `mia main press 1` picks an option when it is the main agent that asks |
 | `mia main interrupt` | stop it mid-work |
 | `mia api main` | where the main agent stands, from any folder |
 | `mia api main turns [--after <n>]` | its conversation as turns, each of mia's verbs it ran said as what it did |

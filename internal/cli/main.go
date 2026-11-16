@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	mainUsage      = "mia main [status|start|stop|say <text…>|interrupt]"
+	mainUsage      = "mia main [status|start|stop|say <text…>|press <keys…>|interrupt]"
 	mainTurnsUsage = "mia api main [turns [--after <n>]]"
 	standingUsage  = "mia api standing [--here] [--seen <repository>/<worktree>[@<machine>]]"
 )
@@ -39,17 +39,19 @@ func cmdMain(args []string) int {
 		verbUsage(os.Stdout, "main")
 		return exitOK
 	}
-	asJSON := sub != "say" && take(&args, "--json")
-	if !slices.Contains([]string{"status", "start", "stop", "say", "interrupt"}, sub) || (sub != "say" && len(args) > 0) {
+	// what is said to it and the keys pressed in it are taken as they are typed
+	typed := sub == "say" || sub == "press"
+	asJSON := !typed && take(&args, "--json")
+	if !slices.Contains([]string{"status", "start", "stop", "say", "press", "interrupt"}, sub) || (!typed && len(args) > 0) {
 		return usageErr(mainUsage)
 	}
 	text := ""
-	if sub == "say" {
+	if typed {
 		if len(args) > 0 && args[0] == "--" {
 			args = args[1:]
 		}
 		if text = strings.TrimSpace(strings.Join(args, " ")); text == "" {
-			return usageErr("mia main say <text…>")
+			return usageErr(map[string]string{"say": "mia main say <text…>", "press": "mia main press <keys…>"}[sub])
 		}
 	}
 	a, err := atMain()
@@ -62,7 +64,7 @@ func cmdMain(args []string) int {
 		// it lives on another machine: that machine's mia does it, and says it
 		ask, state := []string{"main", sub}, asJSON && (sub == "status" || sub == "start")
 		switch {
-		case sub == "say":
+		case typed:
 			ask = append(ask, "--", text)
 		case state:
 			ask = append(ask, "--json")
@@ -95,6 +97,8 @@ func cmdMain(args []string) int {
 		return exitOK
 	case "say":
 		return exitFor(a.SayToMain(text))
+	case "press":
+		return exitFor(a.PressInMain(text))
 	}
 	return exitFor(a.InterruptMain())
 }

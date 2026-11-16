@@ -58,6 +58,9 @@ func TestTheMainAgentIsStartedOnceSpokenToAndStopped(t *testing.T) {
 	if err := open().SayToMain("anyone?"); err == nil {
 		t.Error("something was said to a main agent that is not running")
 	}
+	if err := open().PressInMain("1"); err == nil || err.Error() != "the main agent is not running — `mia main start`" {
+		t.Errorf("a key pressed in a main agent that is not running: %v", err)
+	}
 
 	state, err := open().StartMain()
 	if err != nil {
@@ -100,10 +103,17 @@ func TestTheMainAgentIsStartedOnceSpokenToAndStopped(t *testing.T) {
 	if screen := read("where do things stand --json -h\nwhere do things stand --json -h"); strings.Count(screen, "where do things stand") != 2 {
 		t.Errorf("said once and submitted, it is typed and cat's echo: %q", screen)
 	}
+	// a key is typed and nothing after it: cat, which reads lines, has not been given this one
+	if err := open().PressInMain("2"); err != nil {
+		t.Fatal(err)
+	}
+	if screen := read("--json -h\n2"); strings.Count(screen, "2") != 2 { // e2 above, and the key
+		t.Errorf("pressed once with no Enter, the key is on the line and cat has not echoed it: %q", screen)
+	}
 	if err := open().InterruptMain(); err != nil {
 		t.Fatal(err)
 	}
-	read("^[") // Escape, as a terminal that reads lines shows it
+	read("2^[") // Escape, as a terminal that reads lines shows it, on the line the key is still on
 
 	if err := open().StopMain(); err != nil {
 		t.Fatal(err)

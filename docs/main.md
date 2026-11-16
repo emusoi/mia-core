@@ -9,6 +9,7 @@ on the machine that is always on, and it is no repository's.
 mia main start        # its folder and session when they are not there, and the agent in it
 mia main              # whether it runs, and what it is doing
 mia main say start goba on the login bug, and tell me when it asks something
+mia main press 2      # a key with no Enter: pick an option when it asks you to choose
 mia main interrupt    # stop it mid-work
 mia main stop         # end its session; its folder and conversations stay
 ```
@@ -82,6 +83,12 @@ the window by its name or its number as `mia api standing` and
 a line break in it is not an Enter — and presses Enter after. The text is
 taken as it is typed: `--json` or `-h` in it are words. `mia main
 interrupt` presses Escape, or the agent's own key for stopping.
+
+`mia main press <keys…>` types its keys into the agent's window as they
+are, with no Enter after and not as a paste, as `mia window press` does
+in a worktree's window: `mia main press 1` picks the first option when
+the main agent itself asks you to choose. An app presses the digit; it
+does not say it. With no main agent running it is refused, as `say` is.
 
 ## For an app
 

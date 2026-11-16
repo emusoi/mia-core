@@ -285,6 +285,18 @@ func (a *App) SayToMain(text string) error {
 	return host.Keys(mainName, window.Name, []string{"Enter"})
 }
 
+// PressInMain presses keys in the main agent's window with no Enter after
+// them and not as a paste, as PressInWindow does in a worktree's: a digit
+// that picks an answer when it is the main agent that asks.
+func (a *App) PressInMain(keys string) error {
+	host := a.mainHost()
+	window, _, running := a.mainWindow(host)
+	if !running {
+		return errMainDown
+	}
+	return host.Press(mainName, window.Name, keys)
+}
+
 // InterruptMain presses the key that stops the main agent mid-work.
 func (a *App) InterruptMain() error {
 	host := a.mainHost()
