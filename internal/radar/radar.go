@@ -693,16 +693,12 @@ func plural(n int, word string) string {
 	return fmt.Sprintf("%d %ss", n, word)
 }
 
-// quietRank: a signal ranked above it is a note on its row, not a call for
-// you — claude's busy, at 60. One set without a rank is 50, and needs you.
-const quietRank = 50
-
 // needsYou: its best signal asks for you — asks, failed, done — rather than
 // saying how it is.
 func needsYou(r row) bool { return NeedsYou(r.signals) }
 
 // NeedsYou is whether a worktree's signals, best first, call for you.
-func NeedsYou(signals []signal.Signal) bool { return len(signals) > 0 && signals[0].Rank <= quietRank }
+func NeedsYou(signals []signal.Signal) bool { return len(signals) > 0 && signals[0].Calls() }
 
 // idleDays is how long untouched before a worktree folds away, as mia gc
 // counts it.

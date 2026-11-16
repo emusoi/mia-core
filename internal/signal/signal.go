@@ -39,6 +39,10 @@ type Signal struct {
 	Yes string `json:"yes,omitempty"`
 }
 
+// Calls: it is ranked to call for you — asks, failed, done — where one
+// ranked above DefaultRank, claude's busy at 60, says how a worktree is.
+func (s Signal) Calls() bool { return s.Rank <= DefaultRank }
+
 type Store struct{ Dir string }
 
 func (s Store) path() string { return filepath.Join(s.Dir, "signals.json") }
