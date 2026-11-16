@@ -56,11 +56,12 @@ func cmdAPI(a *app.App, args []string) int {
 		if branch == "" {
 			return emit([]stack.Layer{})
 		}
-		layers, err := stackStore(a).Of(record.Path, branch, a.BaseBranch(record.Path))
+		// as `mia stack show --json` says them: each with the worktree it is in
+		layers, err := a.Layers(record.Path, branch)
 		if err != nil {
 			return fail(err)
 		}
-		return emit(layers)
+		return emit(append([]stack.Layer{}, layers...))
 
 	case "base":
 		return emit(struct {

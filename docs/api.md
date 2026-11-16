@@ -42,6 +42,18 @@ wrapped in a version envelope.
 | `mia gc --merged --json` | clean merged worktrees offered for removal, without removing them |
 | `mia stack sync --json` | fetched base, current layer, dropped landed layers and rebase count |
 
+`mia api stack [worktree]` and `mia stack show --json` are the same answer:
+the layers of the stack the worktree's branch is in, bottom first, each with
+`branch`, `parent`, `landed`, `ahead`, `needs_restack`, `current`,
+`base_moved` when the base moved on under the bottom layer, and `worktree`,
+the name of the worktree the layer is checked out in, left out when it is
+checked out in none.
+
+```json
+[{"branch":"api","parent":"main","landed":false,"ahead":2,"needs_restack":false,"current":true,"worktree":"monduli"},
+ {"branch":"ui","parent":"api","landed":false,"ahead":1,"needs_restack":true,"current":false}]
+```
+
 `mia dev <worktree> --json` reports the new lent state; `mia dev off --json`
 reports `{"lent": false}`. `--follow` cannot be combined with `--json`.
 
