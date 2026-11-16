@@ -7,10 +7,11 @@ package app
 // and `… command` for what to type in the window there. The conversation's
 // recorded folder is rewritten to the new path, so --continue finds it.
 var carriers = map[string]string{
-	// claude keeps a folder's conversations in ~/.claude/projects/<the path
-	// with / and . as ->; --continue picks the newest there.
+	// claude keeps a folder's conversations in ~/.claude/projects/<the path,
+	// every character but a letter or a digit a ->; --continue picks the
+	// newest there.
 	"claude": `
-from=$(printf %s "$1" | tr '/.' '--'); to=$(printf %s "$2" | tr '/.' '--')
+from=$(printf %s "$1" | sed 's/[^a-zA-Z0-9]/-/g'); to=$(printf %s "$2" | sed 's/[^a-zA-Z0-9]/-/g')
 newest=$(ls -t "$HOME/.claude/projects/$from"/*.jsonl 2>/dev/null | head -1)
 [ -n "$newest" ] || exit 0
 case "$3" in
