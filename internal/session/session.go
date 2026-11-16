@@ -482,6 +482,7 @@ func (h Host) WindowsOf(worktree string) []Window {
 
 func WindowsFrom(panes []Pane) []Window {
 	seen := map[int]bool{}
+	host, _ := os.Hostname() // unknown: no title is taken for it
 	var windows []Window
 	for _, pane := range panes {
 		if seen[pane.Index] {
@@ -499,7 +500,7 @@ func WindowsFrom(panes []Pane) []Window {
 			}
 		}
 		agent := AgentTitle(pane.Title)
-		if command == "claude" && agent == "" {
+		if command == "claude" && agent == "" && !hostTitle(strings.TrimSpace(pane.Title), host) {
 			agent = strings.TrimSpace(pane.Title) // claude does not always mark it
 		}
 		if agent == "Claude Code" {
@@ -509,6 +510,15 @@ func WindowsFrom(panes []Pane) []Window {
 			Still: quiet.Round(time.Second).String(), Active: pane.Active, Agent: agent})
 	}
 	return windows
+}
+
+// hostTitle reports whether a pane's title is only the machine's name, as
+// tmux titles a pane no program has: the name alone, or with a domain after
+// it (.lan, .local), whichever of the two the machine itself says.
+func hostTitle(title, host string) bool {
+	name, _, _ := strings.Cut(title, ".")
+	short, _, _ := strings.Cut(host, ".")
+	return short != "" && strings.EqualFold(name, short) && !strings.ContainsAny(title, " \t")
 }
 
 var version = regexp.MustCompile(`^[0-9]+(\.[0-9]+)+$`)

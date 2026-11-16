@@ -54,6 +54,10 @@ on GitHub; a tag without its section is not released.
   `mia new` now remember too, and so does mia just before it kills a
   session itself. A new worktree handed the name of a removed one starts
   with no session of that one's to bring back.
+- **An agent that has said nothing is not said to be doing the machine's
+  name.** Until claude titles its pane — at its prompt to trust a new
+  folder — tmux titles it with the host's name, and `mia api worktrees`
+  gave that as what the agent was doing: `"agent": "MacBookPro.lan"`.
 - **A move does not write over work already there.** When the branch was
   already checked out on the other side with uncommitted work — left by a
   move that stopped half way, or done there — its new files were

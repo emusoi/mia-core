@@ -73,3 +73,37 @@ func TestAnAgentsTitleSaysWhatItIsDoing(t *testing.T) {
 		t.Errorf("a claude title unmarked is still its own; its bare name says nothing: %+v", w)
 	}
 }
+
+// A pane no program has titled is titled with the machine's name by tmux,
+// short or with its domain: that is not what an agent in it is doing.
+func TestTheMachinesNameIsNoAgentTitle(t *testing.T) {
+	for _, c := range []struct {
+		title, host string
+		want        bool
+	}{
+		{"MacBookPro.lan", "MacBookPro.lan", true},
+		{"MacBookPro.lan", "MacBookPro", true},
+		{"MacBookPro", "MacBookPro.local", true},
+		{"macbookpro.local", "MacBookPro.lan", true},
+		{"fedora", "fedora", true},
+		{"fedora.home.arpa", "fedora", true},
+		{"MacBookPro.lan fix the build", "MacBookPro.lan", false},
+		{"MacBookProject", "MacBookPro", false},
+		{"resume the task", "MacBookPro.lan", false},
+		{"fedora", "MacBookPro.lan", false},
+		{"", "MacBookPro.lan", false},
+		{"anything", "", false},
+	} {
+		if got := hostTitle(c.title, c.host); got != c.want {
+			t.Errorf("hostTitle(%q, %q) = %v, want %v", c.title, c.host, got, c.want)
+		}
+	}
+	host, err := os.Hostname()
+	if err != nil {
+		t.Skip(err)
+	}
+	w := WindowsFrom([]Pane{{Index: 1, Window: "claude", Command: "claude", Title: host}})
+	if w[0].Agent != "" {
+		t.Errorf("a claude that has not titled its pane says nothing, not %q", w[0].Agent)
+	}
+}
