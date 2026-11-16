@@ -86,12 +86,14 @@ mia signal <worktree> clear [--from claude]
 mia signal ls
 ```
 
-`.` is the worktree the command runs in, which is what a hook means. A
-signal set from a tmux pane goes when that pane does: an agent that asked
-and then died asks no more. Set with `.` outside tmux, it goes when the
-process behind it does, by its process id and when it began: the agent
-whose hook set it or, with no agent above it, whatever ran the hook's
-shell. One signal per source per worktree. Lower ranks come first (50 if none is
+`.` is the worktree the command runs in, which is what a hook means. Set
+with `.`, a signal goes when the process behind it does, by its process id
+and when it began: the agent whose hook set it or, with no agent above it,
+whatever ran the hook's shell. An agent that asked and then died asks no
+more, even killed with no word, its pane left with a shell in it. One set
+from a tmux pane goes when that pane does too. A `--until seen` signal
+outlives its process: a done is news after the agent has gone. One signal
+per source per worktree. Lower ranks come first (50 if none is
 given). A signal ranked above 50, such as claude's `busy` at 60, says how a
 worktree is rather than asking for you: it is a word on its row, under
 active. `--for` ends it after a while, `--until seen` when you next switch

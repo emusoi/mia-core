@@ -35,9 +35,9 @@ type Signal struct {
 	// Pane is the tmux pane the setter ran in, when it ran in one: where the
 	// radar types an answer.
 	Pane string `json:"pane,omitempty"`
-	// Pid is the process that stands behind one set from no pane, the agent
-	// whose hook set it, and Started when that process began, which tells it
-	// from another given its number later. Zero when none could be told.
+	// Pid is the process that stands behind it, the agent whose hook set
+	// it, and Started when that process began, which tells it from another
+	// given its number later. Zero when none could be told.
 	Pid     int       `json:"pid,omitempty"`
 	Started time.Time `json:"started,omitzero"`
 	// Yes is the keys its setter says approve it, pressed with no Enter.

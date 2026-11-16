@@ -131,6 +131,15 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **An ask from an agent killed in tmux no longer waits on you.** A
+  signal set from a pane went only with the pane, and a pane outlives the
+  agent killed in it, its shell left behind: claude's `asks` and `busy`
+  stayed. `mia signal .` now records the process behind it in tmux too,
+  and the signal goes when that process does, in `mia ls`, the radar and
+  `mia api standing`. A `--until seen` signal such as `done` still
+  outlives it; `TMUX_PANE=` emptied still records none; signals set before
+  this go by their pane as they did.
+
 - **Nothing typed into the main agent answers a question it asks.** In a
   folder it had not seen, claude asks whether you trust it, with
   **No, exit** chosen; `mia main say` and `mia main model` pasted and

@@ -52,11 +52,12 @@ func cmdSignal(a *app.App, args []string, asJSON bool) int {
 	one := signal.Signal{Worktree: record.Name, Kind: args[1], Text: strings.Join(args[2:], " "),
 		Style: style, Rank: signal.DefaultRank, From: from, At: time.Now(), Yes: yes}
 	if worktree == "" {
-		pane, said := os.LookupEnv("TMUX_PANE")
-		one.Pane = pane // set from inside: the radar can answer there
-		if !said {
-			// outside tmux there is no pane to go by: the agent whose hook
-			// this is stands behind it. TMUX_PANE= emptied asks for neither.
+		// TMUX_PANE= emptied asks for neither a pane nor a process: a note
+		// that is to outlive its agent.
+		if pane, said := os.LookupEnv("TMUX_PANE"); !said || pane != "" {
+			one.Pane = pane // set from inside: the radar can answer there
+			// the agent whose hook this is stands behind it, in a pane or
+			// not: a pane outlives the agent killed in it.
 			one.Pid, one.Started = a.Setter()
 		}
 	}

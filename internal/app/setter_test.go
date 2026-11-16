@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/emusoi/mia-core/internal/gittest"
+	"github.com/emusoi/mia-core/internal/session"
 	"github.com/emusoi/mia-core/internal/signal"
 )
 
@@ -148,5 +149,35 @@ func TestTheSetterIsTheNearestAgentOrWhatIsNotAShell(t *testing.T) {
 		if pid != c.want || (pid != 0 && !started.Equal(c.all[pid].started)) || (pid == 0 && !started.IsZero()) {
 			t.Errorf("%s: process %d began %v, want %d", c.name, pid, started, c.want)
 		}
+	}
+}
+
+// A pane outlives the agent killed in it, its shell left behind: what was
+// recorded as the signal's process goes first, pane or no pane. One that
+// waits to be seen outlives it; one with no process goes by its pane.
+func TestASignalGoesWithItsProcessThoughItsPaneLives(t *testing.T) {
+	began := time.Date(2026, 11, 3, 9, 0, 0, 0, time.Local)
+	live := map[string]session.Pane{"%1": {ID: "%1"}}
+	running := map[int]process{30: {started: began}}
+	for _, c := range []struct {
+		name string
+		one  signal.Signal
+		gone bool
+	}{
+		{"its agent died, its pane lives", signal.Signal{Pane: "%1", Pid: 40, Started: began}, true},
+		{"another has its agent's number", signal.Signal{Pane: "%1", Pid: 30, Started: began.Add(-time.Hour)}, true},
+		{"its agent runs in its pane", signal.Signal{Pane: "%1", Pid: 30, Started: began}, false},
+		{"its agent runs, its pane is gone", signal.Signal{Pane: "%2", Pid: 30, Started: began}, true},
+		{"a done whose agent died", signal.Signal{Pane: "%1", Pid: 40, Started: began, UntilSeen: true}, false},
+		{"no process: its pane lives", signal.Signal{Pane: "%1"}, false},
+		{"no process: its pane is gone", signal.Signal{Pane: "%2"}, true},
+		{"neither: a note", signal.Signal{}, false},
+	} {
+		if got := setterGone(c.one, live, running); got != c.gone {
+			t.Errorf("%s: gone %v, want %v", c.name, got, c.gone)
+		}
+	}
+	if setterGone(signal.Signal{Pane: "%1", Pid: 40, Started: began}, live, nil) {
+		t.Error("with no word from ps nothing is known gone by its process")
 	}
 }

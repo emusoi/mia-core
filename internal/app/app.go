@@ -638,25 +638,25 @@ func (a *App) withoutGoneSetters(signals []signal.Signal, panes map[string][]ses
 }
 
 // setterGone reports whether what set a signal is no longer there: an
-// agent that asked and then died asks no more. Set from a tmux pane, that
-// is the pane; set from none, the process recorded with it, and one with
-// neither is never gone. It is the one rule for it, a listing's and
-// standing's. Only when tmux, or ps, answered: with no word from it live,
-// or running, is nil, and nothing is known gone.
+// agent that asked and then died asks no more. The process recorded with
+// it is gone, or another has its number; set from a tmux pane, that pane is
+// gone. A pane outlives the agent killed in it, its shell left behind, so
+// the process is asked first, whether or not there is a pane; one with
+// neither recorded is never gone. It is the one rule for it, a listing's,
+// the radar's and standing's. Only when tmux, or ps, answered: with no word
+// from it live, or running, is nil, and nothing is known gone by it.
 func setterGone(one signal.Signal, live map[string]session.Pane, running map[int]process) bool {
-	if one.Pane != "" {
-		if live == nil {
-			return false
+	// One that waits to be seen outlives its process: a done is news after the agent has gone.
+	if one.Pid != 0 && running != nil && !one.UntilSeen {
+		if now, there := running[one.Pid]; !there || !sameStart(now.started, one.Started) {
+			return true
 		}
-		_, there := live[one.Pane]
-		return !there
 	}
-	// One that waits to be seen outlives its setter: a done is news after the agent has gone.
-	if one.Pid == 0 || running == nil || one.UntilSeen {
+	if one.Pane == "" || live == nil {
 		return false
 	}
-	now, there := running[one.Pid]
-	return !there || !sameStart(now.started, one.Started)
+	_, there := live[one.Pane]
+	return !there
 }
 
 // panesByID is every pane there is by its id; nil when tmux did not answer.

@@ -64,12 +64,13 @@ func sameStart(a, b time.Time) bool {
 	return a.Sub(b).Abs() <= time.Second
 }
 
-// setters is the processes recorded with the signals set from no pane, those
-// of them still running; nil when none is recorded or ps did not answer.
+// setters is the processes recorded with the signals that go with them,
+// those of them still running; nil when none is recorded or ps did not
+// answer.
 func setters(signals []signal.Signal) map[int]process {
 	var pids []int
 	for _, one := range signals {
-		if one.Pane == "" && one.Pid != 0 && !slices.Contains(pids, one.Pid) {
+		if one.Pid != 0 && !one.UntilSeen && !slices.Contains(pids, one.Pid) {
 			pids = append(pids, one.Pid)
 		}
 	}
