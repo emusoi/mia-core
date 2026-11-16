@@ -97,7 +97,9 @@ func (p pluginTalks) heads(in folders) ([]Head, error) {
 	return heads, nil
 }
 
-func (p pluginTalks) turns(in folders, id string, after int) ([]Turn, bool, error) {
+// A plugin is asked for a conversation by its id alone: which copy of one
+// it gives is its own to say.
+func (p pluginTalks) turns(in folders, id, _ string, after int) ([]Turn, bool, error) {
 	heads, err := p.heads(in)
 	if err != nil {
 		return nil, false, err

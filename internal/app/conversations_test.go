@@ -341,7 +341,7 @@ func TestResumingAPluginAgentsConversationOpensItsWindowOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	done, err := a.ResumeConversation("e2", "")
+	done, err := a.ResumeConversation("e2", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +362,7 @@ func TestResumingAPluginAgentsConversationOpensItsWindowOnce(t *testing.T) {
 	if running.ID != "e2" || !running.Running || running.Window == nil || running.Window.Name != "echo" {
 		t.Fatalf("the newest of the agent's there is the one its window has: %+v", running)
 	}
-	again, err := a.ResumeConversation("e2", "")
+	again, err := a.ResumeConversation("e2", "", "")
 	if err != nil || !again.Already || again.Window.Name != "echo" {
 		t.Errorf("a second time says a window has it: %+v %v", again, err)
 	}
@@ -390,10 +390,10 @@ func TestResumingAClaudeConversationInAnotherWorktreeCopiesItThere(t *testing.T)
 	put(t, filepath.Join(claudeDir(one.Path), "c9.jsonl"), claudeSays(one.Path, "user", `"start it here"`, ""))
 	put(t, filepath.Join(claudeDir(repo.Root+".gone"), "c2.jsonl"), claudeSays(repo.Root+".gone", "user", `"try the other way"`, ""))
 
-	if _, err := a.ResumeConversation("c2", ""); err == nil || !strings.Contains(err.Error(), "--in") || !strings.Contains(err.Error(), "gone") {
+	if _, err := a.ResumeConversation("c2", "", ""); err == nil || !strings.Contains(err.Error(), "--in") || !strings.Contains(err.Error(), "gone") {
 		t.Errorf("one whose worktree is gone is refused, with what to do: %v", err)
 	}
-	done, err := a.ResumeConversation("c9", two.Name)
+	done, err := a.ResumeConversation("c9", "", two.Name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +409,7 @@ func TestResumingAClaudeConversationInAnotherWorktreeCopiesItThere(t *testing.T)
 	}
 	// what is said there since is not written over by a second resume
 	put(t, filepath.Join(claudeDir(two.Path), "c9.jsonl"), claudeSays(two.Path, "user", `"and go on here"`, ""))
-	again, err := a.ResumeConversation("c9", two.Name)
+	again, err := a.ResumeConversation("c9", "", two.Name)
 	if err != nil || again.Copied {
 		t.Fatalf("a second resume there: %+v %v", again, err)
 	}
@@ -419,9 +419,36 @@ func TestResumingAClaudeConversationInAnotherWorktreeCopiesItThere(t *testing.T)
 	if again.Window.Name != "claude-2" {
 		t.Errorf("a window beside the first: %+v", again)
 	}
-	back, err := a.ResumeConversation("c9", one.Name)
+	back, err := a.ResumeConversation("c9", "", one.Name)
 	if err != nil || back.Copied || back.Worktree != one.Name {
 		t.Errorf("where it was made it is as it was: %+v %v", back, err)
+	}
+
+	// one id in two folders now: each is read by its worktree, and with none the last written to
+	if first, err := a.ConversationIn("c9", one.Name, 0); err != nil || kinds(first) != "1:asked" || first[0].Text != "start it here" {
+		t.Errorf("the one where it was made: %+v %v", first, err)
+	}
+	if second, err := a.ConversationIn("c9", two.Name, 0); err != nil || kinds(second) != "1:asked 2:asked" || second[1].Text != "and go on here" {
+		t.Errorf("the copy that went on: %+v %v", second, err)
+	}
+	if last, err := a.ConversationTurns("c9", 0); err != nil || len(last) != 2 {
+		t.Errorf("with no worktree named, the last written to: %+v %v", last, err)
+	}
+	if _, err := a.ConversationIn("c9", "nowhere", 0); err == nil || !strings.Contains(err.Error(), "nowhere") {
+		t.Errorf("a worktree it is not in: %v", err)
+	}
+	heads, _ := a.Conversations(app.Wanted{})
+	heads = slices.DeleteFunc(heads, func(h app.Head) bool { return h.ID != "c9" })
+	if len(heads) != 2 || heads[0].Worktree != two.Name || heads[1].Worktree != one.Name || heads[0].Cwd == heads[1].Cwd {
+		t.Errorf("listed once for each folder, told apart by worktree and cwd: %+v", heads)
+	}
+	// resumed with no worktree named it is the last written to, two's; named, one's own
+	named, err := a.ResumeConversation("c9", one.Name, "")
+	if err != nil || named.Worktree != one.Name || named.Copied {
+		t.Errorf("the copy in the worktree named: %+v %v", named, err)
+	}
+	if _, err := a.ResumeConversation("c9", "nowhere", ""); err == nil || !strings.Contains(err.Error(), "nowhere") {
+		t.Errorf("resumed from a worktree it is not in: %v", err)
 	}
 }
 

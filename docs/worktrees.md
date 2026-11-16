@@ -168,7 +168,9 @@ is, and said so. One whose worktree is gone is refused, with how to bring
 the worktree back; `--in` takes it up in another instead. claude and pi
 keep a conversation under its folder's name, so for another worktree mia
 first copies it under that folder's, its path rewritten, as a move does;
-the first stays where it was.
+the first stays where it was. From then on the conversation is in both,
+each going its own way: `mia conversation resume <id>` takes up the one
+last written to, and `--worktree <name>` the one in that worktree.
 
 `mia api conversations` lists them all and `mia api conversation <id>`
 reads one as turns: see [Automation](api.md#conversations).

@@ -47,7 +47,7 @@ var verbs = []Verb{
 	{"archive", "mia archive [--stop-running] <worktree> · ls", "put a worktree away: everything in it, uncommitted and untracked work too, kept under refs/mia/archive; its branch stays", false, ""},
 	{"unarchive", "mia unarchive <name>", "bring an archived worktree back as it was, under its old name when free", false, ""},
 	{"recall", "mia recall <text…>", "the agent conversations here that mention it — claude's, codex's, pi's — newest first, and how to resume each", true, ""},
-	{"conversation", "mia conversation resume <id> [--in <worktree>]", "open a window with the agent taking a conversation up again, in the worktree it was made in or another; `mia api conversations` lists them", false, ""},
+	{"conversation", "mia conversation resume <id> [--worktree <name>] [--in <worktree>]", "open a window with the agent taking a conversation up again, in the worktree it was made in or another; --worktree picks the copy of one that is in several; `mia api conversations` lists them", false, ""},
 	{"main", "mia main [status|start|stop|say <text…>|interrupt]", "the main agent: the one you talk to, which runs the others — one for you, in a session of its own, no repository's; say types a message into it, interrupt stops it mid-work", false, ""},
 	{"why", "mia why <file:line|commit>", "the claude conversation that made a commit, or the line's last commit: what you asked, and how to resume it", true, ""},
 	{"radar", "mia radar [--new]", "the popup that shows and finds everything; --new makes a worktree", false, ""},

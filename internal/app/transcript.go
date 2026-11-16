@@ -247,12 +247,13 @@ func (t transcripts) heads(in folders) ([]Head, error) {
 	return heads, nil
 }
 
-func (t transcripts) turns(in folders, id string, after int) ([]Turn, bool, error) {
+func (t transcripts) turns(in folders, id, cwd string, after int) ([]Turn, bool, error) {
 	if strings.ContainsAny(id, `/\*?[`) {
 		return nil, false, nil
 	}
 	// one copied to another folder is there once for each, under one id:
-	// the last written to is the one read, as it is the first in a list
+	// the one made in cwd is read, or with none the last written to, as it
+	// is the first in a list
 	files := t.find(in, id)
 	written := func(file string) time.Time {
 		info, err := os.Stat(file)
@@ -288,7 +289,7 @@ func (t transcripts) turns(in folders, id string, after int) ([]Turn, bool, erro
 		if t.advance(file, s, nil, collect) {
 			t.keep(all)
 		}
-		if !in.holds(s.Cwd) {
+		if !in.holds(s.Cwd) || (cwd != "" && s.Cwd != cwd) {
 			continue
 		}
 		if after < from.N {

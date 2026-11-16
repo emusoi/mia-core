@@ -78,6 +78,13 @@ func TestConversationsAPIListsThemAndReadsOneAsTurns(t *testing.T) {
 	if data, code = answered(t, "conversation", "c1", "--after", "2"); code != exitOK || string(data) != "[]\n" {
 		t.Fatalf("nothing new is an empty list: %q, exit %d", data, code)
 	}
+	// by the worktree it is in, as the list names it: the main checkout's is its folder's name
+	if data, code = answered(t, "conversation", "c1", "--worktree", heads[0].Worktree); code != exitOK || json.Unmarshal(data, &turns) != nil || len(turns) != 2 {
+		t.Fatalf("conversation --worktree %s = %s, exit %d", heads[0].Worktree, data, code)
+	}
+	if _, code = answered(t, "conversation", "c1", "--worktree", "nowhere"); code != exitFailed {
+		t.Errorf("a worktree it is not in exited %d", code)
+	}
 	if _, code = answered(t, "conversation", "nobody"); code == exitOK {
 		t.Error("a conversation there is not exits non-zero")
 	}

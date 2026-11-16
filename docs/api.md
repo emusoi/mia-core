@@ -87,14 +87,21 @@ the agents' own transcripts, so nothing is recorded as they work.
 | `turns` | how many things the person asked |
 | `running`, `window` | a window of that worktree's session runs this agent with this conversation; `window` is left out otherwise |
 
+A conversation taken up in another worktree was copied there, so it is
+listed once for each folder it lives in: the same `id`, told apart by
+`worktree` and `cwd`, each with its own turns from where they parted.
+
 Which conversation a window has open, claude says itself. Of any other
 agent it is the newest of that agent's in the worktree, so two of one
 agent in one worktree are told apart only by which was written to last.
 
-`mia api conversation <id> [--after <n>]` is one conversation as turns, in
-order, each with a number `n` that only grows. `--after` gives the turns
-with a greater `n`: a view that polls asks for what came after the last it
-has, and mia reads only what was written since.
+`mia api conversation <id> [--worktree <name>] [--after <n>]` is one
+conversation as turns, in order, each with a number `n` that only grows.
+`--after` gives the turns with a greater `n`: a view that polls asks for
+what came after the last it has, and mia reads only what was written
+since. Of a conversation that is in several worktrees, `--worktree` reads
+the copy in the one named, as the list names it; with none it is the last
+written to, the first of them in the list.
 
 ```json
 [{"n":1,"kind":"asked","at":"2026-11-02T10:00:00Z","text":"make the list faster"},

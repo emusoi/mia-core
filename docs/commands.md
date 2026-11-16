@@ -25,7 +25,7 @@
 | `mia archive ls` | what is archived |
 | `mia unarchive <name>` | bring it back as it was, under its old name when that is free |
 | `mia recall <text…>` | the agent conversations of this repository and its worktrees that mention it — claude's, codex's, pi's — newest first: the words around it, and how to resume each |
-| `mia conversation resume <id> [--in <worktree>]` | open a window with the agent taking the conversation up again, in the worktree it was made in or in another |
+| `mia conversation resume <id> [--worktree <name>] [--in <worktree>]` | open a window with the agent taking the conversation up again, in the worktree it was made in or in another; `--worktree` picks the copy of one that is in several |
 | `mia why <file:line\|commit>` | the claude conversation that made a commit, or the line's last commit: what you asked, and how to resume it |
 | `mia resurrect [--dry-run] [--list] [<worktree>...]` | after tmux or the computer went down, open each session again — or any one named, closed on purpose or not: its windows in their folders, their programs restarted, each claude resuming its own conversation; `--list` shows every session remembered |
 | `mia gc [--apply\|--ask] [--days N]` | find, or remove, idle worktrees: clean, no session, not starred, untouched for N days (14); `--ask` shows them and removes on `y` |
@@ -70,7 +70,7 @@
 | `mia api <query>` | state as JSON |
 | `mia api capabilities` | API version, queries and feature markers |
 | `mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]` | the agent conversations of the repository and its worktrees, the last written to first |
-| `mia api conversation <id> [--after <n>]` | one conversation as turns, for a chat view |
+| `mia api conversation <id> [--worktree <name>] [--after <n>]` | one conversation as turns, for a chat view; `--worktree` picks the copy of one that is in several |
 | `mia main [status]` | the [main agent](main.md): whether it runs, and what it is doing |
 | `mia main start` | make its folder and session when they are not there and start the agent, going on with its last conversation; one that runs is left as it is |
 | `mia main stop` | end its session; its folder and conversations stay |

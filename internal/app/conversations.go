@@ -204,14 +204,30 @@ func foreground() map[int]string {
 
 // ConversationTurns is one conversation as turns for a chat view, in
 // order, those after turn number after: a view that polls asks for what
-// came after the last it has.
+// came after the last it has. One that was copied to another worktree is
+// the copy last written to.
 func (a *App) ConversationTurns(id string, after int) ([]Turn, error) {
+	return a.ConversationIn(id, "", after)
+}
+
+// ConversationIn is ConversationTurns of the copy in one worktree, named as
+// a list of conversations names it; with no worktree, the last written to.
+func (a *App) ConversationIn(id, worktree string, after int) ([]Turn, error) {
 	in, _ := a.where()
+	cwd, whose := "", ""
+	if worktree != "" {
+		heads, _ := a.Conversations(Wanted{Worktree: worktree})
+		at := slices.IndexFunc(heads, func(h Head) bool { return h.ID == id })
+		if at < 0 {
+			return nil, fmt.Errorf("no conversation %s in %s — `mia api conversations --worktree %s` lists what is", id, worktree, worktree)
+		}
+		cwd, whose = heads[at].Cwd, heads[at].Agent
+	}
 	for _, agent := range a.agents() {
-		if agent.talks == nil {
+		if agent.talks == nil || (whose != "" && agent.Name != whose) {
 			continue
 		}
-		turns, found, err := agent.talks.turns(in, id, after)
+		turns, found, err := agent.talks.turns(in, id, cwd, after)
 		if err != nil {
 			if found {
 				return nil, fmt.Errorf("agent %s: %w", agent.Name, err)
@@ -236,18 +252,23 @@ type Resumed struct {
 
 // ResumeConversation opens a window in a worktree's session with the agent
 // taking the conversation up again: in the worktree it was made in, or in
-// another when told. One a window already has open is left as it is.
-func (a *App) ResumeConversation(id, in string) (Resumed, error) {
+// another when told. One a window already has open is left as it is. Of a
+// conversation that was copied to another worktree, from names the
+// worktree whose copy is meant.
+func (a *App) ResumeConversation(id, from, in string) (Resumed, error) {
 	heads, problems := a.Conversations(Wanted{})
-	at := slices.IndexFunc(heads, func(h Head) bool { return h.ID == id })
+	at := slices.IndexFunc(heads, func(h Head) bool { return h.ID == id && (from == "" || h.Worktree == from) })
 	if at < 0 {
+		if from != "" && slices.ContainsFunc(heads, func(h Head) bool { return h.ID == id }) {
+			return Resumed{}, fmt.Errorf("no conversation %s in %s — `mia api conversations` says which worktrees it is in", id, from)
+		}
 		if len(problems) > 0 {
 			return Resumed{}, fmt.Errorf("no conversation %s here — %s", id, strings.Join(problems, "; "))
 		}
 		return Resumed{}, fmt.Errorf("no conversation %s here — `mia api conversations` lists them", id)
 	}
 	// one copied to another worktree is there twice, under one id: the last
-	// written to is taken, as it is the first
+	// written to is taken, as it is the first, unless one was named
 	head := heads[at]
 	agent, _ := agentNamed(a.agents(), head.Agent)
 	if agent.resume == nil {

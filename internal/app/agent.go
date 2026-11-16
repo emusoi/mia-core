@@ -74,8 +74,10 @@ type talks interface {
 	// heads is the conversations made in the folders, in no order.
 	heads(in folders) ([]Head, error)
 	// turns is one conversation's turns after turn number after; found is
-	// false when the conversation is not this agent's.
-	turns(in folders, id string, after int) (turns []Turn, found bool, err error)
+	// false when the conversation is not this agent's. One that was copied
+	// to another folder is the copy made in cwd, or with no cwd the one
+	// last written to.
+	turns(in folders, id, cwd string, after int) (turns []Turn, found bool, err error)
 	// search is the conversations in the folders that mention text, each at
 	// the place it comes up.
 	search(in folders, text string, limit int) ([]Recalled, error)

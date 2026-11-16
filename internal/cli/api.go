@@ -85,7 +85,7 @@ func cmdAPI(a *app.App, args []string) int {
 
 	case "conversation":
 		rest := args[1:]
-		after := 0
+		after, worktree := 0, takeValue(&rest, "--worktree")
 		if value := takeValue(&rest, "--after"); value != "" {
 			n, err := strconv.Atoi(value)
 			if err != nil || n < 0 {
@@ -96,7 +96,7 @@ func cmdAPI(a *app.App, args []string) int {
 		if len(rest) != 1 {
 			return usageErr(conversationUsage)
 		}
-		turns, err := a.ConversationTurns(rest[0], after)
+		turns, err := a.ConversationIn(rest[0], worktree, after)
 		if err != nil {
 			return fail(err)
 		}
@@ -117,7 +117,7 @@ var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "re
 
 const (
 	conversationsUsage = "mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]"
-	conversationUsage  = "mia api conversation <id> [--after <n>]"
+	conversationUsage  = "mia api conversation <id> [--worktree <name>] [--after <n>]"
 )
 
 var apiQueries = strings.Join(apiQueryList, "|")
