@@ -266,8 +266,14 @@ func (u uncommitted) staysBehind() string {
 	return fmt.Sprintf("not crossing, since git ignores them: %s%s", strings.Join(named, ", "), more)
 }
 
-// putUncommitted gives a clean worktree at the same commit that work.
+// putUncommitted gives a clean worktree at the same commit that work. One
+// that has work of its own is refused: its new files would be overwritten.
 func (s side) putUncommitted(path string, u uncommitted) error {
+	if own, err := s.sh(`cd "$1" && git status --porcelain`, path); err != nil {
+		return err
+	} else if strings.TrimSpace(own) != "" {
+		return fmt.Errorf("the worktree %s, %s, has uncommitted work of its own — commit or discard it there, then move again", s.where(), path)
+	}
 	if len(bytes.TrimSpace(u.staged)) > 0 {
 		if err := s.feed(u.staged, `cd "$1" && git apply --binary --index`, path); err != nil {
 			return fmt.Errorf("apply the staged changes: %w", err)

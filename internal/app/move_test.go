@@ -57,6 +57,11 @@ func TestUncommittedWorkCrossesWithItsIndex(t *testing.T) {
 	if err := local.putUncommitted(to, work); err != nil {
 		t.Fatal(err)
 	}
+	// a worktree with work of its own is not one to put more into: a move that
+	// found the branch checked out there would overwrite its new files
+	if err := local.putUncommitted(to, work); err == nil || !strings.Contains(err.Error(), "uncommitted work of its own") {
+		t.Errorf("putting work into a worktree that has some: %v", err)
+	}
 	status := func(dir string) string {
 		return repo.GitIn(dir, "-c", "core.quotepath=off", "status", "--porcelain")
 	}

@@ -44,6 +44,11 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **A move does not write over work already there.** When the branch was
+  already checked out on the other side with uncommitted work — left by a
+  move that stopped half way, or done there — its new files were
+  overwritten by the ones arriving. The move now stops and says so, and
+  the worktree it was moving is untouched.
 - **`mia run <worktree>@<machine>` from a script is quiet.** Started with
   no terminal — by the desk, the phone, a script — it asked ssh for one
   anyway, and every call printed "Pseudo-terminal will not be allocated";
