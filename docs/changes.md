@@ -131,6 +131,19 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **Nothing typed into the main agent answers a question it asks.** In a
+  folder it had not seen, claude asks whether you trust it, with
+  **No, exit** chosen; `mia main say` and `mia main model` pasted and
+  pressed Enter, the Enter answered No, and claude quit, and the next
+  `mia main model` failed with `can't find window: claude`. Now `mia api
+  main` says what it asks, as `asks`, and is not `working` then; `say` and
+  `model` type nothing and say what it asks and how to answer, `mia main
+  press <n>`, which moves the cursor where the agent takes no digit;
+  `mia window send` into a worktree's window that asks is refused the
+  same way. One that
+  ends as it is typed into is not running, as one stopped is. mia
+  answers no question itself. See [The main agent](main.md#when-it-asks-first).
+
 - **An ask from an agent outside tmux no longer waits on you after the
   agent is gone.** `mia signal .` run with no `TMUX_PANE` at all records
   the process behind it, the agent whose hook it is, and the signal goes

@@ -155,9 +155,22 @@ any folder, and starts and writes nothing.
 | `window` | the agent's window; left out when it is not running |
 | `conversation` | the one it has open — claude says which — or, of another agent and when it is not running, the last written to in its folder; empty when there is none, or mia cannot read that agent's |
 | `working` | it is doing something now: claude's pane title says so, and of another agent, that its window wrote in the last three seconds |
+| `asks` | the question its window shows, waiting on you: `text`, `options` and `selected`, the option its cursor is on, the first being 1, what Enter alone would answer; left out when it asks nothing, and `working` is false while it asks. A mia has it when its capabilities have `main-asks` |
 | `since` | when its session was started; left out when it is not running |
 | `model`, `effort` | what mia started it with or last switched it to, as [Agents](#agents) says; left out when it is not running, or mia chose none |
 | `account` | the [account](#accounts) it runs on, `default` for its agent's own; left out when it is not running, or for an agent mia keeps no accounts of |
+
+```json
+{"running":true,"agent":"claude","working":false,
+ "asks":{"text":"Is this a project you created or one you trust?",
+         "options":["No, exit","Yes, I trust this folder"],"selected":1}}
+```
+
+While it asks, `mia main say` and `mia main model` type nothing and fail,
+exit 1, with a line that says what it asks and how to answer; `mia main
+press <n>` answers it, as [The main agent](main.md#when-it-asks-first)
+says. `mia main start --json` is the same state, `asks` and all, once the
+agent has settled.
 
 When `[main] machine` names another machine, `mia api main` and
 `mia api main turns` are that machine's answers, asked over ssh: `home`,

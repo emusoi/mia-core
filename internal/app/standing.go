@@ -199,29 +199,51 @@ func (a *App) standingIn(repo Repository, panes map[string][]session.Pane) []sto
 	return found
 }
 
-// option is a numbered choice as an agent draws one: "❯ 1. Yes", "  2. No".
-var option = regexp.MustCompile(`^[\s│|]*(?:[❯›>▶]\s*)?(\d+)[.)]\s+(\S.*?)[\s│|]*$`)
+// option is a numbered choice as an agent draws one: "❯ 1. Yes", "  2. No",
+// with the cursor before the one it is on.
+var option = regexp.MustCompile(`^[\s│|]*(?:([❯›>▶])\s*)?(\d+)[.)]\s+(\S.*?)[\s│|]*$`)
 
 // optionsOn is the numbered choices a screen ends with: the last run of
 // lines numbered from 1, whatever is drawn between them.
 func optionsOn(screen string) []string {
-	var options []string
-	for _, line := range strings.Split(screen, "\n") {
+	return numberedOn(strings.Split(screen, "\n")).options
+}
+
+// choices is a run of options on a screen: the lines it is drawn on, first
+// to last, and the option the agent's cursor is on, the first being 1; 0
+// when it shows none.
+type choices struct {
+	options     []string
+	cursor      int
+	first, last int
+}
+
+// numberedOn is the last run of lines numbered from 1, whatever is drawn
+// between them.
+func numberedOn(lines []string) choices {
+	var run choices
+	for i, line := range lines {
 		m := option.FindStringSubmatch(line)
 		if m == nil {
 			continue
 		}
-		switch n, _ := strconv.Atoi(m[1]); {
+		switch n, _ := strconv.Atoi(m[2]); {
 		case n == 1:
-			options = []string{m[2]}
-		case n == len(options)+1:
-			options = append(options, m[2])
+			run = choices{options: []string{m[3]}, first: i}
+		case n == len(run.options)+1:
+			run.options = append(run.options, m[3])
+		default:
+			continue
+		}
+		run.last = i
+		if m[1] != "" {
+			run.cursor = len(run.options)
 		}
 	}
-	if len(options) < 2 {
-		return nil // a list of one is prose that starts with a number
+	if len(run.options) < 2 {
+		return choices{} // a list of one is prose that starts with a number
 	}
-	return options
+	return run
 }
 
 // unreachableFor is how long a machine that did not answer is not asked

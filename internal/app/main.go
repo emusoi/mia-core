@@ -77,6 +77,9 @@ type MainState struct {
 	Conversation string `json:"conversation"`
 	// Working: it is doing something now, as its pane says.
 	Working bool `json:"working"`
+	// Asks is the question its window shows, waiting on the person: left
+	// out when it asks nothing. It is not working while it asks.
+	Asks *Asks `json:"asks,omitempty"`
 	// Since is when its session was started.
 	Since time.Time `json:"since,omitzero"`
 	// Model and Effort are what mia started it with or last switched it to;
@@ -190,6 +193,9 @@ func (a *App) Main() MainState {
 		// claude says it in its pane's title; of another, writing is the sign
 		state.Working = session.Spinning(pane.Title) ||
 			(session.AgentTitle(pane.Title) == "" && !pane.Activity.IsZero() && time.Since(pane.Activity) < workingFor)
+		if asks, on := askingIn(host, mainName, window.Name); on {
+			state.Asks, state.Working = &asks, false
+		}
 		kept := a.chosen()[chosenKey(session.Name(mainName), pane.PID)]
 		state.Model, state.Effort = kept.Model, kept.Effort
 		if agent.AccountEnv != "" {
@@ -360,29 +366,44 @@ func (a *App) StopMain() error {
 var errMainDown = errors.New("the main agent is not running — `mia main start`")
 
 // SayToMain types text into the main agent as one message and submits it:
-// pasted, so a line break in it is not an Enter, and Enter after.
+// pasted, so a line break in it is not an Enter, and Enter after. While it
+// asks something nothing is typed: the Enter would answer it.
 func (a *App) SayToMain(text string) error {
 	host := a.mainHost()
 	window, _, running := a.mainWindow(host)
 	if !running {
 		return errMainDown
 	}
-	if err := host.Paste(mainName, window.Name, text); err != nil {
-		return err
+	if asks, on := askingIn(host, mainName, window.Name); on {
+		return askedFirst(window.Name, asks, "mia main press")
 	}
-	return host.Keys(mainName, window.Name, []string{"Enter"})
+	err := host.Paste(mainName, window.Name, text)
+	if err == nil {
+		err = host.Keys(mainName, window.Name, []string{"Enter"})
+	}
+	return a.mainGone(host, err)
+}
+
+// mainGone is err, or errMainDown when the agent ended as it was typed
+// into: a window that is gone is not to be pasted into.
+func (a *App) mainGone(host session.Host, err error) error {
+	if _, _, running := a.mainWindow(host); err != nil && !running {
+		return errMainDown
+	}
+	return err
 }
 
 // PressInMain presses keys in the main agent's window with no Enter after
 // them and not as a paste, as PressInWindow does in a worktree's: a digit
-// that picks an answer when it is the main agent that asks.
+// that picks an answer when it is the main agent that asks, or moves its
+// cursor there and presses Enter when its options have no numbers.
 func (a *App) PressInMain(keys string) error {
 	host := a.mainHost()
 	window, _, running := a.mainWindow(host)
 	if !running {
 		return errMainDown
 	}
-	return host.Press(mainName, window.Name, keys)
+	return pressAnswer(host, mainName, window.Name, keys)
 }
 
 // SwitchMain switches the main agent to another model, and effort when
@@ -393,11 +414,14 @@ func (a *App) SwitchMain(model, effort string) (Chosen, error) {
 	if !running {
 		return Chosen{}, errMainDown
 	}
+	if asks, on := askingIn(host, mainName, window.Name); on {
+		return Chosen{}, askedFirst(window.Name, asks, "mia main press")
+	}
 	agent, _ := agentNamed(a.agents(), window.Name)
 	was := a.chosen()[chosenKey(session.Name(mainName), pane.PID)]
 	chosen, err := switchTo(host, mainName, window.Name, agent, model, effort, was, a.mainSet(agent)...)
 	if err != nil {
-		return Chosen{}, err
+		return Chosen{}, a.mainGone(host, err)
 	}
 	if err := a.keep(host, mainName, pane.PID, chosen); err != nil {
 		return chosen, err

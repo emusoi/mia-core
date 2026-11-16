@@ -131,8 +131,35 @@ in a worktree's window: `mia main press 1` picks the first option when
 the main agent itself asks you to choose. An app presses the digit; it
 does not say it. With no main agent running it is refused, as `say` is.
 
+## When it asks first
+
+While the agent's screen shows a question with options — claude's trust
+in a new folder, a permission, a choice it puts to you — anything typed
+into it answers it, Enter above all: claude's trust question has
+**No, exit** chosen, and an Enter there ends it. So `mia main say` and
+`mia main model` type nothing then, and say what it asks, exit 1:
+
+```
+mia: claude asks first: Is this a project you created or one you trust? — answer it: `mia main press <n>` (1 No, exit · 2 Yes, I trust this folder)
+```
+
+mia never answers it for you. `mia main press <n>` does, as you say: a
+digit, where the agent numbers its options; where it draws them with no
+numbers and takes no digit, as claude's trust question, mia moves the
+cursor to option n and presses Enter once it sees the cursor there, and
+presses nothing more when it does not. A question is a run of options at
+the foot of the screen with the agent's cursor on one, and, of those with
+no numbers, a hint under them such as `Enter to confirm`.
+`mia window send` into a worktree's window is refused the same way, and
+`mia window press <worktree> <window> -- <n>` answers it.
+
+With no main agent running, `say`, `press`, `model` and `interrupt` say
+that it is not running and that `mia main start` starts it, and so does
+one that ends as it is typed into.
+
 ## For an app
 
-`mia api main` is where it stands, `mia api main turns` its conversation
+`mia api main` is where it stands, `asks` among it when it asks
+something, `mia api main turns` its conversation
 with what it did as lines of their own, and `mia api standing` every
 agent in every repository: see [Automation](api.md#the-main-agent).

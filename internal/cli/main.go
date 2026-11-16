@@ -160,7 +160,13 @@ func sayMain(state app.MainState, asJSON bool) int {
 	if state.Working {
 		doing = "working"
 	}
+	if state.Asks != nil {
+		doing = "asking"
+	}
 	fmt.Printf("%s is the main agent, %s, in window %s of %s since %s\n%s\n", state.Agent, doing, state.Window.Name, state.Session, state.Since.Local().Format("Jan 2 15:04"), state.Home)
+	if state.Asks != nil {
+		fmt.Println(state.Asks.Said(state.Agent, "mia main press"))
+	}
 	return exitOK
 }
 

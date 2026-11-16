@@ -88,21 +88,44 @@ func (a *App) CloseWindow(record model.Record, window string) error {
 	return nil
 }
 
+// SendToWindow types text into a window and Enter after it, unless the
+// window asks something: Enter would answer it.
 func (a *App) SendToWindow(record model.Record, window, text string) error {
 	host, window, err := a.windowNamed(record, window)
 	if err != nil {
 		return err
 	}
+	if asks, on := askingIn(host, record.Name, window); on {
+		return askedFirst(a.agentOfWindow(host, record.Name, window), asks, "mia window press "+record.Name+" "+window+" --")
+	}
 	return host.Send(record.Name, window, text)
 }
 
-// PressInWindow presses keys in a window without Enter after them.
+// agentOfWindow is the agent a window runs, by name, or the window when
+// mia knows none there.
+func (a *App) agentOfWindow(host session.Host, worktree, window string) string {
+	if _, known := agentNamed(a.agents(), window); known {
+		return window
+	}
+	for _, pane := range host.Panes(worktree) {
+		if pane.Window == window || strconv.Itoa(pane.Index) == window {
+			if name := agentIn(a.agents(), pane.Command, pane.Title); name != "" {
+				return name
+			}
+		}
+	}
+	return "window " + window
+}
+
+// PressInWindow presses keys in a window without Enter after them: a
+// number where it asks with a cursor and no numbers moves the cursor to
+// that option and presses Enter.
 func (a *App) PressInWindow(record model.Record, window, keys string) error {
 	host, window, err := a.windowNamed(record, window)
 	if err != nil {
 		return err
 	}
-	return host.Press(record.Name, window, keys)
+	return pressAnswer(host, record.Name, window, keys)
 }
 
 // KeysInWindow presses keys in a window by tmux's names for them — C-c,
