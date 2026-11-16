@@ -8,6 +8,7 @@ on the machine that is always on, and it is no repository's.
 ```bash
 mia main start        # its folder and session when they are not there, and the agent in it
 mia main start --model opus --effort high   # started with a model and an effort
+mia main start --agent codex                # started as another agent, this once
 mia main              # whether it runs, and what it is doing
 mia main say start goba on the login bug, and tell me when it asks something
 mia main press 2      # a key with no Enter: pick an option when it asks you to choose
@@ -65,6 +66,16 @@ too. How it is started, how it goes on with a conversation, which file it
 reads its notes from and which key stops it are that agent's own, kept
 where mia keeps everything it knows of an agent. An agent mia cannot read
 the conversations of is started anew each time, and has no turns to show.
+
+`mia main start --agent <name>` starts another agent of those mia knows,
+for this start: `[main] agent` stays as it is, and the next `mia main
+start` with no `--agent` starts that one again. It goes on with its own
+last conversation in the folder, and reads its own notes file, which mia
+writes as it does at every start. While one runs it is refused: `mia main
+stop` first. Its model and effort are its own under `[agents]`, or those
+`--model` and `--effort` say: `[main] model` and `effort` are for the
+agent `[main]` names. From another machine, it is that machine's mia's,
+as every `mia main …` is.
 
 ## Its model
 

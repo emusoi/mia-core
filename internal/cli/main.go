@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	mainUsage      = "mia main [status|start [--model <model>] [--effort <effort>]|stop|say <text…>|press <keys…>|interrupt|model <model> [--effort <effort>]]"
+	mainUsage      = "mia main [status|start [--agent <agent>] [--model <model>] [--effort <effort>]|stop|say <text…>|press <keys…>|interrupt|model <model> [--effort <effort>]]"
 	mainTurnsUsage = "mia api main [turns [--after <n>]]"
 	standingUsage  = "mia api standing [--here] [--seen <repository>/<worktree>[@<machine>]]"
 )
@@ -42,9 +42,12 @@ func cmdMain(args []string) int {
 	// what is said to it and the keys pressed in it are taken as they are typed
 	typed := sub == "say" || sub == "press"
 	asJSON := !typed && take(&args, "--json")
-	var model, effort string
+	var agent, model, effort string
 	if sub == "start" || sub == "model" {
 		model, effort = takeValue(&args, "--model"), takeValue(&args, "--effort")
+	}
+	if sub == "start" {
+		agent = takeValue(&args, "--agent")
 	}
 	if sub == "model" {
 		if model != "" || len(args) != 1 || strings.HasPrefix(args[0], "-") {
@@ -81,6 +84,9 @@ func cmdMain(args []string) int {
 		case model != "":
 			ask = append(ask, "--model", model)
 		}
+		if agent != "" {
+			ask = append(ask, "--agent", agent)
+		}
 		if effort != "" {
 			ask = append(ask, "--effort", effort)
 		}
@@ -102,7 +108,7 @@ func cmdMain(args []string) int {
 	case "status":
 		return sayMain(a.Main(), asJSON)
 	case "start":
-		state, err := a.StartMain(model, effort)
+		state, err := a.StartMain(agent, model, effort)
 		if err != nil {
 			return fail(err)
 		}

@@ -74,7 +74,7 @@
 | `mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]` | the agent conversations of the repository and its worktrees, the last written to first |
 | `mia api conversation <id> [--worktree <name>] [--after <n>]` | one conversation as turns, for a chat view; `--worktree` picks the copy of one that is in several |
 | `mia main [status]` | the [main agent](main.md): whether it runs, and what it is doing |
-| `mia main start` | make its folder and session when they are not there and start the agent, going on with its last conversation; one that runs is left as it is |
+| `mia main start [--agent <name>] [--model <m>] [--effort <e>]` | make its folder and session when they are not there and start the agent, going on with its last conversation; one that runs is left as it is. `--agent` starts another than `[main] agent`, this once |
 | `mia main stop` | end its session; its folder and conversations stay |
 | `mia main say <text…>` | type a message into it and submit it |
 | `mia main press <keys…>` | type keys into it with no Enter after: `mia main press 1` picks an option when it is the main agent that asks |

@@ -130,13 +130,13 @@ func TestTheMainAgentIsStartedWithAModelAndSwitched(t *testing.T) {
 		a.Plugins = plugins(t, map[string]string{"echo": echoPlugin(t)})
 		return a
 	}
-	if _, err := open().StartMain("", "medium"); err == nil || err.Error() != "echo has no effort medium — it has low, high" {
+	if _, err := open().StartMain("", "", "medium"); err == nil || err.Error() != "echo has no effort medium — it has low, high" {
 		t.Errorf("an effort it has not: %v", err)
 	}
 	if _, err := os.Stat(mainHome()); err == nil {
 		t.Error("its folder was made for a start that was refused")
 	}
-	state, err := open().StartMain("", "high")
+	state, err := open().StartMain("", "", "high")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func TestTheMainAgentIsStartedWithAModelAndSwitched(t *testing.T) {
 	if state.Model != "soft" || state.Effort != "high" {
 		t.Errorf("started: %+v", state)
 	}
-	if _, err := open().StartMain("loud", ""); err == nil || !strings.Contains(err.Error(), "mia main model") {
+	if _, err := open().StartMain("", "loud", ""); err == nil || !strings.Contains(err.Error(), "mia main model") {
 		t.Errorf("started again with a model: %v", err)
 	}
 	if now, err := open().SwitchMain("loud", ""); err != nil || now != (app.Chosen{Model: "loud", Effort: "high"}) {
@@ -159,5 +159,61 @@ func TestTheMainAgentIsStartedWithAModelAndSwitched(t *testing.T) {
 	if setups := open().Setups("main"); len(setups) != 3 || !setups[0].Usual || setups[0].Model != "loud" || setups[0].Last.Worktree != "main" ||
 		setups[1].Model != "soft" || setups[1].Effort != "high" || setups[2] != (app.Setup{Agent: "echo", Model: "soft"}) {
 		t.Errorf("setups = %+v", setups)
+	}
+}
+
+// The main agent is started as another agent of the table for one start:
+// with that agent's own model and effort and not [main]'s, and with its
+// notes. One that runs is not started as another; [main] is as it was.
+// The other is a plugin's too: a login shell puts the real codex and pi
+// before the test's own.
+func TestTheMainAgentIsStartedAsAnotherAgent(t *testing.T) {
+	lab(t, map[string]string{"echo-agent": `echo "echo-agent $*"; exec cat`, "hush-agent": `echo "hush-agent $*"; exec cat`})
+	t.Setenv("MIA_WORKTREE", "")
+	put(t, filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "config.toml"), "[main]", `agent = "echo"`, `model = "soft"`, "[agents.hush]", `effort = "low"`)
+	hush := strings.ReplaceAll(strings.ReplaceAll(echoPlugin(t), "echo-agent", "hush-agent"), `"name":"echo"`, `"name":"hush"`)
+	open := func() *app.App {
+		t.Helper()
+		a, err := app.AtMain()
+		if err != nil {
+			t.Fatal(err)
+		}
+		a.Plugins = plugins(t, map[string]string{"echo": echoPlugin(t), "hush": hush})
+		return a
+	}
+	if _, err := open().StartMain("nobody", "", ""); err == nil || !strings.Contains(err.Error(), "nobody") {
+		t.Errorf("an agent there is not: %v", err)
+	}
+	if _, err := open().StartMain("hush", "shout", ""); err == nil || !strings.Contains(err.Error(), "hush has no model shout") {
+		t.Errorf("a model it has not: %v", err)
+	}
+	state, err := open().StartMain("hush", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { open().StopMain() })
+	if screen := screenOf(t, "main", "hush", "hush-agent --effort low e2"); strings.Contains(screen, "soft") {
+		t.Errorf("started with [main]'s model, which is echo's: %q", screen)
+	}
+	if !state.Running || state.Agent != "hush" || state.Window == nil || state.Window.Name != "hush" || state.Model != "" || state.Effort != "low" {
+		t.Errorf("started: %+v", state)
+	}
+	if _, err := os.Stat(filepath.Join(mainHome(), "AGENTS.md")); err != nil {
+		t.Errorf("its notes are not where it reads them: %v", err)
+	}
+	if _, err := open().StartMain("echo", "", ""); err == nil || !strings.Contains(err.Error(), "mia main stop") {
+		t.Errorf("started as another while one runs: %v", err)
+	}
+	if again, err := open().StartMain("", "", ""); err != nil || again.Agent != "hush" {
+		t.Errorf("started again with nothing said, the one that runs is left as it is: %+v %v", again, err)
+	}
+	if setups := open().Setups("main"); len(setups) == 0 || setups[0].Agent != "hush" || setups[0].Effort != "low" || setups[0].Uses != 1 {
+		t.Errorf("setups = %+v", setups)
+	}
+	if err := open().StopMain(); err != nil {
+		t.Fatal(err)
+	}
+	if state := open().Main(); state.Running || state.Agent != "echo" {
+		t.Errorf("stopped, the main agent is [main]'s again: %+v", state)
 	}
 }

@@ -39,7 +39,7 @@ func TestTheMainAgentAndStandingAnswerOutsideARepository(t *testing.T) {
 	if _, code = answered(t, "standing", "--seen", "nowhere/kilwa"); code != exitFailed {
 		t.Errorf("--seen of a repository there is not exited %d", code)
 	}
-	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "main") || !slices.Contains(caps.Queries, "standing") || !slices.Contains(caps.Features, "main-agent") {
+	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "main") || !slices.Contains(caps.Queries, "standing") || !slices.Contains(caps.Features, "main-agent") || !slices.Contains(caps.Features, "main-start-agent") {
 		t.Errorf("capabilities = %+v", caps)
 	}
 
@@ -165,11 +165,12 @@ esac
 	if code := Run([]string{"main", "say", "start goba", "--json", "and it's -h"}); code != exitOK {
 		t.Errorf("said to it there exited %d", code)
 	}
+	Run([]string{"main", "start", "--agent", "pi", "--model", "anthropic/claude-sonnet-5"}) // refused there: it is asked all the same
 	if code := Run([]string{"main", "press", "2"}); code != exitOK {
 		t.Errorf("a key pressed in it there exited %d", code)
 	}
 	// each asked of its own mia, told to answer for its own machine; what is said goes as it was typed
-	for _, want := range []string{"MIA_MAIN_HERE=1 $HOME/.local/bin/mia", "'api' 'main' 'turns' '--after' '2'", `'main' 'say' '--' 'start goba --json and it'\''s -h'`, "'main' 'press' '--' '2'"} {
+	for _, want := range []string{"MIA_MAIN_HERE=1 $HOME/.local/bin/mia", "'api' 'main' 'turns' '--after' '2'", `'main' 'say' '--' 'start goba --json and it'\''s -h'`, "'main' 'press' '--' '2'", "'main' 'start' '--model' 'anthropic/claude-sonnet-5' '--agent' 'pi'"} {
 		if !strings.Contains(asked(), want) {
 			t.Errorf("fedora was not asked %s:\n%s", want, asked())
 		}

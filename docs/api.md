@@ -145,7 +145,7 @@ any folder, and starts and writes nothing.
 | field | is |
 |---|---|
 | `running` | the agent is in a window of its session |
-| `agent` | the one that runs; when none does, the one `[main] agent` names |
+| `agent` | the one that runs — another than `[main] agent` when `mia main start --agent` started it, which a mia can when its capabilities have `main-start-agent`; when none runs, the one `[main] agent` names |
 | `machine` | the machine it lives on, as `mia api machines` calls it: `local` when that is the one asked, and the name `[main] machine` gives when it is another, whose mia answered |
 | `home`, `session` | its folder and its tmux session, whether or not they are there yet |
 | `window` | the agent's window; left out when it is not running |

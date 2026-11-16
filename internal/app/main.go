@@ -213,17 +213,30 @@ func (a *App) mainConversation(agent Agent, pid int) string {
 }
 
 // mainSet is what the main agent is started with when nothing else is
-// said: [main]'s, and failing that its agent's own.
+// said: [main]'s, and failing that its agent's own. Started as another
+// agent than [main] names, only that agent's own.
 func (a *App) mainSet(agent Agent) []config.Agent {
-	return []config.Agent{{Model: a.Config.Main.Model, Effort: a.Config.Main.Effort}, a.Config.Agents[agent.Name]}
+	set := []config.Agent{a.Config.Agents[agent.Name]}
+	if configured, err := a.mainAgent(); err == nil && configured.Name == agent.Name {
+		set = slices.Insert(set, 0, config.Agent{Model: a.Config.Main.Model, Effort: a.Config.Main.Effort})
+	}
+	return set
 }
 
 // StartMain makes the main agent's folder and session when they are not
 // there and starts the agent in it, going on with its last conversation
 // when it has one, with a model and an effort: those given, or the
-// configured ones. One that runs already is left as it is.
-func (a *App) StartMain(model, effort string) (MainState, error) {
+// configured ones. One that runs already is left as it is. Named, the
+// agent is that one of the table for this start, whatever [main] says.
+func (a *App) StartMain(name, model, effort string) (MainState, error) {
 	agent, err := a.mainAgent()
+	if name != "" {
+		var known bool
+		agent, known = agentNamed(a.agents(), name)
+		if err = nil; !known {
+			err = fmt.Errorf("mia knows no agent %s — `mia api agents` lists those it does", name)
+		}
+	}
 	if err != nil {
 		return MainState{}, err
 	}
@@ -233,6 +246,9 @@ func (a *App) StartMain(model, effort string) (MainState, error) {
 	host := a.mainHost()
 	if !host.Available() {
 		return MainState{}, errors.New("tmux not found — the main agent runs in a session: https://github.com/tmux/tmux/wiki/Installing")
+	}
+	if window, _, running := a.mainWindow(host); running && name != "" {
+		return MainState{}, fmt.Errorf("the main agent runs already, as %s — `mia main stop` first", window.Name)
 	}
 	home := paths.In(mainName)
 	if err := os.MkdirAll(home, 0o755); err != nil {
