@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -30,14 +31,23 @@ type Verb struct {
 	Help  string `json:"help,omitempty"`
 }
 
-// Manifest is what a plugin says it does: the commands it adds and the
-// events it wants to hear. Plugins draw nothing in mia; what they want
-// shown they say with mia signal.
+// Agent is a coding agent a plugin adds: how to tell it in a window. Its
+// conversations mia asks the plugin for, with `mia-<name> agent …`.
+type Agent struct {
+	Name     string   `json:"name"`               // the plugin's own when empty
+	Commands []string `json:"commands,omitempty"` // first words of a command line that mean it; its name when none
+	Title    string   `json:"title,omitempty"`    // a regular expression a pane's title matches when it runs there
+}
+
+// Manifest is what a plugin says it does: the commands it adds, the
+// events it wants to hear and the agent it adds. Plugins draw nothing in
+// mia; what they want shown they say with mia signal.
 type Manifest struct {
 	Protocol int      `json:"protocol"`
 	Help     string   `json:"help,omitempty"`
 	Verbs    []Verb   `json:"verbs,omitempty"`
 	Events   []string `json:"events,omitempty"`
+	Agent    *Agent   `json:"agent,omitempty"`
 }
 
 type Plugin struct {
@@ -260,7 +270,25 @@ func ReadManifest(path string) (Manifest, error) {
 			return Manifest{}, fmt.Errorf("no event called %q; there are %s", event, strings.Join(Events, ", "))
 		}
 	}
+	if m.Agent != nil {
+		if strings.ContainsFunc(m.Agent.Name, unicode.IsSpace) {
+			return Manifest{}, fmt.Errorf("agent %q must be one word", m.Agent.Name)
+		}
+		if _, err := regexp.Compile(m.Agent.Title); err != nil {
+			return Manifest{}, fmt.Errorf("agent title is not a regular expression: %w", err)
+		}
+	}
 	return m, nil
+}
+
+// Ask runs the plugin for an answer mia reads: what it printed, or why it
+// could not, within the time given.
+func (p Plugin) Ask(c Context, timeout time.Duration, args ...string) ([]byte, error) {
+	env, err := p.Env(c)
+	if err != nil {
+		return nil, err
+	}
+	return call(p.Path, env, args, nil, timeout)
 }
 
 func call(path string, env []string, args []string, stdin []byte, timeout time.Duration) ([]byte, error) {

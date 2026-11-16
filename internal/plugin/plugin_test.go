@@ -206,3 +206,39 @@ esac
 		t.Errorf("a changed plugin is asked again: %+v", on)
 	}
 }
+
+func TestAPluginDeclaresAnAgentAndAnswersAboutIt(t *testing.T) {
+	h, dir := host(t)
+	write(t, dir, "echo", `case "$1" in
+manifest) echo '{"protocol":1,"agent":{"name":"echo","commands":["echo-agent"],"title":"^echo "}}' ;;
+agent) shift; echo "asked $* by $MIA_PLUGIN" ;;
+esac
+`)
+	write(t, dir, "spaced", `echo '{"protocol":1,"agent":{"name":"two words"}}'`)
+	write(t, dir, "titled", `echo '{"protocol":1,"agent":{"name":"titled","title":"("}}'`)
+	h.Configured = []string{"echo", "spaced", "titled"}
+	all, err := h.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range all {
+		switch p.Name {
+		case "echo":
+			if p.Problem != "" || p.Manifest.Agent == nil || p.Manifest.Agent.Name != "echo" || p.Manifest.Agent.Commands[0] != "echo-agent" {
+				t.Fatalf("the agent it declares: %+v", p)
+			}
+			out, err := p.Ask(Context{MiaDir: t.TempDir()}, time.Second, "agent", "resume", "e1")
+			if err != nil || strings.TrimSpace(string(out)) != "asked resume e1 by echo" {
+				t.Errorf("asked = %q %v", out, err)
+			}
+		case "spaced":
+			if !strings.Contains(p.Problem, "one word") {
+				t.Errorf("an agent's name is one word: %q", p.Problem)
+			}
+		case "titled":
+			if !strings.Contains(p.Problem, "regular expression") {
+				t.Errorf("a title that is no pattern is said so: %q", p.Problem)
+			}
+		}
+	}
+}
