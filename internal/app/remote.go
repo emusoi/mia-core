@@ -256,6 +256,9 @@ func (a *App) answerPath(machine string) string {
 // keepAnswer remembers whether the machine answered, for what has to know
 // without asking it: the status line.
 func (a *App) keepAnswer(machine string, answers bool, detail string) {
+	if a.MiaDir == "" {
+		return // outside a repository there is nowhere to keep it
+	}
 	data, err := json.Marshal(answer{answers, detail, time.Now()})
 	if err != nil {
 		return

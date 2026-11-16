@@ -259,6 +259,12 @@ func Open(dir string) (*App, error) {
 	}, nil
 }
 
+// Outside is mia where there is no repository: it knows the machines and
+// this computer, and nothing a repository keeps.
+func Outside() *App {
+	return &App{Runtimes: runtime.Store{Path: config.RuntimesPath()}}
+}
+
 func globalNames() (*names.Store, error) {
 	path := config.NamesPath()
 	if path == "" {

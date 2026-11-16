@@ -22,7 +22,8 @@ introduced by newer builds:
 ```
 
 The actual answer includes every query and feature, not this shortened list.
-Check capabilities before using a feature. Existing response shapes are not
+`capabilities`, `machines`, `here` and `repos` answer from any folder; the
+other queries are about a repository and need one. Check capabilities before using a feature. Existing response shapes are not
 wrapped in a version envelope.
 
 ## JSON commands

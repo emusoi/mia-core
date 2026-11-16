@@ -22,6 +22,11 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **`mia api machines`, `here` and `capabilities` answer from anywhere.**
+  Outside a repository they said "not inside a git repository", though
+  none is about one: the machines and how busy each is are the same from
+  any folder. A machine's worktrees are still listed only from inside the
+  repository they belong to.
 - **A session is remembered while you work in it.** mia's sessions show
   nothing on the right of their status line, and so never ran the look
   that remembers them: what `mia resurrect` brought back was the session

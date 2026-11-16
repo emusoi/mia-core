@@ -120,6 +120,9 @@ func Run(args []string) int {
 			}
 			return emit(repos)
 		}
+		if len(rest) == 0 || !slices.Contains(apiQueryList, rest[0]) || rest[0] == "capabilities" {
+			return cmdAPI(nil, rest) // the usage, what the API speaks, a query there is not: no repository's
+		}
 	}
 
 	here, err := os.Getwd()
@@ -130,6 +133,9 @@ func Run(args []string) int {
 	if err != nil {
 		if verb == "tmux" { // prefix m, where a printed error is seen by no one
 			return tmuxSay(rest[1:], err)
+		}
+		if verb == "api" && len(rest) == 1 && (rest[0] == "machines" || rest[0] == "here") && errors.Is(err, git.ErrNotARepository) {
+			return cmdAPI(app.Outside(), rest) // the machines are the same from anywhere
 		}
 		return fail(err)
 	}
