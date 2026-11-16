@@ -72,10 +72,12 @@ type Config struct {
 }
 
 // Agent is what an agent is started with when mia starts it and nothing
-// else is said: a model and an effort, each from those it has.
+// else is said: a model and an effort, each from those it has, and the
+// account its sessions start on.
 type Agent struct {
-	Model  string `toml:"model" json:"model,omitempty"`
-	Effort string `toml:"effort" json:"effort,omitempty"`
+	Model   string `toml:"model" json:"model,omitempty"`
+	Effort  string `toml:"effort" json:"effort,omitempty"`
+	Account string `toml:"account" json:"account,omitempty"`
 }
 
 type Main struct {
@@ -88,6 +90,9 @@ type Main struct {
 	// when empty.
 	Model  string `toml:"model" json:"model,omitempty"`
 	Effort string `toml:"effort" json:"effort,omitempty"`
+	// Account is the account of its agent it is started on; its agent's
+	// own in [agents] when empty.
+	Account string `toml:"account" json:"account,omitempty"`
 }
 
 type Keys []string
