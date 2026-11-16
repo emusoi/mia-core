@@ -44,6 +44,13 @@ func TestCarriersPackTheNewestConversationUnderTheNewPath(t *testing.T) {
 				t.Fatalf("pack: %v, %d bytes", err, len(packed))
 			}
 			files := untar(t, packed)
+			for name := range files {
+				// macOS tar adds one for each file with attributes of its own; on Linux
+				// it is litter, and the newest *.jsonl there the next time
+				if strings.HasPrefix(filepath.Base(name), "._") {
+					t.Errorf("packed %s: an AppleDouble file must not cross", name)
+				}
+			}
 			got, ok := files[c.there]
 			if !ok {
 				t.Fatalf("packed %v, wanted %s", keys(files), c.there)

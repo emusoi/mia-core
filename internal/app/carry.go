@@ -19,7 +19,7 @@ pack)
 	tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 	mkdir -p "$tmp/.claude/projects/$to"
 	sed "s|$1|$2|g" "$newest" > "$tmp/.claude/projects/$to/$(basename "$newest")"
-	tar -cf - -C "$tmp" .claude ;;
+	COPYFILE_DISABLE=1 tar -cf - -C "$tmp" .claude ;;
 esac`,
 	// codex keeps every conversation under ~/.codex/sessions/<y>/<m>/<d>/,
 	// its folder on the first line, the time in the name so sorting finds the
@@ -36,7 +36,7 @@ pack)
 	tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 	mkdir -p "$tmp/.codex/sessions/$(dirname "$rel")"
 	sed "s|$1|$2|g" "$newest" > "$tmp/.codex/sessions/$rel"
-	tar -cf - -C "$tmp" .codex ;;
+	COPYFILE_DISABLE=1 tar -cf - -C "$tmp" .codex ;;
 esac`,
 	// pi keeps a folder's conversations in ~/.pi/agent/sessions/-<the path
 	// with / as ->--; --continue picks the newest there.
@@ -50,7 +50,7 @@ pack)
 	tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 	mkdir -p "$tmp/.pi/agent/sessions/$to"
 	sed "s|$1|$2|g" "$newest" > "$tmp/.pi/agent/sessions/$to/$(basename "$newest")"
-	tar -cf - -C "$tmp" .pi ;;
+	COPYFILE_DISABLE=1 tar -cf - -C "$tmp" .pi ;;
 esac`,
 }
 

@@ -22,6 +22,10 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **A move from a Mac leaves no `._` files beside the conversation.**
+  macOS tar packed an AppleDouble file for every file and folder of an
+  agent's conversation, which Linux unpacked as `._<id>.jsonl` beside the
+  real one, where the next move back could take it for the newest.
 - **`mia api machines`, `here` and `capabilities` answer from anywhere.**
   Outside a repository they said "not inside a git repository", though
   none is about one: the machines and how busy each is are the same from
