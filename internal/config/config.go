@@ -71,6 +71,9 @@ type Config struct {
 type Main struct {
 	// Agent is which agent the main one is; claude when empty.
 	Agent string `toml:"agent" json:"agent,omitempty"`
+	// Machine is the machine it lives on, by the name `mia api machines`
+	// gives it; this one when empty.
+	Machine string `toml:"machine" json:"machine,omitempty"`
 }
 
 type Keys []string

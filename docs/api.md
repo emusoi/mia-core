@@ -145,12 +145,17 @@ any folder, and starts and writes nothing.
 |---|---|
 | `running` | the agent is in a window of its session |
 | `agent` | the one that runs; when none does, the one `[main] agent` names |
-| `machine` | `local`: the machine that was asked, as `mia api machines` calls it |
+| `machine` | the machine it lives on, as `mia api machines` calls it: `local` when that is the one asked, and the name `[main] machine` gives when it is another, whose mia answered |
 | `home`, `session` | its folder and its tmux session, whether or not they are there yet |
 | `window` | the agent's window; left out when it is not running |
 | `conversation` | the one it has open — claude says which — or, of another agent and when it is not running, the last written to in its folder; empty when there is none, or mia cannot read that agent's |
 | `working` | it is doing something now: claude's pane title says so, and of another agent, that its window wrote in the last three seconds |
 | `since` | when its session was started; left out when it is not running |
+
+When `[main] machine` names another machine, `mia api main` and
+`mia api main turns` are that machine's answers, asked over ssh: `home`,
+`session` and `window` are its own. One that does not answer is an error
+in a line that names it, exit 1, and is not asked again for 30 seconds.
 
 `mia api main turns [--after <n>]` is that conversation as
 [`mia api conversation`](#conversations) gives one, an empty list when

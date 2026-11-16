@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -38,12 +40,43 @@ func cmdMain(args []string) int {
 		return exitOK
 	}
 	asJSON := sub != "say" && take(&args, "--json")
-	if sub != "say" && len(args) > 0 {
+	if !slices.Contains([]string{"status", "start", "stop", "say", "interrupt"}, sub) || (sub != "say" && len(args) > 0) {
 		return usageErr(mainUsage)
+	}
+	text := ""
+	if sub == "say" {
+		if len(args) > 0 && args[0] == "--" {
+			args = args[1:]
+		}
+		if text = strings.TrimSpace(strings.Join(args, " ")); text == "" {
+			return usageErr("mia main say <text…>")
+		}
 	}
 	a, err := atMain()
 	if err != nil {
 		return fail(err)
+	}
+	if machine, elsewhere, err := a.MainElsewhere(); err != nil {
+		return fail(err)
+	} else if elsewhere {
+		// it lives on another machine: that machine's mia does it, and says it
+		ask, state := []string{"main", sub}, asJSON && (sub == "status" || sub == "start")
+		switch {
+		case sub == "say":
+			ask = append(ask, "--", text)
+		case state:
+			ask = append(ask, "--json")
+		}
+		out, err := a.OnMainMachine(machine, false, ask...)
+		switch {
+		case err != nil:
+			return fail(err)
+		case state:
+			return sayMainOf(machine.Name, out)
+		case out != "":
+			fmt.Println(out)
+		}
+		return exitOK
 	}
 	switch sub {
 	case "status":
@@ -61,18 +94,20 @@ func cmdMain(args []string) int {
 		fmt.Println("the main agent is stopped; its folder and conversations stay")
 		return exitOK
 	case "say":
-		if len(args) > 0 && args[0] == "--" {
-			args = args[1:]
-		}
-		text := strings.TrimSpace(strings.Join(args, " "))
-		if text == "" {
-			return usageErr("mia main say <text…>")
-		}
 		return exitFor(a.SayToMain(text))
-	case "interrupt":
-		return exitFor(a.InterruptMain())
 	}
-	return usageErr(mainUsage)
+	return exitFor(a.InterruptMain())
+}
+
+// sayMainOf prints where the main agent stands as another machine's mia
+// said it, with that machine's name where it said local.
+func sayMainOf(machine, said string) int {
+	var state app.MainState
+	if err := json.Unmarshal([]byte(said), &state); err != nil {
+		return fail(fmt.Errorf("%s's mia did not say where the main agent stands: %w", machine, err))
+	}
+	state.Machine = machine
+	return emit(state)
 }
 
 func sayMain(state app.MainState, asJSON bool) int {
@@ -116,7 +151,18 @@ func cmdAPIMain(args []string) int {
 		}
 		return emit(standing)
 	}
+	machine, elsewhere, err := a.MainElsewhere()
+	if err != nil {
+		return fail(err)
+	}
 	if len(rest) == 0 {
+		if elsewhere {
+			out, err := a.OnMainMachine(machine, true, "api", "main")
+			if err != nil {
+				return fail(err)
+			}
+			return sayMainOf(machine.Name, out)
+		}
 		return emit(a.Main())
 	}
 	after := 0
@@ -129,6 +175,14 @@ func cmdAPIMain(args []string) int {
 	}
 	if len(rest) != 1 || rest[0] != "turns" {
 		return usageErr(mainTurnsUsage)
+	}
+	if elsewhere {
+		out, err := a.OnMainMachine(machine, true, "api", "main", "turns", "--after", strconv.Itoa(after))
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Println(out) // its turns, as its mia said them
+		return exitOK
 	}
 	turns, err := a.MainTurns(after)
 	if err != nil {

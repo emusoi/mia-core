@@ -156,7 +156,7 @@ func Run(target string, argv ...string) (string, error) {
 		if target == "" {
 			return "", err // here: there is no machine to name
 		}
-		return "", fmt.Errorf("%s: %s", target, err)
+		return "", fmt.Errorf("%s: %w", target, err) // wrapped: how it exited says whether ssh or the command failed
 	}
 	return out, nil
 }

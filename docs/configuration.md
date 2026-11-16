@@ -95,6 +95,7 @@ In the user-wide config, as a person has one [main agent](main.md):
 | key | meaning |
 |---|---|
 | `[main] agent` | which agent it is: `claude` when left out, or any agent mia knows, one a plugin adds too |
+| `[main] machine` | the machine it lives on, by the name `mia machine list` gives it: `mia main …`, `mia api main` and `mia api main turns` are then run there over ssh. This machine when left out, or `local` |
 
 ## Plugins
 

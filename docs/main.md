@@ -31,6 +31,23 @@ The window is the agent and goes when the agent ends, so a window named
 for an agent is an agent running. `mia resurrect` does not bring the
 session back after tmux goes down; `mia main start` does.
 
+## On which machine
+
+It lives on one machine and is reached from the others. On each of the
+others, the user-wide config names the machine, as `mia machine list`
+does:
+
+```toml
+[main]
+machine = "fedora"
+```
+
+Every `mia main …` there, and `mia api main` and `mia api main turns`, is
+then run by fedora's own mia over ssh, and what it says is printed:
+`mia main say` from a laptop types into the agent on fedora. A machine
+that does not answer is an error that names it. Left out, or `local`, the
+main agent is this machine's, and so it is on the machine itself.
+
 ## Which agent
 
 claude, unless the user-wide config says another:

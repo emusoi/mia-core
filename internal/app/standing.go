@@ -229,17 +229,36 @@ func optionsOn(screen string) []string {
 // one each asking.
 const unreachableFor = 30 * time.Second
 
+// unreachable is why a machine did not answer, when it was asked and did
+// not within unreachableFor.
+func (a *App) unreachable(machine string) (string, bool) {
+	data, err := os.ReadFile(a.answerPath(machine))
+	if err != nil {
+		return "", false
+	}
+	var last answer
+	if json.Unmarshal(data, &last) != nil || last.Answers || time.Since(last.At) >= unreachableFor {
+		return "", false
+	}
+	return last.Detail, true
+}
+
+// askMia runs a machine's own mia with args, from no folder, and gives what
+// it printed: how one machine asks another what is a person's and no
+// repository's, where agents stand and the main agent. before is put
+// before the command, for its environment.
+func askMia(machine runtime.Machine, before string, args ...string) (string, error) {
+	return runtime.Run(machine.SSH, append([]string{"sh", "-c", utf8 + before + remoteMia + ` "$@"`, "sh"}, args...)...)
+}
+
 // standingOn asks a machine's own mia where its agents stand.
 func (a *App) standingOn(machine runtime.Machine) (Standing, Answered) {
 	asked := Answered{Name: machine.Name}
-	if data, err := os.ReadFile(a.answerPath(machine.Name)); err == nil {
-		var last answer
-		if json.Unmarshal(data, &last) == nil && !last.Answers && time.Since(last.At) < unreachableFor {
-			asked.Detail = last.Detail
-			return Standing{}, asked
-		}
+	if detail, off := a.unreachable(machine.Name); off {
+		asked.Detail = detail
+		return Standing{}, asked
 	}
-	out, err := runtime.Run(machine.SSH, "sh", "-c", utf8+remoteMia+" api standing --here")
+	out, err := askMia(machine, "", "api", "standing", "--here")
 	var theirs Standing
 	if err == nil {
 		if err = json.Unmarshal([]byte(out), &theirs); err != nil {

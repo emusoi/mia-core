@@ -15,7 +15,9 @@ on GitHub; a tag without its section is not released.
   what it may answer. `mia main say <text…>` types a message into it,
   `mia main interrupt` stops it mid-work, `mia main stop` ends it; started
   again it goes on with its last conversation. `[main] agent` says which
-  agent it is, a plugin's too. `mia api main` is where it stands and
+  agent it is, a plugin's too, and `[main] machine` the machine it lives
+  on: from any other, each of these is asked of that machine's mia over
+  ssh. `mia api main` is where it stands and
   `mia api main turns` its conversation, each of mia's verbs it ran said
   as what it did: "Started goba on mia-desk · claude", "Told olasiti:
   rebase onto main", "Moved sakina to fedora". See [The main agent](main.md).
@@ -33,11 +35,14 @@ on GitHub; a tag without its section is not released.
   as turns for a chat view: what was asked and said, each tool in a line,
   questions and their answers, commits made. `mia conversation resume <id>
   [--in <worktree>]` opens a window with the agent taking it up again,
-  where it was made or in another worktree. All of it for claude, codex
+  where it was made or in another worktree; one copied there is listed
+  once for each folder, and `--worktree <name>` reads or resumes the copy
+  in one. All of it for claude, codex
   and pi, from their own transcripts, with nothing recorded as they work.
 
 - **`mia recall` reads codex's and pi's conversations too**, and with
-  `--json` says each one's `agent` and `n`, the turn it came up in.
+  `--json` says each one's `agent`, `worktree` and `n`, the turn it came
+  up in.
 
 - **A plugin can add an agent.** Its manifest declares the agent and what
   means it in a window, and mia asks the plugin for its conversations,

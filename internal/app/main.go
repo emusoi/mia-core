@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/emusoi/mia-core/internal/config"
@@ -77,6 +78,52 @@ type MainState struct {
 	Working bool `json:"working"`
 	// Since is when its session was started.
 	Since time.Time `json:"since,omitzero"`
+}
+
+// mainHere, in the environment, makes mia answer for the main agent of the
+// machine it runs on whatever the config says: what one machine sets when
+// it asks another, so two that name each other do not ask in a circle.
+const mainHere = "MIA_MAIN_HERE"
+
+// MainElsewhere is the machine the config says the main agent lives on,
+// when that is not this one: everything about the main agent is then asked
+// of that machine's mia.
+func (a *App) MainElsewhere() (runtime.Machine, bool, error) {
+	name := a.Config.Main.Machine
+	if name == "" || name == runtime.Local || os.Getenv(mainHere) != "" {
+		return runtime.Machine{}, false, nil
+	}
+	machine, err := a.Runtimes.Get(name)
+	if err != nil {
+		return runtime.Machine{}, false, fmt.Errorf("[main] machine = %q: %w", name, err)
+	}
+	return machine, true, nil
+}
+
+// sshFailed is how ssh exits when it is ssh that failed, and not the
+// command it ran.
+const sshFailed = 255
+
+// OnMainMachine runs mia with args on the machine the main agent lives on,
+// as standing asks a machine, and gives what it printed. A machine that
+// does not answer is an error that names it; polled, one that did not is
+// not asked again for a while, as with standing.
+func (a *App) OnMainMachine(machine runtime.Machine, polled bool, args ...string) (string, error) {
+	const unanswered = "%s, the machine the main agent lives on, does not answer: %s"
+	if detail, off := a.unreachable(machine.Name); polled && off {
+		return "", fmt.Errorf(unanswered, machine.Name, detail)
+	}
+	out, err := askMia(machine, mainHere+"=1 ", args...)
+	if err == nil {
+		a.keepAnswer(machine.Name, true, "")
+		return out, nil
+	}
+	detail := strings.TrimPrefix(run.FirstLine(err.Error()), machine.SSH+": ")
+	if run.ExitCode(err) != sshFailed {
+		return "", fmt.Errorf("on %s: %s", machine.Name, strings.TrimPrefix(detail, "mia: ")) // its mia answered, and said why not
+	}
+	a.keepAnswer(machine.Name, false, detail)
+	return "", fmt.Errorf(unanswered, machine.Name, detail)
 }
 
 func (a *App) mainHost() session.Host {
