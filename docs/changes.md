@@ -9,6 +9,11 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **`mia move --dry-run`** reads the worktree and says what would cross —
+  the branch, how many files staged, changed and new, what git ignores and
+  so stays, the windows that would open — after checking the machine
+  answers. Nothing is moved.
+
 - **A move names what it leaves.** Files git ignores (`.env`, a build
   folder) never crossed, and went with the worktree when it was removed
   where it was, unsaid. `mia move` now names them before it takes

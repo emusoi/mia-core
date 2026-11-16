@@ -12,16 +12,25 @@ import (
 // cmdMove is mia move <worktree>[@<machine>] <machine|local>: the worktree,
 // its uncommitted work and its windows, taken to the other side.
 func cmdMove(a *app.App, args []string) int {
+	dry := take(&args, "--dry-run")
 	if len(args) != 2 {
-		return usageErr("mia move <worktree>[@<machine>] <machine|local>")
+		return usageErr("mia move [--dry-run] <worktree>[@<machine>] <machine|local>")
 	}
 	name, from, _ := strings.Cut(args[0], "@")
 	if from == "" {
 		from = runtime.Local
 	}
-	moved, err := a.Move(name, from, args[1], os.Stdout)
+	moved, err := a.Move(name, from, args[1], dry, os.Stdout)
 	if err != nil {
 		return fail(err)
+	}
+	if dry {
+		var what []string
+		for _, w := range moved.Windows {
+			what = append(what, w.What())
+		}
+		fmt.Printf("would open %d window(s) there: %s\nnothing was moved\n", len(what), strings.Join(what, " · "))
+		return exitOK
 	}
 	where := args[1]
 	if where == runtime.Local {

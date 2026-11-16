@@ -49,6 +49,9 @@ func TestUncommittedWorkCrossesWithItsIndex(t *testing.T) {
 	if said := work.staysBehind(); said != "not crossing, since git ignores them: debug.log" {
 		t.Errorf("what stays behind was said as %q", said)
 	}
+	if said := work.summary(); said != "with 3 file(s) staged, 3 changed and not staged, 1 new" {
+		t.Errorf("the work was summed up as %q", said)
+	}
 	if err := local.putUncommitted(to, work); err != nil {
 		t.Fatal(err)
 	}

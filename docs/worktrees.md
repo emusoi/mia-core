@@ -182,6 +182,7 @@ here as `fedora/<branch>` on every refresh; pushing them anywhere is yours.
 ```bash
 mia move monduli fedora          # from here to fedora
 mia move monduli@fedora local    # and back
+mia move --dry-run monduli fedora    # what would cross; nothing moves
 ```
 
 The branch goes across, and so does what is not committed: changed files

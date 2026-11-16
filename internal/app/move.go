@@ -103,8 +103,8 @@ var shells = map[string]bool{"zsh": true, "bash": true, "sh": true, "fish": true
 // uncommitted work and its session's windows, each restarted there; a
 // claude, codex or pi window has its conversation carried too.
 // Only once all of that is there is the worktree here removed; its branch
-// stays where it was.
-func (a *App) Move(name, from, to string, say io.Writer) (Moved, error) {
+// stays where it was. dry only reads, and says what would cross.
+func (a *App) Move(name, from, to string, dry bool, say io.Writer) (Moved, error) {
 	src, err := a.sideOf(from)
 	if err != nil {
 		return Moved{}, err
@@ -135,6 +135,13 @@ func (a *App) Move(name, from, to string, say io.Writer) (Moved, error) {
 	windows := src.windows(name, path)
 	if stays := work.staysBehind(); stays != "" {
 		fmt.Fprintf(say, "%s — they go when %s is removed %s\n", stays, name, src.where())
+	}
+	if dry {
+		if _, err := dst.sh("true"); err != nil {
+			return Moved{}, err
+		}
+		fmt.Fprintf(say, "would take %s across, %s\n", branch, work.summary())
+		return Moved{Name: name, Path: path, Windows: windows}, nil
 	}
 
 	fmt.Fprintf(say, "taking %s across\n", branch)
@@ -188,6 +195,7 @@ type uncommitted struct {
 	staged  []byte // a patch from HEAD to the index
 	changed []byte // a patch from the index to the files
 	files   []byte // a tar of the files git does not know and does not ignore
+	news    int    // how many those are
 	// ignored is what git ignores there, a folder as one: it does not cross.
 	ignored []string
 }
@@ -212,7 +220,8 @@ func (s side) uncommitted(path string) (uncommitted, error) {
 	if err != nil {
 		return u, err
 	}
-	if strings.TrimSpace(untracked) != "" {
+	if untracked = strings.TrimSpace(untracked); untracked != "" {
+		u.news = strings.Count(untracked, "\n") + 1
 		if u.files, err = s.bytesOf(`cd "$1" && git ls-files --others --exclude-standard -z | COPYFILE_DISABLE=1 tar --null -cf - -T -`, path); err != nil {
 			return u, err
 		}
@@ -225,6 +234,17 @@ func (s side) uncommitted(path string) (uncommitted, error) {
 		u.ignored = strings.Split(ignored, "\n")
 	}
 	return u, nil
+}
+
+// summary says the uncommitted work in a line, by how many files.
+func (u uncommitted) summary() string {
+	if u.none() {
+		return "with nothing uncommitted"
+	}
+	files := func(patch []byte) int {
+		return bytes.Count(append([]byte("\n"), patch...), []byte("\ndiff --git "))
+	}
+	return fmt.Sprintf("with %d file(s) staged, %d changed and not staged, %d new", files(u.staged), files(u.changed), u.news)
 }
 
 // staysBehind says what of the worktree does not cross, "" when all of it does.
