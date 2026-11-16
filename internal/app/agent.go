@@ -39,6 +39,34 @@ type Agent struct {
 	held string
 	// talks is its conversations; nil for an agent mia cannot read them of.
 	talks talks
+	// notes is the file in its folder it reads its instructions from;
+	// AGENTS.md when empty.
+	notes string
+	// stop is the key that stops it mid-work, as tmux names it; Escape
+	// when empty.
+	stop string
+}
+
+// start is the word that runs it.
+func (a Agent) start() string {
+	if len(a.Commands) > 0 {
+		return a.Commands[0]
+	}
+	return a.Name
+}
+
+func (a Agent) notesFile() string {
+	if a.notes != "" {
+		return a.notes
+	}
+	return "AGENTS.md"
+}
+
+func (a Agent) stopKey() string {
+	if a.stop != "" {
+		return a.stop
+	}
+	return "Escape"
 }
 
 // talks is one agent's conversations, as mia reads them.
@@ -83,7 +111,7 @@ func fixed(format string) func(string) (string, error) {
 // them again.
 var builtin = []Agent{
 	{Name: "claude", goOn: "--continue", has: []string{"-c", "--continue", "-r", "--resume"},
-		resume: fixed("claude --resume %s"), byFolder: true, carrier: carriers["claude"],
+		resume: fixed("claude --resume %s"), byFolder: true, carrier: carriers["claude"], notes: "CLAUDE.md",
 		// claude writes the session of each of its processes to sessions/<pid>.json
 		held:  `pid="$(ps -o tpgid= -p "$1" | tr -d ' ')"; cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions/$pid.json" 2>/dev/null`,
 		talks: transcripts{agent: "claude", files: claudeFiles, find: claudeFind, id: claudeID, decode: claudeLine}},

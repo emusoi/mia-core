@@ -538,6 +538,24 @@ func AgentTitle(title string) string {
 	return strings.TrimSpace(title[size:])
 }
 
+// Spinning reports whether a pane's title is one claude gives while it
+// works: a braille spinner before what it is doing.
+func Spinning(title string) bool {
+	mark, _ := utf8.DecodeRuneInString(title)
+	return mark >= 0x2800 && mark <= 0x28FF
+}
+
+// Created is when the worktree's session was started; zero when there is
+// none.
+func (h Host) Created(worktree string) time.Time {
+	out, err := h.run("display-message", "-p", "-t", Target(worktree, ""), "#{session_created}")
+	seconds, bad := strconv.ParseInt(strings.TrimSpace(out), 10, 64)
+	if err != nil || bad != nil {
+		return time.Time{}
+	}
+	return time.Unix(seconds, 0)
+}
+
 type Process struct {
 	PID  int
 	PPID int

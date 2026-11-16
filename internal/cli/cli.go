@@ -112,7 +112,12 @@ func Run(args []string) int {
 		return cmdPlugin(configHere(), rest, asJSON)
 	case "doctor":
 		return cmdDoctor(rest, asJSON)
+	case "main":
+		return cmdMain(rest)
 	case "api":
+		if len(rest) > 0 && rest[0] == "main" { // the person's, from anywhere
+			return cmdAPIMain(rest)
+		}
 		if len(rest) == 1 && rest[0] == "repos" { // every repository, from anywhere
 			repos, err := app.Repositories()
 			if err != nil {
@@ -434,7 +439,7 @@ func Run(args []string) int {
 
 func passesArgumentsThrough(verb string) bool {
 	switch verb {
-	case "run", "env":
+	case "run", "env", "main":
 		return true
 	case "help", "-h", "--help", "version", "--version", "__complete", "list", "remove", "windows", "plugins":
 		return false

@@ -62,6 +62,15 @@ type Config struct {
 	Names []string `toml:"names" json:"names,omitempty"`
 
 	Plugin map[string]map[string]any `toml:"plugin" json:"plugin,omitempty"`
+
+	// Main is the main agent's: a person has one, so it belongs in the
+	// user-wide config.
+	Main Main `toml:"main" json:"main"`
+}
+
+type Main struct {
+	// Agent is which agent the main one is; claude when empty.
+	Agent string `toml:"agent" json:"agent,omitempty"`
 }
 
 type Keys []string
