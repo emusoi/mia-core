@@ -23,7 +23,7 @@ func TestAnAgentContinuesItsConversation(t *testing.T) {
 		"/usr/local/bin/cursor-agent --use-system-ca /opt/cursor-agent/index.js": "cursor-agent --continue",
 		"": "",
 	} {
-		if got := again(in, ""); got != want {
+		if got := again(builtin, in, ""); got != want {
 			t.Errorf("again(%q) = %q, want %q", in, got, want)
 		}
 	}
@@ -32,14 +32,14 @@ func TestAnAgentContinuesItsConversation(t *testing.T) {
 		"claude --model opus -c":        "claude --model opus --resume 23f98c02",
 		"claude --resume old --verbose": "claude --verbose --resume 23f98c02",
 	} {
-		if got := again(in, "23f98c02"); got != want {
+		if got := again(builtin, in, "23f98c02"); got != want {
 			t.Errorf("again(%q, conversation) = %q, want %q", in, got, want)
 		}
 	}
 	// what again gives, given again, stays as it is
 	for _, in := range []string{"claude", "codex", "pi", "opencode", "gemini", "cursor-agent"} {
-		if once := again(in, ""); again(once, "") != once {
-			t.Errorf("again(%q) twice = %q, want %q", in, again(once, ""), once)
+		if once := again(builtin, in, ""); again(builtin, once, "") != once {
+			t.Errorf("again(%q) twice = %q, want %q", in, again(builtin, once, ""), once)
 		}
 	}
 }
@@ -58,7 +58,7 @@ func TestWhatStaysIsKeptAndWhatFinishesIsNot(t *testing.T) {
 		"tail":                       "",
 		"":                           "",
 	} {
-		if got := stays(in, []string{"tail -f"}); got != want {
+		if got := stays(builtin, in, []string{"tail -f"}); got != want {
 			t.Errorf("stays(%q) = %q, want %q", in, got, want)
 		}
 	}

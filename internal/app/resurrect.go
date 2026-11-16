@@ -70,7 +70,7 @@ func (a *App) remember(opened map[string][]Window) error {
 		before, had := saved[record.Name]
 		switch {
 		case session.Here().Exists(record.Name):
-			windows := side{}.windows(record.Name, record.Path)
+			windows := side{}.windows(a.agents(), record.Name, record.Path)
 			if was, ok := opened[record.Name]; ok && len(was) == len(windows) {
 				for i := range was { // opened in this order
 					if then, now := was[i].panes(), windows[i].panes(); len(then) == len(now) {
@@ -79,9 +79,9 @@ func (a *App) remember(opened map[string][]Window) error {
 						}
 					}
 				}
-				keepRunning(windows, was, a.Config.Keep)
+				keepRunning(a.agents(), windows, was, a.Config.Keep)
 			} else if had && before.Server == server {
-				keepRunning(windows, before.Windows, a.Config.Keep)
+				keepRunning(a.agents(), windows, before.Windows, a.Config.Keep)
 			}
 			kept[record.Name] = remembered{Server: server, Windows: windows, Seen: time.Now()}
 		case had && before.Server == server && !before.Closed:
@@ -118,8 +118,8 @@ var kept = []string{"nvim", "vim", "hx", "npm run dev", "npm start", "pnpm dev",
 
 // stays names the program a pane keeps after it ends — an agent, or one of
 // kept and keep, by its first words — and is "" for any other.
-func stays(command string, keep []string) string {
-	if name, _ := agentOf(command); name != "" {
+func stays(table []Agent, command string, keep []string) string {
+	if name, _ := agentOf(table, command); name != "" {
 		return name
 	}
 	words := strings.Fields(command)
@@ -139,7 +139,7 @@ func stays(command string, keep []string) string {
 // running, when that is one that stays: so an agent, an editor or a dev
 // server that ended before tmux went down still comes back. One quit on
 // purpose comes back too, until its pane runs something else.
-func keepRunning(now, before []Window, keep []string) {
+func keepRunning(table []Agent, now, before []Window, keep []string) {
 	was := map[string]Pane{}
 	for i := range before {
 		for _, p := range before[i].panes() {
@@ -148,7 +148,7 @@ func keepRunning(now, before []Window, keep []string) {
 	}
 	for i := range now {
 		for _, p := range now[i].panes() {
-			if p.Command != "" || stays(was[p.ID].Command, keep) == "" {
+			if p.Command != "" || stays(table, was[p.ID].Command, keep) == "" {
 				continue
 			}
 			p.Command, p.Conversation = was[p.ID].Command, was[p.ID].Conversation
@@ -223,7 +223,7 @@ func (a *App) Resurrect(dry bool, names ...string) ([]Revived, error) {
 		for i := range windows {
 			windows[i].Splits = slices.Clone(windows[i].Splits)
 			for _, p := range windows[i].panes() {
-				p.Command = again(p.Command, p.Conversation)
+				p.Command = again(a.agents(), p.Command, p.Conversation)
 			}
 		}
 		if !dry {
@@ -246,52 +246,17 @@ func (a *App) Resurrect(dry bool, names ...string) ([]Revived, error) {
 	return revived, nil
 }
 
-// agents is each coding agent mia knows: what makes it go on with its
-// folder's last conversation, and the words that say it already does.
-var agents = map[string]struct {
-	resume string
-	has    []string
-}{
-	"claude":       {"--continue", []string{"-c", "--continue", "-r", "--resume"}},
-	"codex":        {"resume --last", []string{"resume"}},
-	"pi":           {"--continue", []string{"-c", "--continue", "-r", "--resume", "--session"}},
-	"opencode":     {"--continue", []string{"-c", "--continue", "-s", "--session"}},
-	"gemini":       {"--resume latest", []string{"-r", "--resume"}},
-	"cursor-agent": {"--continue", []string{"--continue", "--resume", "resume"}},
-}
-
-// agentOf is the agent a command line runs and what it was given, "" for
-// anything else. ps shows some behind node, or with their launcher's own
-// arguments.
-func agentOf(command string) (string, []string) {
-	words := strings.Fields(command)
-	if len(words) > 1 && (filepath.Base(words[0]) == "node" || filepath.Base(words[0]) == "bun") {
-		words = words[1:]
-	}
-	if len(words) == 0 {
-		return "", nil
-	}
-	name := filepath.Base(words[0])
-	if _, ok := agents[name]; !ok {
-		return "", nil
-	}
-	args := slices.Clone(words[1:])
-	if name == "cursor-agent" {
-		args = slices.DeleteFunc(args, func(a string) bool { return a == "--use-system-ca" || strings.HasSuffix(a, "/index.js") })
-	}
-	return name, args
-}
-
 // again is how to start a window's program anew: an agent goes on with its
 // folder's last conversation, a claude with the very one it had; anything
 // else runs as it did.
 // ponytail: an agent started with a prompt gets the prompt again, unquoted;
 // keep each window's own conversation id, as for claude, if that bites.
-func again(command, conversation string) string {
-	name, args := agentOf(command)
+func again(table []Agent, command, conversation string) string {
+	name, args := agentOf(table, command)
 	if name == "" {
 		return command
 	}
+	agent, _ := agentNamed(table, name)
 	start := name // by name: the path ps shows is one version's
 	if name == "claude" {
 		start = strings.Fields(command)[0]
@@ -313,11 +278,11 @@ func again(command, conversation string) string {
 		return strings.Join(append(kept, "--resume", conversation), " ")
 	}
 	words := append([]string{start}, args...)
-	resumes := slices.ContainsFunc(args, func(a string) bool { return slices.Contains(agents[name].has, a) })
+	resumes := slices.ContainsFunc(args, func(a string) bool { return slices.Contains(agent.has, a) })
 	// codex resumes by a subcommand, which only flags may come before
 	prompted := name == "codex" && slices.ContainsFunc(args, func(a string) bool { return !strings.HasPrefix(a, "-") })
-	if !resumes && !prompted {
-		words = append(words, agents[name].resume)
+	if !resumes && !prompted && agent.goOn != "" {
+		words = append(words, agent.goOn)
 	}
 	return strings.Join(words, " ")
 }

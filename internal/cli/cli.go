@@ -140,6 +140,7 @@ func Run(args []string) int {
 		return fail(err)
 	}
 	a.Events = func(e app.Event) { sendEvent(a, e) }
+	a.Plugins = pluginHost(a.Config)
 
 	switch verb {
 	case "tmux":
@@ -219,19 +220,21 @@ func Run(args []string) int {
 			return emit(found)
 		}
 		if len(found) == 0 {
-			fmt.Println("no conversation of claude's here mentions it")
+			fmt.Println("no conversation here mentions it")
 		}
 		for i, r := range found {
 			if i > 0 {
 				fmt.Println()
 			}
-			who := "claude"
+			who := r.Agent
 			if r.Yours {
 				who = "you"
 			}
-			fmt.Printf("%s  %s\n  %s: %s\n  cd %s && claude --resume %s\n", r.At.Local().Format("2006-01-02 15:04"), filepath.Base(r.Cwd), who, r.Line, r.Cwd, r.Session)
+			fmt.Printf("%s  %s\n  %s: %s\n  cd %s && %s\n", r.At.Local().Format("2006-01-02 15:04"), filepath.Base(r.Cwd), who, r.Line, r.Cwd, a.ResumeCommand(r.Agent, r.Session))
 		}
 		return exitOK
+	case "conversation", "conversations":
+		return cmdConversation(a, rest, asJSON)
 	case "why":
 		if len(rest) != 1 {
 			return usageErr("mia why <file:line|commit>")
@@ -1351,20 +1354,10 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		return exitFor(a.SelectWindow(record, name))
 	case "new":
 		if command, ok := a.Config.Launch[name]; ok && len(argv) == 0 && !editor {
-			shell := a.Config.Dotfiles.Shell
-			if shell == "" {
-				host, err := a.SessionHostOf(record)
-				if err != nil {
-					return fail(err)
-				}
-				if host.SSH == "" {
-					shell = os.Getenv("SHELL")
-				}
-				if shell == "" {
-					shell = "/bin/sh"
-				}
+			var err error
+			if argv, err = a.LaunchArgv(record, command); err != nil {
+				return fail(err)
 			}
-			argv = []string{shell, "-lc", command + "; exec " + run.ShellJoin([]string{shell}) + " -l"}
 		}
 		if editor {
 			command := a.Config.EditorCommand()

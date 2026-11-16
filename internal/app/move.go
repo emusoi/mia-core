@@ -153,7 +153,7 @@ func (a *App) Move(name, from, to string, dry bool, say io.Writer) (Moved, error
 	if err != nil {
 		return Moved{}, err
 	}
-	windows := src.windows(name, path)
+	windows := src.windows(a.agents(), name, path)
 	if stays := work.staysBehind(); stays != "" {
 		fmt.Fprintf(say, "%s — they go when %s is removed %s\n", stays, name, src.where())
 	}
@@ -484,22 +484,25 @@ func (a *App) carryBranch(src, dst side, branch string) error {
 	return git.Push(a.Root, dst.machine.Name, "refs/heads/"+branch+":refs/heads/"+branch)
 }
 
-// windows is the session's windows: name, folder under the worktree, and
-// the command running there when it is not just a shell.
-// conversationOf is the claude session the program in the foreground of a
-// pane's process runs: claude writes it to sessions/<pid>.json.
-func (s side) conversationOf(panePID string) string {
-	out, err := s.sh(`pid="$(ps -o tpgid= -p "$1" | tr -d ' ')"; cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/sessions/$pid.json" 2>/dev/null`, panePID)
+// conversationOf is the conversation the program in the foreground of a
+// pane's process has open, for an agent that says: held prints what it wrote.
+func (s side) conversationOf(held, panePID string) string {
+	out, _ := s.sh(held, panePID)
+	return sessionIn(out)
+}
+
+// sessionIn is the conversation named in what an agent wrote of a process.
+func sessionIn(written string) string {
 	var running struct {
 		SessionID string `json:"sessionId"`
 	}
-	if err != nil || json.Unmarshal([]byte(out), &running) != nil {
-		return ""
-	}
+	_ = json.Unmarshal([]byte(written), &running)
 	return running.SessionID
 }
 
-func (s side) windows(name, path string) []Window {
+// windows is the session's windows: name, folder under the worktree, and
+// the command running there when it is not just a shell.
+func (s side) windows(table []Agent, name, path string) []Window {
 	out, err := s.sh(`tmux list-panes -s -t "=mia-$1" -F '#{window_id}	#{window_name}	#{window_layout}	#{pane_current_path}	#{pane_current_command}	#{pane_pid}	#{pane_id}	#{automatic-rename}' 2>/dev/null`, name)
 	if err != nil {
 		return nil
@@ -521,8 +524,10 @@ func (s side) windows(name, path string) []Window {
 			if err != nil || p.Command == "" {
 				p.Command = f[4]
 			}
-			if words := strings.Fields(p.Command); len(words) > 0 && filepath.Base(words[0]) == "claude" {
-				p.Conversation = s.conversationOf(f[5])
+			if words := strings.Fields(p.Command); len(words) > 0 {
+				if agent, ok := agentNamed(table, filepath.Base(words[0])); ok && agent.held != "" {
+					p.Conversation = s.conversationOf(agent.held, f[5])
+				}
 			}
 		}
 		if f[0] != window {
@@ -603,9 +608,10 @@ func (a *App) carry(src, dst side, from, to string, windows []Window) []string {
 	again := map[string]string{} // by program: one folder, one conversation each
 	for i := range windows {
 		for _, p := range windows[i].panes() {
-			program, _ := agentOf(p.Command)
-			script, ok := carriers[program]
-			if !ok {
+			program, _ := agentOf(a.agents(), p.Command)
+			agent, _ := agentNamed(a.agents(), program)
+			script := agent.carrier
+			if script == "" {
 				continue // a shell, or a program with no conversation to carry
 			}
 			if _, done := again[program]; !done {

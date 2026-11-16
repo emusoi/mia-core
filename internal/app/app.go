@@ -19,6 +19,7 @@ import (
 	"github.com/emusoi/mia-core/internal/git"
 	"github.com/emusoi/mia-core/internal/model"
 	"github.com/emusoi/mia-core/internal/names"
+	"github.com/emusoi/mia-core/internal/plugin"
 	"github.com/emusoi/mia-core/internal/resolve"
 	"github.com/emusoi/mia-core/internal/runtime"
 	"github.com/emusoi/mia-core/internal/session"
@@ -50,6 +51,10 @@ type App struct {
 	hereOnce   sync.Once
 	here       string
 	Events     func(Event)
+	// Plugins is where the plugins are, for the agents they add.
+	Plugins    plugin.Host
+	agentsOnce sync.Once
+	agentTable []Agent
 }
 
 type Event struct {

@@ -18,7 +18,7 @@ var groupOf = map[string]string{
 	"dash": "Working", "stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working",
 	"env":    "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
-	"api": "Records", "signal": "Records", "radar": "Working", "tmux": "Working", "move": "Worktrees", "resurrect": "Worktrees", "why": "Records", "recall": "Records", "archive": "Worktrees", "fork": "Worktrees", "unarchive": "Worktrees", "plugin": "Records", "doctor": "Records",
+	"api": "Records", "signal": "Records", "radar": "Working", "tmux": "Working", "move": "Worktrees", "resurrect": "Worktrees", "why": "Records", "recall": "Records", "conversation": "Records", "archive": "Worktrees", "fork": "Worktrees", "unarchive": "Worktrees", "plugin": "Records", "doctor": "Records",
 }
 
 var verbs = []Verb{
@@ -46,7 +46,8 @@ var verbs = []Verb{
 	{"fork", "mia fork [worktree] <branch>", "a new worktree on a new branch from where a worktree is, its uncommitted and untracked work copied: a second try beside the first", false, ""},
 	{"archive", "mia archive [--stop-running] <worktree> · ls", "put a worktree away: everything in it, uncommitted and untracked work too, kept under refs/mia/archive; its branch stays", false, ""},
 	{"unarchive", "mia unarchive <name>", "bring an archived worktree back as it was, under its old name when free", false, ""},
-	{"recall", "mia recall <text…>", "the claude conversations here that mention it, newest first, and how to resume each", true, ""},
+	{"recall", "mia recall <text…>", "the agent conversations here that mention it — claude's, codex's, pi's — newest first, and how to resume each", true, ""},
+	{"conversation", "mia conversation resume <id> [--in <worktree>]", "open a window with the agent taking a conversation up again, in the worktree it was made in or another; `mia api conversations` lists them", false, ""},
 	{"why", "mia why <file:line|commit>", "the claude conversation that made a commit, or the line's last commit: what you asked, and how to resume it", true, ""},
 	{"radar", "mia radar [--new]", "the popup that shows and finds everything; --new makes a worktree", false, ""},
 	{"tmux", "mia tmux [install|uninstall|menu <client>]", "mia's part of the tmux status line, its two popups and its menu, printed, added to ~/.tmux.conf, or taken out; menu draws prefix m", true, ""},

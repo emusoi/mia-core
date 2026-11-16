@@ -1,0 +1,19 @@
+#!/bin/sh
+# The smallest agent plugin: an agent called echo, with two invented
+# conversations in the last folder it is asked about.
+case "$1" in
+manifest) echo '{"protocol":1,"agent":{"name":"echo","commands":["echo-agent"],"title":"^echo-agent "}}' ;;
+agent)
+	case "$2" in
+	conversations)
+		for folder; do :; done
+		printf '[{"id":"e1","cwd":"%s","asked":"say it back","said":"say it back","started":"2026-11-02T10:00:00Z","active":"2026-11-02T10:05:00Z","turns":1},\n' "$folder"
+		printf ' {"id":"e2","cwd":"%s","asked":"and again","said":"and again","started":"2026-11-03T10:00:00Z","active":"2026-11-03T10:05:00Z","turns":1}]\n' "$folder" ;;
+	turns)
+		echo '{"n":1,"kind":"asked","at":"2026-11-02T10:00:00Z","text":"say it back"}'
+		echo '{"n":2,"kind":"said","at":"2026-11-02T10:00:01Z","text":"say it back"}' ;;
+	search) echo '[]' ;;
+	resume) echo "echo-agent $3" ;;
+	carry) ;;
+	esac ;;
+esac

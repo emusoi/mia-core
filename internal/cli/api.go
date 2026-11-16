@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/app"
@@ -63,6 +64,44 @@ func cmdAPI(a *app.App, args []string) int {
 		}
 		return emit(append([]stack.Layer{}, layers...))
 
+	case "conversations":
+		rest := args[1:]
+		want := app.Wanted{Worktree: takeValue(&rest, "--worktree"), Agent: takeValue(&rest, "--agent")}
+		if limit := takeValue(&rest, "--limit"); limit != "" {
+			n, err := strconv.Atoi(limit)
+			if err != nil || n < 0 {
+				return usageErr(conversationsUsage)
+			}
+			want.Limit = n
+		}
+		if len(rest) > 0 {
+			return usageErr(conversationsUsage)
+		}
+		heads, problems := a.Conversations(want)
+		for _, problem := range problems {
+			fmt.Fprintln(os.Stderr, "mia:", problem) // the others are listed all the same
+		}
+		return emit(append([]app.Head{}, heads...))
+
+	case "conversation":
+		rest := args[1:]
+		after := 0
+		if value := takeValue(&rest, "--after"); value != "" {
+			n, err := strconv.Atoi(value)
+			if err != nil || n < 0 {
+				return usageErr(conversationUsage)
+			}
+			after = n
+		}
+		if len(rest) != 1 {
+			return usageErr(conversationUsage)
+		}
+		turns, err := a.ConversationTurns(rest[0], after)
+		if err != nil {
+			return fail(err)
+		}
+		return emit(turns)
+
 	case "base":
 		return emit(struct {
 			Branch string `json:"branch"`
@@ -74,7 +113,12 @@ func cmdAPI(a *app.App, args []string) int {
 	}
 }
 
-var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base"}
+var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base", "conversations", "conversation"}
+
+const (
+	conversationsUsage = "mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]"
+	conversationUsage  = "mia api conversation <id> [--after <n>]"
+)
 
 var apiQueries = strings.Join(apiQueryList, "|")
 
@@ -94,7 +138,7 @@ func apiCapabilities() capabilities {
 		Queries: apiQueryList,
 		Features: []string{
 			"direct-http", "project-config", "doctor", "environment-readiness", "environment-drift",
-			"local-sessions", "remote-sync-preview", "sync-conflicts", "safe-cleanup", "stack-sync", "merged-gc", "compose-environments",
+			"local-sessions", "conversations", "remote-sync-preview", "sync-conflicts", "safe-cleanup", "stack-sync", "merged-gc", "compose-environments",
 		},
 	}
 }

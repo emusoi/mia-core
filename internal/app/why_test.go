@@ -66,7 +66,7 @@ func TestRecallFindsTheConversationYouSaidItIn(t *testing.T) {
 		if err := os.MkdirAll(project, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		line := fmt.Sprintf(`{"type":%q,"sessionId":%q,"cwd":"/w","timestamp":"2026-11-02T10:00:00Z","message":{"content":%s}}`+"\n", kind, session, content)
+		line := fmt.Sprintf(`{"type":%q,"sessionId":%q,"cwd":%q,"timestamp":"2026-11-02T10:00:00Z","message":{"content":%s}}`+"\n", kind, session, repo.Root+worktree, content)
 		file := filepath.Join(project, session+".jsonl")
 		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 			t.Fatal(err)
@@ -88,14 +88,14 @@ func TestRecallFindsTheConversationYouSaidItIn(t *testing.T) {
 		t.Fatalf("two conversations mention it: %+v", got)
 	}
 	for _, r := range got {
-		if r.Session == "sub/subagents/agent-1" && r.Yours {
-			t.Errorf("a subagent's prompt is claude's words, not yours: %+v", r)
+		if r.Session == "sub" && (r.Yours || r.N != 0) {
+			t.Errorf("a subagent's prompt is claude's words, not yours, in its parent's conversation and no turn of it: %+v", r)
 		}
-		if r.Session == "sub/subagents/agent-1" {
-			continue
-		}
-		if (r.Session == "mine") != r.Yours || !strings.Contains(strings.ToLower(r.Line), "retry loop") {
+		if (r.Session == "mine") != r.Yours || !strings.Contains(strings.ToLower(r.Line), "retry loop") || r.Agent != "claude" {
 			t.Errorf("who said it, and the words around it: %+v", r)
+		}
+		if r.Session != "sub" && r.N != 1 {
+			t.Errorf("the turn it came up in: %+v", r)
 		}
 	}
 }

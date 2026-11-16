@@ -6,6 +6,8 @@ package app
 // a tar of files under the home (nothing when there is no conversation),
 // and `… command` for what to type in the window there. The conversation's
 // recorded folder is rewritten to the new path, so --continue finds it.
+// A fourth word is the id of the conversation to take, in place of the
+// folder's newest.
 var carriers = map[string]string{
 	// claude keeps a folder's conversations in ~/.claude/projects/<the path,
 	// every character but a letter or a digit a ->; --continue picks the
@@ -13,6 +15,7 @@ var carriers = map[string]string{
 	"claude": `
 from=$(printf %s "$1" | sed 's/[^a-zA-Z0-9]/-/g'); to=$(printf %s "$2" | sed 's/[^a-zA-Z0-9]/-/g')
 newest=$(ls -t "$HOME/.claude/projects/$from"/*.jsonl 2>/dev/null | head -1)
+[ -z "$4" ] || newest=$(ls "$HOME/.claude/projects/$from/$4.jsonl" 2>/dev/null)
 [ -n "$newest" ] || exit 0
 case "$3" in
 command) echo "claude --continue" ;;
@@ -29,6 +32,7 @@ esac`,
 dir="$HOME/.codex/sessions"
 newest=$(find "$dir" -name 'rollout-*.jsonl' 2>/dev/null | sort -r | while read -r f; do
 	head -1 "$f" | grep -q "\"cwd\":\"$1\"" && echo "$f" && break; done)
+[ -z "$4" ] || newest=$(find "$dir" -name "rollout-*-$4.jsonl" 2>/dev/null | head -1)
 [ -n "$newest" ] || exit 0
 case "$3" in
 command) echo "codex resume $(basename "$newest" .jsonl | cut -c29-)" ;;
@@ -44,6 +48,7 @@ esac`,
 	"pi": `
 from="-$(printf %s "$1" | tr / -)--"; to="-$(printf %s "$2" | tr / -)--"
 newest=$(ls -t "$HOME/.pi/agent/sessions/$from"/*.jsonl 2>/dev/null | head -1)
+[ -z "$4" ] || newest=$(ls "$HOME/.pi/agent/sessions/$from"/*_"$4".jsonl 2>/dev/null | head -1)
 [ -n "$newest" ] || exit 0
 case "$3" in
 command) echo "pi --continue" ;;

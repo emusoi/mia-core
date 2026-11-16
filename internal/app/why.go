@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -45,9 +46,8 @@ func (a *App) Why(target string) (Why, error) {
 	why := Why{Commit: commit, Subject: subject}
 	seconds, _ := strconv.ParseInt(stamp, 10, 64)
 	files := transcriptsMentioning(a.Root, commit[:7], time.Unix(seconds, 0))
-	made := regexp.MustCompile(`\[\S+ (?:\(root-commit\) )?` + commit[:7] + `[0-9a-f]*\]`)
 	for _, file := range files {
-		if c, ok := conversationIn(file, commit[:7], made); ok {
+		if c, ok := conversationIn(file, commit[:7]); ok {
 			why.Conversations = append(why.Conversations, c)
 		}
 	}
@@ -101,6 +101,20 @@ func (a *App) commitOf(target string) (string, error) {
 
 var projectPrefix = regexp.MustCompile(`[^a-zA-Z0-9]`)
 
+// made is the line git commit prints when it makes one: the branch, the
+// commit's short hash and its subject.
+var made = regexp.MustCompile(`\[\S+ (?:\(root-commit\) )?([0-9a-f]{7,40})\] ([^\n]*)`)
+
+// commitsMade is each commit that what a tool gave back shows was made:
+// its hash as printed, and its subject.
+func commitsMade(output string) [][2]string {
+	var commits [][2]string
+	for _, m := range made.FindAllStringSubmatch(output, -1) {
+		commits = append(commits, [2]string{m[1], strings.TrimSpace(m[2])})
+	}
+	return commits
+}
+
 // transcriptsMentioning is claude's transcripts, for the repository and its
 // worktrees, that hold the short hash; only those written to since the
 // commit was made can.
@@ -122,20 +136,26 @@ func transcriptsMentioning(root, short string, since time.Time) []string {
 }
 
 type entry struct {
-	Type      string    `json:"type"`
-	IsMeta    bool      `json:"isMeta"`
-	SessionID string    `json:"sessionId"`
-	Cwd       string    `json:"cwd"`
-	Timestamp time.Time `json:"timestamp"`
-	Message   struct {
+	Type        string    `json:"type"`
+	IsMeta      bool      `json:"isMeta"`
+	IsSidechain bool      `json:"isSidechain"`
+	SessionID   string    `json:"sessionId"`
+	Cwd         string    `json:"cwd"`
+	Timestamp   time.Time `json:"timestamp"`
+	Message     struct {
 		Content json.RawMessage `json:"content"`
 	} `json:"message"`
+	ToolUseResult json.RawMessage `json:"toolUseResult"`
 }
 
 type block struct {
-	Type    string          `json:"type"`
-	Text    string          `json:"text"`
-	Content json.RawMessage `json:"content"`
+	Type      string          `json:"type"`
+	Text      string          `json:"text"`
+	Content   json.RawMessage `json:"content"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Input     json.RawMessage `json:"input"`
+	ToolUseID string          `json:"tool_use_id"`
 }
 
 // said is what you typed in a user entry; "" for tool results and mia's,
@@ -195,7 +215,7 @@ func (e entry) toolOutput() string {
 // conversationIn is where a transcript first shows the commit in what a
 // tool gave back — git commit's own line when there is one — and what you
 // had last asked before it.
-func conversationIn(file, short string, made *regexp.Regexp) (Conversation, bool) {
+func conversationIn(file, short string) (Conversation, bool) {
 	f, err := os.Open(file)
 	if err != nil {
 		return Conversation{}, false
@@ -215,7 +235,7 @@ func conversationIn(file, short string, made *regexp.Regexp) (Conversation, bool
 				if strings.Contains(string(line), short) {
 					if out := e.toolOutput(); strings.Contains(out, short) {
 						c := Conversation{Session: e.SessionID, Cwd: e.Cwd, File: file, At: e.Timestamp, Asked: asked}
-						if made.MatchString(out) {
+						if slices.ContainsFunc(commitsMade(out), func(c [2]string) bool { return strings.HasPrefix(c[0], short) }) {
 							c.Made = true
 							return c, true
 						}

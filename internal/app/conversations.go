@@ -1,0 +1,348 @@
+package app
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+
+	"github.com/emusoi/mia-core/internal/model"
+	"github.com/emusoi/mia-core/internal/run"
+	"github.com/emusoi/mia-core/internal/session"
+)
+
+// Wanted is which conversations are wanted: a worktree's, an agent's, the
+// first few. Its zero value is all of them.
+type Wanted struct {
+	Worktree string
+	Agent    string
+	Limit    int
+}
+
+// where is the repository's folders, and the worktrees there are now.
+func (a *App) where() (folders, []model.Record) {
+	records, _ := a.Store.Load()
+	in := folders{Root: a.Root, Paths: []string{a.Root}}
+	for _, r := range records {
+		if r.Path != a.Root {
+			in.Paths = append(in.Paths, r.Path)
+		}
+	}
+	return in, records
+}
+
+// Conversations is the agent conversations of the repository, its main
+// checkout and every worktree — one that is gone too — the last written to
+// first. An agent that could not say what it has is named in problems, and
+// the others' are listed all the same.
+func (a *App) Conversations(want Wanted) (heads []Head, problems []string) {
+	in, records := a.where()
+	var agents []Agent
+	for _, agent := range a.agents() {
+		if agent.talks != nil && (want.Agent == "" || want.Agent == agent.Name) {
+			agents = append(agents, agent)
+		}
+	}
+	listed, failed := make([][]Head, len(agents)), make([]error, len(agents))
+	var wg sync.WaitGroup
+	for i, agent := range agents {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			listed[i], failed[i] = agent.talks.heads(in)
+		}()
+	}
+	wg.Wait()
+	for i, agent := range agents {
+		if failed[i] != nil {
+			problems = append(problems, fmt.Sprintf("agent %s: %v", agent.Name, failed[i]))
+		}
+		heads = append(heads, listed[i]...)
+	}
+	for i := range heads {
+		heads[i].Worktree, heads[i].Gone = a.worktreeOf(heads[i].Cwd, records)
+	}
+	a.markRunning(heads, records)
+	if want.Worktree != "" {
+		heads = slices.DeleteFunc(heads, func(h Head) bool { return h.Worktree != want.Worktree })
+	}
+	slices.SortStableFunc(heads, func(x, y Head) int { return y.Active.Compare(x.Active) })
+	if want.Limit > 0 && len(heads) > want.Limit {
+		heads = heads[:want.Limit]
+	}
+	return heads, problems
+}
+
+// worktreeOf is the name of the worktree a folder is or is in, and whether
+// the folder is gone. A worktree that was removed is known by what follows
+// the main checkout's path in its own: <root>.<name>.
+func (a *App) worktreeOf(cwd string, records []model.Record) (string, bool) {
+	_, err := os.Stat(cwd)
+	gone := err != nil
+	under := func(dir string) bool { return cwd == dir || strings.HasPrefix(cwd, dir+string(filepath.Separator)) }
+	for _, r := range records {
+		if under(r.Path) {
+			return r.Name, gone
+		}
+	}
+	if under(a.Root) {
+		return filepath.Base(a.Root), gone
+	}
+	if rest, ok := strings.CutPrefix(cwd, a.Root+"."); ok {
+		name, _, _ := strings.Cut(rest, string(filepath.Separator))
+		return name, gone
+	}
+	return "", gone
+}
+
+// markRunning marks the conversation each agent in a window has open: the
+// one the agent itself says it has, for an agent that says, and otherwise
+// the newest of that agent's in the window's worktree.
+// ponytail: two conversations of one agent in one worktree are told apart
+// only by which was written to last, unless the agent says which it holds —
+// claude does, in sessions/<pid>.json. A SessionStart hook that records the
+// id for each window is the upgrade, for codex and pi most of all.
+func (a *App) markRunning(heads []Head, records []model.Record) {
+	if len(heads) == 0 {
+		return
+	}
+	panes := session.Here().AllPanes()
+	if len(panes) == 0 {
+		return
+	}
+	table := a.agents()
+	// every process of a Mac takes ps a tenth of a second: asked only for a
+	// pane whose program tmux knows by its launcher's name
+	behind := sync.OnceValue(foreground)
+	for _, record := range records {
+		if a.sessionOf(record).SSH != "" {
+			continue // its windows are on a machine, and its conversations with them
+		}
+		its := panes[session.Name(record.Name)]
+		titles := map[int]string{}
+		for _, pane := range slices.Backward(its) {
+			titles[pane.Index] = pane.Title // a window is its first pane
+		}
+		for _, window := range session.WindowsFrom(its) {
+			pane := struct {
+				Index, PID int
+				Window     string
+			}{window.Index, window.PID, window.Name}
+			command := window.Command
+			if command == "node" || command == "bun" {
+				command = behind()[window.PID]
+			}
+			name := agentIn(table, command, titles[window.Index])
+			if name == "" {
+				continue
+			}
+			agent, _ := agentNamed(table, name)
+			held := ""
+			if agent.held != "" {
+				out, _ := run.Local("sh").Capture("-c", agent.held, "sh", strconv.Itoa(pane.PID))
+				held = sessionIn(out)
+			}
+			var its *Head
+			for i := range heads {
+				h := &heads[i]
+				if h.Agent != name || h.Worktree != record.Name || h.Running {
+					continue
+				}
+				if held != "" && h.ID == held {
+					its = h
+					break
+				}
+				if held == "" && (its == nil || h.Active.After(its.Active)) {
+					its = h
+				}
+			}
+			if its != nil {
+				its.Running, its.Window = true, &WindowRef{Index: pane.Index, Name: pane.Window}
+			}
+		}
+	}
+}
+
+// foreground is the command line in front in each terminal, by the process
+// the terminal was started with: what a pane runs, whatever shell is
+// between.
+func foreground() map[int]string {
+	out, err := run.Local("ps").Capture("-axo", "pid=,tpgid=,args=")
+	if err != nil {
+		return nil
+	}
+	front, args := map[int]int{}, map[int]string{}
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		pid, err1 := strconv.Atoi(fields[0])
+		group, err2 := strconv.Atoi(fields[1])
+		if err1 != nil || err2 != nil {
+			continue
+		}
+		front[pid], args[pid] = group, strings.Join(fields[2:], " ")
+	}
+	commands := map[int]string{}
+	for pid, group := range front {
+		if group > 0 {
+			commands[pid] = args[group]
+		}
+	}
+	return commands
+}
+
+// ConversationTurns is one conversation as turns for a chat view, in
+// order, those after turn number after: a view that polls asks for what
+// came after the last it has.
+func (a *App) ConversationTurns(id string, after int) ([]Turn, error) {
+	in, _ := a.where()
+	for _, agent := range a.agents() {
+		if agent.talks == nil {
+			continue
+		}
+		turns, found, err := agent.talks.turns(in, id, after)
+		if err != nil {
+			if found {
+				return nil, fmt.Errorf("agent %s: %w", agent.Name, err)
+			}
+			continue // an agent that cannot say what it has does not hide another's
+		}
+		if found {
+			return append([]Turn{}, turns...), nil
+		}
+	}
+	return nil, fmt.Errorf("no conversation %s here — `mia api conversations` lists them", id)
+}
+
+// Resumed is what resuming a conversation did.
+type Resumed struct {
+	Worktree string    `json:"worktree"`
+	Window   WindowRef `json:"window"`
+	Command  string    `json:"command,omitempty"`
+	Already  bool      `json:"already"` // a window had it open: nothing was opened
+	Copied   bool      `json:"copied"`  // it was made in another folder, and copied to this one's
+}
+
+// ResumeConversation opens a window in a worktree's session with the agent
+// taking the conversation up again: in the worktree it was made in, or in
+// another when told. One a window already has open is left as it is.
+func (a *App) ResumeConversation(id, in string) (Resumed, error) {
+	heads, problems := a.Conversations(Wanted{})
+	at := slices.IndexFunc(heads, func(h Head) bool { return h.ID == id })
+	if at < 0 {
+		if len(problems) > 0 {
+			return Resumed{}, fmt.Errorf("no conversation %s here — %s", id, strings.Join(problems, "; "))
+		}
+		return Resumed{}, fmt.Errorf("no conversation %s here — `mia api conversations` lists them", id)
+	}
+	// one copied to another worktree is there twice, under one id: the last
+	// written to is taken, as it is the first
+	head := heads[at]
+	agent, _ := agentNamed(a.agents(), head.Agent)
+	if agent.resume == nil {
+		return Resumed{}, fmt.Errorf("mia does not know how %s takes a conversation up again", head.Agent)
+	}
+	target := in
+	if target == "" {
+		if head.Worktree == "" || head.Gone {
+			name := head.Worktree
+			if name == "" {
+				name = head.Cwd
+			}
+			return Resumed{}, fmt.Errorf("%s is gone, and that is where this conversation was — `mia unarchive %s` brings back one that was archived, `mia new <branch>` makes a worktree of its branch again; or take it up in another: mia conversation resume %s --in <worktree>", name, name, id)
+		}
+		target = head.Worktree
+	}
+	record, err := a.RecordOrHere(target)
+	if err != nil {
+		return Resumed{}, err
+	}
+	host := a.sessionOf(record)
+	if host.SSH != "" {
+		return Resumed{}, fmt.Errorf("%s's session is on a machine, and this conversation is kept here — resume it in a worktree that is here", record.Name)
+	}
+	if same := slices.IndexFunc(heads, func(h Head) bool {
+		return h.ID == id && h.Agent == head.Agent && h.Worktree == record.Name && h.Running && h.Window != nil
+	}); same >= 0 {
+		return Resumed{Worktree: record.Name, Window: *heads[same].Window, Already: true}, nil
+	}
+	command, err := agent.resume(id)
+	if err != nil {
+		return Resumed{}, fmt.Errorf("agent %s: %w", agent.Name, err)
+	}
+	done := Resumed{Worktree: record.Name}
+	switch {
+	case head.Worktree == record.Name && head.Cwd != record.Path:
+		command = "cd " + shellQuote(head.Cwd) + " && " + command // made in a folder under the worktree
+	case head.Worktree != record.Name && agent.byFolder && agent.carrier != "":
+		// kept under its folder's name: taken up from another only once a
+		// copy is there, as when a worktree moves. One already there, from
+		// the last time, has what was said since and is left alone.
+		there := slices.ContainsFunc(heads, func(h Head) bool { return h.ID == id && h.Agent == head.Agent && h.Worktree == record.Name })
+		if !there {
+			local := side{}
+			packed, err := local.bytesOf(agent.carrier, head.Cwd, record.Path, "pack", id)
+			if err != nil || len(packed) == 0 {
+				return Resumed{}, fmt.Errorf("the conversation could not be copied to %s", record.Name)
+			}
+			if err := local.feed(packed, `cd && tar -xf -`); err != nil {
+				return Resumed{}, err
+			}
+			done.Copied = true
+		}
+	}
+	window := agent.Name
+	for i := 2; host.HasWindow(record.Name, window); i++ {
+		window = fmt.Sprintf("%s-%d", agent.Name, i)
+	}
+	argv, err := a.LaunchArgv(record, command)
+	if err != nil {
+		return Resumed{}, err
+	}
+	if window, err = a.NewWindow(record, window, argv); err != nil {
+		return Resumed{}, err
+	}
+	done.Command = command
+	done.Window.Name = window
+	for _, w := range host.WindowsOf(record.Name) {
+		if w.Name == window {
+			done.Window.Index = w.Index
+		}
+	}
+	return done, nil
+}
+
+// ResumeCommand is the command line by which an agent takes one of its
+// conversations up again, typed in the folder it was made in.
+func (a *App) ResumeCommand(agent, id string) string {
+	if known, ok := agentNamed(a.agents(), agent); ok && known.resume != nil {
+		if command, err := known.resume(id); err == nil {
+			return command
+		}
+	}
+	return "mia conversation resume " + id
+}
+
+// LaunchArgv is a command as a window runs it: by the session's shell, as
+// a login shell does, and with that shell left when the command ends.
+func (a *App) LaunchArgv(record model.Record, command string) ([]string, error) {
+	shell := a.Config.Dotfiles.Shell
+	if shell == "" {
+		host, err := a.SessionHostOf(record)
+		if err != nil {
+			return nil, err
+		}
+		if host.SSH == "" {
+			shell = os.Getenv("SHELL")
+		}
+		if shell == "" {
+			shell = "/bin/sh"
+		}
+	}
+	return []string{shell, "-lc", command + "; exec " + run.ShellJoin([]string{shell}) + " -l"}, nil
+}
