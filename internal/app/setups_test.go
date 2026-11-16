@@ -45,7 +45,8 @@ func TestAUseIsWrittenDownAndTheOldestGo(t *testing.T) {
 
 // A repository's setups are its usual one first — the one used in the
 // most of its worktrees, the later used of a tie — then the last used
-// first, then what the config starts agents with that was never used.
+// first, then what the config starts agents with that was never used. A
+// setup with neither a model nor an effort is none.
 func TestSetupsAreTheUsualFirstThenTheLastUsed(t *testing.T) {
 	gittest.Isolate(t)
 	day := func(n int) time.Time { return time.Date(2026, 11, n, 10, 0, 0, 0, time.UTC) }
@@ -57,6 +58,7 @@ func TestSetupsAreTheUsualFirstThenTheLastUsed(t *testing.T) {
 		{"claude", "sonnet", "medium", "mia-desk", "kijenge", "local", day(5)},
 		{"claude", "opus", "high", "mia-phone", "olasiti", "local", day(6)},
 		{"codex", "5.1-codex", "high", "mia-phone", "duluti", "local", day(7)},
+		{"claude", "", "", "mia-phone", "goba", "local", day(8)}, // nothing chosen: written by hand, or by an older mia
 	}
 	data, _ := json.Marshal(history)
 	if err := os.MkdirAll(filepath.Dir(usesPath()), 0o755); err != nil {
@@ -66,8 +68,10 @@ func TestSetupsAreTheUsualFirstThenTheLastUsed(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := &App{Config: config.Config{
-		Main:   config.Main{Model: "sonnet"},
-		Agents: map[string]config.Agent{"claude": {Model: "opus", Effort: "high"}, "pi": {Effort: "low"}, "codex": {}},
+		Main: config.Main{Model: "sonnet"},
+		// opencode is started with no model nor effort, and nobody is no agent
+		Agents: map[string]config.Agent{"claude": {Model: "opus", Effort: "high"}, "pi": {Effort: "low"}, "codex": {},
+			"opencode": {Effort: "high"}, "nobody": {Model: "x"}},
 	}}
 	type row struct {
 		agent, model, effort string

@@ -253,7 +253,7 @@ for every one.
 
 | field | is |
 |---|---|
-| `agent`, `model`, `effort` | the setup; `""` for a model or an effort mia did not choose, so the agent's own |
+| `agent`, `model`, `effort` | the setup; `""` for a model or an effort mia did not choose, so the agent's own — never both |
 | `uses` | how many times an agent was started with it or switched to it |
 | `sessions` | in how many worktrees |
 | `last` | where it was used last: the `repository`, the `worktree`, the `machine` it runs on — `local` for this one — and `at`; left out for one never used |
@@ -262,7 +262,9 @@ for every one.
 The usual one comes first, then the last used first. After them come
 what the config starts agents with, `[main]` and `[agents.<name>]`, that
 were not used there, with `uses` 0: someone who has chosen nothing yet
-still has those.
+still has those. One of them with no model is there for its effort; one
+that says neither, or names an agent mia does not start with a model and
+an effort — opencode, or one no enabled plugin adds — is left out.
 
 Every `mia window new … --model`, `mia window model`, `mia main start`
 and `mia main model` writes down a use, in `setups.json` in the user-wide

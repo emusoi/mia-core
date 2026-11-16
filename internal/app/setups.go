@@ -107,8 +107,8 @@ func (a *App) Setups(repository string) []Setup {
 	at, worktrees := map[key]int{}, map[key]map[string]bool{}
 	setups := []Setup{}
 	for _, use := range uses() {
-		if repository != "" && use.Repository != repository {
-			continue
+		if (repository != "" && use.Repository != repository) || (use.Model == "" && use.Effort == "") {
+			continue // nothing chosen is no setup
 		}
 		k := key{use.Agent, use.Model, use.Effort}
 		i, seen := at[k]
@@ -143,19 +143,23 @@ func (a *App) Setups(repository string) []Setup {
 }
 
 // configuredSetups is what the config starts agents with: the main
-// agent's first, then each in [agents] by its name.
+// agent's first, then each in [agents] by its name. One with no model is
+// there for its effort; one with neither, or for an agent mia does not
+// start with them, is none.
 func (a *App) configuredSetups() []Setup {
 	setups := []Setup{}
-	if agent, err := a.mainAgent(); err == nil {
-		set := a.Config.Agents[agent.Name]
-		if model, effort := cmp.Or(a.Config.Main.Model, set.Model), cmp.Or(a.Config.Main.Effort, set.Effort); model != "" || effort != "" {
-			setups = append(setups, Setup{Agent: agent.Name, Model: model, Effort: effort})
+	add := func(name, model, effort string) {
+		agent, known := agentNamed(a.agents(), name)
+		if known && agent.with != nil && (model != "" || effort != "") {
+			setups = append(setups, Setup{Agent: name, Model: model, Effort: effort})
 		}
 	}
+	if agent, err := a.mainAgent(); err == nil {
+		set := a.Config.Agents[agent.Name]
+		add(agent.Name, cmp.Or(a.Config.Main.Model, set.Model), cmp.Or(a.Config.Main.Effort, set.Effort))
+	}
 	for _, name := range slices.Sorted(maps.Keys(a.Config.Agents)) {
-		if set := a.Config.Agents[name]; set.Model != "" || set.Effort != "" {
-			setups = append(setups, Setup{Agent: name, Model: set.Model, Effort: set.Effort})
-		}
+		add(name, a.Config.Agents[name].Model, a.Config.Agents[name].Effort)
 	}
 	return setups
 }
