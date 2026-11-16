@@ -131,3 +131,41 @@ func TestCarryReachesEveryPaneOfAWindow(t *testing.T) {
 		t.Errorf("the conversation is under the new path: %v", err)
 	}
 }
+
+// Given a conversation's id, a carrier packs that one and not the newest.
+func TestCarriersPackTheConversationNamed(t *testing.T) {
+	from, to := "/home/a/src/x_old", "/Users/b/src/x.new"
+	cases := []struct {
+		program, id, named, newest, there string
+	}{
+		{"claude", "c1", ".claude/projects/-home-a-src-x-old/c1.jsonl", ".claude/projects/-home-a-src-x-old/c2.jsonl", ".claude/projects/-Users-b-src-x-new/c1.jsonl"},
+		{"codex", "aaaaaaaa-0000", ".codex/sessions/2026/01/01/rollout-2026-01-01T00-00-00-aaaaaaaa-0000.jsonl", ".codex/sessions/2026/01/02/rollout-2026-01-02T00-00-00-bbbbbbbb-0000.jsonl", ".codex/sessions/2026/01/01/rollout-2026-01-01T00-00-00-aaaaaaaa-0000.jsonl"},
+		{"pi", "p1", ".pi/agent/sessions/--home-a-src-x_old--/2026-01-01_p1.jsonl", ".pi/agent/sessions/--home-a-src-x_old--/2026-01-02_p2.jsonl", ".pi/agent/sessions/--Users-b-src-x.new--/2026-01-01_p1.jsonl"},
+	}
+	for _, c := range cases {
+		t.Run(c.program, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			for _, f := range []string{c.named, c.newest} {
+				if err := os.MkdirAll(filepath.Dir(filepath.Join(home, f)), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(home, f), []byte(`{"cwd":"`+from+`"}`+"\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.Chtimes(filepath.Join(home, c.newest), time.Now().Add(time.Hour), time.Now().Add(time.Hour)); err != nil {
+				t.Fatal(err)
+			}
+			agent, _ := agentNamed(builtin, c.program)
+			packed, err := side{}.bytesOf(agent.carrier, from, to, "pack", c.id)
+			if err != nil || len(packed) == 0 {
+				t.Fatalf("pack: %v, %d bytes", err, len(packed))
+			}
+			files := untar(t, packed)
+			if body, ok := files[c.there]; !ok || !strings.Contains(body, to) || len(files) != 1 {
+				t.Errorf("packed %v, wanted only %s with the folder rewritten", files, c.there)
+			}
+		})
+	}
+}
