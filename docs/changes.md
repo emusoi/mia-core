@@ -26,10 +26,13 @@ on GitHub; a tag without its section is not released.
   so stays, the windows that would open — after checking the machine
   answers. Nothing is moved.
 
-- **A move names what it leaves.** Files git ignores (`.env`, a build
-  folder) never crossed, and went with the worktree when it was removed
-  where it was, unsaid. `mia move` now names them before it takes
-  anything across.
+- **A move takes small ignored files along, and names what it leaves.**
+  What git ignores never crossed, and went with the worktree when it was
+  removed where it was, unsaid: a `.env` was lost. An ignored file of at
+  most 1 MiB now crosses with its mode, and is not written over one the
+  other side has differently. An ignored folder (`build/`,
+  `node_modules/`) and an ignored file over 1 MiB stay, and `mia move`
+  names them before it takes anything across.
 
 - **Split windows come back split.** mia remembers every pane of a window,
   not only the one in front: `mia resurrect` and `mia move` open each in

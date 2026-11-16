@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/git"
@@ -41,6 +42,20 @@ func (s side) feed(data []byte, script string, args ...string) error {
 // bytesOf runs a script on the side and returns what it printed, untouched.
 func (s side) bytesOf(script string, args ...string) ([]byte, error) {
 	return runtime.Command(s.machine.SSH, append([]string{"sh", "-c", utf8 + script, "sh"}, args...)...).Output()
+}
+
+// pipe runs a script on the side with data on its standard input and
+// returns what it printed, untouched.
+func (s side) pipe(data []byte, script string, args ...string) ([]byte, error) {
+	cmd := runtime.Command(s.machine.SSH, append([]string{"sh", "-c", utf8 + script, "sh"}, args...)...)
+	cmd.Stdin = bytes.NewReader(data)
+	var said bytes.Buffer
+	cmd.Stderr = &said
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("%v: %s", err, strings.TrimSpace(said.String()))
+	}
+	return out, nil
 }
 
 // Pane is one pane of a window: where it is and what runs in it.
@@ -202,12 +217,26 @@ type uncommitted struct {
 	changed []byte // a patch from the index to the files
 	files   []byte // a tar of the files git does not know and does not ignore
 	news    int    // how many those are
-	// ignored is what git ignores there, a folder as one: it does not cross.
+	// carried is the small files git ignores, a .env or a local setting:
+	// they cross, each with the hash of what it holds.
+	carried []ignoredFile
+	kept    []byte // a tar of them
+	// ignored is what else git ignores there, a folder as one: it does not cross.
 	ignored []string
 }
 
+// ignoredFile is a file git ignores that crosses with a move.
+type ignoredFile struct {
+	name string // under the worktree
+	hash string // git's, of its content as it is
+}
+
+// ignoredLimit is the largest ignored file a move takes along: what a person
+// wrote there is under it, what a build left is a folder or over it.
+const ignoredLimit = 1 << 20
+
 func (u uncommitted) none() bool {
-	return len(bytes.TrimSpace(u.staged)) == 0 && len(bytes.TrimSpace(u.changed)) == 0 && len(u.files) == 0
+	return len(bytes.TrimSpace(u.staged)) == 0 && len(bytes.TrimSpace(u.changed)) == 0 && len(u.files) == 0 && len(u.carried) == 0
 }
 
 // uncommitted reads the worktree's uncommitted work: what is staged and
@@ -232,14 +261,81 @@ func (s side) uncommitted(path string) (uncommitted, error) {
 			return u, err
 		}
 	}
-	ignored, err := s.sh(`cd "$1" && git -c core.quotepath=off ls-files --others --ignored --exclude-standard --directory`, path)
+	ignored, err := s.bytesOf(`cd "$1" && git ls-files --others --ignored --exclude-standard --directory -z`, path)
 	if err != nil {
 		return u, err
 	}
-	if ignored = strings.TrimSpace(ignored); ignored != "" {
-		u.ignored = strings.Split(ignored, "\n")
+	// a folder git does not ignore, with only ignored files in it, is listed
+	// and its files after it: they are what is there, so it is not one more
+	listed := nulSplit(ignored)
+	var all []string
+	for _, name := range listed {
+		if strings.HasSuffix(name, "/") && slices.ContainsFunc(listed, func(other string) bool { return other != name && strings.HasPrefix(other, name) }) {
+			continue
+		}
+		all = append(all, name)
+	}
+	if len(all) == 0 {
+		return u, nil
+	}
+	// each as ./name, so that one starting with a dash is no option to find
+	small, err := s.pipe(nulJoin(all, "./"), fmt.Sprintf(`cd "$1" && xargs -0 sh -c '[ $# -eq 0 ] || find "$@" -prune -type f -size -%dc -print0' sh`, ignoredLimit+1), path)
+	if err != nil {
+		return u, err
+	}
+	crossing := map[string]bool{}
+	for _, name := range nulSplit(small) {
+		crossing[strings.TrimPrefix(name, "./")] = true
+	}
+	var names []string
+	for _, name := range all {
+		if crossing[name] {
+			names = append(names, name)
+		} else {
+			u.ignored = append(u.ignored, name)
+		}
+	}
+	if len(names) == 0 {
+		return u, nil
+	}
+	list := nulJoin(names, "./")
+	hashes, err := s.pipe(list, `cd "$1" && xargs -0 git hash-object --no-filters --`, path)
+	if err != nil {
+		return u, err
+	}
+	hashed := strings.Fields(string(hashes))
+	if len(hashed) != len(names) {
+		return u, fmt.Errorf("read the ignored files of %s: %d of %d could be read", path, len(hashed), len(names))
+	}
+	for i, name := range names {
+		u.carried = append(u.carried, ignoredFile{name: name, hash: hashed[i]})
+	}
+	if u.kept, err = s.pipe(list, `cd "$1" && COPYFILE_DISABLE=1 tar --null -cf - -T -`, path); err != nil {
+		return u, err
 	}
 	return u, nil
+}
+
+// nulSplit is the names in a list that ends each with a NUL, as git, find
+// and tar pass names that may hold anything else.
+func nulSplit(list []byte) []string {
+	var names []string
+	for _, name := range bytes.Split(list, []byte{0}) {
+		if len(name) > 0 {
+			names = append(names, string(name))
+		}
+	}
+	return names
+}
+
+// nulJoin is such a list of the names, each after the prefix.
+func nulJoin(names []string, prefix string) []byte {
+	var list bytes.Buffer
+	for _, name := range names {
+		list.WriteString(prefix + name)
+		list.WriteByte(0)
+	}
+	return list.Bytes()
 }
 
 // summary says the uncommitted work in a line, by how many files.
@@ -250,7 +346,11 @@ func (u uncommitted) summary() string {
 	files := func(patch []byte) int {
 		return bytes.Count(append([]byte("\n"), patch...), []byte("\ndiff --git "))
 	}
-	return fmt.Sprintf("with %d file(s) staged, %d changed and not staged, %d new", files(u.staged), files(u.changed), u.news)
+	said := fmt.Sprintf("with %d file(s) staged, %d changed and not staged, %d new", files(u.staged), files(u.changed), u.news)
+	if len(u.carried) > 0 {
+		said += fmt.Sprintf(", %d ignored file(s) carried", len(u.carried))
+	}
+	return said
 }
 
 // staysBehind says what of the worktree does not cross, "" when all of it does.
@@ -263,16 +363,37 @@ func (u uncommitted) staysBehind() string {
 	if len(named) > 4 {
 		named, more = named[:4], fmt.Sprintf(" and %d more", len(u.ignored)-4)
 	}
-	return fmt.Sprintf("not crossing, since git ignores them: %s%s", strings.Join(named, ", "), more)
+	return fmt.Sprintf("not crossing — git ignores them, and each is a folder or over 1 MiB: %s%s", strings.Join(named, ", "), more)
 }
 
 // putUncommitted gives a clean worktree at the same commit that work. One
 // that has work of its own is refused: its new files would be overwritten.
+// So is one that has an ignored file the work brings, and has it differently.
 func (s side) putUncommitted(path string, u uncommitted) error {
 	if own, err := s.sh(`cd "$1" && git status --porcelain`, path); err != nil {
 		return err
 	} else if strings.TrimSpace(own) != "" {
 		return fmt.Errorf("the worktree %s, %s, has uncommitted work of its own — commit or discard it there, then move again", s.where(), path)
+	}
+	if len(u.carried) > 0 {
+		var names []string
+		for _, file := range u.carried {
+			names = append(names, file.name)
+		}
+		// a line for each, in order: what it holds there, or that it is not there
+		there, err := s.pipe(nulJoin(names, "./"), `cd "$1" && xargs -0 sh -c 'for f; do if [ -f "$f" ] && [ ! -L "$f" ]; then git hash-object --no-filters -- "$f" || echo unread; elif [ -e "$f" ] || [ -L "$f" ]; then echo other; else echo none; fi; done' sh`, path)
+		if err != nil {
+			return err
+		}
+		has := strings.Fields(string(there))
+		if len(has) != len(names) {
+			return fmt.Errorf("look for the ignored files in %s %s: %d answers for %d files", path, s.where(), len(has), len(names))
+		}
+		for i, file := range u.carried {
+			if has[i] != "none" && has[i] != file.hash {
+				return fmt.Errorf("the worktree %s, %s, has a %s of its own that differs — git ignores it, so nothing keeps the one there: move it aside or remove it there, then move again", s.where(), path, file.name)
+			}
+		}
 	}
 	if len(bytes.TrimSpace(u.staged)) > 0 {
 		if err := s.feed(u.staged, `cd "$1" && git apply --binary --index`, path); err != nil {
@@ -287,6 +408,11 @@ func (s side) putUncommitted(path string, u uncommitted) error {
 	if len(u.files) > 0 {
 		if err := s.feed(u.files, `cd "$1" && tar -xf -`, path); err != nil {
 			return fmt.Errorf("copy the new files: %w", err)
+		}
+	}
+	if len(u.kept) > 0 {
+		if err := s.feed(u.kept, `cd "$1" && tar -xpf -`, path); err != nil {
+			return fmt.Errorf("copy the ignored files: %w", err)
 		}
 	}
 	return nil

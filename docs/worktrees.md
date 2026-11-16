@@ -195,8 +195,12 @@ as a patch, new files as they are. The session's windows open again
 there, in the same folders, each with the command that was running in it
 typed in again — claude, nvim, a dev server. Only once all of that is
 there is the worktree removed where it was; its branch stays. What is
-staged stays staged. What git ignores does not cross: the move names it,
-and it goes with the worktree where it was.
+staged stays staged. A file git ignores crosses too when it is a file of
+at most 1 MiB — a `.env`, a local setting — with its mode; one the other
+side already has differently is not written over: the move is refused. A
+folder git ignores (`build/`, `node_modules/`) and an ignored file over
+1 MiB do not cross: the move names them, and they go with the worktree
+where it was.
 
 A running program starts again rather than continuing. One that keeps
 state can bring it along through an extension named `mia-carry-<program>`
