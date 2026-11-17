@@ -61,6 +61,13 @@ func (a *App) remember(opened map[string][]Window) error {
 	if err != nil {
 		return err
 	}
+	// every session's panes in one ask, not one ask a worktree: this runs
+	// at each poll. A server runs only while it has a session, so none
+	// listed is tmux not answering, and what was seen stays.
+	running := session.Here().AllPanes()
+	if len(running) == 0 {
+		return nil
+	}
 	saved := a.readRemembered()
 	kept := map[string]remembered{}
 	for _, record := range records {
@@ -69,7 +76,7 @@ func (a *App) remember(opened map[string][]Window) error {
 		}
 		before, had := saved[record.Name]
 		switch {
-		case session.Here().Exists(record.Name):
+		case running[session.Name(record.Name)] != nil:
 			windows := side{}.windows(a.agents(), record.Name, record.Path, a.chosen())
 			if was, ok := opened[record.Name]; ok && len(was) == len(windows) {
 				for i := range was { // opened in this order
