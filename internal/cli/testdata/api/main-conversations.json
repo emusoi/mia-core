@@ -1,0 +1,78 @@
+{
+  "query": "main conversations",
+  "usage": "mia api main conversations",
+  "inputs": [
+    {
+      "name": "conversations",
+      "required": true
+    }
+  ],
+  "output": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "fields": {
+        "account": {
+          "type": "string",
+          "optional": true
+        },
+        "active": {
+          "type": "time",
+          "optional": true
+        },
+        "agent": {
+          "type": "string"
+        },
+        "asked": {
+          "type": "string"
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "effort": {
+          "type": "string",
+          "optional": true
+        },
+        "gone": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string",
+          "optional": true
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "said": {
+          "type": "string"
+        },
+        "started": {
+          "type": "time",
+          "optional": true
+        },
+        "turns": {
+          "type": "integer"
+        },
+        "window": {
+          "type": "object",
+          "optional": true,
+          "nullable": true,
+          "fields": {
+            "index": {
+              "type": "integer"
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        "worktree": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

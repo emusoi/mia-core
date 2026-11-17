@@ -105,14 +105,17 @@ func cmdAPI(a *app.App, args []string) int {
 		return emit(turns)
 
 	case "base":
-		return emit(struct {
-			Branch string `json:"branch"`
-		}{Branch: a.BaseBranch(a.Root)})
+		return emit(baseBranch{Branch: a.BaseBranch(a.Root)})
 
 	default:
 		fmt.Fprintf(os.Stderr, "mia: no such query %q — try one of %s\n", args[0], apiQueries)
 		return exitNotFound
 	}
+}
+
+// baseBranch is what `mia api base` says.
+type baseBranch struct {
+	Branch string `json:"branch"`
 }
 
 var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base", "conversations", "conversation", "main", "standing", "agents", "setups", "accounts"}

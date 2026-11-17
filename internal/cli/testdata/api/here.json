@@ -1,0 +1,54 @@
+{
+  "query": "here",
+  "usage": "mia api here",
+  "inputs": [],
+  "output": {
+    "type": "object",
+    "fields": {
+      "health": {
+        "type": "object",
+        "optional": true,
+        "nullable": true,
+        "fields": {
+          "cores": {
+            "type": "integer"
+          },
+          "disk_total": {
+            "type": "number"
+          },
+          "disk_used": {
+            "type": "number"
+          },
+          "load": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "mem_total": {
+            "type": "number"
+          },
+          "mem_used": {
+            "type": "number"
+          },
+          "ports": {
+            "type": "map",
+            "optional": true,
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "machines": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

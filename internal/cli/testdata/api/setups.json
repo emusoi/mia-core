@@ -1,0 +1,58 @@
+{
+  "query": "setups",
+  "usage": "mia api setups [--repository \u003cname\u003e | --all]",
+  "inputs": [
+    {
+      "name": "--repository",
+      "value": "\u003cname\u003e"
+    },
+    {
+      "name": "--all"
+    }
+  ],
+  "output": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "fields": {
+        "agent": {
+          "type": "string"
+        },
+        "effort": {
+          "type": "string"
+        },
+        "last": {
+          "type": "object",
+          "optional": true,
+          "nullable": true,
+          "fields": {
+            "at": {
+              "type": "time"
+            },
+            "machine": {
+              "type": "string"
+            },
+            "repository": {
+              "type": "string"
+            },
+            "worktree": {
+              "type": "string"
+            }
+          }
+        },
+        "model": {
+          "type": "string"
+        },
+        "sessions": {
+          "type": "integer"
+        },
+        "uses": {
+          "type": "integer"
+        },
+        "usual": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

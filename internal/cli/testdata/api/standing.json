@@ -1,0 +1,261 @@
+{
+  "query": "standing",
+  "usage": "mia api standing [--here] [--seen \u003crepository\u003e/\u003cworktree\u003e[@\u003cmachine\u003e]]",
+  "inputs": [
+    {
+      "name": "--here"
+    },
+    {
+      "name": "--seen",
+      "value": "\u003crepository\u003e/\u003cworktree\u003e[@\u003cmachine\u003e]"
+    }
+  ],
+  "output": {
+    "type": "object",
+    "fields": {
+      "counts": {
+        "type": "object",
+        "fields": {
+          "done_unread": {
+            "type": "integer"
+          },
+          "waiting": {
+            "type": "integer"
+          },
+          "working": {
+            "type": "integer"
+          }
+        }
+      },
+      "done_unread": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "fields": {
+            "agent": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "line": {
+              "type": "string"
+            },
+            "machine": {
+              "type": "string"
+            },
+            "options": {
+              "type": "array",
+              "optional": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "repository": {
+              "type": "string"
+            },
+            "root": {
+              "type": "string"
+            },
+            "since": {
+              "type": "time"
+            },
+            "window": {
+              "type": "object",
+              "optional": true,
+              "nullable": true,
+              "fields": {
+                "index": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            },
+            "worktree": {
+              "type": "string"
+            },
+            "yes": {
+              "type": "string",
+              "optional": true
+            }
+          }
+        }
+      },
+      "machines": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "fields": {
+            "answers": {
+              "type": "boolean"
+            },
+            "detail": {
+              "type": "string",
+              "optional": true
+            },
+            "name": {
+              "type": "string"
+            },
+            "reach": {
+              "type": "object",
+              "fields": {
+                "detail": {
+                  "type": "string",
+                  "optional": true
+                },
+                "fix": {
+                  "type": "string",
+                  "optional": true
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "ok",
+                    "unreachable",
+                    "needs_login",
+                    "no_mia",
+                    "old_mia",
+                    "not_set_up",
+                    "failed"
+                  ]
+                },
+                "warnings": {
+                  "type": "array",
+                  "optional": true,
+                  "items": {
+                    "type": "object",
+                    "fields": {
+                      "detail": {
+                        "type": "string"
+                      },
+                      "fix": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "waiting": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "fields": {
+            "agent": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "line": {
+              "type": "string"
+            },
+            "machine": {
+              "type": "string"
+            },
+            "options": {
+              "type": "array",
+              "optional": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "repository": {
+              "type": "string"
+            },
+            "root": {
+              "type": "string"
+            },
+            "since": {
+              "type": "time"
+            },
+            "window": {
+              "type": "object",
+              "optional": true,
+              "nullable": true,
+              "fields": {
+                "index": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            },
+            "worktree": {
+              "type": "string"
+            },
+            "yes": {
+              "type": "string",
+              "optional": true
+            }
+          }
+        }
+      },
+      "working": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "fields": {
+            "agent": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "line": {
+              "type": "string"
+            },
+            "machine": {
+              "type": "string"
+            },
+            "options": {
+              "type": "array",
+              "optional": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "repository": {
+              "type": "string"
+            },
+            "root": {
+              "type": "string"
+            },
+            "since": {
+              "type": "time"
+            },
+            "window": {
+              "type": "object",
+              "optional": true,
+              "nullable": true,
+              "fields": {
+                "index": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            },
+            "worktree": {
+              "type": "string"
+            },
+            "yes": {
+              "type": "string",
+              "optional": true
+            }
+          }
+        }
+      }
+    }
+  }
+}

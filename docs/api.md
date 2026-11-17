@@ -26,6 +26,16 @@ The actual answer includes every query and feature, not this shortened list.
 `agents` answer from any folder; the other queries are about a repository and need one. Check capabilities before using a feature. Existing response shapes are not
 wrapped in a version envelope.
 
+What the apps read is kept: `internal/cli/testdata/api` holds the shape of
+each `mia api` answer — every field by name, its type, whether it may be
+left out or null, and the values of a closed set such as a turn's `kind` or
+a machine's `reach.state` — and the inputs its usage names, read off the Go
+types rather than off a live answer. A test fails, naming the field, when one
+is removed or renamed, changes type, may newly be left out, loses a value, or
+when a query comes to need an input it did not. A field, value or optional
+flag that is added passes and says to keep it with
+`go test ./internal/cli -run TestTheAPIAnAppWasBuiltOnStillAnswersTheSame -update`.
+
 ## JSON commands
 
 | command | returns |

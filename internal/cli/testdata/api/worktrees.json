@@ -1,0 +1,219 @@
+{
+  "query": "worktrees",
+  "usage": "mia api worktrees [\u003cworktree\u003e...]",
+  "inputs": [
+    {
+      "name": "\u003cworktree\u003e..."
+    }
+  ],
+  "output": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "fields": {
+        "added": {
+          "type": "integer",
+          "optional": true
+        },
+        "adopted": {
+          "type": "boolean"
+        },
+        "ahead": {
+          "type": "integer",
+          "optional": true
+        },
+        "behind": {
+          "type": "integer",
+          "optional": true
+        },
+        "branch": {
+          "type": "string",
+          "optional": true
+        },
+        "deleted": {
+          "type": "integer",
+          "optional": true
+        },
+        "dev": {
+          "type": "string",
+          "optional": true
+        },
+        "dirty": {
+          "type": "boolean"
+        },
+        "files": {
+          "type": "integer",
+          "optional": true
+        },
+        "last_subject": {
+          "type": "string",
+          "optional": true
+        },
+        "last_work": {
+          "type": "time",
+          "optional": true
+        },
+        "layers": {
+          "type": "array",
+          "optional": true,
+          "items": {
+            "type": "object",
+            "fields": {
+              "ahead": {
+                "type": "integer"
+              },
+              "base_moved": {
+                "type": "boolean",
+                "optional": true
+              },
+              "branch": {
+                "type": "string"
+              },
+              "current": {
+                "type": "boolean"
+              },
+              "landed": {
+                "type": "boolean"
+              },
+              "needs_restack": {
+                "type": "boolean"
+              },
+              "parent": {
+                "type": "string"
+              },
+              "worktree": {
+                "type": "string",
+                "optional": true
+              }
+            }
+          }
+        },
+        "machine": {
+          "type": "string",
+          "optional": true
+        },
+        "main": {
+          "type": "boolean",
+          "optional": true
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "seen": {
+          "type": "time",
+          "optional": true
+        },
+        "session": {
+          "type": "boolean"
+        },
+        "signals": {
+          "type": "array",
+          "optional": true,
+          "items": {
+            "type": "object",
+            "fields": {
+              "at": {
+                "type": "time"
+              },
+              "from": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "pane": {
+                "type": "string",
+                "optional": true
+              },
+              "pid": {
+                "type": "integer",
+                "optional": true
+              },
+              "rank": {
+                "type": "integer"
+              },
+              "started": {
+                "type": "time",
+                "optional": true
+              },
+              "style": {
+                "type": "string",
+                "optional": true
+              },
+              "text": {
+                "type": "string",
+                "optional": true
+              },
+              "until": {
+                "type": "time",
+                "optional": true
+              },
+              "until_seen": {
+                "type": "boolean",
+                "optional": true
+              },
+              "worktree": {
+                "type": "string"
+              },
+              "yes": {
+                "type": "string",
+                "optional": true
+              }
+            }
+          }
+        },
+        "stack": {
+          "type": "string",
+          "optional": true
+        },
+        "starred": {
+          "type": "boolean",
+          "optional": true
+        },
+        "unreachable": {
+          "type": "boolean",
+          "optional": true
+        },
+        "where": {
+          "type": "string",
+          "optional": true
+        },
+        "windows": {
+          "type": "array",
+          "optional": true,
+          "items": {
+            "type": "object",
+            "fields": {
+              "active": {
+                "type": "boolean"
+              },
+              "agent": {
+                "type": "string",
+                "optional": true
+              },
+              "command": {
+                "type": "string"
+              },
+              "index": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "pid": {
+                "type": "integer",
+                "optional": true
+              },
+              "quiet": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

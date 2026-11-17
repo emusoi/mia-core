@@ -394,6 +394,9 @@ const (
 	turnDid      = "did"
 )
 
+// TurnKinds is every kind a turn is.
+var TurnKinds = []string{turnAsked, turnSaid, turnTool, turnQuestion, turnAnswer, turnCommit, turnDid}
+
 // oneLine is text on one line, cut to what a list shows.
 func oneLine(text string) string {
 	text = strings.Join(strings.Fields(text), " ")

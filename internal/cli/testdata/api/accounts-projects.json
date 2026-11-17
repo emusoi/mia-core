@@ -1,0 +1,30 @@
+{
+  "query": "accounts --projects",
+  "usage": "mia api accounts --projects",
+  "inputs": [
+    {
+      "name": "--projects",
+      "required": true
+    }
+  ],
+  "output": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "fields": {
+        "account": {
+          "type": "string"
+        },
+        "agent": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

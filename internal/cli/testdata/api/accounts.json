@@ -1,0 +1,38 @@
+{
+  "query": "accounts",
+  "usage": "mia api accounts [--projects]",
+  "inputs": [
+    {
+      "name": "--projects"
+    }
+  ],
+  "output": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "fields": {
+        "agent": {
+          "type": "string"
+        },
+        "default": {
+          "type": "boolean"
+        },
+        "home": {
+          "type": "string"
+        },
+        "logged_in": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

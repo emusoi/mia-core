@@ -1,0 +1,13 @@
+{
+  "query": "base",
+  "usage": "mia api base",
+  "inputs": [],
+  "output": {
+    "type": "object",
+    "fields": {
+      "branch": {
+        "type": "string"
+      }
+    }
+  }
+}

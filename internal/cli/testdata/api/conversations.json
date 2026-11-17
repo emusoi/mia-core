@@ -1,0 +1,86 @@
+{
+  "query": "conversations",
+  "usage": "mia api conversations [--worktree \u003cname\u003e] [--agent \u003cagent\u003e] [--limit \u003cn\u003e]",
+  "inputs": [
+    {
+      "name": "--worktree",
+      "value": "\u003cname\u003e"
+    },
+    {
+      "name": "--agent",
+      "value": "\u003cagent\u003e"
+    },
+    {
+      "name": "--limit",
+      "value": "\u003cn\u003e"
+    }
+  ],
+  "output": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "fields": {
+        "account": {
+          "type": "string",
+          "optional": true
+        },
+        "active": {
+          "type": "time",
+          "optional": true
+        },
+        "agent": {
+          "type": "string"
+        },
+        "asked": {
+          "type": "string"
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "effort": {
+          "type": "string",
+          "optional": true
+        },
+        "gone": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string",
+          "optional": true
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "said": {
+          "type": "string"
+        },
+        "started": {
+          "type": "time",
+          "optional": true
+        },
+        "turns": {
+          "type": "integer"
+        },
+        "window": {
+          "type": "object",
+          "optional": true,
+          "nullable": true,
+          "fields": {
+            "index": {
+              "type": "integer"
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        "worktree": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

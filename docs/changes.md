@@ -9,6 +9,14 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **The API the apps were built on is kept.** `internal/cli/testdata/api`
+  holds the shape of every `mia api` answer and the inputs its usage
+  names, read off the Go types; a test fails, naming the field, when one
+  goes, is renamed, changes type, may newly be left out or loses a value
+  of a closed set, or when a query comes to need a new input. What is
+  added passes and is kept with `-update`. No answer changes. See
+  [Automation](api.md).
+
 - **A machine that does not answer says what is wrong, and the fix.**
   Each machine in `mia api standing` and `mia api machines` has a
   `reach`: a `state` — `ok`, `unreachable`, `needs_login`, `no_mia`,

@@ -1,0 +1,96 @@
+{
+  "query": "conversation",
+  "usage": "mia api conversation \u003cid\u003e [--worktree \u003cname\u003e] [--after \u003cn\u003e]",
+  "inputs": [
+    {
+      "name": "\u003cid\u003e",
+      "required": true
+    },
+    {
+      "name": "--worktree",
+      "value": "\u003cname\u003e"
+    },
+    {
+      "name": "--after",
+      "value": "\u003cn\u003e"
+    }
+  ],
+  "output": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "fields": {
+        "answer": {
+          "type": "string",
+          "optional": true
+        },
+        "at": {
+          "type": "time",
+          "optional": true
+        },
+        "file": {
+          "type": "string",
+          "optional": true
+        },
+        "hash": {
+          "type": "string",
+          "optional": true
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "asked",
+            "said",
+            "tool",
+            "question",
+            "answer",
+            "commit",
+            "did"
+          ]
+        },
+        "machine": {
+          "type": "string",
+          "optional": true
+        },
+        "n": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string",
+          "optional": true
+        },
+        "options": {
+          "type": "array",
+          "optional": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "question": {
+          "type": "integer",
+          "optional": true
+        },
+        "repository": {
+          "type": "string",
+          "optional": true
+        },
+        "subject": {
+          "type": "string",
+          "optional": true
+        },
+        "text": {
+          "type": "string",
+          "optional": true
+        },
+        "verb": {
+          "type": "string",
+          "optional": true
+        },
+        "worktree": {
+          "type": "string",
+          "optional": true
+        }
+      }
+    }
+  }
+}

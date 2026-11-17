@@ -1,0 +1,25 @@
+{
+  "query": "capabilities",
+  "usage": "mia api capabilities",
+  "inputs": [],
+  "output": {
+    "type": "object",
+    "fields": {
+      "features": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "queries": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "version": {
+        "type": "integer"
+      }
+    }
+  }
+}

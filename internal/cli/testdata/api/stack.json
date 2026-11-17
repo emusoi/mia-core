@@ -1,0 +1,43 @@
+{
+  "query": "stack",
+  "usage": "mia api stack [\u003cworktree\u003e]",
+  "inputs": [
+    {
+      "name": "\u003cworktree\u003e"
+    }
+  ],
+  "output": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "fields": {
+        "ahead": {
+          "type": "integer"
+        },
+        "base_moved": {
+          "type": "boolean",
+          "optional": true
+        },
+        "branch": {
+          "type": "string"
+        },
+        "current": {
+          "type": "boolean"
+        },
+        "landed": {
+          "type": "boolean"
+        },
+        "needs_restack": {
+          "type": "boolean"
+        },
+        "parent": {
+          "type": "string"
+        },
+        "worktree": {
+          "type": "string",
+          "optional": true
+        }
+      }
+    }
+  }
+}
