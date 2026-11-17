@@ -55,6 +55,24 @@ so as well, with `-2`, `-3` after it when that name is taken. A window you
 rename keeps its name: tmux turns its own naming off for it, and mia only
 ever names a window it is opening.
 
+## Prompt marks
+
+Add this to your zshrc:
+
+```zsh
+eval "$(mia shell-integration zsh)"
+```
+
+mia only prints it; your zshrc is yours. It marks where each prompt is
+and where each command's output starts, with the command's exit status
+(OSC 133), and says the folder the shell is in (OSC 7). In tmux's copy
+mode, `send -X previous-prompt` and `send -X next-prompt` then jump from
+one command to the next, and with `-o` to its output — bind them to keys
+of your own in your tmux config.
+
+It does nothing where there is no terminal, and nothing more when your
+zshrc is read twice.
+
 ## The radar
 
 A popup 72 columns wide, one row per worktree, in four groups:

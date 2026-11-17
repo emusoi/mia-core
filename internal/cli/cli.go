@@ -98,6 +98,8 @@ func Run(args []string) int {
 		return exitOK
 	case "shell-init":
 		return cmdShellInit(rest)
+	case "shell-integration":
+		return cmdShellIntegration(rest)
 	case "gateway":
 		return cmdGateway(rest, asJSON)
 	case "status-line":

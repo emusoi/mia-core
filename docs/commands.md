@@ -97,6 +97,7 @@
 | `mia api setups [--repository <name> \| --all]` | the agent · model · effort setups used, the repository's usual first, from any folder |
 | `mia api standing [--here] [--seen <repository>/<worktree>]` | every agent in every repository, and on every machine: which wait on you, which work, which finished unseen |
 | `mia help vocabulary` | the words |
+| `mia shell-integration zsh` | prints what marks each prompt and its output for tmux: `eval "$(mia shell-integration zsh)"` in your zshrc — see [Prompt marks](tmux.md#prompt-marks) |
 | `mia help tmux` | what `mia tmux install` adds: the radar, a new worktree, the menu, the status line |
 
 Reading commands take `--json`.

@@ -14,7 +14,7 @@ var Groups = []string{"Worktrees", "Working", "Environments", "Records"}
 
 var groupOf = map[string]string{
 	"new": "Worktrees", "ls": "Worktrees", "path": "Worktrees", "adopt": "Worktrees", "rm": "Worktrees", "gc": "Worktrees",
-	"star": "Worktrees", "open": "Worktrees", "shell": "Worktrees", "window": "Worktrees", "rename": "Worktrees", "run": "Worktrees", "setup": "Worktrees", "switch": "Worktrees", "shell-init": "Worktrees",
+	"star": "Worktrees", "open": "Worktrees", "shell": "Worktrees", "window": "Worktrees", "rename": "Worktrees", "run": "Worktrees", "setup": "Worktrees", "switch": "Worktrees", "shell-init": "Worktrees", "shell-integration": "Working",
 	"dash": "Working", "stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working",
 	"env":    "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
@@ -28,6 +28,7 @@ var verbs = []Verb{
 	{"path", "mia path [worktree|stack]", "print a worktree's path, for scripts; no argument is the main checkout", true, ""},
 	{"switch", "mia switch <worktree|stack>", "cd there — with `eval \"$(mia shell-init zsh)\"` in your rc", true, ""},
 	{"shell-init", "mia shell-init <zsh|bash|fish>", "the shell function that makes `mia switch` change directory, and completion", true, ""},
+	{"shell-integration", shellIntegrationUsage, "marks each prompt and each command's output, so tmux's previous-prompt and next-prompt jump between commands, and says the folder; mia prints it, your zshrc runs it", true, ""},
 	{"gc", "mia gc [--merged] [--apply] [--days N] | --others [--apply] [path...]", "worktrees nobody has touched: clean, no session, not starred, quiet for N days; --merged: those whose branch is merged; --others: clean ones mia did not make", false, ""},
 	{"adopt", "mia adopt <worktree>", "take over a worktree created by hand", false, ""},
 	{"rm", "mia rm [--force] [--stop-running] [--branch] <worktree>", "remove a worktree, its session and its name", false, ""},
