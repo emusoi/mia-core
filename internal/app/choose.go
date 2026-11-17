@@ -227,6 +227,9 @@ type Chosen struct {
 	Model   string `json:"model,omitempty"`
 	Effort  string `json:"effort,omitempty"`
 	Account string `json:"account,omitempty"`
+	// Fresh is when the main agent was started with a new conversation,
+	// and zero when it went on with its last: only one begun since is its.
+	Fresh time.Time `json:"fresh,omitzero"`
 }
 
 // chosenPath keeps them by window, the window as its session's name and

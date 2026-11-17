@@ -185,6 +185,7 @@ func (a *App) Main() MainState {
 		state.Agent = a.Config.Main.Agent
 	}
 	window, pane, running := a.mainWindow(host)
+	var fresh time.Time
 	if running {
 		agent, _ = agentNamed(a.agents(), window.Name)
 		state.Running, state.Agent = true, agent.Name
@@ -197,19 +198,20 @@ func (a *App) Main() MainState {
 			state.Asks, state.Working = &asks, false
 		}
 		kept := a.chosen()[chosenKey(session.Name(mainName), pane.PID)]
-		state.Model, state.Effort = kept.Model, kept.Effort
+		state.Model, state.Effort, fresh = kept.Model, kept.Effort, kept.Fresh
 		if agent.AccountEnv != "" {
 			state.Account = cmp.Or(kept.Account, DefaultAccount)
 		}
 	}
-	state.Conversation = a.mainConversation(agent, pane.PID, state.Account)
+	state.Conversation = a.mainConversation(agent, pane.PID, state.Account, fresh)
 	return state
 }
 
 // mainConversation is the conversation the agent has open in the pane, when
 // it says, and otherwise the one of its folder last written to: of the
-// account named, when one is.
-func (a *App) mainConversation(agent Agent, pid int, account string) string {
+// account named, when one is. Started with a new conversation at fresh, it
+// is one begun since, and none until there is one: not the one it left.
+func (a *App) mainConversation(agent Agent, pid int, account string, fresh time.Time) string {
 	if agent.talks == nil {
 		return ""
 	}
@@ -223,6 +225,9 @@ func (a *App) mainConversation(agent Agent, pid int, account string) string {
 	heads, _ := agent.talks.heads(in)
 	if account != "" {
 		heads = slices.DeleteFunc(heads, func(h Head) bool { return h.Account != "" && h.Account != account })
+	}
+	if !fresh.IsZero() {
+		heads = slices.DeleteFunc(heads, func(h Head) bool { return h.Started.Before(fresh.Truncate(time.Second)) })
 	}
 	if len(heads) == 0 {
 		return ""
@@ -259,6 +264,45 @@ func (a *App) mainAccount(agent Agent, account string) (string, error) {
 // left as it is. Named, the agent is that one of the table for this
 // start, whatever [main] says.
 func (a *App) StartMain(name, model, effort, account string) (MainState, error) {
+	return a.startMain(name, model, effort, account, false, false)
+}
+
+// StartMainNew starts the main agent with a new conversation: it goes on
+// with none, and the one it had stays where its agent keeps them. One
+// that runs is refused, in a line that says what would be cut short,
+// unless restart says to end it: it is then stopped and started as the
+// agent it was, with the model, the effort and the account it had, where
+// none is given. Another agent named takes none of them.
+func (a *App) StartMainNew(name, model, effort, account string, restart bool) (MainState, error) {
+	return a.startMain(name, model, effort, account, true, restart)
+}
+
+// newRefused is why a main agent that runs is not given a new
+// conversation unasked: what ending it would cut short.
+func newRefused(state MainState) error {
+	const how = "`mia main start --new --restart` %s its conversation and starts a fresh one"
+	switch {
+	case state.Asks != nil:
+		return fmt.Errorf("the main agent asks something: %s — "+how, state.Asks.Text, "leaves it unanswered, ends")
+	case state.Working:
+		return fmt.Errorf("the main agent is working — "+how, "stops it mid-turn, ends")
+	}
+	return fmt.Errorf("the main agent is running — "+how, "ends")
+}
+
+func (a *App) startMain(name, model, effort, account string, fresh, restart bool) (MainState, error) {
+	host := a.mainHost()
+	restarting := false
+	if window, pane, running := a.mainWindow(host); fresh && running {
+		if !restart {
+			return MainState{}, newRefused(a.Main())
+		}
+		restarting = true
+		if name == "" || name == window.Name {
+			was := a.chosen()[chosenKey(session.Name(mainName), pane.PID)]
+			name, model, effort, account = window.Name, cmp.Or(model, was.Model), cmp.Or(effort, was.Effort), cmp.Or(account, was.Account)
+		}
+	}
 	agent, err := a.mainAgent()
 	if name != "" {
 		var known bool
@@ -277,11 +321,10 @@ func (a *App) StartMain(name, model, effort, account string) (MainState, error) 
 	if account, err = a.mainAccount(agent, account); err != nil {
 		return MainState{}, err
 	}
-	host := a.mainHost()
 	if !host.Available() {
 		return MainState{}, errors.New("tmux not found — the main agent runs in a session: https://github.com/tmux/tmux/wiki/Installing")
 	}
-	if window, _, running := a.mainWindow(host); running && name != "" {
+	if window, _, running := a.mainWindow(host); running && name != "" && !restarting {
 		return MainState{}, fmt.Errorf("the main agent runs already, as %s — `mia main stop` first", window.Name)
 	}
 	home := paths.In(mainName)
@@ -298,7 +341,12 @@ func (a *App) StartMain(name, model, effort, account string) (MainState, error) 
 			return MainState{}, err
 		}
 	}
-	if _, _, running := a.mainWindow(host); running {
+	if _, _, running := a.mainWindow(host); running && restarting {
+		// asked for in so many words, and everything it is started with is known to be good
+		if err := host.Kill(mainName); err != nil {
+			return MainState{}, err
+		}
+	} else if running {
 		if model != "" || effort != "" {
 			return MainState{}, errors.New("the main agent runs already — `mia main model <model>` switches it")
 		}
@@ -312,7 +360,7 @@ func (a *App) StartMain(name, model, effort, account string) (MainState, error) 
 		on = cmp.Or(account, DefaultAccount)
 	}
 	command := agent.start()
-	if last := a.mainConversation(agent, 0, on); last != "" && agent.resume != nil {
+	if last := a.mainConversation(agent, 0, on, time.Time{}); !fresh && last != "" && agent.resume != nil {
 		if command, err = agent.resume(last); err != nil {
 			return MainState{}, fmt.Errorf("agent %s: %w", agent.Name, err)
 		}
@@ -325,6 +373,10 @@ func (a *App) StartMain(name, model, effort, account string) (MainState, error) 
 		command = put(command, with)
 	}
 	chosen.Account = account
+	kept := chosen
+	if fresh {
+		kept.Fresh = time.Now()
+	}
 	command = withAccount(agent, account, command)
 	if err := host.Ensure(mainName, a.Root); err != nil {
 		return MainState{}, err
@@ -350,8 +402,8 @@ func (a *App) StartMain(name, model, effort, account string) (MainState, error) 
 		}
 		return MainState{}, fmt.Errorf("%s ended as soon as it started — `%s` in %s shows why", agent.Name, command, a.Root)
 	}
-	if chosen != (Chosen{}) {
-		if err := a.keep(host, mainName, pane.PID, chosen); err != nil {
+	if kept != (Chosen{}) {
+		if err := a.keep(host, mainName, pane.PID, kept); err != nil {
 			return MainState{}, err
 		}
 		if err := a.used(agent.Name, mainName, runtime.Local, chosen); err != nil {

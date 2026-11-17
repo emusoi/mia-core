@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	mainUsage      = "mia main [status|start [--agent <agent>] [--model <model>] [--effort <effort>] [--account <account>]|stop|say <text…>|press <keys…>|interrupt|model <model> [--effort <effort>]]"
+	mainUsage      = "mia main [status|start [--new [--restart]] [--agent <agent>] [--model <model>] [--effort <effort>] [--account <account>]|stop|say <text…>|press <keys…>|interrupt|model <model> [--effort <effort>]]"
 	mainTurnsUsage = "mia api main [turns [--after <n>]]"
 	standingUsage  = "mia api standing [--here] [--seen <repository>/<worktree>[@<machine>]]"
 )
@@ -46,8 +46,13 @@ func cmdMain(args []string) int {
 	if sub == "start" || sub == "model" {
 		model, effort = takeValue(&args, "--model"), takeValue(&args, "--effort")
 	}
+	var fresh, restart bool
 	if sub == "start" {
 		agent, account = takeValue(&args, "--agent"), takeValue(&args, "--account")
+		// --restart ends a conversation: only for a new one, said in so many words
+		if fresh, restart = take(&args, "--new"), take(&args, "--restart"); restart && !fresh {
+			return usageErr(mainUsage)
+		}
 	}
 	if sub == "model" {
 		if model != "" || len(args) != 1 || strings.HasPrefix(args[0], "-") {
@@ -84,6 +89,12 @@ func cmdMain(args []string) int {
 		case model != "":
 			ask = append(ask, "--model", model)
 		}
+		if fresh {
+			ask = append(ask, "--new")
+		}
+		if restart {
+			ask = append(ask, "--restart")
+		}
 		if agent != "" {
 			ask = append(ask, "--agent", agent)
 		}
@@ -111,7 +122,13 @@ func cmdMain(args []string) int {
 	case "status":
 		return sayMain(a.Main(), asJSON)
 	case "start":
-		state, err := a.StartMain(agent, model, effort, account)
+		start := a.StartMain
+		if fresh {
+			start = func(agent, model, effort, account string) (app.MainState, error) {
+				return a.StartMainNew(agent, model, effort, account, restart)
+			}
+		}
+		state, err := start(agent, model, effort, account)
 		if err != nil {
 			return fail(err)
 		}

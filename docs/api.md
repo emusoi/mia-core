@@ -153,7 +153,7 @@ any folder, and starts and writes nothing.
 | `machine` | the machine it lives on, as `mia api machines` calls it: `local` when that is the one asked, and the name `[main] machine` gives when it is another, whose mia answered |
 | `home`, `session` | its folder and its tmux session, whether or not they are there yet |
 | `window` | the agent's window; left out when it is not running |
-| `conversation` | the one it has open — claude says which — or, of another agent and when it is not running, the last written to in its folder; empty when there is none, or mia cannot read that agent's |
+| `conversation` | the one it has open — claude says which — or, of another agent and when it is not running, the last written to in its folder; empty when there is none, or mia cannot read that agent's. Started with a [new conversation](main.md#a-new-conversation) — `mia main start --new`, which a mia has when its capabilities have `main-start-new` — it is that one, and empty until an agent that does not say which it has open has written the first of it: another id than before, or none, is a conversation that changed |
 | `working` | it is doing something now: claude's pane title says so, and of another agent, that its window wrote in the last three seconds |
 | `asks` | the question its window shows, waiting on you: `text`, `options` and `selected`, the option its cursor is on, the first being 1, what Enter alone would answer; left out when it asks nothing, and `working` is false while it asks. A mia has it when its capabilities have `main-asks` |
 | `since` | when its session was started; left out when it is not running |

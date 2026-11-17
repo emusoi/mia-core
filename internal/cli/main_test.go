@@ -39,7 +39,7 @@ func TestTheMainAgentAndStandingAnswerOutsideARepository(t *testing.T) {
 	if _, code = answered(t, "standing", "--seen", "nowhere/kilwa"); code != exitFailed {
 		t.Errorf("--seen of a repository there is not exited %d", code)
 	}
-	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "main") || !slices.Contains(caps.Queries, "standing") || !slices.Contains(caps.Features, "main-agent") || !slices.Contains(caps.Features, "main-start-agent") {
+	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "main") || !slices.Contains(caps.Queries, "standing") || !slices.Contains(caps.Features, "main-agent") || !slices.Contains(caps.Features, "main-start-agent") || !slices.Contains(caps.Features, "main-start-new") {
 		t.Errorf("capabilities = %+v", caps)
 	}
 
@@ -60,6 +60,10 @@ func TestTheMainAgentAndStandingAnswerOutsideARepository(t *testing.T) {
 	}
 	if code := Run([]string{"main", "restart"}); code != exitUsage {
 		t.Errorf("a verb main has not exited %d", code)
+	}
+	// ending a conversation is said with the new one it is ended for
+	if code := Run([]string{"main", "start", "--restart"}); code != exitUsage {
+		t.Errorf("--restart with no --new exited %d", code)
 	}
 	if code := Run([]string{"main"}); code != exitOK {
 		t.Errorf("mia main exited %d", code)
@@ -192,6 +196,11 @@ esac
 	}
 	if code := Run([]string{"main", "restart"}); code != exitUsage || strings.Contains(asked(), "restart") {
 		t.Errorf("a verb main has not exited %d, and fedora was asked it: %v", code, strings.Contains(asked(), "restart"))
+	}
+	// a new conversation is that machine's to start, and to refuse
+	Run([]string{"main", "start", "--new", "--restart", "--model", "opus"})
+	if want := "'main' 'start' '--model' 'opus' '--new' '--restart'"; !strings.Contains(asked(), want) {
+		t.Errorf("fedora was not asked %s:\n%s", want, asked())
 	}
 
 	// a machine that does not answer is one sentence that names it

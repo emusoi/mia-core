@@ -82,6 +82,7 @@
 | `mia api conversation <id> [--worktree <name>] [--after <n>]` | one conversation as turns, for a chat view; `--worktree` picks the copy of one that is in several |
 | `mia main [status]` | the [main agent](main.md): whether it runs, and what it is doing |
 | `mia main start [--agent <name>] [--model <m>] [--effort <e>] [--account <a>]` | make its folder and session when they are not there and start the agent, going on with its last conversation; one that runs is left as it is. `--agent` starts another than `[main] agent`, this once |
+| `mia main start --new [--restart] [--agent <name>] [--model <m>] [--effort <e>] [--account <a>]` | start it with a [new conversation](main.md#a-new-conversation), going on with none; the one it had stays. One that runs is refused, unless `--restart` says to end it and start it again as it was |
 | `mia main stop` | end its session; its folder and conversations stay |
 | `mia main say <text…>` | type a message into it and submit it; refused while it [asks something](main.md#when-it-asks-first) |
 | `mia main press <keys…>` | type keys into it with no Enter after: `mia main press 1` picks an option when it is the main agent that asks, moving its cursor there and pressing Enter when its options have no numbers |

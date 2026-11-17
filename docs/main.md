@@ -9,6 +9,8 @@ on the machine that is always on, and it is no repository's.
 mia main start        # its folder and session when they are not there, and the agent in it
 mia main start --model opus --effort high   # started with a model and an effort
 mia main start --agent codex                # started as another agent, this once
+mia main start --new                        # started with a new conversation, not its last
+mia main start --new --restart              # the one that runs ended, and started again with a new one
 mia main              # whether it runs, and what it is doing
 mia main say start goba on the login bug, and tell me when it asks something
 mia main press 2      # a key with no Enter: pick an option when it asks you to choose
@@ -19,7 +21,8 @@ mia main stop         # end its session; its folder and conversations stay
 
 Each answers from any folder. `mia main start` twice starts one: an agent
 that already runs is left as it is. Stopped and started again, it goes on
-with its last conversation.
+with its last conversation, unless [`--new`](#a-new-conversation) says
+not to.
 
 `mia main start` watches the agent for up to three seconds before it says
 it started: until it asks something, ends, or has drawn the same for a
@@ -110,6 +113,38 @@ goes on with the last conversation of its folder on that account. One
 that runs already is refused another: an agent takes its account when
 it starts, so `mia main stop` first. `mia api main` says the `account`
 it runs on.
+
+## A new conversation
+
+`mia main start --new` starts it going on with nothing: its agent is run
+as it is the first time, with the model, the effort and the account any
+start gives it. The conversation it had is not touched: it stays where
+its agent keeps them. The next plain `mia main start` goes on with the
+last written to, which is the new one once something is said in it.
+
+One that runs is refused, exit 1, and nothing is stopped or started. The
+line says what ending it would cut short:
+
+```
+mia: the main agent is running — `mia main start --new --restart` ends its conversation and starts a fresh one
+mia: the main agent is working — `mia main start --new --restart` stops it mid-turn, ends its conversation and starts a fresh one
+mia: the main agent asks something: Do you want to proceed? — `mia main start --new --restart` leaves it unanswered, ends its conversation and starts a fresh one
+```
+
+`mia main start --new --restart` is that said in so many words: the one
+that runs is stopped, working or asking as it may be, and started again
+with a new conversation, as the agent it was and with the model, the
+effort and the account it had, unless `--agent`, `--model`, `--effort` or
+`--account` say others. Another agent named takes none of them: its own
+are as at any start. What it is to be started with is checked before
+anything is stopped, so a model its agent has not leaves it running.
+`--restart` with no `--new` is not a verb: `mia main stop` and `mia main
+start` go on with the same conversation.
+
+`mia api main` says the new one as `conversation`: at once for claude,
+which says which it has open, and for another agent empty until it has
+written the first of it, never the one it left. A mia starts one when its
+capabilities have `main-start-new`.
 
 ## What it may answer
 

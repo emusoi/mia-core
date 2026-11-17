@@ -307,3 +307,144 @@ func TestStandingIsEveryRepositorysAgentsAndEachMachineAskedForItsOwn(t *testing
 		}
 	}
 }
+
+// agentPID is the process of the main agent's one window, named for it.
+func agentPID(t *testing.T, agent string) int {
+	t.Helper()
+	var found []int
+	for _, pane := range session.Here().Panes("main") {
+		if pane.Window == agent {
+			found = append(found, pane.PID)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("the main agent's session has %d windows named %s, want one", len(found), agent)
+	}
+	return found[0]
+}
+
+// The main agent is started with a new conversation: it is told to go on
+// with none, one that runs is not ended unasked, and one ended in so many
+// words is started once, as it was. Started plainly, it goes on as ever.
+func TestTheMainAgentIsStartedWithANewConversation(t *testing.T) {
+	lab(t, map[string]string{"echo-agent": `echo "echo-agent $* on=${ECHO_HOME##*/}."; exec cat`})
+	t.Setenv("MIA_WORKTREE", "")
+	put(t, filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "config.toml"), "[main]", `agent = "echo"`)
+	if err := os.MkdirAll(filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "accounts", "echo", "work"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	withAccounts := strings.Replace(echoPlugin(t), `"name":"echo",`, `"name":"echo","account_env":"ECHO_HOME",`, 1)
+	open := func() *app.App {
+		t.Helper()
+		a, err := app.AtMain()
+		if err != nil {
+			t.Fatal(err)
+		}
+		a.Plugins = plugins(t, map[string]string{"echo": withAccounts})
+		return a
+	}
+	t.Cleanup(func() { open().StopMain() })
+	pid := func() int {
+		t.Helper()
+		return agentPID(t, "echo")
+	}
+	// working still, as one that has just written is: what the line ends with either way
+	const refused = "its conversation and starts a fresh one"
+
+	// each start in turn: what it is given, and what the agent was run with, once
+	first := 0
+	for _, start := range []struct {
+		name                   string
+		model, effort, account string
+		restart                bool
+		ran, refused           string
+	}{
+		{name: "not running, it is started with no conversation", model: "loud", effort: "high", account: "work", ran: "echo-agent --model loud --effort high on=work."},
+		{name: "running, it is not ended unasked", refused: refused},
+		{name: "nor with something to start it with", model: "soft", refused: refused},
+		{name: "ended in so many words, it is started as it was", restart: true, ran: "echo-agent --model loud --effort high on=work."},
+		{name: "a model it has not leaves it running", model: "shout", restart: true, refused: "echo has no model shout"},
+		{name: "and with what is said, where something is", model: "soft", restart: true, ran: "echo-agent --model soft --effort high on=work."},
+	} {
+		was := 0
+		if first != 0 {
+			was = pid()
+		}
+		state, err := open().StartMainNew("", start.model, start.effort, start.account, start.restart)
+		if start.refused != "" {
+			if err == nil || !strings.Contains(err.Error(), start.refused) || pid() != was {
+				t.Fatalf("%s: %v, its process %d then %d", start.name, err, was, pid())
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("%s: %v", start.name, err)
+		}
+		screen := screenOf(t, "main", "echo", start.ran)
+		if first = pid(); first == was || strings.Count(screen, "echo-agent") != 1 || strings.Contains(screen, "e2") {
+			t.Fatalf("%s: process %d then %d, and its window shows %q", start.name, was, first, screen)
+		}
+		// e1 and e2 are the ones it left: neither is the one it has now
+		if !state.Running || state.Conversation != "" || state.Account != "work" || state.Effort != "high" || !strings.HasSuffix(start.ran, "--model "+state.Model+" --effort high on=work.") {
+			t.Fatalf("%s: %+v", start.name, state)
+		}
+	}
+	if turns, err := open().MainTurns(0); err != nil || len(turns) != 0 {
+		t.Errorf("a conversation with nothing said yet has turns: %+v, %v", turns, err)
+	}
+
+	// the line says what ending it would cut short, once it has stopped writing
+	for range 250 {
+		if !open().Main().Working {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if _, err := open().StartMainNew("", "", "", "", false); err == nil || err.Error() != "the main agent is running — `mia main start --new --restart` ends "+refused {
+		t.Errorf("idle, and asked for a new conversation: %v", err)
+	}
+
+	// stopped and started with nothing said, it goes on with its last
+	if err := open().StopMain(); err != nil {
+		t.Fatal(err)
+	}
+	state, err := open().StartMain("", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	screenOf(t, "main", "echo", "echo-agent e2 on=.")
+	if state.Conversation != "e2" {
+		t.Errorf("started plainly: %+v", state)
+	}
+}
+
+// One that asks something is not ended unasked either, and the line says
+// what it asks; ended in so many words, it is.
+func TestAMainAgentThatAsksIsGivenANewConversationOnlyWhenToldTo(t *testing.T) {
+	gittest.Isolate(t)
+	ownTmux(t)
+	manifests := fakeAgents(t, map[string]string{"asker": permissionAgent})
+	put(t, filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "config.toml"), "[main]", `agent = "asker"`)
+	open := func() *app.App {
+		t.Helper()
+		a, err := app.AtMain()
+		if err != nil {
+			t.Fatal(err)
+		}
+		a.Plugins = plugins(t, manifests)
+		return a
+	}
+	if _, err := open().StartMain("", "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { open().StopMain() })
+	was := agentPID(t, "asker")
+	want := "the main agent asks something: Do you want to proceed? — `mia main start --new --restart` leaves it unanswered, ends its conversation and starts a fresh one"
+	if _, err := open().StartMainNew("", "", "", "", false); err == nil || err.Error() != want || agentPID(t, "asker") != was {
+		t.Fatalf("asked for a new conversation while it asks: %v", err)
+	}
+	state, err := open().StartMainNew("", "", "", "", true)
+	if err != nil || !state.Running || agentPID(t, "asker") == was {
+		t.Fatalf("ended in so many words: %+v, %v", state, err)
+	}
+}

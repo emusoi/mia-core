@@ -9,6 +9,15 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **A new conversation for the main agent.** `mia main start --new`
+  starts it going on with none; the one it had stays, and is listed and
+  resumed as any other. One that runs is refused in a line that says
+  what ending it would cut short, and `--new --restart` ends it and
+  starts it again as the agent it was, with the model, the effort and
+  the account it had. `mia api main` says the new `conversation`, and
+  none until there is one. Capability `main-start-new`. See [A new
+  conversation](main.md#a-new-conversation).
+
 - **Accounts.** An agent can have several logins, each a folder of its
   own it keeps its sign-in and conversations in — claude's
   `CLAUDE_CONFIG_DIR`, codex's `CODEX_HOME`, pi's `PI_CODING_AGENT_DIR`,
