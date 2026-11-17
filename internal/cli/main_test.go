@@ -39,7 +39,7 @@ func TestTheMainAgentAndStandingAnswerOutsideARepository(t *testing.T) {
 	if _, code = answered(t, "standing", "--seen", "nowhere/kilwa"); code != exitFailed {
 		t.Errorf("--seen of a repository there is not exited %d", code)
 	}
-	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "main") || !slices.Contains(caps.Queries, "standing") || !slices.Contains(caps.Features, "main-agent") || !slices.Contains(caps.Features, "main-start-agent") || !slices.Contains(caps.Features, "main-start-new") {
+	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "main") || !slices.Contains(caps.Queries, "standing") || !slices.Contains(caps.Features, "main-agent") || !slices.Contains(caps.Features, "main-start-agent") || !slices.Contains(caps.Features, "main-start-new") || !slices.Contains(caps.Features, "main-conversations") {
 		t.Errorf("capabilities = %+v", caps)
 	}
 
@@ -64,6 +64,22 @@ func TestTheMainAgentAndStandingAnswerOutsideARepository(t *testing.T) {
 	// ending a conversation is said with the new one it is ended for
 	if code := Run([]string{"main", "start", "--restart"}); code != exitUsage {
 		t.Errorf("--restart with no --new exited %d", code)
+	}
+	// an earlier conversation is gone on with by its id: one, and not with a new one
+	for _, bad := range [][]string{{"main", "start", "--resume"}, {"main", "start", "--new", "--resume", "c1"}} {
+		if code := Run(bad); code != exitUsage {
+			t.Errorf("%v exited %d", bad, code)
+		}
+	}
+	// with none yet it has none to list, and an id is none of its
+	if data, code = answered(t, "main", "conversations"); code != exitOK || string(data) != "[]\n" {
+		t.Errorf("api main conversations = %q, exit %d", data, code)
+	}
+	if _, code = answered(t, "main", "turns", "--conversation", "c1"); code != exitFailed {
+		t.Errorf("turns of a conversation that is none of its exited %d", code)
+	}
+	if code := Run([]string{"main", "start", "--resume", "c1", "--restart"}); code != exitFailed {
+		t.Errorf("resuming a conversation that is none of its exited %d", code)
 	}
 	if code := Run([]string{"main"}); code != exitOK {
 		t.Errorf("mia main exited %d", code)
@@ -120,6 +136,7 @@ for arg do command=$arg; done
 printf '%s\n' "$command" >> ` + log + `
 case " $* " in *" fedora.invalid "*) ;; *) echo "ssh: connect to host box.invalid port 22: Operation timed out" >&2; exit 255 ;; esac
 case "$command" in
+*"'api' 'main' 'conversations'"*) echo '[{"id":"c0","agent":"claude","asked":"what is waiting"}]' ;;
 *"'api' 'main' 'turns'"*) echo '[{"n":3,"kind":"said","text":"goba is on it"}]' ;;
 *"'api' 'main'"*|*"'main' 'status' '--json'"*) echo '{"running":true,"agent":"claude","machine":"local","home":"/home/user/.config/mia/main","session":"mia-main","window":{"index":1,"name":"claude"},"conversation":"c1","working":true}' ;;
 *"'main' 'status'"*) echo "claude is the main agent, working, in window claude of mia-main since Nov 2 10:00" ;;
@@ -201,6 +218,19 @@ esac
 	Run([]string{"main", "start", "--new", "--restart", "--model", "opus"})
 	if want := "'main' 'start' '--model' 'opus' '--new' '--restart'"; !strings.Contains(asked(), want) {
 		t.Errorf("fedora was not asked %s:\n%s", want, asked())
+	}
+
+	// its earlier conversations are that machine's to list, to read and to go on with
+	var heads []app.Head
+	if data, code := answered(t, "main", "conversations"); json.Unmarshal(data, &heads) != nil || code != exitOK || len(heads) != 1 || heads[0].ID != "c0" {
+		t.Errorf("its conversations = %s, exit %d", data, code)
+	}
+	answered(t, "main", "turns", "--conversation", "c0", "--after", "1")
+	Run([]string{"main", "start", "--resume", "c0", "--restart"})
+	for _, want := range []string{"'api' 'main' 'conversations'", "'api' 'main' 'turns' '--after' '1' '--conversation' 'c0'", "'main' 'start' '--resume' 'c0' '--restart'"} {
+		if !strings.Contains(asked(), want) {
+			t.Errorf("fedora was not asked %s:\n%s", want, asked())
+		}
 	}
 
 	// a machine that does not answer is one sentence that names it

@@ -82,13 +82,15 @@
 | `mia api conversation <id> [--worktree <name>] [--after <n>]` | one conversation as turns, for a chat view; `--worktree` picks the copy of one that is in several |
 | `mia main [status]` | the [main agent](main.md): whether it runs, and what it is doing |
 | `mia main start [--agent <name>] [--model <m>] [--effort <e>] [--account <a>]` | make its folder and session when they are not there and start the agent, going on with its last conversation; one that runs is left as it is. `--agent` starts another than `[main] agent`, this once |
+| `mia main start --resume <id> [--restart] [--model <m>] [--effort <e>]` | start it going on with one of its [earlier conversations](main.md#earlier-conversations), as the agent that had it; one that runs is refused, unless `--restart` says to end it |
 | `mia main start --new [--restart] [--agent <name>] [--model <m>] [--effort <e>] [--account <a>]` | start it with a [new conversation](main.md#a-new-conversation), going on with none; the one it had stays. One that runs is refused, unless `--restart` says to end it and start it again as it was |
 | `mia main stop` | end its session; its folder and conversations stay |
 | `mia main say <text…>` | type a message into it and submit it; refused while it [asks something](main.md#when-it-asks-first) |
 | `mia main press <keys…>` | type keys into it with no Enter after: `mia main press 1` picks an option when it is the main agent that asks, moving its cursor there and pressing Enter when its options have no numbers |
 | `mia main interrupt` | stop it mid-work |
 | `mia api main` | where the main agent stands, from any folder |
-| `mia api main turns [--after <n>]` | its conversation as turns, each of mia's verbs it ran said as what it did |
+| `mia api main turns [--conversation <id>] [--after <n>]` | its conversation as turns, each of mia's verbs it ran said as what it did; `--conversation` reads one of its earlier ones |
+| `mia api main conversations` | the conversations made in its folder, with every agent it was run as, the one it has open marked `running` |
 | `mia api setups [--repository <name> \| --all]` | the agent · model · effort setups used, the repository's usual first, from any folder |
 | `mia api standing [--here] [--seen <repository>/<worktree>]` | every agent in every repository, and on every machine: which wait on you, which work, which finished unseen |
 | `mia help vocabulary` | the words |

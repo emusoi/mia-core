@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	mainUsage      = "mia main [status|start [--new [--restart]] [--agent <agent>] [--model <model>] [--effort <effort>] [--account <account>]|stop|say <text…>|press <keys…>|interrupt|model <model> [--effort <effort>]]"
-	mainTurnsUsage = "mia api main [turns [--after <n>]]"
+	mainUsage      = "mia main [status|start [--new|--resume <conversation>] [--restart] [--agent <agent>] [--model <model>] [--effort <effort>] [--account <account>]|stop|say <text…>|press <keys…>|interrupt|model <model> [--effort <effort>]]"
+	mainTurnsUsage = "mia api main [conversations|turns [--conversation <id>] [--after <n>]]"
 	standingUsage  = "mia api standing [--here] [--seen <repository>/<worktree>[@<machine>]]"
 )
 
@@ -47,10 +47,12 @@ func cmdMain(args []string) int {
 		model, effort = takeValue(&args, "--model"), takeValue(&args, "--effort")
 	}
 	var fresh, restart bool
+	var resume string
 	if sub == "start" {
-		agent, account = takeValue(&args, "--agent"), takeValue(&args, "--account")
-		// --restart ends a conversation: only for a new one, said in so many words
-		if fresh, restart = take(&args, "--new"), take(&args, "--restart"); restart && !fresh {
+		agent, account, resume = takeValue(&args, "--agent"), takeValue(&args, "--account"), takeValue(&args, "--resume")
+		// --restart ends a conversation: only for another one, new or an
+		// earlier one, said in so many words
+		if fresh, restart = take(&args, "--new"), take(&args, "--restart"); (restart && !fresh && resume == "") || (fresh && resume != "") {
 			return usageErr(mainUsage)
 		}
 	}
@@ -92,6 +94,9 @@ func cmdMain(args []string) int {
 		if fresh {
 			ask = append(ask, "--new")
 		}
+		if resume != "" {
+			ask = append(ask, "--resume", resume)
+		}
 		if restart {
 			ask = append(ask, "--restart")
 		}
@@ -123,9 +128,14 @@ func cmdMain(args []string) int {
 		return sayMain(a.Main(), asJSON)
 	case "start":
 		start := a.StartMain
-		if fresh {
+		switch {
+		case fresh:
 			start = func(agent, model, effort, account string) (app.MainState, error) {
 				return a.StartMainNew(agent, model, effort, account, restart)
+			}
+		case resume != "":
+			start = func(agent, model, effort, account string) (app.MainState, error) {
+				return a.StartMainResuming(resume, agent, model, effort, account, restart)
 			}
 		}
 		state, err := start(agent, model, effort, account)
@@ -226,6 +236,22 @@ func cmdAPIMain(args []string) int {
 		}
 		return emit(a.Main())
 	}
+	if len(rest) == 1 && rest[0] == "conversations" {
+		if elsewhere {
+			out, err := a.OnMainMachine(machine, true, "api", "main", "conversations")
+			if err != nil {
+				return fail(err)
+			}
+			fmt.Println(out) // its conversations, as its mia said them
+			return exitOK
+		}
+		heads, problems := a.MainConversations()
+		for _, problem := range problems {
+			fmt.Fprintln(os.Stderr, "mia:", problem) // the others are listed all the same
+		}
+		return emit(append([]app.Head{}, heads...))
+	}
+	conversation := takeValue(&rest, "--conversation")
 	after := 0
 	if value := takeValue(&rest, "--after"); value != "" {
 		n, err := strconv.Atoi(value)
@@ -238,14 +264,18 @@ func cmdAPIMain(args []string) int {
 		return usageErr(mainTurnsUsage)
 	}
 	if elsewhere {
-		out, err := a.OnMainMachine(machine, true, "api", "main", "turns", "--after", strconv.Itoa(after))
+		ask := []string{"api", "main", "turns", "--after", strconv.Itoa(after)}
+		if conversation != "" {
+			ask = append(ask, "--conversation", conversation)
+		}
+		out, err := a.OnMainMachine(machine, true, ask...)
 		if err != nil {
 			return fail(err)
 		}
 		fmt.Println(out) // its turns, as its mia said them
 		return exitOK
 	}
-	turns, err := a.MainTurns(after)
+	turns, err := a.MainTurns(conversation, after)
 	if err != nil {
 		return fail(err)
 	}

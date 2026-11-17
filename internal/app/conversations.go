@@ -240,6 +240,16 @@ func (a *App) ConversationIn(id, worktree string, after int) ([]Turn, error) {
 		}
 		cwd, whose = heads[at].Cwd, heads[at].Agent
 	}
+	turns, found, err := a.turnsIn(in, id, cwd, whose, after)
+	if err == nil && !found {
+		err = fmt.Errorf("no conversation %s here — `mia api conversations` lists them", id)
+	}
+	return turns, err
+}
+
+// turnsIn is a conversation made in the folders as turns, of the first
+// agent that has it, or of the one named; found is false when none has.
+func (a *App) turnsIn(in folders, id, cwd, whose string, after int) (turns []Turn, found bool, err error) {
 	for _, agent := range a.agents() {
 		if agent.talks == nil || (whose != "" && agent.Name != whose) {
 			continue
@@ -247,15 +257,15 @@ func (a *App) ConversationIn(id, worktree string, after int) ([]Turn, error) {
 		turns, found, err := agent.talks.turns(in, id, cwd, after)
 		if err != nil {
 			if found {
-				return nil, fmt.Errorf("agent %s: %w", agent.Name, err)
+				return nil, true, fmt.Errorf("agent %s: %w", agent.Name, err)
 			}
 			continue // an agent that cannot say what it has does not hide another's
 		}
 		if found {
-			return append([]Turn{}, turns...), nil
+			return append([]Turn{}, turns...), true, nil
 		}
 	}
-	return nil, fmt.Errorf("no conversation %s here — `mia api conversations` lists them", id)
+	return nil, false, nil
 }
 
 // Resumed is what resuming a conversation did.

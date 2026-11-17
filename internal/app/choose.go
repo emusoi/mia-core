@@ -230,6 +230,9 @@ type Chosen struct {
 	// Fresh is when the main agent was started with a new conversation,
 	// and zero when it went on with its last: only one begun since is its.
 	Fresh time.Time `json:"fresh,omitzero"`
+	// Resumed is the earlier conversation the main agent was started going
+	// on with at Fresh: its, until another is begun.
+	Resumed string `json:"resumed,omitempty"`
 }
 
 // chosenPath keeps them by window, the window as its session's name and

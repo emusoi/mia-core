@@ -172,8 +172,8 @@ press <n>` answers it, as [The main agent](main.md#when-it-asks-first)
 says. `mia main start --json` is the same state, `asks` and all, once the
 agent has settled.
 
-When `[main] machine` names another machine, `mia api main` and
-`mia api main turns` are that machine's answers, asked over ssh: `home`,
+When `[main] machine` names another machine, `mia api main`,
+`mia api main conversations` and `mia api main turns` are that machine's answers, asked over ssh: `home`,
 `session` and `window` are its own. One that does not answer is an error
 in a line that names it, exit 1, and is not asked again for 30 seconds.
 
@@ -189,6 +189,17 @@ there is none, with one kind more:
   "verb":"move","repository":"mia-desk","worktree":"sakina","machine":"fedora"},
  {"n":10,"kind":"tool","at":"2026-11-02T10:02:15Z","text":"Ran mia api standing","name":"Bash"}]
 ```
+
+`mia api main turns --conversation <id> [--after <n>]` is one of its
+[earlier conversations](main.md#earlier-conversations) in the same way,
+and `mia api main conversations` lists them: the heads
+[`mia api conversations`](#conversations) gives, of the conversations
+made in the main agent's folder with every agent it was run as, the last
+written to first. `running` is true of the one it has open now, with its
+`window`; `worktree` is its folder's name. An id that is none of these is
+refused, exit 1. `mia main start --resume <id> [--restart]` starts it
+going on with one. A mia has all three when its capabilities have
+`main-conversations`.
 
 A `did` is a shell command the main agent ran that is one of mia's verbs
 and changes something. Nothing is logged for it: it is the `tool` turn of

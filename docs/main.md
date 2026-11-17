@@ -11,6 +11,7 @@ mia main start --model opus --effort high   # started with a model and an effort
 mia main start --agent codex                # started as another agent, this once
 mia main start --new                        # started with a new conversation, not its last
 mia main start --new --restart              # the one that runs ended, and started again with a new one
+mia main start --resume <id>                # started going on with one of its earlier conversations
 mia main              # whether it runs, and what it is doing
 mia main say start goba on the login bug, and tell me when it asks something
 mia main press 2      # a key with no Enter: pick an option when it asks you to choose
@@ -55,7 +56,8 @@ does:
 machine = "fedora"
 ```
 
-Every `mia main …` there, and `mia api main` and `mia api main turns`, is
+Every `mia main …` there, and `mia api main`, `mia api main conversations`
+and `mia api main turns`, is
 then run by fedora's own mia over ssh, and what it says is printed:
 `mia main say` from a laptop types into the agent on fedora. A machine
 that does not answer is an error that names it. Left out, or `local`, the
@@ -146,6 +148,44 @@ which says which it has open, and for another agent empty until it has
 written the first of it, never the one it left. A mia starts one when its
 capabilities have `main-start-new`.
 
+## Earlier conversations
+
+The conversations it left stay in its agents' folders, and are the main
+agent's own: those made in its folder, with every agent it was run as.
+
+```
+mia api main conversations                  # each of them, the last written to first
+mia api main turns --conversation <id>      # one of them as turns
+mia main start --resume <id>                # started going on with that one
+mia main start --resume <id> --restart      # the one that runs ended first
+```
+
+`mia main start --resume <id>` starts it going on with that conversation,
+as the agent that had it — whatever `[main] agent` says — and on the
+account it is kept on. The id is one `mia api main conversations` lists,
+and no other: a repository's conversation is refused, and so is
+`--agent` or `--account` naming another than the conversation's own, and
+an agent mia does not know how to take up again by an id:
+
+```
+mia: no conversation 5f0c of the main agent's — `mia api main conversations` lists them
+mia: conversation 5f0c is claude's, not codex's — it is gone on with as claude
+mia: conversation 5f0c is kept on claude's account default, not work — it is gone on with there
+mia: mia does not know how gemini takes a conversation up again by its id
+```
+
+One that runs is refused as for a new conversation, and `--restart` ends
+it in the same way, with the model and the effort it had when it is the
+same agent:
+
+```
+mia: the main agent is running — `mia main start --resume 5f0c --restart` ends its conversation and goes on with that one
+```
+
+The conversation it had is not touched, and is among the earlier ones
+from then on. `--new` and `--resume` together are not a verb. A mia has
+these when its capabilities have `main-conversations`.
+
 ## What it may answer
 
 Its notes say it in a few lines. A permission prompt for work the task
@@ -202,5 +242,6 @@ one that ends as it is typed into.
 
 `mia api main` is where it stands, `asks` among it when it asks
 something, `mia api main turns` its conversation
-with what it did as lines of their own, and `mia api standing` every
+with what it did as lines of their own, `mia api main conversations` the
+[earlier ones](#earlier-conversations), and `mia api standing` every
 agent in every repository: see [Automation](api.md#the-main-agent).

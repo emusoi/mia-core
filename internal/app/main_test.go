@@ -157,7 +157,7 @@ func TestTheMainAgentsTurnsSayWhatItDid(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, err := a.MainTurns(0); err != nil || len(got) != 0 {
+	if got, err := a.MainTurns("", 0); err != nil || len(got) != 0 {
 		t.Fatalf("with no conversation yet: %+v, %v", got, err)
 	}
 	ran := func(command string) string {
@@ -172,7 +172,7 @@ func TestTheMainAgentsTurnsSayWhatItDid(t *testing.T) {
 	if state := a.Main(); state.Running || state.Conversation != "c1" || state.Agent != "claude" {
 		t.Fatalf("not running, with a conversation to go on with: %+v", state)
 	}
-	turns, err := a.MainTurns(0)
+	turns, err := a.MainTurns("", 0)
 	if err != nil || kinds(turns) != "1:asked 2:did 3:tool 4:said" {
 		t.Fatalf("turns = %s, %v", kinds(turns), err)
 	}
@@ -182,7 +182,7 @@ func TestTheMainAgentsTurnsSayWhatItDid(t *testing.T) {
 	if turns[2].Text != "Ran mia api standing" {
 		t.Errorf("a verb that reads = %+v", turns[2])
 	}
-	if later, err := a.MainTurns(2); err != nil || kinds(later) != "3:tool 4:said" {
+	if later, err := a.MainTurns("", 2); err != nil || kinds(later) != "3:tool 4:said" {
 		t.Errorf("after 2 = %s, %v", kinds(later), err)
 	}
 	// the conversation read as any other is as it was
@@ -389,7 +389,7 @@ func TestTheMainAgentIsStartedWithANewConversation(t *testing.T) {
 			t.Fatalf("%s: %+v", start.name, state)
 		}
 	}
-	if turns, err := open().MainTurns(0); err != nil || len(turns) != 0 {
+	if turns, err := open().MainTurns("", 0); err != nil || len(turns) != 0 {
 		t.Errorf("a conversation with nothing said yet has turns: %+v, %v", turns, err)
 	}
 
@@ -447,4 +447,137 @@ func TestAMainAgentThatAsksIsGivenANewConversationOnlyWhenToldTo(t *testing.T) {
 	if err != nil || !state.Running || agentPID(t, "asker") == was {
 		t.Fatalf("ended in so many words: %+v, %v", state, err)
 	}
+}
+
+// The main agent's earlier conversations are those made in its folder,
+// with every agent it was run as: listed with the one it has open marked,
+// read by id, and gone on with by id — as the agent that had each, and
+// never unasked while it runs. One made in a repository is none of its.
+func TestTheMainAgentsEarlierConversationsAreListedReadAndGoneOnWith(t *testing.T) {
+	lab(t, map[string]string{
+		"echo-agent": `echo "echo-agent $*."; exec cat`,
+		"claude":     `echo "claude-agent $*."; exec cat`,
+	})
+	t.Setenv("MIA_WORKTREE", "")
+	repo := gittest.New(t)
+	claudeDir := agentHomes(t)
+	put(t, filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "config.toml"), "[main]", `agent = "echo"`)
+	if err := os.MkdirAll(mainHome(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	open := func() *app.App {
+		t.Helper()
+		a, err := app.AtMain()
+		if err != nil {
+			t.Fatal(err)
+		}
+		a.Plugins = plugins(t, map[string]string{"echo": echoPlugin(t)})
+		return a
+	}
+	t.Cleanup(func() { open().StopMain() })
+	home := open().Root
+	put(t, filepath.Join(claudeDir(home), "c1.jsonl"),
+		claudeSays(home, "user", `"where do things stand"`, ""),
+		claudeSays(home, "assistant", `[{"type":"text","text":"All quiet."}]`, ""))
+	put(t, filepath.Join(claudeDir(repo.Root), "c2.jsonl"), claudeSays(repo.Root, "user", `"make the list faster"`, ""))
+	listed := func() string {
+		t.Helper()
+		heads, problems := open().MainConversations()
+		if len(problems) > 0 {
+			t.Fatalf("problems: %v", problems)
+		}
+		var all []string
+		for _, head := range heads {
+			one := head.Agent + ":" + head.ID
+			if head.Running {
+				one += "*"
+			}
+			all = append(all, one)
+		}
+		return strings.Join(all, " ")
+	}
+
+	// not running: its folder's, of both agents, the last written to first
+	if got := listed(); got != "claude:c1 echo:e2 echo:e1" {
+		t.Fatalf("with none open: %s", got)
+	}
+	if turns, err := open().MainTurns("c1", 0); err != nil || kinds(turns) != "1:asked 2:said" {
+		t.Errorf("an earlier one's turns = %s, %v", kinds(turns), err)
+	}
+	if later, err := open().MainTurns("c1", 1); err != nil || kinds(later) != "2:said" {
+		t.Errorf("after 1 = %s, %v", kinds(later), err)
+	}
+	const none = "no conversation c2 of the main agent's — `mia api main conversations` lists them"
+	if _, err := open().MainTurns("c2", 0); err == nil || err.Error() != none {
+		t.Errorf("a repository's conversation was read as the main agent's: %v", err)
+	}
+
+	// started plainly it goes on with its agent's last, which is marked
+	if _, err := open().StartMain("", "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	screenOf(t, "main", "echo", "echo-agent e2.")
+	if got := listed(); got != "claude:c1 echo:e2* echo:e1" {
+		t.Fatalf("with e2 open: %s", got)
+	}
+	for range 250 {
+		if !open().Main().Working {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	// while it runs nothing is ended unasked, and an id has to be its own
+	was := agentPID(t, "echo")
+	for _, refused := range []struct{ id, agent, account, why string }{
+		{id: "e1", why: "the main agent is running — `mia main start --resume e1 --restart` ends its conversation and goes on with that one"},
+		{id: "c2", why: none},
+		{id: "c1", agent: "echo", why: "conversation c1 is claude's, not echo's — it is gone on with as claude"},
+		{id: "c1", account: "work", why: "conversation c1 is kept on claude's account default, not work — it is gone on with there"},
+	} {
+		if _, err := open().StartMainResuming(refused.id, refused.agent, "", "", refused.account, refused.agent != "" || refused.account != ""); err == nil || err.Error() != refused.why {
+			t.Errorf("resuming %s: %v", refused.id, err)
+		}
+		if agentPID(t, "echo") != was {
+			t.Fatalf("resuming %s, refused, ended the agent", refused.id)
+		}
+	}
+
+	// ended in so many words, it goes on with the one named, once
+	state, err := open().StartMainResuming("e1", "", "", "", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	screen := screenOf(t, "main", "echo", "echo-agent e1.")
+	if agentPID(t, "echo") == was || strings.Count(screen, "echo-agent") != 1 || state.Conversation != "e1" || state.Agent != "echo" {
+		t.Fatalf("resumed e1: %+v, its window shows %q", state, screen)
+	}
+	if got := listed(); got != "claude:c1 echo:e2 echo:e1*" {
+		t.Errorf("with e1 open: %s", got)
+	}
+
+	// one another agent had is gone on with as that agent
+	if state, err = open().StartMainResuming("c1", "", "", "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	screenOf(t, "main", "claude", "claude-agent --resume c1.")
+	if state.Agent != "claude" || state.Conversation != "c1" || agentPID(t, "claude") == 0 ||
+		slices.ContainsFunc(session.Here().Panes("main"), func(p session.Pane) bool { return p.Window == "echo" }) {
+		t.Fatalf("resumed c1: %+v", state)
+	}
+	if got := listed(); got != "claude:c1* echo:e2 echo:e1" {
+		t.Errorf("with c1 open: %s", got)
+	}
+	if turns, err := open().MainTurns("", 0); err != nil || kinds(turns) != "1:asked 2:said" {
+		t.Errorf("the open one's turns = %s, %v", kinds(turns), err)
+	}
+
+	// not running, it needs no --restart
+	if err := open().StopMain(); err != nil {
+		t.Fatal(err)
+	}
+	if state, err = open().StartMainResuming("e1", "", "", "", "", false); err != nil || state.Conversation != "e1" {
+		t.Fatalf("resumed while stopped: %+v, %v", state, err)
+	}
+	screenOf(t, "main", "echo", "echo-agent e1.")
 }
