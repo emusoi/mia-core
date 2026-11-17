@@ -9,6 +9,17 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **A machine that does not answer says what is wrong, and the fix.**
+  Each machine in `mia api standing` and `mia api machines` has a
+  `reach`: a `state` — `ok`, `unreachable`, `needs_login`, `no_mia`,
+  `old_mia`, `not_set_up`, `failed` — a `detail` of one line and the
+  `fix`, the one command that puts it right. `mia machine ls` shows it as
+  standing last found it, and `mia doctor` says it of each machine it
+  cannot use. One that is off or wants a login is asked once a minute
+  after failing twice, not every 30 seconds. A Linux machine whose user
+  services stop at logout warns of it, with `loginctl enable-linger`.
+  Capability `machine-reach`. See [Standing](api.md#standing).
+
 - **A new conversation for the main agent.** `mia main start --new`
   starts it going on with none; the one it had stays, and is listed and
   resumed as any other. One that runs is refused in a line that says

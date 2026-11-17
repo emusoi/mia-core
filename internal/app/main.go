@@ -121,19 +121,19 @@ const sshFailed = 255
 // not asked again for a while, as with standing.
 func (a *App) OnMainMachine(machine runtime.Machine, polled bool, args ...string) (string, error) {
 	const unanswered = "%s, the machine the main agent lives on, does not answer: %s"
-	if detail, off := a.unreachable(machine.Name); polled && off {
-		return "", fmt.Errorf(unanswered, machine.Name, detail)
+	if last, off := a.unreachable(machine.Name); polled && off {
+		return "", fmt.Errorf(unanswered, machine.Name, last.Detail)
 	}
 	out, err := askMia(machine, mainHere+"=1 ", args...)
 	if err == nil {
-		a.keepAnswer(machine.Name, true, "")
+		a.keepAnswer(machine.Name, Reach{State: ReachOK}, "")
 		return out, nil
 	}
 	detail := strings.TrimPrefix(run.FirstLine(err.Error()), machine.SSH+": ")
 	if run.ExitCode(err) != sshFailed {
 		return "", fmt.Errorf("on %s: %s", machine.Name, strings.TrimPrefix(detail, "mia: ")) // its mia answered, and said why not
 	}
-	a.keepAnswer(machine.Name, false, detail)
+	a.keepAnswer(machine.Name, Diagnose(machine, err, false), detail)
 	return "", fmt.Errorf(unanswered, machine.Name, detail)
 }
 

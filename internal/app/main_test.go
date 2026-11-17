@@ -280,10 +280,17 @@ func TestStandingIsEveryRepositorysAgentsAndEachMachineAskedForItsOwn(t *testing
 	if all.Counts.Waiting != 2 || all.Waiting[0].Worktree != "sakina" || all.Waiting[0].Machine != "fedora" || len(all.Waiting[0].Options) != 2 || all.Waiting[1].Machine != "local" {
 		t.Fatalf("waiting everywhere = %+v", all.Waiting)
 	}
-	if len(all.Machines) != 3 || all.Machines[0] != (app.Answered{Name: "local", Answers: true}) ||
+	if len(all.Machines) != 3 || all.Machines[0].Name != "local" || !all.Machines[0].Answers ||
 		all.Machines[1].Name != "box" || all.Machines[1].Answers || !strings.Contains(all.Machines[1].Detail, "timed out") ||
-		all.Machines[2] != (app.Answered{Name: "fedora", Answers: true}) {
+		all.Machines[2].Name != "fedora" || !all.Machines[2].Answers {
 		t.Fatalf("machines = %+v", all.Machines)
+	}
+	// each says what its not answering means, and the step that fixes it
+	if box := all.Machines[1].Reach; box.State != app.ReachUnreachable || !strings.Contains(box.Detail, "timed out") || box.Fix != "turn box on, or check its address with ssh box.invalid" {
+		t.Errorf("box's reach = %+v", box)
+	}
+	if all.Machines[0].Reach.State != app.ReachOK || all.Machines[2].Reach.State != app.ReachOK {
+		t.Errorf("the machines that answer = %+v", all.Machines)
 	}
 	// one that did not answer is not asked again at once, and is still named
 	if again, err := a.Standing(true); err != nil || len(again.Machines) != 3 || again.Machines[1].Answers || again.Machines[1].Detail == "" {

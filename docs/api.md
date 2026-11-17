@@ -387,8 +387,12 @@ worktree's best [signal](tmux.md#signals), as the radar reads them.
  "done_unread":[{"repository":"api","root":"/home/user/src/api","worktree":"olasiti",
    "machine":"fedora","agent":"codex","kind":"done","line":"","since":"2026-11-02T09:40:00Z"}],
  "counts":{"waiting":1,"working":1,"done_unread":1},
- "machines":[{"name":"local","answers":true},{"name":"fedora","answers":true},
-   {"name":"box","answers":false,"detail":"box: ssh: connect to host box port 22: Operation timed out"}]}
+ "machines":[{"name":"local","answers":true,"reach":{"state":"ok"}},
+   {"name":"fedora","answers":true,"reach":{"state":"ok","warnings":[
+     {"name":"linger","detail":"user services stop at logout, and the agents with them","fix":"loginctl enable-linger"}]}},
+   {"name":"box","answers":false,"detail":"box: ssh: connect to host box port 22: Operation timed out",
+    "reach":{"state":"unreachable","detail":"box cannot be reached over ssh: ssh: connect to host box port 22: Operation timed out",
+      "fix":"turn box on, or check its address with ssh box"}}]}
 ```
 
 | group | holds the worktrees whose best signal |
@@ -416,6 +420,29 @@ its own mia, and its entries carry its name. `machines` names each one
 asked: one that did not answer — it is off, or its mia is older than this
 query — has `answers` false and why, and no entries; that is not an
 error. It is not asked again for 30 seconds. `--here` asks no machine.
+
+`reach` says what a machine's not answering means: a `state`, a `detail`
+of one line, and the `fix`, the one command or step that puts it right —
+left out when mia knows none. Capability `machine-reach`; a machine in
+`mia api machines` and in `mia machine ls --json` has the same `reach`.
+
+| `state` | is | `fix` |
+|---|---|---|
+| `ok` | it answered | |
+| `unreachable` | ssh could not connect: it is off, its name does not resolve, it timed out | turn it on, or check its address |
+| `needs_login` | ssh got there and was not let in: a key refused, a host key not accepted, a passphrase or password wanted. mia never asks for one | `ssh <target>` once in a terminal |
+| `no_mia` | it answers and has no mia at `~/.local/bin/mia` | `mia machine ship <name>` |
+| `old_mia` | its mia answers and does not know the query; `detail` says its version | `mia machine ship <name>` |
+| `not_set_up` | its mia runs and the repository asked about is not there: in `mia api machines`, of a machine linked to the repository. It has `answers` true | `mia machine link <name>` |
+| `failed` | its mia answered with an error that is none of these; `detail` has its line | |
+
+One that is `unreachable` or `needs_login` twice running is asked once a
+minute from then on, not every 30 seconds, until it answers. `warnings`
+are what works now and will not go on working, each a `name`, a `detail`
+and a `fix`: `linger`, on a Linux machine whose user services stop when
+you log out (`loginctl show-user` says `Linger=no`). Each machine's own
+mia looks, at most every ten minutes, and says it of itself, so it costs
+no asking.
 
 `--seen <repository>/<worktree>` first marks that worktree seen, as
 switching to it does, so what it finished is unread no more; the

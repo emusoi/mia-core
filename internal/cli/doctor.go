@@ -21,6 +21,10 @@ type doctorCheck struct {
 	Name   string `json:"name"`
 	Status string `json:"status"`
 	Detail string `json:"detail,omitempty"`
+	// State and Fix are of a machine's check: what its not answering
+	// means, and the step that puts it right.
+	State app.ReachState `json:"state,omitempty"`
+	Fix   string         `json:"fix,omitempty"`
 }
 
 type doctorReport struct {
@@ -47,7 +51,11 @@ func cmdDoctor(args []string, asJSON bool) int {
 			}
 		} else {
 			for _, check := range report.Checks {
-				fmt.Printf("%-5s %-24s %s\n", strings.ToUpper(check.Status), check.Name, check.Detail)
+				detail := check.Detail
+				if check.Fix != "" {
+					detail += " — " + check.Fix
+				}
+				fmt.Printf("%-5s %-24s %s\n", strings.ToUpper(check.Status), check.Name, detail)
 			}
 		}
 		if !report.OK {
@@ -108,17 +116,29 @@ func cmdDoctor(args []string, asJSON bool) int {
 		}
 	}
 
+	for _, warning := range a.Linger() {
+		report.Checks = append(report.Checks, doctorCheck{Name: warning.Name, Status: "warn", Detail: warning.Detail, Fix: warning.Fix})
+	}
 	machines, err := a.Runtimes.All()
 	if err != nil {
 		report.add("machines", "fail", err.Error())
 	} else {
 		for _, machine := range machines {
-			ok, detail := reachable(machine)
-			if !ok {
-				report.add("machine "+machine.Name, "fail", detail)
-				continue
+			system, reach := app.Examine(machine)
+			if reach.State != app.ReachOK {
+				report.add("machine "+machine.Name, "fail", reach.Detail)
+				last := &report.Checks[len(report.Checks)-1]
+				last.State, last.Fix = reach.State, reach.Fix
+				if reach.State != app.ReachNoMia { // one with no mia answers all the same
+					continue
+				}
+			} else {
+				report.add("machine "+machine.Name, "ok", system)
+				report.Checks[len(report.Checks)-1].State = app.ReachOK
 			}
-			report.add("machine "+machine.Name, "ok", detail)
+			for _, warning := range reach.Warnings {
+				report.Checks = append(report.Checks, doctorCheck{Name: warning.Name + " on " + machine.Name, Status: "warn", Detail: warning.Detail, Fix: warning.Fix})
+			}
 			if _, err := runtime.Run(machine.SSH, "sh", "-c", "command -v tmux"); err != nil {
 				report.add("tmux on "+machine.Name, "fail", err.Error())
 			} else {
@@ -173,14 +193,4 @@ func cmdDoctor(args []string, asJSON bool) int {
 		}
 	}
 	return finish()
-}
-
-// reachable is whether a machine answers over ssh, and what it runs: its
-// system and its container engine.
-func reachable(machine runtime.Machine) (bool, string) {
-	out, err := runtime.Run(machine.SSH, "sh", "-c", "uname -sr; command -v podman || command -v docker")
-	if err != nil {
-		return false, run.FirstLine(err.Error())
-	}
-	return true, strings.ReplaceAll(strings.TrimSpace(out), "\n", " · ")
 }

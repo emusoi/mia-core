@@ -3,7 +3,6 @@ package app
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -70,7 +69,10 @@ type Stand struct {
 type Answered struct {
 	Name    string `json:"name"`
 	Answers bool   `json:"answers"`
-	Detail  string `json:"detail,omitempty"` // why it did not
+	Detail  string `json:"detail,omitempty"` // why it did not, as ssh or its mia said it
+	// Reach is what that means and the step that fixes it, and what a
+	// machine that answers warns of.
+	Reach Reach `json:"reach"`
 }
 
 // standingLanes is how many repositories are read at once.
@@ -106,7 +108,7 @@ func (a *App) Standing(machines bool) (Standing, error) {
 	}
 	wg.Wait()
 
-	all := Standing{Waiting: []Stand{}, Working: []Stand{}, DoneUnread: []Stand{}, Machines: []Answered{{Name: runtime.Local, Answers: true}}}
+	all := Standing{Waiting: []Stand{}, Working: []Stand{}, DoneUnread: []Stand{}, Machines: []Answered{{Name: runtime.Local, Answers: true, Reach: Reach{State: ReachOK, Warnings: a.Linger()}}}}
 	for _, one := range slices.Concat(found...) {
 		switch one.group {
 		case groupWaiting:
@@ -248,21 +250,17 @@ func numberedOn(lines []string) choices {
 
 // unreachableFor is how long a machine that did not answer is not asked
 // again, so one that is off costs one ssh timeout in that time and not
-// one each asking.
+// one each asking. askAgainAfter makes it longer for one that stays off.
 const unreachableFor = 30 * time.Second
 
-// unreachable is why a machine did not answer, when it was asked and did
-// not within unreachableFor.
-func (a *App) unreachable(machine string) (string, bool) {
-	data, err := os.ReadFile(a.answerPath(machine))
-	if err != nil {
-		return "", false
+// unreachable is how a machine did not answer, when it was asked and did
+// not, too lately to ask it again.
+func (a *App) unreachable(machine string) (answer, bool) {
+	last, ok := a.lastAnswer(machine)
+	if !ok || last.Answers || a.clock().Sub(last.At) >= askAgainAfter(last.reach().State, last.Failures) {
+		return answer{}, false
 	}
-	var last answer
-	if json.Unmarshal(data, &last) != nil || last.Answers || time.Since(last.At) >= unreachableFor {
-		return "", false
-	}
-	return last.Detail, true
+	return last, true
 }
 
 // askMia runs a machine's own mia with args, from no folder, and gives what
@@ -276,11 +274,11 @@ func askMia(machine runtime.Machine, before string, args ...string) (string, err
 // standingOn asks a machine's own mia where its agents stand.
 func (a *App) standingOn(machine runtime.Machine) (Standing, Answered) {
 	asked := Answered{Name: machine.Name}
-	if detail, off := a.unreachable(machine.Name); off {
-		asked.Detail = detail
+	if last, off := a.unreachable(machine.Name); off {
+		asked.Detail, asked.Reach = last.Detail, last.reach()
 		return Standing{}, asked
 	}
-	out, err := askMia(machine, "", "api", "standing", "--here")
+	out, err := runtime.Run(machine.SSH, "sh", "-c", utf8+remoteMia+` "$@"`+sayVersionWhenFailed, "sh", "api", "standing", "--here")
 	var theirs Standing
 	if err == nil {
 		if err = json.Unmarshal([]byte(out), &theirs); err != nil {
@@ -288,12 +286,15 @@ func (a *App) standingOn(machine runtime.Machine) (Standing, Answered) {
 		}
 	}
 	if err != nil {
-		asked.Detail = run.FirstLine(err.Error())
-		a.keepAnswer(machine.Name, false, asked.Detail)
+		asked.Detail, asked.Reach = run.FirstLine(err.Error()), Diagnose(machine, err, false)
+		a.keepAnswer(machine.Name, asked.Reach, asked.Detail)
 		return Standing{}, asked
 	}
-	a.keepAnswer(machine.Name, true, "")
-	asked.Answers = true
+	asked.Answers, asked.Reach = true, Reach{State: ReachOK}
+	if len(theirs.Machines) > 0 { // itself, first: what its own mia warns of
+		asked.Reach.Warnings = theirs.Machines[0].Reach.Warnings
+	}
+	a.keepAnswer(machine.Name, asked.Reach, "")
 	return theirs, asked
 }
 

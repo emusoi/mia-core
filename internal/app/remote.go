@@ -147,6 +147,7 @@ type MachineState struct {
 	runtime.Machine
 	Answers bool    `json:"answers"`
 	Detail  string  `json:"detail,omitempty"` // why it did not answer
+	Reach   Reach   `json:"reach"`            // what that means, and the fix
 	Health  *Health `json:"health,omitempty"` // nil when it did not answer
 	// Worktrees another machine keeps, as it last reported them; none for
 	// this computer, whose worktrees the radar lists itself.
@@ -166,8 +167,9 @@ func (a *App) Machines() []MachineState {
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		out, err := runtime.Run("", "sh", "-c", probeScript, "sh", a.Root)
-		states[0] = MachineState{Machine: runtime.Machine{Name: runtime.Local}, Answers: err == nil}
+		states[0] = MachineState{Machine: runtime.Machine{Name: runtime.Local}, Answers: err == nil, Reach: Diagnose(runtime.Machine{Name: runtime.Local}, err, true)}
 		if err == nil {
+			states[0].Reach.Warnings = a.Linger()
 			health := parseHealth(out)
 			states[0].Health = &health
 		}
@@ -210,31 +212,39 @@ func (a *App) askMachine(machine runtime.Machine, dir string, linked bool) Machi
 	if linked {
 		script = "(" + probeScript + ")\necho " + worktreesMark + "\n" +
 			// the machine answers whether or not the repository is still there: without it, it has no worktrees of it
-			"{ cd \"$1\" 2>/dev/null && " + remoteMia + " api worktrees; } || true"
+			"{ cd \"$1\" 2>/dev/null || { echo " + noFolderMark + "; false; }; } && " + remoteMia + " api worktrees || true"
 		at = dir
 	}
 	// a machine that did not answer is not asked again for 30s, so one that
 	// is off costs one ssh timeout per 30s rather than every refresh
 	if got, ok := a.reach.Load(machine.Name); ok {
-		if r := got.(reachability); !r.ok && time.Since(r.at) < 30*time.Second {
-			state.Detail = r.detail
+		if r := got.(reachability); !r.ok && a.clock().Sub(r.at) < askAgainAfter(r.reach.State, r.failures) {
+			state.Detail, state.Reach = r.detail, r.reach
 			state.Worktrees = cachedWorktrees(cache, machine.Name, false)
 			return state
 		}
 	}
 	out, err := runtime.Run(machine.SSH, "sh", "-c", script, "sh", at)
 	if err != nil {
-		state.Detail = run.FirstLine(err.Error())
-		a.reach.Store(machine.Name, reachability{false, state.Detail, time.Now()})
-		a.keepAnswer(machine.Name, false, state.Detail)
+		state.Detail, state.Reach = run.FirstLine(err.Error()), Diagnose(machine, err, linked)
+		failures := 1
+		if got, ok := a.reach.Load(machine.Name); ok {
+			failures += got.(reachability).failures
+		}
+		a.reach.Store(machine.Name, reachability{false, state.Detail, a.clock(), state.Reach, failures})
+		a.keepAnswer(machine.Name, state.Reach, state.Detail)
 		state.Worktrees = cachedWorktrees(cache, machine.Name, false)
 		return state
 	}
-	a.reach.Store(machine.Name, reachability{true, "", time.Now()})
-	a.keepAnswer(machine.Name, true, "")
 	probe, worktrees, _ := strings.Cut(out, worktreesMark+"\n")
 	health := parseHealth(probe)
-	state.Answers, state.Health = true, &health
+	state.Answers, state.Health, state.Reach = true, &health, Reach{State: ReachOK}
+	if strings.TrimSpace(worktrees) == noFolderMark {
+		// it answers, and the repository it was linked for is gone from it
+		state.Reach, worktrees = Reach{State: ReachNotSetUp, Detail: machine.Name + " does not have this repository at ~/" + dir, Fix: "mia machine link " + machine.Name}, ""
+	}
+	a.reach.Store(machine.Name, reachability{ok: true, at: a.clock(), reach: state.Reach})
+	a.keepAnswer(machine.Name, state.Reach, "")
 	if linked && strings.TrimSpace(worktrees) != "" {
 		if err := os.MkdirAll(filepath.Dir(cache), 0o755); err == nil {
 			_ = os.WriteFile(cache, []byte(worktrees), 0o644)
@@ -249,7 +259,13 @@ type answer struct {
 	Answers bool      `json:"answers"`
 	Detail  string    `json:"detail,omitempty"`
 	At      time.Time `json:"at"`
+	Reach   Reach     `json:"reach"`
+	// Failures is how many asks running were not answered.
+	Failures int `json:"failures,omitempty"`
 }
+
+// noFolderMark is what a machine prints for the repository it does not have.
+const noFolderMark = "@@nofolder"
 
 func (a *App) answerPath(machine string) string {
 	return filepath.Join(a.MiaDir, "remote", machine+".answer.json")
@@ -257,11 +273,19 @@ func (a *App) answerPath(machine string) string {
 
 // keepAnswer remembers whether the machine answered, for what has to know
 // without asking it: the status line.
-func (a *App) keepAnswer(machine string, answers bool, detail string) {
+func (a *App) keepAnswer(machine string, reach Reach, detail string) {
 	if a.MiaDir == "" {
 		return // outside a repository there is nowhere to keep it
 	}
-	data, err := json.Marshal(answer{answers, detail, time.Now()})
+	// not set up is of one repository there: the machine answered
+	kept := answer{Answers: reach.State == ReachOK || reach.State == ReachNotSetUp, Detail: detail, At: a.clock(), Reach: reach}
+	if last, ok := a.lastAnswer(machine); ok && !kept.Answers {
+		kept.Failures = last.Failures
+	}
+	if !kept.Answers {
+		kept.Failures++
+	}
+	data, err := json.Marshal(kept)
 	if err != nil {
 		return
 	}
@@ -275,14 +299,11 @@ func (a *App) keepAnswer(machine string, answers bool, detail string) {
 // answering until it is.
 func (a *App) KnownMachines() []MachineState {
 	machines, _ := a.Runtimes.All()
-	states := []MachineState{{Machine: runtime.Machine{Name: runtime.Local}, Answers: true}}
+	states := []MachineState{{Machine: runtime.Machine{Name: runtime.Local}, Answers: true, Reach: Reach{State: ReachOK}}}
 	for _, machine := range machines {
-		state := MachineState{Machine: machine, Answers: true}
-		if data, err := os.ReadFile(a.answerPath(machine.Name)); err == nil {
-			var last answer
-			if json.Unmarshal(data, &last) == nil {
-				state.Answers, state.Detail = last.Answers, last.Detail
-			}
+		state := MachineState{Machine: machine, Answers: true, Reach: Reach{State: ReachOK}}
+		if last, ok := a.lastAnswer(machine.Name); ok {
+			state.Answers, state.Detail, state.Reach = last.Answers, last.Detail, last.reach()
 		}
 		state.Worktrees = cachedWorktrees(filepath.Join(a.MiaDir, "remote", machine.Name+".json"), machine.Name, state.Answers)
 		states = append(states, state)

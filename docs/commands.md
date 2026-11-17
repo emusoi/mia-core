@@ -62,7 +62,7 @@
 | `mia env status\|ports\|service` | what it is doing |
 | `mia env host [machine]` | where it runs, or move it after a target preflight |
 | `mia env sync [worktree] [auto\|manual\|now\|status\|conflicts\|preview\|restart]` | control and inspect remote file synchronization |
-| `mia machine list\|add\|shell\|rm` | machines |
+| `mia machine list\|add\|shell\|rm` | machines; the list says how each stood when last asked — `ok`, or what is wrong and the fix — and asks none |
 | `mia gateway status\|start\|stop\|setup\|trust` | the `<name>.mia` gateway |
 
 ## Other
@@ -74,7 +74,7 @@
 | `mia config [show\|validate]` | edit local overrides, or inspect the effective configuration |
 | `mia config [--global] <key> [<value>]` | say, or set, one setting: `base staging`, `keys.quizzicle.quiz K`, `plugin.agent.default codex`; one line edited, comments kept, and a setting mia would not load refused |
 | `mia plugin ls\|enable\|disable` | plugins |
-| `mia doctor` | check tools, config, gateway, machines, plugins and environment drift |
+| `mia doctor` | check tools, config, gateway, machines, plugins and environment drift; of a machine that does not answer, what is wrong and the fix |
 | `mia api <query>` | state as JSON |
 | `mia api capabilities` | API version, queries and feature markers |
 | `mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]` | the agent conversations of the repository and its worktrees, the last written to first |

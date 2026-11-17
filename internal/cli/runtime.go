@@ -5,11 +5,20 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/config"
 	"github.com/emusoi/mia-core/internal/runtime"
 )
+
+// listedMachine is a machine in `mia machine ls`: as it was added, and as
+// it stood when last asked; never asked, it has neither.
+type listedMachine struct {
+	runtime.Machine
+	Reach *app.Reach `json:"reach,omitempty"`
+	Asked *time.Time `json:"asked,omitempty"`
+}
 
 func cmdRuntime(args []string, asJSON bool) int {
 	store := runtime.Store{Path: config.RuntimesPath()}
@@ -24,12 +33,38 @@ func cmdRuntime(args []string, asJSON bool) int {
 		if err != nil {
 			return fail(err)
 		}
+		// how each stood when last asked — by `mia api standing`, which
+		// the apps poll — without asking any: a listing stays instant
+		listed := []listedMachine{{Machine: runtime.Machine{Name: runtime.Local}}}
+		a, _ := app.AtMain()
+		for _, machine := range machines {
+			one := listedMachine{Machine: machine}
+			if a != nil {
+				if reach, at, ok := a.LastReach(machine.Name); ok {
+					one.Reach, one.Asked = &reach, &at
+				}
+			}
+			listed = append(listed, one)
+		}
 		if asJSON {
-			return emit(append([]runtime.Machine{{Name: runtime.Local}}, machines...))
+			return emit(listed)
 		}
 		fmt.Printf("%-12s %-24s %s\n", runtime.Local, "this computer", "")
-		for _, machine := range machines {
-			fmt.Printf("%-12s %-24s %s\n", machine.Name, machine.SSH, machine.Engine)
+		for _, one := range listed[1:] {
+			stands := ""
+			if one.Reach != nil {
+				stands = string(one.Reach.State)
+				if one.Reach.State != app.ReachOK {
+					stands += " — " + one.Reach.Detail
+					if one.Reach.Fix != "" {
+						stands += " — " + one.Reach.Fix
+					}
+				}
+				for _, warning := range one.Reach.Warnings {
+					stands += " — " + warning.Detail + ": " + warning.Fix
+				}
+			}
+			fmt.Println(strings.TrimRight(fmt.Sprintf("%-12s %-24s %-8s %s", one.Name, one.SSH, one.Engine, stands), " "))
 		}
 		return exitOK
 

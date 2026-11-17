@@ -48,6 +48,7 @@ type App struct {
 	dirtyOnce  sync.Once
 	dirtySeen  atomic.Bool
 	reach      sync.Map
+	now        func() time.Time // the clock, when a test sets one
 	hereOnce   sync.Once
 	here       string
 	Events     func(Event)
@@ -70,9 +71,11 @@ func (a *App) Emit(name string, record model.Record, detail any) {
 }
 
 type reachability struct {
-	ok     bool
-	detail string
-	at     time.Time
+	ok       bool
+	detail   string
+	at       time.Time
+	reach    Reach
+	failures int // running, of asks that were not answered
 }
 
 // ForgetDirtiness drops what was cached about each worktree's changes, so
