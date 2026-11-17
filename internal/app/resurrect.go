@@ -226,7 +226,8 @@ func (a *App) Resurrect(dry bool, names ...string) ([]Revived, error) {
 			windows[i].Splits = slices.Clone(windows[i].Splits)
 			for _, p := range windows[i].panes() {
 				if p.Kind == "" { // remembered before panes were marked
-					p.Kind = a.WhatOf(p.Command).Kind
+					what := a.WhatOf(p.Command)
+					p.Kind, p.Label = what.Kind, what.Label
 				}
 				p.Command = again(a.agents(), p.Command, p.Conversation)
 				if name, _ := agentOf(a.agents(), p.Command); name != "" && p.Account != "" {

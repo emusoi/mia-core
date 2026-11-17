@@ -40,6 +40,21 @@ Every pane mia starts is marked with what it is for, in tmux's pane option
 `mia window new … --kind <kind>` says it instead. A pane opened by hand in
 tmux has no kind. `tmux show-options -p -t <pane> @mia_kind` reads one.
 
+A pane is titled, on its border, by what it is for: an agent by its name
+(`claude`), an editor by its file (`nvim · main.go`) or, opened on a
+folder, by the folder it is in, a server by its name and port (`api
+:8080`, as `PORT=`, `--port` or `-p` says it), tests `tests`, logs `logs`,
+and a shell `shell · <folder>`, following it as it goes. mia keeps the
+fixed part in the pane option `@mia_label`; the rest is tmux's own format,
+so a plain `tmux attach` shows the same titles as the apps.
+
+A window tmux names, one opened with `prefix c`, is named as its pane is
+titled (`shell · config`, `nvim · config`), so two in one folder are told
+apart by what runs in them. `mia window new` with no name calls the window
+so as well, with `-2`, `-3` after it when that name is taken. A window you
+rename keeps its name: tmux turns its own naming off for it, and mia only
+ever names a window it is opening.
+
 ## The radar
 
 A popup 72 columns wide, one row per worktree, in four groups:

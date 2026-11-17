@@ -383,13 +383,14 @@ type Pane struct {
 	Activity time.Time
 	Active   bool
 	ID       string
-	Kind     Kind // as mia marked the pane; "" for one it did not start
+	Kind     Kind   // as mia marked the pane; "" for one it did not start
+	Label    string // the title mia gave it; "" for none
 	Title    string
 }
 
 // paneFormat is one pane a line, tab between fields: a window name or a
 // title may have spaces in it. The title is last: it may have tabs too.
-const paneFormat = "#{window_index}\t#{window_name}\t#{pane_pid}\t#{pane_current_command}\t#{window_activity}\t#{window_active}\t#{pane_id}\t#{@mia_kind}\t#{pane_title}"
+const paneFormat = "#{window_index}\t#{window_name}\t#{pane_pid}\t#{pane_current_command}\t#{window_activity}\t#{window_active}\t#{pane_id}\t#{@mia_kind}\t#{@mia_label}\t#{pane_title}"
 
 func parsePane(fields []string) (Pane, bool) {
 	if len(fields) < 3 {
@@ -422,7 +423,10 @@ func parsePane(fields []string) (Pane, bool) {
 		pane.Kind = Kind(fields[7])
 	}
 	if len(fields) > 8 {
-		pane.Title = strings.Join(fields[8:], "\t")
+		pane.Label = fields[8]
+	}
+	if len(fields) > 9 {
+		pane.Title = strings.Join(fields[9:], "\t")
 	}
 	return pane, true
 }
@@ -506,11 +510,16 @@ func WindowsFrom(panes []Pane) []Window {
 		quiet := pane.Quiet()
 		name, command := pane.Window, pane.Command
 		if version.MatchString(command) {
-			// ponytail: claude's own installer names its binary for its version,
-			// so tmux calls the window 2.1.316; the one agent known to do it
+			// a binary named for its version is the agent mia marked the pane
+			// for; unmarked, claude's: its own installer names it so, and tmux
+			// calls the window 2.1.316. What runs now, not what the pane is
+			// for: an agent that quit leaves its shell in front.
 			command = "claude"
+			if pane.Kind == KindAgent && pane.Label != "" {
+				command = pane.Label
+			}
 			if version.MatchString(name) {
-				name = "claude"
+				name = command
 			}
 		}
 		agent := AgentTitle(pane.Title)

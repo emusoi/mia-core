@@ -451,7 +451,7 @@ func (a *App) ResumeConversation(id, from, in, model, effort, account string) (R
 	if err != nil {
 		return Resumed{}, err
 	}
-	if window, err = a.NewWindow(record, window, session.What{Kind: session.KindAgent}, argv); err != nil {
+	if window, err = a.NewWindow(record, window, session.What{Kind: session.KindAgent, Label: agent.Name}, argv); err != nil {
 		return Resumed{}, err
 	}
 	done.Command = command

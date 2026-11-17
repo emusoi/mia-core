@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -48,10 +49,15 @@ func (a *App) SelectWindow(record model.Record, window string) error {
 // NewWindow opens a window in the worktree's session, starting the session
 // when there is none, and remembers the session as it is then: one made
 // with no status line to poll it comes back all the same. Its pane is
-// marked with what it is: what is given, or what its command is for.
+// marked with what it is: what is given, or what its command is for. With
+// no name, it is called as tmux titles its pane, told apart from a window
+// of that name already there by a number.
 func (a *App) NewWindow(record model.Record, window string, what session.What, argv []string) (string, error) {
 	if what.Kind == "" {
 		what = a.WhatOf(strings.Join(argv, " "))
+	}
+	if window == "" {
+		window = freeWindow(a.sessionOf(record), record.Name, titleOf(what, argv, record.Path))
 	}
 	name, err := a.newWindow(record, window, what, argv)
 	if err == nil {
@@ -81,6 +87,19 @@ func (a *App) newWindow(record model.Record, window string, what session.What, a
 		return "", fmt.Errorf("%s already has a window called %s", record.Name, window)
 	}
 	return window, host.StartWindow(record.Name, dir, window, what, argv)
+}
+
+// titleOf is session.Title for a pane about to start: its label; else
+// "shell", or the command it runs, and its folder.
+func titleOf(what session.What, argv []string, dir string) string {
+	if what.Label != "" {
+		return what.Label
+	}
+	command := "shell"
+	if words := argv[withoutEnv(argv):]; len(words) > 0 && !shells[filepath.Base(words[0])] {
+		command = filepath.Base(words[0])
+	}
+	return command + " · " + filepath.Base(dir)
 }
 
 func (a *App) CloseWindow(record model.Record, window string) error {

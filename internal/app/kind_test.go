@@ -122,3 +122,60 @@ func TestEachPaneMiaStartsIsMarkedWithWhatItIsForAndKeepsItWhenItComesBack(t *te
 		t.Errorf("each window comes back marked as it was: %v, want %v", got, want)
 	}
 }
+
+func TestAPaneIsTitledByWhatItIsFor(t *testing.T) {
+	a := &app.App{}
+	a.Config.Services = []env.Service{{ID: "api", Run: []string{"./bin/api"}}}
+	for _, c := range []struct {
+		kind    session.Kind
+		command string
+		want    session.What
+	}{
+		{"", "claude --resume 1234", session.What{Kind: session.KindAgent, Label: "claude"}},
+		{"", "nvim -O main.go", session.What{Kind: session.KindEditor, Label: "nvim · main.go"}},
+		{"", "nvim .", session.What{Kind: session.KindEditor}}, // its folder says it, as it goes
+		{"", "PORT=5173 npm run dev", session.What{Kind: session.KindServer, Label: "npm :5173"}},
+		{"", "./bin/api --port=8080", session.What{Kind: session.KindServer, Label: "api :8080"}},
+		{"", "go test ./...", session.What{Kind: session.KindTests, Label: "tests"}},
+		{"", "tail -f app.log", session.What{Kind: session.KindLogs, Label: "logs"}},
+		{"", "htop", session.What{Kind: session.KindShell}},
+		{session.KindServer, "python3 -m http.server -p 8000", session.What{Kind: session.KindServer, Label: "python3 :8000"}},
+		{session.KindLogs, "htop", session.What{Kind: session.KindLogs, Label: "logs"}},
+	} {
+		if got := a.WhatAs(c.kind, c.command); got != c.want {
+			t.Errorf("%q as %q is %+v, want %+v", c.command, c.kind, got, c.want)
+		}
+	}
+}
+
+func TestAWindowWithNoNameIsCalledAsItsPaneIsTitled(t *testing.T) {
+	lab(t, map[string]string{"nvim": "exec sleep 300"})
+	repo := gittest.New(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := a.New("config")
+	if err != nil {
+		t.Fatal(err)
+	}
+	folder := filepath.Base(record.Path)
+	for _, c := range []struct {
+		argv []string
+		want string
+	}{
+		{nil, "shell · " + folder},
+		{[]string{"nvim", "notes.md"}, "nvim · notes.md"},
+		{[]string{"nvim", "."}, "nvim · " + folder},
+		{[]string{"sleep", "300"}, "sleep · " + folder},
+		{nil, "shell · " + folder + "-2"}, // told apart from the one there already
+	} {
+		got, err := a.NewWindow(record, "", session.What{}, c.argv)
+		if err != nil || got != c.want {
+			t.Errorf("a window running %q is called %q (%v), want %q", c.argv, got, err, c.want)
+		}
+	}
+	if !session.Here().HasWindow(record.Name, "nvim · notes.md") {
+		t.Errorf("tmux calls it so too: %v", session.Here().Windows(record.Name))
+	}
+}

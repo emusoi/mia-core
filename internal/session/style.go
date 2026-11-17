@@ -38,7 +38,8 @@ var miaWindowStyle = [][2]string{
 	{"window-status-separator", " "},
 	{"pane-border-style", "fg=colour8,bg=default"},
 	{"pane-active-border-style", "fg=default,bg=default"},
-	{"pane-border-format", " #{pane_index} · #{b:pane_current_path} "},
+	{"pane-border-format", " " + Title + " "},
+	{"automatic-rename-format", Title},
 }
 
 // Style changes only this worktree's tmux session and its windows. The terminal's

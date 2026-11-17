@@ -76,6 +76,8 @@ type Pane struct {
 	// Kind is what the pane is for, as mia marked it; marked again when
 	// the pane is opened again.
 	Kind session.Kind `json:",omitempty"`
+	// Label is the title mia gave the pane, as its kind's; "" for none.
+	Label string `json:",omitempty"`
 }
 
 // Window is one window of a session, as a move recreates it: its first
@@ -545,7 +547,7 @@ func (s side) chosen(a *App) map[string]Chosen {
 // command running there when it is not just a shell, and the account mia
 // started an agent there on, from what is kept of each window.
 func (s side) windows(table []Agent, name, path string, kept map[string]Chosen) []Window {
-	out, err := s.sh(`tmux list-panes -s -t "=mia-$1" -F '#{window_id}	#{window_name}	#{window_layout}	#{pane_current_path}	#{pane_current_command}	#{pane_pid}	#{pane_id}	#{@mia_kind}	#{automatic-rename}' 2>/dev/null`, name)
+	out, err := s.sh(`tmux list-panes -s -t "=mia-$1" -F '#{window_id}	#{window_name}	#{window_layout}	#{pane_current_path}	#{pane_current_command}	#{pane_pid}	#{pane_id}	#{@mia_kind}	#{@mia_label}	#{automatic-rename}' 2>/dev/null`, name)
 	if err != nil {
 		return nil
 	}
@@ -553,10 +555,10 @@ func (s side) windows(table []Agent, name, path string, kept map[string]Chosen) 
 	window := "" // tmux lists a window's panes together, in order
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		f := strings.Split(line, "\t")
-		if len(f) != 9 {
+		if len(f) != 10 {
 			continue
 		}
-		p := Pane{ID: f[6], Kind: session.Kind(f[7])}
+		p := Pane{ID: f[6], Kind: session.Kind(f[7]), Label: f[8]}
 		if rel, err := filepath.Rel(path, f[3]); err == nil && !strings.HasPrefix(rel, "..") {
 			p.Dir = rel
 		}
@@ -577,7 +579,7 @@ func (s side) windows(table []Agent, name, path string, kept map[string]Chosen) 
 			if pid, err := strconv.Atoi(f[5]); err == nil && p.Command != "" {
 				p.Account = kept[chosenKey("mia-"+name, pid)].Account
 			}
-			windows = append(windows, Window{Name: f[1], Pane: p, Auto: f[8] == "1"})
+			windows = append(windows, Window{Name: f[1], Pane: p, Auto: f[9] == "1"})
 			continue
 		}
 		last := &windows[len(windows)-1]
@@ -595,7 +597,7 @@ func (s side) open(name, path string, windows []Window) error {
 	}
 	run := func(pane string, p Pane) error {
 		if p.Kind != "" {
-			if _, err := s.sh(`tmux set-option -p -t "$1" @mia_kind "$2"`, pane, string(p.Kind)); err != nil {
+			if _, err := s.sh(`tmux set-option -p -t "$1" @mia_kind "$2" && { [ -z "$3" ] || tmux set-option -p -t "$1" @mia_label "$3"; }`, pane, string(p.Kind), p.Label); err != nil {
 				return err
 			}
 		}

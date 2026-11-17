@@ -1398,7 +1398,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 	case "new":
 		// an agent is started with a model and an effort: those given, or the configured ones
 		var chosen app.Chosen
-		var agent, body string
+		var agent, body, line string // line: the command the window runs, not the shell that starts it
 		if role != "" {
 			// a role is a setup with a body: what is given here is said over it
 			read, err := app.ReadRole(role)
@@ -1429,6 +1429,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 			if argv, err = a.LaunchArgv(record, command); err != nil {
 				return fail(err)
 			}
+			line = command
 		} else if len(argv) > 0 {
 			var err error
 			agent = a.AgentOf(strings.Join(argv, " "))
@@ -1444,31 +1445,26 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 				return fail(fmt.Errorf("no editor: set `editor` in the config or $EDITOR"))
 			}
 			argv = append(strings.Fields(command), ".")
-			if name == "" {
-				name = "editor"
-			}
 		}
-		if name == "" {
-			name = "shell"
-		}
-		// what the window is for: its agent, its editor, what its command is for, or as told
-		what := a.WhatOf(strings.Join(argv, " "))
-		switch {
-		case agent != "":
-			what = session.What{Kind: session.KindAgent}
-		case editor:
-			what = session.What{Kind: session.KindEditor}
-		case launched:
-			what = a.WhatOf(command)
-		}
+		// what the window is for: as told, its agent, its editor, or what its command is for
+		told := session.Kind("")
 		if kind != "" {
-			told, err := session.ParseKind(kind)
-			if err != nil {
+			var err error
+			if told, err = session.ParseKind(kind); err != nil {
 				return fail(err)
 			}
-			what.Kind = told
 		}
-		name, err := a.NewWindow(record, name, what, argv)
+		switch {
+		case told != "":
+		case agent != "":
+			told = session.KindAgent
+		case editor:
+			told = session.KindEditor
+		}
+		if line == "" {
+			line = strings.Join(argv, " ")
+		}
+		name, err := a.NewWindow(record, name, a.WhatAs(told, line), argv)
 		if err != nil {
 			return fail(err)
 		}

@@ -348,7 +348,7 @@ func (a *App) AddAccount(agentName, name, in string) (AccountOpened, error) {
 			return opened, err
 		}
 		window := freeWindow(a.sessionOf(record), record.Name, agent.Name+"-"+name)
-		if window, err = a.NewWindow(record, window, session.What{Kind: session.KindAgent}, argv); err != nil {
+		if window, err = a.NewWindow(record, window, session.What{Kind: session.KindAgent, Label: agent.Name}, argv); err != nil {
 			return opened, err
 		}
 		opened.Worktree, opened.Window = record.Name, window
@@ -367,7 +367,7 @@ func (a *App) AddAccount(agentName, name, in string) (AccountOpened, error) {
 		shell := cmp.Or(a.Config.Dotfiles.Shell, os.Getenv("SHELL"), "/bin/sh")
 		window := freeWindow(host, accountsSession, agent.Name+"-"+name)
 		// the window is the agent, and goes when the person has signed in and left it
-		if err := host.StartWindowWith(agent.AccountEnv+"="+dir, accountsSession, root, window, session.What{Kind: session.KindAgent}, []string{shell, "-lc", command}); err != nil {
+		if err := host.StartWindowWith(agent.AccountEnv+"="+dir, accountsSession, root, window, session.What{Kind: session.KindAgent, Label: agent.Name}, []string{shell, "-lc", command}); err != nil {
 			return opened, err
 		}
 		opened.Worktree, opened.Window = accountsSession, window
