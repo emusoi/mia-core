@@ -9,6 +9,17 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **Roles: a setup with opening instructions.** A file of yours,
+  `~/.config/mia/roles/<name>.md`, says in its front matter the agent,
+  model, effort and account, all optional, and below them what to tell
+  the agent first. `mia window new <worktree> --role <name>` and `mia
+  main start --role <name>` start it and send it the body once it is
+  ready, never into a question. `mia role ls`, `show` and `path` read
+  them; `mia api setups` lists them after the other setups, with `role`,
+  `body` and `account`. An agent mia does not know, or a model it has
+  not, is refused before anything starts. Capability `roles`. See
+  [A role](worktrees.md#a-role).
+
 - **The API the apps were built on is kept.** `internal/cli/testdata/api`
   holds the shape of every `mia api` answer and the inputs its usage
   names, read off the Go types; a test fails, naming the field, when one

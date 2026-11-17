@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	mainUsage      = "mia main [status|start [--new|--resume <conversation>] [--restart] [--agent <agent>] [--model <model>] [--effort <effort>] [--account <account>]|stop|say <text…>|press <keys…>|interrupt|model <model> [--effort <effort>]]"
+	mainUsage      = "mia main [status|start [--new|--resume <conversation>] [--restart] [--role <role>] [--agent <agent>] [--model <model>] [--effort <effort>] [--account <account>]|stop|say <text…>|press <keys…>|interrupt|model <model> [--effort <effort>]]"
 	mainTurnsUsage = "mia api main [conversations|turns [--conversation <id>] [--after <n>]]"
 	standingUsage  = "mia api standing [--here] [--seen <repository>/<worktree>[@<machine>]]"
 )
@@ -47,9 +48,9 @@ func cmdMain(args []string) int {
 		model, effort = takeValue(&args, "--model"), takeValue(&args, "--effort")
 	}
 	var fresh, restart bool
-	var resume string
+	var resume, role string
 	if sub == "start" {
-		agent, account, resume = takeValue(&args, "--agent"), takeValue(&args, "--account"), takeValue(&args, "--resume")
+		agent, account, resume, role = takeValue(&args, "--agent"), takeValue(&args, "--account"), takeValue(&args, "--resume"), takeValue(&args, "--role")
 		// --restart ends a conversation: only for another one, new or an
 		// earlier one, said in so many words
 		if fresh, restart = take(&args, "--new"), take(&args, "--restart"); (restart && !fresh && resume == "") || (fresh && resume != "") {
@@ -100,6 +101,9 @@ func cmdMain(args []string) int {
 		if restart {
 			ask = append(ask, "--restart")
 		}
+		if role != "" {
+			ask = append(ask, "--role", role) // that machine's role of the name
+		}
 		if agent != "" {
 			ask = append(ask, "--agent", agent)
 		}
@@ -127,6 +131,18 @@ func cmdMain(args []string) int {
 	case "status":
 		return sayMain(a.Main(), asJSON)
 	case "start":
+		body := ""
+		if role != "" {
+			// a role is a setup with a body: what is given here is said over it
+			read, err := app.ReadRole(role)
+			if err != nil {
+				return fail(err)
+			}
+			if !restart && a.Main().Running {
+				return fail(fmt.Errorf("the main agent runs already, and role %s opens a conversation — `mia main stop` first, or `mia main start --new --restart --role %s`", role, role))
+			}
+			agent, model, effort, account, body = cmp.Or(agent, read.Agent), cmp.Or(model, read.Model), cmp.Or(effort, read.Effort), cmp.Or(account, read.Account), read.Body
+		}
 		start := a.StartMain
 		switch {
 		case fresh:
@@ -141,6 +157,13 @@ func cmdMain(args []string) int {
 		state, err := start(agent, model, effort, account)
 		if err != nil {
 			return fail(err)
+		}
+		if body != "" {
+			// started, it has settled already: it is ready, or asks something
+			if err := a.SayToMain(body); err != nil {
+				return fail(fmt.Errorf("the main agent is started, and role %s's opening was not sent: %w", role, err))
+			}
+			state = a.Main()
 		}
 		return sayMain(state, asJSON)
 	case "stop":

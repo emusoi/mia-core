@@ -511,14 +511,21 @@ func (a *App) SayToMain(text string) error {
 	if !running {
 		return errMainDown
 	}
-	if asks, on := askingIn(host, mainName, window.Name); on {
-		return askedFirst(window.Name, asks, "mia main press")
+	return a.mainGone(host, say(host, mainName, window.Name, window.Name, "mia main press", text))
+}
+
+// say types text into an agent's window as one message and submits it:
+// pasted, so a line break in it is not an Enter, and Enter after. While it
+// asks something nothing is typed: the Enter would answer it, and press is
+// how it is answered.
+func say(host session.Host, worktree, window, agent, press, text string) error {
+	if asks, on := askingIn(host, worktree, window); on {
+		return askedFirst(agent, asks, press)
 	}
-	err := host.Paste(mainName, window.Name, text)
-	if err == nil {
-		err = host.Keys(mainName, window.Name, []string{"Enter"})
+	if err := host.Paste(worktree, window, text); err != nil {
+		return err
 	}
-	return a.mainGone(host, err)
+	return host.Keys(worktree, window, []string{"Enter"})
 }
 
 // mainGone is err, or errMainDown when the agent ended as it was typed

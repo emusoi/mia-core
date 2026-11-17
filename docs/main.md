@@ -88,6 +88,13 @@ stop` first. Its model and effort are its own under `[agents]`, or those
 agent `[main]` names. From another machine, it is that machine's mia's,
 as every `mia main …` is.
 
+`mia main start --role <name>` starts it as a [role](worktrees.md#a-role)
+says — its agent, model, effort and account, the `[main]` ones where it
+says none — and, started, sends it the role's body as `mia main say`
+does. A role opens a conversation, so one that runs is refused: `mia main
+stop` first, or `--new --restart`. From another machine it is that
+machine's role of the name.
+
 ## Its model
 
 It is started with `[main] model` and `[main] effort`, or its agent's own

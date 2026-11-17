@@ -78,6 +78,44 @@ says a window runs is what it started it with or last switched it to,
 not what the agent says: switched by hand in the agent, mia does not
 know.
 
+## A role
+
+A role is a setup with opening instructions: a file of yours,
+`~/.config/mia/roles/<name>.md`, that says which agent, model, effort and
+account to start, all optional, and below them what to tell the agent
+first.
+
+```markdown
+---
+agent: claude
+model: opus
+effort: high
+---
+You review. Read the diff against main and say what is wrong with it.
+```
+
+```bash
+mia window new monduli --role reviewer          # claude, opus, effort high, in a window named claude
+mia window new monduli review --role reviewer   # the same, in a window named review
+mia role ls                                     # every role, and what is wrong with one that cannot be read
+mia role show reviewer
+mia role path reviewer                          # where to write it
+```
+
+The agent starts as `--model`, `--effort` and `--account` would start it,
+and is sent the body once it is ready — when it has drawn the same for a
+second, asks something or ends, as `mia main start` waits — pasted, so a
+line break is not an Enter, and Enter after. Into a question nothing is
+sent: the window stays, and mia says what it asks. What the front matter
+leaves out is the default setup's: the agent the window is named for,
+else the one used most in the repository, else the main agent's, and
+`[agents.<name>]`'s model and effort. `--model`, `--effort` and
+`--account` given with `--role` say over it. An agent mia does not know,
+or a model or an effort it has not, is refused before any window opens.
+The front matter is `key: value` lines between two `---` lines, of
+`agent`, `model`, `effort` and `account` only; a file that starts with
+none is all body. mia writes no role: write one with your editor.
+
 ## An agent's account
 
 An agent can have several accounts — two claude logins, two codex ones —

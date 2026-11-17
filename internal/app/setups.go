@@ -92,6 +92,12 @@ type Setup struct {
 	Last *LastUse `json:"last,omitempty"`
 	// Usual is the one used in the most worktrees of the repository asked.
 	Usual bool `json:"usual"`
+	// Role is the name of the role it is, one with opening instructions:
+	// Body, the first message its agent is sent, and the Account it starts
+	// on when it says one. Left out of a setup that is no role.
+	Role    string `json:"role,omitempty"`
+	Body    string `json:"body,omitempty"`
+	Account string `json:"account,omitempty"`
 }
 
 // LastUse is where a setup was used last.
@@ -104,8 +110,22 @@ type LastUse struct {
 
 // Setups is the setups used in a repository, or in every one for "":
 // the repository's usual first, then the last used first, then those the
-// config starts an agent with that were never used there.
+// config starts an agent with that were never used there, then each role
+// by its name.
 func (a *App) Setups(repository string) []Setup {
+	type key struct{ agent, model, effort string }
+	setups := a.usedSetups(repository)
+	for _, one := range a.configuredSetups() {
+		if k := (key{one.Agent, one.Model, one.Effort}); !slices.ContainsFunc(setups, func(s Setup) bool { return key{s.Agent, s.Model, s.Effort} == k }) {
+			setups = append(setups, one)
+		}
+	}
+	return append(setups, a.roleSetups()...)
+}
+
+// usedSetups is the setups used in a repository, or in every one for "":
+// the repository's usual first, then the last used first.
+func (a *App) usedSetups(repository string) []Setup {
 	type key struct{ agent, model, effort string }
 	at, worktrees := map[key]int{}, map[key]map[string]bool{}
 	setups := []Setup{}
@@ -136,11 +156,6 @@ func (a *App) Setups(repository string) []Setup {
 		}
 		setups[usual].Usual = true
 		setups = slices.Concat(setups[usual:usual+1], setups[:usual], setups[usual+1:])
-	}
-	for _, one := range a.configuredSetups() {
-		if k := (key{one.Agent, one.Model, one.Effort}); !slices.ContainsFunc(setups, func(s Setup) bool { return key{s.Agent, s.Model, s.Effort} == k }) {
-			setups = append(setups, one)
-		}
 	}
 	return setups
 }

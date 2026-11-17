@@ -314,6 +314,7 @@ for every one.
 | `sessions` | in how many worktrees |
 | `last` | where it was used last: the `repository`, the `worktree`, the `machine` it runs on — `local` for this one — and `at`; left out for one never used |
 | `usual` | the one used in the most of the repository's worktrees, the later used of a tie; none when every repository is asked |
+| `role`, `body`, `account` | of a [role](worktrees.md#a-role): its name, the first message its agent is sent, and the account it starts on when it says one; left out of a setup that is no role |
 
 The usual one comes first, then the last used first. After them come
 what the config starts agents with, `[main]` and `[agents.<name>]`, that
@@ -321,6 +322,12 @@ were not used there, with `uses` 0: someone who has chosen nothing yet
 still has those. One of them with no model is there for its effort; one
 that says neither, or names an agent mia does not start with a model and
 an effort — opencode, or one no enabled plugin adds — is left out.
+
+Last come the roles, by name, each with `uses` 0: the agent, model and
+effort it starts, those it leaves out the default setup's, as `mia window
+new <worktree> --role <role>` would start it. A role file that cannot be
+read is left out; `mia role ls` says why. A mia has roles when its
+capabilities have `roles`.
 
 Every `mia window new … --model`, `mia window model`, `mia conversation
 resume`, `mia main start` and `mia main model` writes down a use, in

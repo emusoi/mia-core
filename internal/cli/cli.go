@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -116,6 +117,8 @@ func Run(args []string) int {
 		return cmdMain(rest)
 	case "account", "accounts":
 		return cmdAccount(rest, asJSON)
+	case "role", "roles":
+		return cmdRole(rest, asJSON)
 	case "api":
 		if len(rest) > 0 && (rest[0] == "main" || rest[0] == "standing") { // the person's, from anywhere
 			return cmdAPIMain(rest)
@@ -1357,12 +1360,13 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		argv, args = args[i+1:], args[:i]
 	}
 	model, effort, account := takeValue(&args, "--model"), takeValue(&args, "--effort"), takeValue(&args, "--account")
+	role := takeValue(&args, "--role")
 	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close", "read", "send", "press", "key", "model", "account")
 	if err != nil {
 		return fail(err)
 	}
 	editor := take(&args, "--editor")
-	if (model != "" || effort != "") && sub != "new" && sub != "model" || account != "" && sub != "new" {
+	if (model != "" || effort != "") && sub != "new" && sub != "model" || (account != "" || role != "") && sub != "new" || role != "" && (len(argv) > 0 || editor) {
 		return usageErr(windowUsage)
 	}
 	name := strings.Join(args, " ")
@@ -1393,10 +1397,27 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 	case "new":
 		// an agent is started with a model and an effort: those given, or the configured ones
 		var chosen app.Chosen
-		var agent string
+		var agent, body string
+		if role != "" {
+			// a role is a setup with a body: what is given here is said over it
+			read, err := app.ReadRole(role)
+			if err != nil {
+				return fail(err)
+			}
+			setup, err := a.RoleSetup(read, name)
+			if err != nil {
+				return fail(err)
+			}
+			name = cmp.Or(name, setup.Agent)
+			model, effort, account, body = cmp.Or(model, setup.Model), cmp.Or(effort, setup.Effort), cmp.Or(account, setup.Account), setup.Body
+			agent = setup.Agent
+		}
 		command, launched := a.Config.Launch[name]
 		if !launched && len(argv) == 0 && !editor && (model != "" || effort != "" || account != "") {
 			command, launched = a.AgentCommand(name), true // the window is named for the agent it runs
+		}
+		if role != "" && a.AgentOf(command) != agent {
+			command, launched = a.AgentCommand(agent), true
 		}
 		if launched && len(argv) == 0 && !editor {
 			var err error
@@ -1439,6 +1460,15 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 			}
 		}
 		fmt.Printf("%s: window %s opened\n", record.Name, name)
+		if body != "" {
+			err := a.SayOnceReady(record, name, body)
+			_ = a.Remember()
+			if err != nil {
+				return fail(fmt.Errorf("%s: role %s's opening was not sent to window %s: %w", record.Name, role, name, err))
+			}
+			fmt.Printf("%s: window %s was sent role %s's opening\n", record.Name, name, role)
+			return exitOK
+		}
 		if len(argv) > 0 {
 			time.Sleep(1500 * time.Millisecond)
 			if text, err := a.ReadWindow(record, name); err != nil {
@@ -1505,7 +1535,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 	return usageErr(windowUsage)
 }
 
-const windowUsage = "mia window [ls|open|select|new|close|read|send|press|key|model|account] [worktree[@machine]] [window] [--editor] [--model <model>] [--effort <effort>] [--account <account>] [-- command|text|keys]"
+const windowUsage = "mia window [ls|open|select|new|close|read|send|press|key|model|account] [worktree[@machine]] [window] [--editor] [--model <model>] [--effort <effort>] [--account <account>] [--role <role>] [-- command|text|keys]"
 
 // said is a model and an effort as a line says them: sonnet, effort high.
 func said(chosen app.Chosen) string {
