@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -177,6 +176,12 @@ const workingFor = 3 * time.Second
 
 // Main is where the main agent stands. Nothing is started or written.
 func (a *App) Main() MainState {
+	state, _ := a.mainNow()
+	return state
+}
+
+// mainNow is Main, and what the agent itself says it has open, when it says.
+func (a *App) mainNow() (MainState, holds) {
 	host := a.mainHost()
 	state := MainState{Machine: runtime.Local, Home: a.Root, Session: session.Name(mainName)}
 	agent, _ := a.mainAgent()
@@ -204,24 +209,24 @@ func (a *App) Main() MainState {
 			state.Account = cmp.Or(kept.Account, DefaultAccount)
 		}
 	}
-	state.Conversation = a.mainConversation(agent, pane.PID, state.Account, fresh, resumed)
-	return state
+	var said holds
+	if agent.talks != nil {
+		said = agent.holding(pane.PID)
+	}
+	if state.Conversation = said.ID; said.ID == "" {
+		state.Conversation = a.mainConversation(agent, state.Account, fresh, resumed)
+	}
+	return state, said
 }
 
-// mainConversation is the conversation the agent has open in the pane, when
-// it says, and otherwise the one of its folder last written to: of the
-// account named, when one is. Started with a new conversation at fresh, it
+// mainConversation is the conversation of the agent's folder last written
+// to, which is the one it has open when it does not say: of the account
+// named, when one is. Started with a new conversation at fresh, it
 // is one begun since, and until there is one none, or the one it was
 // started going on with, resumed: not the one it left.
-func (a *App) mainConversation(agent Agent, pid int, account string, fresh time.Time, resumed string) string {
+func (a *App) mainConversation(agent Agent, account string, fresh time.Time, resumed string) string {
 	if agent.talks == nil {
 		return ""
-	}
-	if agent.held != "" && pid > 0 {
-		out, _ := run.Local("sh").Capture("-c", agent.held, "sh", strconv.Itoa(pid))
-		if held := sessionIn(out); held != "" {
-			return held
-		}
 	}
 	in, _ := a.where()
 	heads, _ := agent.talks.heads(in)
@@ -307,10 +312,15 @@ const noMainConversation = "no conversation %s of the main agent's — `mia api 
 
 // MainConversations is the conversations made in the main agent's folder,
 // with every agent it has been run as, the last written to first, and the
-// one it has open now marked as running.
+// one it has open now marked as running. One it says it has and has
+// written nothing of yet is listed too, first, with nothing asked or said.
 func (a *App) MainConversations() ([]Head, []string) {
 	heads, problems := a.Conversations(Wanted{})
-	if state := a.Main(); state.Running && state.Conversation != "" {
+	if state, said := a.mainNow(); state.Running && state.Conversation != "" {
+		if !slices.ContainsFunc(heads, func(h Head) bool { return h.ID == state.Conversation && h.Agent == state.Agent }) && said.ID != "" {
+			worktree, _ := a.worktreeOf(a.Root, nil)
+			heads = slices.Insert(heads, 0, unsaid(state.Agent, said, state.Account, a.Root, worktree))
+		}
 		for i := range heads {
 			if heads[i].ID == state.Conversation && heads[i].Agent == state.Agent {
 				heads[i].Running, heads[i].Window = true, state.Window
@@ -431,7 +441,7 @@ func (a *App) startMain(name, model, effort, account string, fresh bool, resume 
 	command := agent.start()
 	if resumed != "" {
 		command = resumed
-	} else if last := a.mainConversation(agent, 0, on, time.Time{}, ""); !fresh && last != "" && agent.resume != nil {
+	} else if last := a.mainConversation(agent, on, time.Time{}, ""); !fresh && last != "" && agent.resume != nil {
 		if command, err = agent.resume(last); err != nil {
 			return MainState{}, fmt.Errorf("agent %s: %w", agent.Name, err)
 		}
@@ -580,6 +590,9 @@ func (a *App) MainTurns(id string, after int) ([]Turn, error) {
 	in, _ := a.where()
 	turns, found, err := a.turnsIn(in, id, "", "", after)
 	if err == nil && !found {
+		if state, said := a.mainNow(); state.Running && said.ID == id {
+			return []Turn{}, nil // it has it open, and nothing is written of it yet
+		}
 		err = fmt.Errorf(noMainConversation, id)
 	}
 	if err != nil {

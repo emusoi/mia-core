@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/git"
 	"github.com/emusoi/mia-core/internal/runtime"
@@ -499,12 +500,27 @@ func (s side) conversationOf(held, panePID string) string {
 }
 
 // sessionIn is the conversation named in what an agent wrote of a process.
-func sessionIn(written string) string {
+func sessionIn(written string) string { return heldIn(written).ID }
+
+// heldIn is all of it that mia reads: the conversation, the folder it is
+// in and, in milliseconds, when it was begun and when the agent last wrote
+// of it.
+func heldIn(written string) holds {
 	var running struct {
 		SessionID string `json:"sessionId"`
+		Cwd       string `json:"cwd"`
+		StartedAt int64  `json:"startedAt"`
+		UpdatedAt int64  `json:"updatedAt"`
 	}
-	_ = json.Unmarshal([]byte(written), &running)
-	return running.SessionID
+	_ = json.Unmarshal([]byte(written), &running) // unreadable is as nothing said
+	said := holds{ID: running.SessionID, Cwd: running.Cwd}
+	if running.StartedAt > 0 {
+		said.Started = time.UnixMilli(running.StartedAt)
+	}
+	if running.UpdatedAt > 0 {
+		said.Active = time.UnixMilli(running.UpdatedAt)
+	}
+	return said
 }
 
 // chosen is what the side's mia keeps of the windows of the repository

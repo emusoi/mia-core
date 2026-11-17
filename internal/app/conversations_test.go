@@ -558,3 +558,175 @@ func TestRecallNamesATurnOfTheCopyThatIsRead(t *testing.T) {
 		t.Errorf("one for each folder it lives in: %+v", both)
 	}
 }
+
+// A program tmux knows as claude has to be a file of that name: a link to
+// sleep is sleep to it, a script is its shell, and a copy of a program of
+// the system's is not run. So the test's own, under that name, only waits.
+func init() {
+	if filepath.Base(os.Args[0]) == "claude" {
+		time.Sleep(5 * time.Minute)
+		os.Exit(0)
+	}
+}
+
+// quietClaude is a folder with a claude in it that runs and writes nothing.
+func quietClaude(t *testing.T) string {
+	t.Helper()
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	program, err := os.ReadFile(self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "claude"), program, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return bin
+}
+
+// saysItHolds waits for the program in a window, and gives how it says
+// which conversation it has open as claude does: by writing
+// sessions/<pid>.json in its account's folder. Nothing else is written.
+func saysItHolds(t *testing.T, worktree, window, command string) func(written string) {
+	t.Helper()
+	target := "=" + session.Name(worktree) + ":" + window
+	var pid string
+	var out []byte
+	for range 250 {
+		out, _ = exec.Command("tmux", "display", "-p", "-t", target, "#{pane_pid} #{pane_current_command}").Output()
+		shell, running, _ := strings.Cut(strings.TrimSpace(string(out)), " ")
+		front, _ := exec.Command("ps", "-o", "tpgid=", "-p", shell).Output()
+		if pid = strings.TrimSpace(string(front)); running == command && pid != "" && pid != "-1" && pid != "0" {
+			break
+		}
+		pid = ""
+		time.Sleep(20 * time.Millisecond)
+	}
+	if pid == "" {
+		t.Fatalf("window %s of %s never ran %s: %q", window, worktree, command, out)
+	}
+	file := filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "sessions", pid+".json")
+	return func(written string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(written), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// A claude just started, or cleared, says which conversation it has open
+// and has written nothing of it: it is listed all the same, as its
+// window's, and reads as no turns — a chat can be begun in it. Once
+// something is written it is that one conversation, listed once.
+func TestAConversationNothingIsSaidInYetIsListedWithItsWindow(t *testing.T) {
+	lab(t, map[string]string{"claude": `exec sleep 300`})
+	repo := gittest.New(t)
+	claudeDir := agentHomes(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt, err := a.New("talking")
+	if err != nil {
+		t.Fatal(err)
+	}
+	put(t, filepath.Join(claudeDir(wt.Path), "c1.jsonl"), claudeSays(wt.Path, "user", `"an earlier one"`, ""))
+	bin := quietClaude(t)
+	// typed into the window's shell, as a person does
+	if _, err := a.NewWindow(wt, "claude", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("tmux", "send-keys", "-t", "="+session.Name(wt.Name)+":claude", filepath.Join(bin, "claude"), "Enter").Run(); err != nil {
+		t.Fatal(err)
+	}
+	says := saysItHolds(t, wt.Name, "claude", "claude")
+	listed := func(want app.Wanted) ([]app.Head, string) {
+		t.Helper()
+		heads, problems := a.Conversations(want)
+		if len(problems) > 0 {
+			t.Fatalf("problems: %v", problems)
+		}
+		var all []string
+		for _, head := range heads {
+			one := fmt.Sprintf("%s:%d", head.ID, head.Turns)
+			if head.Running && head.Window != nil {
+				one += "*" + head.Window.Name
+			}
+			all = append(all, one)
+		}
+		return heads, strings.Join(all, " ")
+	}
+
+	// it does not say: the newest there is taken as the one, as before
+	if _, got := listed(app.Wanted{}); got != "c1:1*claude" {
+		t.Fatalf("before it says: %s", got)
+	}
+
+	wrote := time.Now().UnixMilli()
+	says(fmt.Sprintf(`{"sessionId":"f1","cwd":%s,"startedAt":1794509078245,"updatedAt":%d}`, quoted(wt.Path), wrote))
+	heads, got := listed(app.Wanted{})
+	if got != "f1:0*claude c1:1" {
+		t.Fatalf("holding one nothing is said in: %s", got)
+	}
+	fresh := heads[0]
+	if fresh.Agent != "claude" || fresh.Account != app.DefaultAccount || fresh.Cwd != wt.Path || fresh.Worktree != wt.Name || fresh.Gone ||
+		fresh.Asked != "" || fresh.Said != "" || !fresh.Started.Equal(time.UnixMilli(1794509078245)) || !fresh.Active.Equal(time.UnixMilli(wrote)) {
+		t.Errorf("its head = %+v", fresh)
+	}
+	if _, got := listed(app.Wanted{Worktree: wt.Name, Agent: "claude"}); got != "f1:0*claude c1:1" {
+		t.Errorf("asked for by worktree and agent: %s", got)
+	}
+	if _, got := listed(app.Wanted{Agent: "codex"}); got != "" {
+		t.Errorf("another agent's were asked for: %s", got)
+	}
+	for _, read := range []struct {
+		worktree string
+		after    int
+	}{{"", 0}, {"", 3}, {wt.Name, 0}} {
+		if turns, err := a.ConversationIn("f1", read.worktree, read.after); err != nil || turns == nil || len(turns) != 0 {
+			t.Errorf("its turns in %q after %d = %v, %v: want none, and no error", read.worktree, read.after, turns, err)
+		}
+	}
+	if _, err := a.ConversationTurns("f9", 0); err == nil {
+		t.Error("one no window has and nothing is written of was read")
+	}
+
+	// the first thing is said: the same conversation, listed once
+	put(t, filepath.Join(claudeDir(wt.Path), "f1.jsonl"), claudeSays(wt.Path, "user", `"begin here"`, ""))
+	if heads, got := listed(app.Wanted{}); got != "f1:1*claude c1:1" || heads[0].Asked != "begin here" {
+		t.Fatalf("once something is said: %s %+v", got, heads[0])
+	}
+	if turns, err := a.ConversationTurns("f1", 0); err != nil || kinds(turns) != "1:asked" {
+		t.Errorf("its turns = %s, %v", kinds(turns), err)
+	}
+
+	// cleared, it has another, and says no more than which: the one it left is a past one
+	says(`{"sessionId":"f2"}`)
+	heads, got = listed(app.Wanted{})
+	if got != "f2:0*claude f1:1 c1:1" {
+		t.Fatalf("after it is cleared: %s", got)
+	}
+	if heads[0].Cwd != wt.Path || heads[0].Worktree != wt.Name || heads[0].Started.IsZero() {
+		t.Errorf("one it says only the id of is in its window's worktree, begun now: %+v", heads[0])
+	}
+	if turns, err := a.ConversationTurns("f2", 0); err != nil || len(turns) != 0 {
+		t.Errorf("the new one's turns = %v, %v", turns, err)
+	}
+
+	// its window gone, nothing has it: no head is made of what was never written
+	if err := exec.Command("tmux", "kill-window", "-t", "="+session.Name(wt.Name)+":claude").Run(); err != nil {
+		t.Fatal(err)
+	}
+	if _, got := listed(app.Wanted{}); got != "f1:1 c1:1" {
+		t.Errorf("with its window closed: %s", got)
+	}
+	if _, err := a.ConversationTurns("f2", 0); err == nil {
+		t.Error("one no window has any more, and nothing is written of, was read")
+	}
+}

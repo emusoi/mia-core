@@ -69,10 +69,11 @@ func (a *App) Conversations(want Wanted) (heads []Head, problems []string) {
 		// one format for both, whatever the agent's file and the disk said
 		heads[i].Started, heads[i].Active = instant(heads[i].Started), instant(heads[i].Active)
 	}
-	a.markRunning(heads, records)
-	if want.Worktree != "" {
-		heads = slices.DeleteFunc(heads, func(h Head) bool { return h.Worktree != want.Worktree })
-	}
+	heads = a.markRunning(heads, records)
+	heads = slices.DeleteFunc(heads, func(h Head) bool {
+		// an agent in a window is listed with what it has open, wanted or not
+		return (want.Worktree != "" && h.Worktree != want.Worktree) || (want.Agent != "" && h.Agent != want.Agent)
+	})
 	slices.SortStableFunc(heads, func(x, y Head) int { return y.Active.Compare(x.Active) })
 	if want.Limit > 0 && len(heads) > want.Limit {
 		heads = heads[:want.Limit]
@@ -107,18 +108,17 @@ func (a *App) worktreeOf(cwd string, records []model.Record) (string, bool) {
 
 // markRunning marks the conversation each agent in a window has open: the
 // one the agent itself says it has, for an agent that says, and otherwise
-// the newest of that agent's in the window's worktree.
+// the newest of that agent's in the window's worktree. One the agent says
+// it has and has written nothing of yet — just started, or cleared — is in
+// no list an agent gives: it is added, with nothing asked or said.
 // ponytail: two conversations of one agent in one worktree are told apart
 // only by which was written to last, unless the agent says which it holds —
 // claude does, in sessions/<pid>.json. A SessionStart hook that records the
 // id for each window is the upgrade, for codex and pi most of all.
-func (a *App) markRunning(heads []Head, records []model.Record) {
-	if len(heads) == 0 {
-		return
-	}
+func (a *App) markRunning(heads []Head, records []model.Record) []Head {
 	panes := session.Here().AllPanes()
 	if len(panes) == 0 {
-		return
+		return heads
 	}
 	table := a.agents()
 	chosen := a.chosen()
@@ -148,11 +148,8 @@ func (a *App) markRunning(heads []Head, records []model.Record) {
 				continue
 			}
 			agent, _ := agentNamed(table, name)
-			held := ""
-			if agent.held != "" {
-				out, _ := run.Local("sh").Capture("-c", agent.held, "sh", strconv.Itoa(pane.PID))
-				held = sessionIn(out)
-			}
+			said := agent.holding(pane.PID)
+			held := said.ID
 			kept := chosen[chosenKey(session.Name(record.Name), pane.PID)]
 			account := kept.Account
 			if account == "" && agent.AccountEnv != "" {
@@ -178,6 +175,12 @@ func (a *App) markRunning(heads []Head, records []model.Record) {
 					its = h
 				}
 			}
+			if its == nil && held != "" && !slices.ContainsFunc(heads, func(h Head) bool { return h.Agent == name && h.ID == held }) {
+				if cwd := cmp.Or(said.Cwd, record.Path); a.inWorktree(cwd, record, records) {
+					heads = append(heads, unsaid(name, said, account, cwd, record.Name))
+					its = &heads[len(heads)-1]
+				}
+			}
 			if its != nil {
 				its.Running, its.Window = true, &WindowRef{Index: pane.Index, Name: pane.Window}
 				its.Model, its.Effort = kept.Model, kept.Effort
@@ -187,6 +190,45 @@ func (a *App) markRunning(heads []Head, records []model.Record) {
 			}
 		}
 	}
+	return heads
+}
+
+// holds is what an agent wrote of the conversation one of its processes
+// has open: which, and when it says them where it is, when it was begun
+// and when the agent last wrote of it.
+type holds struct {
+	ID      string
+	Cwd     string
+	Started time.Time
+	Active  time.Time
+}
+
+// holding is what the agent says the program in front in a pane has open;
+// nothing for an agent that does not say.
+func (a Agent) holding(pid int) holds {
+	if a.held == "" || pid <= 0 {
+		return holds{}
+	}
+	out, _ := run.Local("sh").Capture("-c", a.held, "sh", strconv.Itoa(pid))
+	return heldIn(out)
+}
+
+// inWorktree reports whether a folder is a worktree's own or in it, and no
+// other's: where a conversation of one of its windows is made.
+func (a *App) inWorktree(cwd string, record model.Record, records []model.Record) bool {
+	name, _ := a.worktreeOf(cwd, records)
+	return name == record.Name
+}
+
+// unsaid is the head of a conversation an agent says it has open and has
+// written nothing of: begun when the agent says, and otherwise now, and
+// last written to when the agent last wrote of it — claude does as it
+// starts one — so that it is among the first, and a list asked for twice
+// says the same.
+func unsaid(agent string, said holds, account, cwd, worktree string) Head {
+	started := cmp.Or(said.Started, said.Active, time.Now())
+	return Head{ID: said.ID, Agent: agent, Account: account, Cwd: cwd, Worktree: worktree,
+		Started: instant(started), Active: instant(cmp.Or(said.Active, started))}
 }
 
 // foreground is the command line in front in each terminal, by the process
@@ -232,8 +274,9 @@ func (a *App) ConversationTurns(id string, after int) ([]Turn, error) {
 func (a *App) ConversationIn(id, worktree string, after int) ([]Turn, error) {
 	in, _ := a.where()
 	cwd, whose := "", ""
+	var heads []Head
 	if worktree != "" {
-		heads, _ := a.Conversations(Wanted{Worktree: worktree})
+		heads, _ = a.Conversations(Wanted{Worktree: worktree})
 		at := slices.IndexFunc(heads, func(h Head) bool { return h.ID == id })
 		if at < 0 {
 			return nil, fmt.Errorf("no conversation %s in %s — `mia api conversations --worktree %s` lists what is", id, worktree, worktree)
@@ -242,6 +285,12 @@ func (a *App) ConversationIn(id, worktree string, after int) ([]Turn, error) {
 	}
 	turns, found, err := a.turnsIn(in, id, cwd, whose, after)
 	if err == nil && !found {
+		if worktree == "" {
+			heads, _ = a.Conversations(Wanted{})
+		}
+		if slices.ContainsFunc(heads, func(h Head) bool { return h.ID == id && h.Running }) {
+			return []Turn{}, nil // a window has it open, and nothing is written of it yet
+		}
 		err = fmt.Errorf("no conversation %s here — `mia api conversations` lists them", id)
 	}
 	return turns, err

@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -580,4 +581,87 @@ func TestTheMainAgentsEarlierConversationsAreListedReadAndGoneOnWith(t *testing.
 		t.Fatalf("resumed while stopped: %+v, %v", state, err)
 	}
 	screenOf(t, "main", "echo", "echo-agent e1.")
+}
+
+// A main agent that says which conversation it has open and has written
+// nothing of it yet — just started with none, or cleared — has that one
+// listed, as running, and read as no turns: not as no conversation.
+func TestTheMainAgentsConversationNothingIsSaidInYetIsListedAndRead(t *testing.T) {
+	lab(t, map[string]string{"claude": `echo "claude-agent $*."; exec cat`})
+	t.Setenv("MIA_WORKTREE", "")
+	claudeDir := agentHomes(t)
+	open := func() *app.App {
+		t.Helper()
+		a, err := app.AtMain()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return a
+	}
+	t.Cleanup(func() { open().StopMain() })
+	if _, err := open().StartMain("", "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	screenOf(t, "main", "claude", "claude-agent .")
+	home := open().Root
+	listed := func() ([]app.Head, string) {
+		t.Helper()
+		heads, problems := open().MainConversations()
+		if len(problems) > 0 {
+			t.Fatalf("problems: %v", problems)
+		}
+		var all []string
+		for _, head := range heads {
+			one := fmt.Sprintf("%s:%d", head.ID, head.Turns)
+			if head.Running && head.Window != nil {
+				one += "*" + head.Window.Name
+			}
+			all = append(all, one)
+		}
+		return heads, strings.Join(all, " ")
+	}
+
+	// it has had none, and does not say: nothing is listed, and nothing made up
+	if _, got := listed(); got != "" {
+		t.Fatalf("before it says: %s", got)
+	}
+	if turns, err := open().MainTurns("", 0); err != nil || len(turns) != 0 {
+		t.Errorf("with none open: %v, %v", turns, err)
+	}
+
+	saysItHolds(t, "main", "claude", "cat")(`{"sessionId":"m1"}`)
+	if state := open().Main(); state.Conversation != "m1" {
+		t.Fatalf("it says it has m1: %+v", state)
+	}
+	heads, got := listed()
+	if got != "m1:0*claude" {
+		t.Fatalf("holding one nothing is said in: %s", got)
+	}
+	if fresh := heads[0]; fresh.Agent != "claude" || fresh.Account != app.DefaultAccount || fresh.Cwd != home || fresh.Worktree != filepath.Base(home) ||
+		fresh.Asked != "" || fresh.Said != "" || fresh.Started.IsZero() {
+		t.Errorf("its head = %+v", fresh)
+	}
+	for _, id := range []string{"", "m1"} {
+		if turns, err := open().MainTurns(id, 0); err != nil || turns == nil || len(turns) != 0 {
+			t.Errorf("turns of %q = %v, %v: want none, and no error", id, turns, err)
+		}
+	}
+	if _, err := open().MainTurns("m9", 0); err == nil {
+		t.Error("one it does not have and nothing is written of was read")
+	}
+
+	// the first thing is said: the same conversation, listed once
+	put(t, filepath.Join(claudeDir(home), "m1.jsonl"), claudeSays(home, "user", `"where do things stand"`, ""))
+	if _, got := listed(); got != "m1:1*claude" {
+		t.Errorf("once something is said: %s", got)
+	}
+	if turns, err := open().MainTurns("", 0); err != nil || kinds(turns) != "1:asked" {
+		t.Errorf("its turns = %s, %v", kinds(turns), err)
+	}
+
+	// cleared: the new one is first, and the one it left a past one
+	saysItHolds(t, "main", "claude", "cat")(`{"sessionId":"m2"}`)
+	if _, got := listed(); got != "m2:0*claude m1:1" {
+		t.Errorf("after it is cleared: %s", got)
+	}
 }

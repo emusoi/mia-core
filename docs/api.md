@@ -97,7 +97,11 @@ turns from where they parted.
 Which conversation a window has open, claude says itself. Of any other
 agent it is the newest of that agent's in the worktree on the account
 the window was started on, so two of one agent in one worktree and
-account are told apart only by which was written to last.
+account are told apart only by which was written to last. One an agent
+says it has and has written nothing of yet — just started, or cleared —
+is listed all the same, `running` with its `window`, nothing in `asked`
+and `said` and no `turns`; `mia api conversation` reads it as no
+turns, `[]`, and it is the same of the main agent's.
 
 `mia api conversation <id> [--worktree <name>] [--after <n>]` is one
 conversation as turns, in order, each with a number `n` that only grows.
