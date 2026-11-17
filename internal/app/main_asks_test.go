@@ -197,7 +197,7 @@ func TestAWindowThatAsksIsNotTypedInto(t *testing.T) {
 	}
 	a := &app.App{Root: dir}
 	record := model.Record{Name: "talker", Path: dir}
-	if _, err := a.NewWindow(record, "agent", []string{filepath.Join(bin, "permission")}); err != nil {
+	if _, err := a.NewWindow(record, "agent", session.What{}, []string{filepath.Join(bin, "permission")}); err != nil {
 		t.Fatal(err)
 	}
 	shows(t, "talker", "agent", "Esc to cancel")

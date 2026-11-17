@@ -153,4 +153,15 @@ func TestAWindowWhoseCommandEndedIsSaidToHaveEnded(t *testing.T) {
 	if got := said("new", record.Name, "stays", "--", "sleep", "300"); strings.Contains(got, "ended already") {
 		t.Errorf("a window whose command still runs:\n%s", got)
 	}
+	said("new", record.Name, "api", "--kind", "server", "--", "sleep", "300")
+	kinds := map[string]session.Kind{}
+	for _, w := range session.Here().WindowsOf(record.Name) {
+		kinds[w.Name] = w.Kind
+	}
+	if kinds["stays"] != session.KindShell || kinds["api"] != session.KindServer {
+		t.Errorf("a window is what its command is for, or what --kind says: %v", kinds)
+	}
+	if code := cmdWindow(a, []string{"new", record.Name, "odd", "--kind", "pet", "--", "sleep", "300"}, false); code == exitOK {
+		t.Error("a kind there is none of is refused")
+	}
 }

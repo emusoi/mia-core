@@ -37,10 +37,10 @@ func TestWhatWentDownWithTmuxComesBackAndWhatWasClosedStaysClosed(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.NewWindow(kept, "agent", []string{"sleep", "300"}); err != nil {
+	if _, err := a.NewWindow(kept, "agent", session.What{}, []string{"sleep", "300"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.NewWindow(closed, "shell", nil); err != nil {
+	if _, err := a.NewWindow(closed, "shell", session.What{}, nil); err != nil {
 		t.Fatal(err)
 	}
 	auto := func() string {
@@ -134,7 +134,7 @@ func TestAClaudeResumesTheConversationItHad(t *testing.T) {
 		t.Fatal(err)
 	}
 	// typed into the window's shell, as a person does, so the window outlives it
-	if _, err := a.NewWindow(wt, "claude", nil); err != nil {
+	if _, err := a.NewWindow(wt, "claude", session.What{}, nil); err != nil {
 		t.Fatal(err)
 	}
 	exec.Command("tmux", "send-keys", "-t", "="+session.Name(wt.Name)+":claude", filepath.Join(bin, "claude")+" 300", "Enter").Run()
@@ -257,7 +257,7 @@ func TestASessionIsRememberedWhenItIsMadeOrChanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, seconds := range map[string]string{"agent": "300", "extra": "200"} {
-		if _, err := a.NewWindow(record, name, []string{"sleep", seconds}); err != nil {
+		if _, err := a.NewWindow(record, name, session.What{}, []string{"sleep", seconds}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -298,7 +298,7 @@ func TestARemovedWorktreesSessionIsSeenLastAndNotInherited(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.NewWindow(gone, "agent", []string{"sleep", "300"}); err != nil {
+	if _, err := a.NewWindow(gone, "agent", session.What{}, []string{"sleep", "300"}); err != nil {
 		t.Fatal(err)
 	}
 	// a window mia did not make, and so has not seen

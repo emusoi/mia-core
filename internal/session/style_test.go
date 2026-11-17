@@ -73,7 +73,7 @@ func TestStyleOnlyAffectsMiaSessions(t *testing.T) {
 	if got := styleTmux(t, "show-options", "-w", "-t", session.Target("existing", "later"), "-v", "pane-border-style"); got != "fg=colour8,bg=default" {
 		t.Errorf("new window pane border = %q", got)
 	}
-	if err := host.StartWindow("fresh", t.TempDir(), "chat", []string{"sleep", "60"}); err != nil {
+	if err := host.StartWindow("fresh", t.TempDir(), "chat", session.What{}, []string{"sleep", "60"}); err != nil {
 		t.Fatal(err)
 	}
 	if got := styleTmux(t, "show-options", "-w", "-t", session.Target("fresh", "chat"), "-v", "pane-border-style"); got != "fg=colour8,bg=default" {
@@ -128,7 +128,7 @@ func TestConfiguredShellIsLocalToMiaSession(t *testing.T) {
 	if err := host.Ensure("fresh", dir); err != nil {
 		t.Fatal(err)
 	}
-	if err := host.StartWindow("fresh", dir, "later", nil); err != nil {
+	if err := host.StartWindow("fresh", dir, "later", session.What{}, nil); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"existing", "fresh"} {

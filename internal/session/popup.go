@@ -64,6 +64,9 @@ func (h Host) AttachPopup(worktree, dir string) error {
 		if err != nil {
 			return err
 		}
+		if err := h.Mark(selected, What{Kind: KindShell}); err != nil {
+			return err
+		}
 		windows = append(windows, selected)
 	}
 	view := fmt.Sprintf("mia-popup-%d-%d", os.Getpid(), time.Now().UnixNano())

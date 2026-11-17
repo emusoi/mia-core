@@ -13,6 +13,7 @@ import (
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/gittest"
+	"github.com/emusoi/mia-core/internal/session"
 )
 
 // An agent killed in its pane leaves the pane behind, its shell still
@@ -78,7 +79,7 @@ func main() {
 		said := filepath.Join(os.Getenv("TMUX_TMPDIR"), "said-"+name)
 		// the agent's shell stays when the agent is killed, as a pane's does
 		script := `claude '` + hook + ` && echo $PPID > ` + said + `'; exec /bin/sh`
-		if _, err := a.NewWindow(record, "claude", []string{"/bin/sh", "-c", script}); err != nil {
+		if _, err := a.NewWindow(record, "claude", session.What{}, []string{"/bin/sh", "-c", script}); err != nil {
 			t.Fatal(err)
 		}
 		var pid []byte

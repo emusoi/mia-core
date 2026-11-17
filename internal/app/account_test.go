@@ -267,7 +267,7 @@ func TestResumingOnAnotherAccountCopiesTheConversationThere(t *testing.T) {
 	// a window started by its shell has the shell in front, to tmux: one
 	// that runs the agent itself, on the account, is the one looked for
 	direct := filepath.Join(os.Getenv("TMUX_TMPDIR"), "hold", "claude")
-	if _, err := a.NewWindow(record, "direct", []string{"env", "CLAUDE_CONFIG_DIR=" + work, direct}); err != nil {
+	if _, err := a.NewWindow(record, "direct", session.What{}, []string{"env", "CLAUDE_CONFIG_DIR=" + work, direct}); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.KeepChosen(record, "direct", "claude", app.Chosen{Account: "work"}); err != nil {

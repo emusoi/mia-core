@@ -58,7 +58,7 @@ func TestAnAgentsWindowIsStartedWithAModelAndSwitched(t *testing.T) {
 	if err != nil || !slices.Equal(argv, []string{"echo-agent", "--model", "loud", "--effort", "low", "say it"}) || chosen != (app.Chosen{Model: "loud", Effort: "low"}) {
 		t.Fatalf("started with = %q, %+v, %v", argv, chosen, err)
 	}
-	if _, err := a.NewWindow(record, "echo", argv); err != nil {
+	if _, err := a.NewWindow(record, "echo", session.What{}, argv); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.KeepChosen(record, "echo", "echo", chosen); err != nil {
@@ -106,7 +106,7 @@ func TestAnAgentsWindowIsStartedWithAModelAndSwitched(t *testing.T) {
 		t.Errorf("setups = %+v", setups)
 	}
 
-	if _, err := a.NewWindow(record, "shell", []string{"sh"}); err != nil {
+	if _, err := a.NewWindow(record, "shell", session.What{}, []string{"sh"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := a.SwitchWindow(record, "shell", "loud", ""); err == nil || !strings.Contains(err.Error(), "runs no agent") {

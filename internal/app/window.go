@@ -47,16 +47,20 @@ func (a *App) SelectWindow(record model.Record, window string) error {
 
 // NewWindow opens a window in the worktree's session, starting the session
 // when there is none, and remembers the session as it is then: one made
-// with no status line to poll it comes back all the same.
-func (a *App) NewWindow(record model.Record, window string, argv []string) (string, error) {
-	name, err := a.newWindow(record, window, argv)
+// with no status line to poll it comes back all the same. Its pane is
+// marked with what it is: what is given, or what its command is for.
+func (a *App) NewWindow(record model.Record, window string, what session.What, argv []string) (string, error) {
+	if what.Kind == "" {
+		what = a.WhatOf(strings.Join(argv, " "))
+	}
+	name, err := a.newWindow(record, window, what, argv)
 	if err == nil {
 		_ = a.Remember() // the window is open; what could not be written is seen at the next look
 	}
 	return name, err
 }
 
-func (a *App) newWindow(record model.Record, window string, argv []string) (string, error) {
+func (a *App) newWindow(record model.Record, window string, what session.What, argv []string) (string, error) {
 	dir, err := a.SessionDir(record)
 	if err != nil {
 		return "", err
@@ -67,13 +71,16 @@ func (a *App) newWindow(record model.Record, window string, argv []string) (stri
 			return "", err
 		}
 		if len(argv) == 0 {
+			if err := host.Mark(session.Target(record.Name, "^"), what); err != nil {
+				return "", err
+			}
 			return window, host.NameFirstWindow(record.Name, window)
 		}
 	}
 	if host.HasWindow(record.Name, window) {
 		return "", fmt.Errorf("%s already has a window called %s", record.Name, window)
 	}
-	return window, host.StartWindow(record.Name, dir, window, argv)
+	return window, host.StartWindow(record.Name, dir, window, what, argv)
 }
 
 func (a *App) CloseWindow(record model.Record, window string) error {

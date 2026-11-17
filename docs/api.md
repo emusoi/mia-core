@@ -60,6 +60,13 @@ that was never adopted. `where` is where the worktree's environment runs,
 as the mia that keeps the worktree says it: `local` is that mia's own
 computer, so beside `"machine": "fedora"` it means on fedora.
 
+Each of a worktree's `windows` has a `kind`: what its first pane is for,
+one of `agent`, `shell`, `editor`, `server`, `tests` or `logs`. mia marks
+every pane it starts with one, as tmux's pane option `@mia_kind`, and
+keeps it when the session comes back after tmux went down or crossed to
+another machine. A window opened by hand in tmux has none: `kind` is left
+out. See [Pane kinds](tmux.md#pane-kinds) for how each is decided.
+
 `mia api stack [worktree]` and `mia stack show --json` are the same answer:
 the layers of the stack the worktree's branch is in, bottom first, each with
 `branch`, `parent`, `landed`, `ahead`, `needs_restack`, `current`,

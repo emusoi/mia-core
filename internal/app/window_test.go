@@ -43,7 +43,7 @@ esac
 	}
 	a := &app.App{Root: filepath.Join(dir, "repo"), Runtimes: store}
 	record := model.Record{Name: "example", Env: &model.Environment{Placement: placement}}
-	if _, err := a.NewWindow(record, "zsh", nil); err != nil {
+	if _, err := a.NewWindow(record, "zsh", session.What{}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -76,7 +76,7 @@ func TestAShellInAWorktreeWithoutASessionIsTheSessionsOwnShell(t *testing.T) {
 	dir := t.TempDir()
 	a := &app.App{Root: dir}
 	record := model.Record{Name: "lonely", Path: dir}
-	opened, err := a.NewWindow(record, "shell", nil)
+	opened, err := a.NewWindow(record, "shell", session.What{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestTextSentToAWindowCanBeReadBack(t *testing.T) {
 	t.Cleanup(func() { exec.Command("tmux", "kill-server").Run() })
 	a := &app.App{Root: dir}
 	record := model.Record{Name: "talker", Path: dir}
-	if _, err := a.NewWindow(record, "agent", []string{"cat"}); err != nil {
+	if _, err := a.NewWindow(record, "agent", session.What{}, []string{"cat"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.SendToWindow(record, "agent", "hello there"); err != nil {
@@ -141,7 +141,7 @@ func TestRenamingAWorktreeRenamesItsSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.NewWindow(record, "shell", nil); err != nil {
+	if _, err := a.NewWindow(record, "shell", session.What{}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := a.Rename(record.Name, "renamed"); err != nil {
@@ -170,10 +170,10 @@ func TestAKeyByNameReachesWhatRunsInAWindow(t *testing.T) {
 	t.Cleanup(func() { exec.Command("tmux", "kill-server").Run() })
 	a := &app.App{Root: dir}
 	record := model.Record{Name: "stopper", Path: dir}
-	if _, err := a.NewWindow(record, "shell", nil); err != nil {
+	if _, err := a.NewWindow(record, "shell", session.What{}, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.NewWindow(record, "agent", []string{"sleep", "300"}); err != nil {
+	if _, err := a.NewWindow(record, "agent", session.What{}, []string{"sleep", "300"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.KeysInWindow(record, "agent", []string{"C-c"}); err != nil {

@@ -55,13 +55,17 @@ func (h Host) Ensure(worktree, dir string) error {
 		return err
 	}
 	if !h.Exists(worktree) {
-		args := []string{"new-session", "-d", "-s", Name(worktree), "-c", dir,
+		args := []string{"new-session", "-d", "-P", "-F", "#{pane_id}", "-s", Name(worktree), "-c", dir,
 			"-x", strconv.Itoa(GeometryWidth), "-y", strconv.Itoa(GeometryHeight)}
 		if shell != "" {
 			args = append(args, run.ShellJoin([]string{shell, "-l"}))
 		}
-		if out, err := h.run(args...); err != nil {
+		out, err := h.run(args...)
+		if err != nil {
 			return fmt.Errorf("start session for %s: %s", worktree, strings.TrimSpace(out))
+		}
+		if err := h.Mark(strings.TrimSpace(out), What{Kind: KindShell}); err != nil {
+			return err
 		}
 	}
 	if shell != "" {
@@ -379,12 +383,13 @@ type Pane struct {
 	Activity time.Time
 	Active   bool
 	ID       string
+	Kind     Kind // as mia marked the pane; "" for one it did not start
 	Title    string
 }
 
 // paneFormat is one pane a line, tab between fields: a window name or a
-// title may have spaces in it.
-const paneFormat = "#{window_index}\t#{window_name}\t#{pane_pid}\t#{pane_current_command}\t#{window_activity}\t#{window_active}\t#{pane_id}\t#{pane_title}"
+// title may have spaces in it. The title is last: it may have tabs too.
+const paneFormat = "#{window_index}\t#{window_name}\t#{pane_pid}\t#{pane_current_command}\t#{window_activity}\t#{window_active}\t#{pane_id}\t#{@mia_kind}\t#{pane_title}"
 
 func parsePane(fields []string) (Pane, bool) {
 	if len(fields) < 3 {
@@ -414,7 +419,10 @@ func parsePane(fields []string) (Pane, bool) {
 		pane.ID = fields[6]
 	}
 	if len(fields) > 7 {
-		pane.Title = strings.Join(fields[7:], "\t")
+		pane.Kind = Kind(fields[7])
+	}
+	if len(fields) > 8 {
+		pane.Title = strings.Join(fields[8:], "\t")
 	}
 	return pane, true
 }
@@ -474,6 +482,9 @@ type Window struct {
 	Still   string        `json:"quiet"`
 	Screen  string        `json:"-"`
 	Active  bool          `json:"active"`
+	// Kind is what its first pane is for, as mia marked it; "" for a pane
+	// mia did not start.
+	Kind Kind `json:"kind,omitempty"`
 	// Agent is what an agent in the window says it is doing, from the title
 	// it gives its pane; "" for anything else.
 	Agent string `json:"agent,omitempty"`
@@ -510,7 +521,7 @@ func WindowsFrom(panes []Pane) []Window {
 			agent = "" // its name until it has something to say
 		}
 		windows = append(windows, Window{Index: pane.Index, Name: name, Command: command, PID: pane.PID, Quiet: quiet,
-			Still: quiet.Round(time.Second).String(), Active: pane.Active, Agent: agent})
+			Still: quiet.Round(time.Second).String(), Active: pane.Active, Kind: pane.Kind, Agent: agent})
 	}
 	return windows
 }
@@ -595,24 +606,27 @@ func (h Host) Windows(worktree string) []string {
 }
 
 // StartWindow starts a window of a worktree's session, which is told the
-// worktree it is in by MIA_WORKTREE.
-func (h Host) StartWindow(worktree, dir, window string, argv []string) error {
-	return h.StartWindowWith("MIA_WORKTREE="+worktree, worktree, dir, window, argv)
+// worktree it is in by MIA_WORKTREE, its pane marked with what it is.
+func (h Host) StartWindow(worktree, dir, window string, what What, argv []string) error {
+	return h.StartWindowWith("MIA_WORKTREE="+worktree, worktree, dir, window, what, argv)
 }
 
 // StartWindowWith is StartWindow with env, NAME=value, in the window's
 // environment in place of MIA_WORKTREE: for a session that is no worktree's.
-func (h Host) StartWindowWith(env, worktree, dir, window string, argv []string) error {
+func (h Host) StartWindowWith(env, worktree, dir, window string, what What, argv []string) error {
 	if err := h.Ensure(worktree, dir); err != nil {
 		return err
 	}
 	if h.HasWindow(worktree, window) {
 		return nil
 	}
-	args := append([]string{"new-window", "-d", "-t", exact(Name(worktree)), "-n", window, "-c", dir, "-e", env, "--"}, argv...)
-	if out, err := h.run(args...); err != nil {
+	args := append([]string{"new-window", "-d", "-P", "-F", "#{pane_id}", "-t", exact(Name(worktree)), "-n", window, "-c", dir, "-e", env, "--"}, argv...)
+	out, err := h.run(args...)
+	if err != nil {
 		return fmt.Errorf("start %s in %s: %s", window, worktree, strings.TrimSpace(out))
 	}
+	// a command that ends at once takes its pane with it before it is marked
+	_ = h.Mark(strings.TrimSpace(out), what)
 	_ = h.styleOptions(Target(worktree, window), true, miaWindowStyle)
 	return nil
 }

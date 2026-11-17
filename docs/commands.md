@@ -19,6 +19,7 @@
 | `mia window model <worktree> <window> <model> [--effort <e>]` | switch the agent in a window to another model while it runs |
 | `mia window new <worktree> [window] --role <role>` | a window running the agent a role says, with its model, effort and account, sent the role's body once it is ready |
 | `mia role [ls]`, `mia role show <role>`, `mia role path <role>` | the roles: setups with opening instructions, files of yours in `~/.config/mia/roles/<role>.md` |
+| `mia window new <worktree> [window] --kind <kind> [-- command]` | a window marked as another [kind](tmux.md#pane-kinds) than its command says: `agent`, `shell`, `editor`, `server`, `tests` or `logs` |
 | `mia window new <worktree> <agent> --account <a>` | a window running an agent on another account than the repository's, this once |
 | `mia window account <worktree> <window> <a>` | says how to put a running agent on another account: end it, then resume its conversation with `--account` |
 | `mia account [ls]` | every agent's accounts: its own folder, `default`, and the ones added — signed in or not, and what runs on each |

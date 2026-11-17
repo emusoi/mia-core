@@ -14,6 +14,7 @@ import (
 
 	"github.com/emusoi/mia-core/internal/git"
 	"github.com/emusoi/mia-core/internal/runtime"
+	"github.com/emusoi/mia-core/internal/session"
 )
 
 // side is one end of a move: this computer or a machine, and where the
@@ -72,6 +73,9 @@ type Pane struct {
 	// Account is the account mia started the agent in it on; "" for the
 	// default, or anything else.
 	Account string `json:",omitempty"`
+	// Kind is what the pane is for, as mia marked it; marked again when
+	// the pane is opened again.
+	Kind session.Kind `json:",omitempty"`
 }
 
 // Window is one window of a session, as a move recreates it: its first
@@ -541,7 +545,7 @@ func (s side) chosen(a *App) map[string]Chosen {
 // command running there when it is not just a shell, and the account mia
 // started an agent there on, from what is kept of each window.
 func (s side) windows(table []Agent, name, path string, kept map[string]Chosen) []Window {
-	out, err := s.sh(`tmux list-panes -s -t "=mia-$1" -F '#{window_id}	#{window_name}	#{window_layout}	#{pane_current_path}	#{pane_current_command}	#{pane_pid}	#{pane_id}	#{automatic-rename}' 2>/dev/null`, name)
+	out, err := s.sh(`tmux list-panes -s -t "=mia-$1" -F '#{window_id}	#{window_name}	#{window_layout}	#{pane_current_path}	#{pane_current_command}	#{pane_pid}	#{pane_id}	#{@mia_kind}	#{automatic-rename}' 2>/dev/null`, name)
 	if err != nil {
 		return nil
 	}
@@ -549,10 +553,10 @@ func (s side) windows(table []Agent, name, path string, kept map[string]Chosen) 
 	window := "" // tmux lists a window's panes together, in order
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		f := strings.Split(line, "\t")
-		if len(f) != 8 {
+		if len(f) != 9 {
 			continue
 		}
-		p := Pane{ID: f[6]}
+		p := Pane{ID: f[6], Kind: session.Kind(f[7])}
 		if rel, err := filepath.Rel(path, f[3]); err == nil && !strings.HasPrefix(rel, "..") {
 			p.Dir = rel
 		}
@@ -573,7 +577,7 @@ func (s side) windows(table []Agent, name, path string, kept map[string]Chosen) 
 			if pid, err := strconv.Atoi(f[5]); err == nil && p.Command != "" {
 				p.Account = kept[chosenKey("mia-"+name, pid)].Account
 			}
-			windows = append(windows, Window{Name: f[1], Pane: p, Auto: f[7] == "1"})
+			windows = append(windows, Window{Name: f[1], Pane: p, Auto: f[8] == "1"})
 			continue
 		}
 		last := &windows[len(windows)-1]
@@ -589,11 +593,16 @@ func (s side) open(name, path string, windows []Window) error {
 	if _, err := s.sh(`tmux has-session -t "=mia-$1" 2>/dev/null || tmux new-session -d -s "mia-$1" -c "$2"`, name, path); err != nil {
 		return err
 	}
-	run := func(pane, command string) error {
-		if command == "" {
+	run := func(pane string, p Pane) error {
+		if p.Kind != "" {
+			if _, err := s.sh(`tmux set-option -p -t "$1" @mia_kind "$2"`, pane, string(p.Kind)); err != nil {
+				return err
+			}
+		}
+		if p.Command == "" {
 			return nil
 		}
-		_, err := s.sh(`tmux send-keys -t "$1" "$2" Enter`, pane, command)
+		_, err := s.sh(`tmux send-keys -t "$1" "$2" Enter`, pane, p.Command)
 		return err
 	}
 	for i, w := range windows {
@@ -603,7 +612,7 @@ func (s side) open(name, path string, windows []Window) error {
 		if i == 0 {
 			// the session starts in the worktree: only a folder under it is gone to
 			if first, err = s.sh(`tmux display-message -p -t "=mia-$1:" '#{pane_id}'`, name); err == nil && dir != path {
-				err = run(strings.TrimSpace(first), "cd "+shellQuote(dir))
+				err = run(strings.TrimSpace(first), Pane{Command: "cd " + shellQuote(dir)})
 			}
 		} else {
 			first, err = s.sh(`tmux new-window -t "=mia-$1:" -c "$2" -P -F '#{pane_id}'`, name, dir)
@@ -613,7 +622,7 @@ func (s side) open(name, path string, windows []Window) error {
 			_, err = s.sh(`tmux rename-window -t "$1" "$2"`, first, w.Name) // tmux names it no more
 		}
 		if err == nil {
-			err = run(first, w.Command)
+			err = run(first, w.Pane)
 		}
 		if err != nil {
 			return err
@@ -624,7 +633,7 @@ func (s side) open(name, path string, windows []Window) error {
 			if err != nil {
 				break // no room for more: what fits is there
 			}
-			if err := run(strings.TrimSpace(pane), p.Command); err != nil {
+			if err := run(strings.TrimSpace(pane), p); err != nil {
 				return err
 			}
 		}

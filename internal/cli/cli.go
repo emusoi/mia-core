@@ -28,6 +28,7 @@ import (
 
 	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/runtime"
+	"github.com/emusoi/mia-core/internal/session"
 	"github.com/emusoi/mia-core/internal/signal"
 )
 
@@ -631,7 +632,7 @@ func setupInWindow(a *app.App, record model.Record, setup []string) error {
 	script := `mia=$1 name=$2; shift 2; "$@"; s=$?
 if [ $s -ne 0 ]; then "$mia" signal "$name" setup "failed: exit $s" --style red --rank 20 --from setup; fi
 echo; echo "setup exited $s"; exec "${SHELL:-sh}"`
-	_, err = a.NewWindow(record, "setup", append([]string{"sh", "-c", script, "sh", self, record.Name}, setup...))
+	_, err = a.NewWindow(record, "setup", session.What{Kind: session.KindShell}, append([]string{"sh", "-c", script, "sh", self, record.Name}, setup...))
 	return err
 }
 
@@ -1360,13 +1361,13 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		argv, args = args[i+1:], args[:i]
 	}
 	model, effort, account := takeValue(&args, "--model"), takeValue(&args, "--effort"), takeValue(&args, "--account")
-	role := takeValue(&args, "--role")
+	role, kind := takeValue(&args, "--role"), takeValue(&args, "--kind")
 	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close", "read", "send", "press", "key", "model", "account")
 	if err != nil {
 		return fail(err)
 	}
 	editor := take(&args, "--editor")
-	if (model != "" || effort != "") && sub != "new" && sub != "model" || (account != "" || role != "") && sub != "new" || role != "" && (len(argv) > 0 || editor) {
+	if (model != "" || effort != "") && sub != "new" && sub != "model" || (account != "" || role != "" || kind != "") && sub != "new" || role != "" && (len(argv) > 0 || editor) {
 		return usageErr(windowUsage)
 	}
 	name := strings.Join(args, " ")
@@ -1450,7 +1451,24 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		if name == "" {
 			name = "shell"
 		}
-		name, err := a.NewWindow(record, name, argv)
+		// what the window is for: its agent, its editor, what its command is for, or as told
+		what := a.WhatOf(strings.Join(argv, " "))
+		switch {
+		case agent != "":
+			what = session.What{Kind: session.KindAgent}
+		case editor:
+			what = session.What{Kind: session.KindEditor}
+		case launched:
+			what = a.WhatOf(command)
+		}
+		if kind != "" {
+			told, err := session.ParseKind(kind)
+			if err != nil {
+				return fail(err)
+			}
+			what.Kind = told
+		}
+		name, err := a.NewWindow(record, name, what, argv)
 		if err != nil {
 			return fail(err)
 		}
@@ -1535,7 +1553,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 	return usageErr(windowUsage)
 }
 
-const windowUsage = "mia window [ls|open|select|new|close|read|send|press|key|model|account] [worktree[@machine]] [window] [--editor] [--model <model>] [--effort <effort>] [--account <account>] [--role <role>] [-- command|text|keys]"
+const windowUsage = "mia window [ls|open|select|new|close|read|send|press|key|model|account] [worktree[@machine]] [window] [--editor] [--model <model>] [--effort <effort>] [--account <account>] [--role <role>] [--kind <kind>] [-- command|text|keys]"
 
 // said is a model and an effort as a line says them: sonnet, effort high.
 func said(chosen app.Chosen) string {

@@ -13,6 +13,7 @@ import (
 	"github.com/emusoi/mia-core/internal/model"
 	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/runtime"
+	"github.com/emusoi/mia-core/internal/session"
 )
 
 func cmdEnv(a *app.App, args []string, asJSON bool) int {
@@ -255,7 +256,7 @@ func cmdEnv(a *app.App, args []string, asJSON bool) int {
 		if err != nil {
 			return fail(err)
 		}
-		if err := host.StartWindow(record.Name, dir, envWindow, argv); err != nil {
+		if err := host.StartWindow(record.Name, dir, envWindow, session.What{Kind: session.KindShell}, argv); err != nil {
 			return fail(err)
 		}
 		if err := host.AttachWindow(record.Name, envWindow); err != nil {

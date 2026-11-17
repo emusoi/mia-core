@@ -639,7 +639,7 @@ func TestAConversationNothingIsSaidInYetIsListedWithItsWindow(t *testing.T) {
 	put(t, filepath.Join(claudeDir(wt.Path), "c1.jsonl"), claudeSays(wt.Path, "user", `"an earlier one"`, ""))
 	bin := quietClaude(t)
 	// typed into the window's shell, as a person does
-	if _, err := a.NewWindow(wt, "claude", nil); err != nil {
+	if _, err := a.NewWindow(wt, "claude", session.What{}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := exec.Command("tmux", "send-keys", "-t", "="+session.Name(wt.Name)+":claude", filepath.Join(bin, "claude"), "Enter").Run(); err != nil {

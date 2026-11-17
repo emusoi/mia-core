@@ -23,6 +23,23 @@ when a layer has fallen behind the one under it, its uncommitted files, and a do
 red when it stops answering. It never waits on a machine; it reads their
 last answers and has them asked again every 30 seconds.
 
+## Pane kinds
+
+Every pane mia starts is marked with what it is for, in tmux's pane option
+`@mia_kind`, so tmux, mia and the apps read it the same:
+
+| kind | when |
+|---|---|
+| `agent` | it runs an agent mia knows: `claude`, `codex`, `pi`, or one a plugin adds |
+| `editor` | it runs `nvim`, `vim`, `vi`, `hx` or `emacs`, or was opened with `--editor` |
+| `tests` | its command starts as a test runner does: `go test`, `cargo test`, `npm test`, `pytest`, `vitest`… |
+| `logs` | its command follows logs: `tail -f`, `journalctl`, `kubectl logs`, `docker logs`, `stern` |
+| `server` | its command is a dev server mia keeps (`npm run dev`, `pnpm dev`…) or what a `[[service]]` of the config runs |
+| `shell` | anything else, and a window with no command |
+
+`mia window new … --kind <kind>` says it instead. A pane opened by hand in
+tmux has no kind. `tmux show-options -p -t <pane> @mia_kind` reads one.
+
 ## The radar
 
 A popup 72 columns wide, one row per worktree, in four groups:

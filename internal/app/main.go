@@ -473,7 +473,7 @@ func (a *App) startMain(name, model, effort, account string, fresh bool, resume 
 	// by a login shell, for its PATH, and with nothing after: the window is
 	// the agent, and goes when it ends. It is told it is the main agent's by
 	// MIA_MAIN, and has no MIA_WORKTREE: it is no worktree's.
-	if err := host.StartWindowWith("MIA_MAIN=1", mainName, a.Root, agent.Name, []string{shell, "-lc", command}); err != nil {
+	if err := host.StartWindowWith("MIA_MAIN=1", mainName, a.Root, agent.Name, session.What{Kind: session.KindAgent}, []string{shell, "-lc", command}); err != nil {
 		return MainState{}, err
 	}
 	said, ended := settle(host, mainName, agent.Name)

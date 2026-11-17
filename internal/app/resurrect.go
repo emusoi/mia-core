@@ -114,7 +114,9 @@ func (a *App) forgetSession(name string) error {
 
 // kept is what a pane keeps after it ends without being told: editors and
 // dev servers, which run until stopped. The config's keep adds to it.
-var kept = []string{"nvim", "vim", "hx", "npm run dev", "npm start", "pnpm dev", "pnpm run dev", "bun dev", "bun run dev", "yarn dev"}
+var kept = append([]string{"nvim", "vim", "hx"}, devServers...)
+
+var devServers = []string{"npm run dev", "npm start", "pnpm dev", "pnpm run dev", "bun dev", "bun run dev", "yarn dev"}
 
 // stays names the program a pane keeps after it ends — an agent, or one of
 // kept and keep, by its first words — and is "" for any other.
@@ -223,6 +225,9 @@ func (a *App) Resurrect(dry bool, names ...string) ([]Revived, error) {
 		for i := range windows {
 			windows[i].Splits = slices.Clone(windows[i].Splits)
 			for _, p := range windows[i].panes() {
+				if p.Kind == "" { // remembered before panes were marked
+					p.Kind = a.WhatOf(p.Command).Kind
+				}
 				p.Command = again(a.agents(), p.Command, p.Conversation)
 				if name, _ := agentOf(a.agents(), p.Command); name != "" && p.Account != "" {
 					agent, _ := agentNamed(a.agents(), name)

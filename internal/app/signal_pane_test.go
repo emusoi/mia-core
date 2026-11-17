@@ -10,6 +10,7 @@ import (
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/gittest"
+	"github.com/emusoi/mia-core/internal/session"
 	"github.com/emusoi/mia-core/internal/signal"
 )
 
@@ -32,10 +33,10 @@ func TestASignalFromAPaneThatIsGoneIsForgotten(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.NewWindow(record, "agent", []string{"sleep", "300"}); err != nil {
+	if _, err := a.NewWindow(record, "agent", session.What{}, []string{"sleep", "300"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.NewWindow(record, "other", []string{"sleep", "300"}); err != nil {
+	if _, err := a.NewWindow(record, "other", session.What{}, []string{"sleep", "300"}); err != nil {
 		t.Fatal(err)
 	}
 	pane := func(window string) string {
@@ -107,7 +108,7 @@ func TestStandingDoesNotWaitOnAnAskWhosePaneIsGone(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := a.NewWindow(record, "agent", []string{"sleep", "300"}); err != nil {
+		if _, err := a.NewWindow(record, "agent", session.What{}, []string{"sleep", "300"}); err != nil {
 			t.Fatal(err)
 		}
 		out, _ := exec.Command("tmux", "display-message", "-p", "-t", "=mia-"+name+":agent", "#{pane_id}").Output()

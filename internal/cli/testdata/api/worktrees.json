@@ -200,6 +200,18 @@
               "index": {
                 "type": "integer"
               },
+              "kind": {
+                "type": "string",
+                "optional": true,
+                "enum": [
+                  "agent",
+                  "shell",
+                  "editor",
+                  "server",
+                  "tests",
+                  "logs"
+                ]
+              },
               "name": {
                 "type": "string"
               },

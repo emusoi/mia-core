@@ -16,6 +16,7 @@ import (
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/env"
+	"github.com/emusoi/mia-core/internal/session"
 	"github.com/emusoi/mia-core/internal/stack"
 )
 
@@ -52,12 +53,21 @@ var apiShapes = []struct {
 // closedSets are the string types whose values are all there are.
 var closedSets = map[reflect.Type][]string{
 	reflect.TypeFor[app.ReachState](): reachStates(),
+	reflect.TypeFor[session.Kind]():   paneKinds(),
 }
 
 // closedFields are the plain strings, by the type that holds them and the
 // name they are marshalled under, whose values are all there are.
 var closedFields = map[string][]string{
 	"app.Turn.kind": app.TurnKinds,
+}
+
+func paneKinds() []string {
+	var all []string
+	for _, kind := range session.Kinds {
+		all = append(all, string(kind))
+	}
+	return all
 }
 
 func reachStates() []string {

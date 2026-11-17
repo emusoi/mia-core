@@ -284,6 +284,16 @@ func agentOf(table []Agent, command string) (string, []string) {
 // runs its agent: env, its flags and the variables it sets, variables set
 // as a shell sets them, and node or bun.
 func launcher(words []string) int {
+	at := withoutEnv(words)
+	if len(words)-at > 1 && (filepath.Base(words[at]) == "node" || filepath.Base(words[at]) == "bun") {
+		at++
+	}
+	return min(at, len(words))
+}
+
+// withoutEnv is where a command line's command is, after env and the
+// variables set before it.
+func withoutEnv(words []string) int {
 	at := 0
 	if len(words) > 0 && filepath.Base(words[0]) == "env" {
 		for at++; at < len(words) && strings.HasPrefix(words[at], "-"); at++ {
@@ -293,9 +303,6 @@ func launcher(words []string) int {
 		}
 	}
 	for at < len(words) && assignment.MatchString(words[at]) {
-		at++
-	}
-	if len(words)-at > 1 && (filepath.Base(words[at]) == "node" || filepath.Base(words[at]) == "bun") {
 		at++
 	}
 	return min(at, len(words))
