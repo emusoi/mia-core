@@ -295,7 +295,7 @@ func (h Host) Capture(worktree, window string, withEscapes bool) (string, error)
 }
 
 func (h Host) Send(worktree, window, text string) error {
-	if out, err := h.run("send-keys", "-t", Target(worktree, window), "-l", text); err != nil {
+	if out, err := h.typeIn(Target(worktree, window), text); err != nil {
 		return fmt.Errorf("type into %s: %s", worktree, strings.TrimSpace(out))
 	}
 	if out, err := h.run("send-keys", "-t", Target(worktree, window), "Enter"); err != nil {
@@ -304,10 +304,36 @@ func (h Host) Send(worktree, window, text string) error {
 	return nil
 }
 
+// typeChunk is how much is typed by one send-keys: tmux refuses a command
+// line over about 16 KB.
+const typeChunk = 4096
+
+// typeIn types text into the target as keys, a piece at a time, each piece
+// whole characters.
+func (h Host) typeIn(target, text string) (string, error) {
+	for {
+		piece := text
+		if len(piece) > typeChunk {
+			cut := typeChunk
+			for cut > 0 && !utf8.RuneStart(text[cut]) {
+				cut--
+			}
+			piece = text[:cut]
+		}
+		if out, err := h.run("send-keys", "-t", target, "-l", piece); err != nil {
+			return out, err
+		}
+		text = text[len(piece):]
+		if text == "" {
+			return "", nil
+		}
+	}
+}
+
 // Press types text into a window as keys, with no Enter after it: a digit
 // that picks an agent's answer from its menu.
 func (h Host) Press(worktree, window, text string) error {
-	if out, err := h.run("send-keys", "-t", Target(worktree, window), "-l", text); err != nil {
+	if out, err := h.typeIn(Target(worktree, window), text); err != nil {
 		return fmt.Errorf("press in %s: %s", worktree, strings.TrimSpace(out))
 	}
 	return nil
@@ -330,8 +356,7 @@ func (h Host) Answer(worktree, pane, text string, enter bool) error {
 	if err != nil || strings.TrimSpace(out) != Name(worktree) {
 		return fmt.Errorf("%s: the pane that signalled is gone", worktree)
 	}
-	args := []string{"send-keys", "-t", pane, "-l", text}
-	if out, err := h.run(args...); err != nil {
+	if out, err := h.typeIn(pane, text); err != nil {
 		return fmt.Errorf("type into %s: %s", worktree, strings.TrimSpace(out))
 	}
 	if enter {
@@ -366,8 +391,12 @@ func (h Host) Paste(worktree, window, text string) error {
 	if h.SSH == "" {
 		direct = run.Tool{Binary: "tmux"}.Combined
 	}
-	if out, err := direct("set-buffer", "-b", buffer, "--", text); err != nil {
-		return fmt.Errorf("paste to %s: %s", worktree, strings.TrimSpace(out))
+	// from stdin: tmux refuses a command line over about 16 KB, and text
+	// given as an argument is one
+	load := run.Tool{Binary: "tmux", SSH: h.SSH}.Command("load-buffer", "-b", buffer, "-")
+	load.Stdin = strings.NewReader(text)
+	if out, err := load.CombinedOutput(); err != nil {
+		return fmt.Errorf("paste to %s: %s", worktree, strings.TrimSpace(string(out)))
 	}
 	if out, err := direct("paste-buffer", "-p", "-d", "-b", buffer, "-t", Target(worktree, window)); err != nil {
 		return fmt.Errorf("paste to %s: %s", worktree, strings.TrimSpace(out))

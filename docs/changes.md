@@ -170,6 +170,12 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **What is said to an agent arrives however long it is.** `mia main
+  say`, a role's opening instructions and `mia window send` gave tmux
+  the text on its command line, and tmux refused one over about 16 KB:
+  "command too long". A paste now reads it from stdin, and what is typed
+  goes 4 KB at a time.
+
 - **A machine that hangs no longer holds up `mia api standing` or `mia api
   machines`.** ssh gave up only on a connection it could not make; one
   that connected and never answered held the answer for a minute, and an
