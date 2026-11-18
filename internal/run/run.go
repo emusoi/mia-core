@@ -1,6 +1,8 @@
 package run
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -63,7 +65,13 @@ type Tool struct {
 	Detail  func(string) string
 	Tty     bool
 	Verbose bool
+	// Within is how long Capture waits for it, 0 for as long as it takes:
+	// one that has not finished by then is killed, and is ErrTooLong.
+	Within time.Duration
 }
+
+// ErrTooLong is a command killed for not finishing Within its time.
+var ErrTooLong = errors.New("did not finish in time")
 
 type Failure struct {
 	Args   []string
@@ -140,15 +148,30 @@ func (t Tool) tick(args []string, started time.Time) {
 
 func (t Tool) Capture(args ...string) (string, error) {
 	command := t.Command(args...)
+	var stdout bytes.Buffer
 	var stderr strings.Builder
-	command.Stderr = &stderr
+	command.Stdout, command.Stderr = &stdout, &stderr
+	if t.Within > 0 {
+		// killed, what it started and left holding its output is not waited for
+		command.WaitDelay = 100 * time.Millisecond
+	}
 	started := time.Now()
-	out, err := command.Output()
+	err := command.Start()
+	if err == nil {
+		var late *time.Timer
+		if t.Within > 0 {
+			late = time.AfterFunc(t.Within, func() { _ = command.Process.Kill() })
+		}
+		err = command.Wait()
+		if late != nil && !late.Stop() && err != nil {
+			err = fmt.Errorf("%w: %s", ErrTooLong, t.Within)
+		}
+	}
 	t.tick(args, started)
 	if err != nil {
 		return "", t.fail(args, stderr.String(), err)
 	}
-	return strings.TrimSpace(string(out)), nil
+	return strings.TrimSpace(stdout.String()), nil
 }
 
 func (t Tool) Combined(args ...string) (string, error) {

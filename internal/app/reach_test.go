@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -131,6 +133,60 @@ func TestStandingSaysHowEachMachineIsReached(t *testing.T) {
 	}
 	if _, _, ok := a.LastReach("nobody"); ok {
 		t.Error("a machine never asked has a last answer")
+	}
+}
+
+// A machine that does not answer in time is not answering: where this one
+// and the others stand is not held up by it, the ssh asking it is not left
+// running, and the next mia to ask, within 30 seconds, does not wait on it.
+func TestAMachineThatHangsIsNotWaitedFor(t *testing.T) {
+	gittest.Isolate(t)
+	pids := filepath.Join(t.TempDir(), "pids")
+	asked := fakeSSH(t, map[string]string{
+		"hang.invalid":   `echo $$ >> ` + pids + `; exec sleep 30`,
+		"fedora.invalid": `echo '{"waiting":[],"working":[],"done_unread":[],"counts":{"waiting":0,"working":0,"done_unread":0},"machines":[{"name":"local","answers":true}]}'`,
+	})
+	add(t, "hang", "fedora")
+	was := askWithin
+	askWithin = 300 * time.Millisecond
+	t.Cleanup(func() { askWithin = was })
+	a, err := AtMain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	standing, err := a.Standing(true)
+	if took := time.Since(started); err != nil || took > 5*time.Second {
+		t.Fatalf("standing took %s, %v", took, err)
+	}
+	if hang := standing.Machines[2]; hang.Name != "hang" || hang.Answers || hang.Reach.State != ReachUnreachable || hang.Reach.Fix == "" {
+		t.Errorf("the machine that hangs = %+v", hang)
+	}
+	if fedora := standing.Machines[1]; !fedora.Answers || fedora.Reach.State != ReachOK {
+		t.Errorf("the one that answers = %+v", fedora)
+	}
+	data, _ := os.ReadFile(pids)
+	for _, line := range strings.Fields(string(data)) {
+		if pid, _ := strconv.Atoi(line); pid > 0 && syscall.Kill(pid, 0) == nil {
+			t.Errorf("the ssh asking it, %d, still runs", pid)
+		}
+	}
+
+	// another mia, a moment later: it is not asked, by standing or machines
+	b, err := AtMain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := times(asked)
+	started = time.Now()
+	if standing, _ := b.Standing(true); standing.Machines[2].Reach.State != ReachUnreachable {
+		t.Errorf("asked again = %+v", standing.Machines[2])
+	}
+	if state := b.askMachine(runtime.Machine{Name: "hang", SSH: "hang.invalid"}, ".", false); state.Answers || state.Reach.State != ReachUnreachable {
+		t.Errorf("machines = %+v", state)
+	}
+	if got := times(asked) - before; got != 1 || time.Since(started) > askWithin {
+		t.Errorf("asked again, ssh ran %d times in %s; want only fedora's", got, time.Since(started))
 	}
 }
 

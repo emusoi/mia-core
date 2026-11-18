@@ -443,7 +443,9 @@ Every machine `mia machine list` has is asked for its own, at once, by
 its own mia, and its entries carry its name. `machines` names each one
 asked: one that did not answer — it is off, or its mia is older than this
 query — has `answers` false and why, and no entries; that is not an
-error. It is not asked again for 30 seconds. `--here` asks no machine.
+error. One that has not answered in 8 seconds has not answered, and
+does not hold up the rest. It is not asked again for 30 seconds, by this
+mia or another. `--here` asks no machine.
 
 `reach` says what a machine's not answering means: a `state`, a `detail`
 of one line, and the `fix`, the one command or step that puts it right —

@@ -170,6 +170,13 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **A machine that hangs no longer holds up `mia api standing` or `mia api
+  machines`.** ssh gave up only on a connection it could not make; one
+  that connected and never answered held the answer for a minute, and an
+  app that gave up first left the ssh running, one more each time it
+  asked. A machine now has 8 seconds: one slower is `unreachable`, its ssh
+  is killed, and it is not asked again for 30 seconds by any mia.
+
 - **`mia signal ls` no longer lists a signal whose setter is gone.** It
   printed the signals file as it was, and what reads it — the Mac app
   between full answers, and before it approves an ask — showed a dead

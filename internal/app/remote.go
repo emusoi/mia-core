@@ -224,7 +224,12 @@ func (a *App) askMachine(machine runtime.Machine, dir string, linked bool) Machi
 			return state
 		}
 	}
-	out, err := runtime.Run(machine.SSH, "sh", "-c", script, "sh", at)
+	if last, off := a.unreachable(machine.Name); off { // asked lately by another mia, and not answered
+		state.Detail, state.Reach = last.Detail, last.reach()
+		state.Worktrees = cachedWorktrees(cache, machine.Name, false)
+		return state
+	}
+	out, err := runtime.RunWithin(askWithin, machine.SSH, "sh", "-c", script, "sh", at)
 	if err != nil {
 		state.Detail, state.Reach = run.FirstLine(err.Error()), Diagnose(machine, err, linked)
 		failures := 1

@@ -253,6 +253,11 @@ func numberedOn(lines []string) choices {
 // one each asking. askAgainAfter makes it longer for one that stays off.
 const unreachableFor = 30 * time.Second
 
+// askWithin is how long a machine is given to answer where it stands: one
+// that is slower is not answering, and what this one has is not held up.
+// ssh's own ConnectTimeout is less.
+var askWithin = 8 * time.Second
+
 // unreachable is how a machine did not answer, when it was asked and did
 // not, too lately to ask it again.
 func (a *App) unreachable(machine string) (answer, bool) {
@@ -278,7 +283,7 @@ func (a *App) standingOn(machine runtime.Machine) (Standing, Answered) {
 		asked.Detail, asked.Reach = last.Detail, last.reach()
 		return Standing{}, asked
 	}
-	out, err := runtime.Run(machine.SSH, "sh", "-c", utf8+remoteMia+` "$@"`+sayVersionWhenFailed, "sh", "api", "standing", "--here")
+	out, err := runtime.RunWithin(askWithin, machine.SSH, "sh", "-c", utf8+remoteMia+` "$@"`+sayVersionWhenFailed, "sh", "api", "standing", "--here")
 	var theirs Standing
 	if err == nil {
 		if err = json.Unmarshal([]byte(out), &theirs); err != nil {

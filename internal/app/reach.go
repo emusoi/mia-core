@@ -107,6 +107,9 @@ func Diagnose(machine runtime.Machine, err error, inRepository bool) Reach {
 		its += " (" + version + ")"
 	}
 	switch {
+	case errors.Is(err, run.ErrTooLong):
+		return Reach{State: ReachUnreachable, Detail: name + " did not answer in time over ssh",
+			Fix: "turn " + name + " on, or check its address with ssh " + machine.SSH}
 	case code == sshFailed && has(loginSigns...):
 		return Reach{State: ReachNeedsLogin, Detail: name + " would not let ssh in: " + first,
 			Fix: "ssh " + machine.SSH + " once in a terminal, to sign in and accept its key"}
@@ -155,6 +158,9 @@ func (a *App) LastReach(machine string) (Reach, time.Time, bool) {
 }
 
 func (a *App) lastAnswer(machine string) (answer, bool) {
+	if a.MiaDir == "" {
+		return answer{}, false // outside a repository nothing is kept
+	}
 	var last answer
 	data, err := os.ReadFile(a.answerPath(machine))
 	if err != nil || json.Unmarshal(data, &last) != nil {

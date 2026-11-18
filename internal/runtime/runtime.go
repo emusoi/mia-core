@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/run"
 )
@@ -150,7 +151,13 @@ func Command(target string, argv ...string) *exec.Cmd {
 }
 
 func Run(target string, argv ...string) (string, error) {
-	tool := run.Tool{Binary: argv[0], SSH: target, Detail: run.FirstLine}
+	return RunWithin(0, target, argv...)
+}
+
+// RunWithin is Run given that long to finish, 0 for as long as it takes:
+// a machine that has not answered by then is run.ErrTooLong.
+func RunWithin(within time.Duration, target string, argv ...string) (string, error) {
+	tool := run.Tool{Binary: argv[0], SSH: target, Detail: run.FirstLine, Within: within}
 	out, err := tool.Capture(argv[1:]...)
 	if err != nil {
 		if target == "" {
