@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -80,7 +81,7 @@ func cmdAccount(args []string, asJSON bool) int {
 		fmt.Printf("%s account %s: %s\n", opened.Account.Agent, opened.Account.Name, opened.Account.Home)
 		fmt.Printf("window %s of %s runs `%s` — sign in there with %s's own login; mia signs nothing in\n", opened.Window, opened.Session, opened.Command, opened.Account.Agent)
 		if in == "" {
-			fmt.Printf("tmux attach -t =%s goes there\n", opened.Session)
+			fmt.Println(goesThere(opened.Session, opened.Window, os.Getenv("TMUX") != "") + " goes there")
 		}
 		return exitOK
 	case sub == "use" && len(args) == 2 && global:
@@ -146,6 +147,25 @@ func cmdAccount(args []string, asJSON bool) int {
 	}
 	return usageErr(accountUsage)
 }
+
+// goesThere is the tmux command line that takes a terminal to a window of
+// a session, to be pasted into a shell as it is: switch-client from inside
+// tmux, attach from outside it. The target has no =, which zsh expands as
+// a command's path, and is quoted when it has anything a shell reads.
+func goesThere(session, window string, inTmux bool) string {
+	verb := "attach"
+	if inTmux {
+		verb = "switch-client"
+	}
+	target := session + ":" + window
+	if !plainWord.MatchString(target) {
+		target = "'" + strings.ReplaceAll(target, "'", `'\''`) + "'"
+	}
+	return "tmux " + verb + " -t " + target
+}
+
+// plainWord is a word no shell changes.
+var plainWord = regexp.MustCompile(`^[A-Za-z0-9_.:/+-]+$`)
 
 func accountNamed(all []app.Account, agent, name string) app.Account {
 	for _, one := range all {

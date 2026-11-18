@@ -183,6 +183,13 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **The way to an account's window is pasted as it is.** `mia account
+  add` said `tmux attach -t =mia-accounts goes there`, and zsh reads
+  `=word` as the path of the command `word`: pasted, it said
+  `mia-accounts not found`, as though the window were gone. It now says
+  `tmux attach -t mia-accounts:<window>`, quoted when a shell would read
+  anything in it, and `tmux switch-client -t …` from inside tmux.
+
 - **A window tmux names is remembered with no name.** The name it had
   when mia looked was kept, and a session never looked at keeps the one
   tmux gave it as it started: `tmux`, which `mia resurrect --list`

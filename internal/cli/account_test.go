@@ -263,3 +263,39 @@ func TestTheUserWideAccountIsSetInTheUserConfigAndFollowed(t *testing.T) {
 		t.Errorf("default takes the line out: %q", said())
 	}
 }
+
+// What mia prints to paste into a shell takes the terminal to the window
+// as it is pasted, in zsh too, where =word is the path of a command: no =,
+// and quoted when a shell would read anything in it; switch-client from
+// inside tmux.
+func TestTheWayToAnAccountsWindowIsPastedAsItIs(t *testing.T) {
+	for _, c := range []struct {
+		session, window string
+		inTmux          bool
+		want            string
+	}{
+		{"mia-accounts", "claude-work", false, "tmux attach -t mia-accounts:claude-work"},
+		{"mia-accounts", "claude-work-2", true, "tmux switch-client -t mia-accounts:claude-work-2"},
+		{"mia-accounts", "it's mine", false, `tmux attach -t 'mia-accounts:it'\''s mine'`},
+		{"mia-accounts", "=x", false, "tmux attach -t 'mia-accounts:=x'"},
+	} {
+		if got := goesThere(c.session, c.window, c.inTmux); got != c.want {
+			t.Errorf("goesThere(%q, %q, %v) = %q, want %q", c.session, c.window, c.inTmux, got, c.want)
+		}
+	}
+	// what zsh makes of it: the words as they were
+	zsh, err := exec.LookPath("zsh")
+	if err != nil {
+		t.Skip("no zsh")
+	}
+	for _, window := range []string{"claude-work", "it's mine"} {
+		line := goesThere("mia-accounts", window, false)
+		out, err := exec.Command(zsh, "-fc", "print -rl -- "+line).CombinedOutput()
+		if want := "tmux\nattach\n-t\nmia-accounts:" + window + "\n"; err != nil || string(out) != want {
+			t.Errorf("zsh reads %q as %q: %v", line, out, err)
+		}
+	}
+	if out, err := exec.Command(zsh, "-fc", "print -rl -- tmux attach -t =mia-accounts").CombinedOutput(); err == nil {
+		t.Errorf("zsh took =mia-accounts as it is: %q", out)
+	}
+}

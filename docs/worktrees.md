@@ -151,7 +151,9 @@ mia account rm claude team
 on it — in a session of mia's own, `mia-accounts`, unless `--in` names a
 worktree — and says what it opened. The person signs in there, with the
 agent's own login: mia never reads, copies or moves a sign-in, a
-password or a token.
+password or a token. Outside tmux it says `tmux attach -t
+mia-accounts:<window>` goes there, inside it `tmux switch-client -t …`,
+written to be pasted into any shell as it is.
 
 `mia account login` opens the same window on an account the agent has
 already, `default` too: one that says `logged_in` `no`, or whose sign-in
