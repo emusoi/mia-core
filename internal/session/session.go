@@ -650,7 +650,8 @@ func (h Host) StartWindow(worktree, dir, window string, what What, argv []string
 }
 
 // StartWindowWith is StartWindow with env, NAME=value, in the window's
-// environment in place of MIA_WORKTREE: for a session that is no worktree's.
+// environment in place of MIA_WORKTREE, or none when env is "": for a
+// session that is no worktree's.
 func (h Host) StartWindowWith(env, worktree, dir, window string, what What, argv []string) error {
 	if err := h.Ensure(worktree, dir); err != nil {
 		return err
@@ -658,7 +659,11 @@ func (h Host) StartWindowWith(env, worktree, dir, window string, what What, argv
 	if h.HasWindow(worktree, window) {
 		return nil
 	}
-	args := append([]string{"new-window", "-d", "-P", "-F", "#{pane_id}", "-t", exact(Name(worktree)), "-n", window, "-c", dir, "-e", env, "--"}, argv...)
+	args := []string{"new-window", "-d", "-P", "-F", "#{pane_id}", "-t", exact(Name(worktree)), "-n", window, "-c", dir}
+	if env != "" {
+		args = append(args, "-e", env)
+	}
+	args = append(append(args, "--"), argv...)
 	out, err := h.run(args...)
 	if err != nil {
 		return fmt.Errorf("start %s in %s: %s", window, worktree, strings.TrimSpace(out))

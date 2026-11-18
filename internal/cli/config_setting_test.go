@@ -21,13 +21,17 @@ func TestASettingEditsOneLineAndKeepsTheRest(t *testing.T) {
 		}
 	}
 	for dotted, want := range map[string][2]string{"base": {"", "base"}, "popup.width": {"popup", "width"},
-		"keys.quizzicle.quiz": {"keys", "quizzicle.quiz"}, "plugin.agent.default": {"plugin.agent", "default"}} {
+		"keys.quizzicle.quiz": {"keys", "quizzicle.quiz"}, "plugin.agent.default": {"plugin.agent", "default"},
+		"agents.claude.account": {"agents.claude", "account"}} {
 		if table, key := settingPath(dotted); table != want[0] || key != want[1] {
 			t.Errorf("settingPath(%s) = %s, %s", dotted, table, key)
 		}
 	}
 	if v, ok := lookup("[keys]\n\"share.pull\" = \"Y\"\n", "keys", "share.pull"); !ok || v != `"Y"` {
 		t.Errorf("lookup = %q %v", v, ok)
+	}
+	if got := unsetting("[agents.claude]\nmodel = \"opus\"\naccount = \"work\"\n\n[main]\naccount = \"x\"\n", "agents.claude", "account"); got != "[agents.claude]\nmodel = \"opus\"\n\n[main]\naccount = \"x\"\n" {
+		t.Errorf("unsetting takes out the one line: %q", got)
 	}
 	if literal("staging") != `"staging"` || literal(`["npm", "i"]`) != `["npm", "i"]` || literal("true") != "true" {
 		t.Error("a value is a string unless it reads as a list, a bool or a number")

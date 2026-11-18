@@ -124,7 +124,9 @@ It is used for a window that starts the agent, `mia window new`, unless
 its command already says one, and for the [main agent](main.md) when
 `[main]` says none. A repository's own config can say another `account`
 than the user-wide one; `mia account use` says one over both, kept by
-mia and not written into either.
+mia and not written into either. `mia account use <agent> <name>
+--global` sets the user-wide one, and `default` takes it out; `mia
+config --global agents.<agent>.<key> <value>` sets any of these.
 
 ## Plugins
 

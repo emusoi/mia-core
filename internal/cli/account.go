@@ -1,15 +1,18 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/config"
 )
 
-const accountUsage = "mia account [ls|add <agent> <name> [--in <worktree>]|use <agent> <name> [--repository <name>]|rename <agent> <name> <new name>|rm [--force] <agent> <name>]"
+const accountUsage = "mia account [ls|add <agent> <name> [--in <worktree>]|login <agent> <name> [--in <worktree>]|use <agent> <name> [--repository <name>|--global]|rename <agent> <name> <new name>|rm [--force] <agent> <name>]"
 
 // atAccounts is mia where accounts are looked at from: the repository
 // here, whose worktrees a window can sign one in to, or, outside one, the
@@ -36,8 +39,9 @@ func cmdAccount(args []string, asJSON bool) int {
 		sub, args = args[0], args[1:]
 	}
 	in, repository := takeValue(&args, "--in"), takeValue(&args, "--repository")
-	force := take(&args, "--force")
-	if (in != "" && sub != "add") || (force && sub != "rm") || (repository != "" && sub != "use") {
+	force, global := take(&args, "--force"), take(&args, "--global")
+	if (in != "" && sub != "add" && sub != "login") || (force && sub != "rm") || (repository != "" && sub != "use") ||
+		(global && (sub != "use" || repository != "")) {
 		return usageErr(accountUsage)
 	}
 	a, err := atAccounts()
@@ -55,11 +59,18 @@ func cmdAccount(args []string, asJSON bool) int {
 			if len(one.Sessions) > 0 {
 				using = "  in " + strings.Join(one.Sessions, ", ")
 			}
+			if one.UserDefault {
+				using += "  (user-wide default)"
+			}
 			fmt.Printf("%-10s %-12s signed in: %-8s %s%s\n", one.Agent, one.Name, one.LoggedIn, one.Home, using)
 		}
 		return exitOK
-	case sub == "add" && len(args) == 2:
-		opened, err := a.AddAccount(args[0], args[1], in)
+	case (sub == "add" || sub == "login") && len(args) == 2:
+		add := a.AddAccount
+		if sub == "login" {
+			add = a.LoginAccount
+		}
+		opened, err := add(args[0], args[1], in)
 		if err != nil {
 			return fail(err)
 		}
@@ -71,6 +82,19 @@ func cmdAccount(args []string, asJSON bool) int {
 		if in == "" {
 			fmt.Printf("tmux attach -t =%s goes there\n", opened.Session)
 		}
+		return exitOK
+	case sub == "use" && len(args) == 2 && global:
+		if err := a.HasAccount(args[0], args[1]); err != nil {
+			return fail(err)
+		}
+		if err := setUserAccount(args[0], args[1]); err != nil {
+			return fail(err)
+		}
+		chosen := accountNamed(a.Accounts(), args[0], args[1])
+		if asJSON {
+			return emit(chosen)
+		}
+		fmt.Printf("%s's sessions start on %s from now on wherever a repository says no other, as %s says; a window that runs already stays on its own\n", chosen.Agent, chosen.Name, config.GlobalPath())
 		return exitOK
 	case sub == "use" && len(args) == 2:
 		if repository == "" {
@@ -97,14 +121,20 @@ func cmdAccount(args []string, asJSON bool) int {
 		if asJSON {
 			return emit(renamed)
 		}
+		if err := followUserAccount(renamed.Agent, args[1], renamed.Name); err != nil {
+			return fail(err)
+		}
 		fmt.Printf("%s account %s is %s now: %s\n", renamed.Agent, args[1], renamed.Name, renamed.Home)
 		if a.KeepsSignInElsewhere(renamed.Agent) {
-			fmt.Printf("%s may keep its sign-in under the folder's old path, out of the folder: if it asks, sign in again\n", renamed.Agent)
+			fmt.Printf("%s may keep its sign-in under the folder's old path, out of the folder: if it asks, `mia account login %s %s` signs in again\n", renamed.Agent, renamed.Agent, renamed.Name)
 		}
 		return exitOK
 	case sub == "rm" && len(args) == 2:
 		gone, err := a.RemoveAccount(args[0], args[1], force)
 		if err != nil {
+			return fail(err)
+		}
+		if err := followUserAccount(gone.Agent, gone.Name, app.DefaultAccount); err != nil {
 			return fail(err)
 		}
 		if asJSON {
@@ -115,4 +145,46 @@ func cmdAccount(args []string, asJSON bool) int {
 		return exitOK
 	}
 	return usageErr(accountUsage)
+}
+
+func accountNamed(all []app.Account, agent, name string) app.Account {
+	for _, one := range all {
+		if one.Agent == agent && one.Name == name {
+			return one
+		}
+	}
+	return app.Account{}
+}
+
+// setUserAccount sets the account the user-wide config starts an agent's
+// sessions on, [agents.<agent>] account; default takes the line out.
+func setUserAccount(agent, name string) error {
+	path := config.GlobalPath()
+	if path == "" {
+		return errors.New("cannot find a home directory to keep the config in")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	table := "agents." + agent
+	edited := unsetting(string(data), table, "account")
+	if name != app.DefaultAccount {
+		edited = setting(string(data), table, "account", strconv.Quote(name))
+	}
+	if err := writeConfig(path, edited); err != nil {
+		return fmt.Errorf("agents.%s.account = %s: %w", agent, name, err)
+	}
+	return nil
+}
+
+// followUserAccount makes the user-wide config, when it starts an agent's
+// sessions on an account renamed or removed, start them on the one it is
+// now: its new name, or default.
+func followUserAccount(agent, was, now string) error {
+	users, err := config.Load("")
+	if err != nil || users.Agents[agent].Account != was {
+		return nil // one mia cannot read it leaves as it is
+	}
+	return setUserAccount(agent, now)
 }

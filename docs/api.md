@@ -355,13 +355,13 @@ list with `accounts` has it.
 
 ```json
 [{"agent":"claude","name":"default","home":"/Users/user/.claude","default":true,
-  "logged_in":"unknown","sessions":["main","goba"]},
+  "logged_in":"unknown","sessions":["main","goba"],"user_default":false},
  {"agent":"claude","name":"work","home":"/Users/user/.config/mia/accounts/claude/work","default":false,
-  "logged_in":"unknown","sessions":["olasiti"]},
+  "logged_in":"unknown","sessions":["olasiti"],"user_default":true},
  {"agent":"codex","name":"default","home":"/Users/user/.codex","default":true,
-  "logged_in":"yes","sessions":[]},
+  "logged_in":"yes","sessions":[],"user_default":true},
  {"agent":"pi","name":"default","home":"/Users/user/.pi/agent","default":true,
-  "logged_in":"no","sessions":[]}]
+  "logged_in":"no","sessions":[],"user_default":true}]
 ```
 
 | field | is |
@@ -370,6 +370,17 @@ list with `accounts` has it.
 | `home` | its folder: the agent's own, as its variable or its usual place says, or mia's `accounts/<agent>/<name>`; empty for the default of a plugin's agent, whose folder mia does not know |
 | `logged_in` | `yes` when the file the agent writes once signed in is there, `no` when it is not and the agent keeps a sign-in nowhere else — or nothing at all is in the folder yet — and `unknown` when mia cannot tell: claude on macOS, which keeps it in the Keychain, codex, which may keep it in a keyring, and a plugin's agent. Only whether a file is there is read |
 | `sessions` | the worktrees with a window that runs the agent on it now — `main` for the main agent, `accounts` for a window signing in to it — on this computer |
+| `user_default` | true of the one the user-wide config starts the agent's sessions on, `[agents.<agent>] account`, or of `default` when it names none; all of an agent's are false when it names one the agent has not. A repository can start its own on another: `--projects` says. A mia has it when its capabilities have `account-user-default`, which `mia account use <agent> <name> --global` sets |
+
+`mia account add --json` and `mia account login --json`, which opens a window to
+sign in to an account the agent has already — a mia has it when its
+capabilities have `account-login` — say what they opened:
+
+```json
+{"account":{"agent":"claude","name":"work","home":"/Users/user/.config/mia/accounts/claude/work",
+  "default":false,"logged_in":"no","sessions":[],"user_default":false},
+ "worktree":"accounts","session":"mia-accounts","window":"claude-work","command":"CLAUDE_CONFIG_DIR='/Users/user/.config/mia/accounts/claude/work' claude"}
+```
 
 `mia api accounts --projects` is which account each repository starts
 each agent's sessions on: every repository mia has named a worktree in,

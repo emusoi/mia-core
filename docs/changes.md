@@ -9,6 +9,19 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **An account is signed in to again, and one is the user-wide default.**
+  `mia account login <agent> <name> [--in <worktree>]` opens a window
+  running the agent on an account it has, `default` too, for the person
+  to sign in to it again with the agent's own login; `mia account add`
+  of a name it has says so. `mia account use <agent> <name> --global`
+  sets `[agents.<agent>] account` in the user-wide config, and `default`
+  takes the line out; a rename or a removal of that account is followed
+  there. `mia api accounts` says which is the user-wide one,
+  `user_default`. `mia config --global agents.<agent>.<key>` reads and
+  sets those keys. Capabilities `account-login` and
+  `account-user-default`. See [An agent's
+  account](worktrees.md#an-agents-account).
+
 - **Roles: a setup with opening instructions.** A file of yours,
   `~/.config/mia/roles/<name>.md`, says in its front matter the agent,
   model, effort and account, all optional, and below them what to tell

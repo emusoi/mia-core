@@ -1134,29 +1134,35 @@ func cmdConfigKey(a *app.App, args []string) int {
 	if args[0] == "base" && !git.BranchExists(a.Root, value) && git.RevParse(a.Root, value) == "" {
 		return fail(fmt.Errorf("no branch %s here", value))
 	}
-	edited := setting(string(data), table, key, literal(value))
-	if err := config.Check(edited); err != nil {
+	if err := writeConfig(path, setting(string(data), table, key, literal(value))); err != nil {
 		return fail(fmt.Errorf("%s = %s: %w", args[0], value, err))
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fail(err)
-	}
-	if err := os.WriteFile(path, []byte(edited), 0o644); err != nil {
-		return fail(err)
 	}
 	fmt.Printf("%s = %s\n", args[0], literal(value))
 	return exitOK
 }
 
+// writeConfig writes a config file edited, refusing what mia would not
+// load.
+func writeConfig(path, edited string) error {
+	if err := config.Check(edited); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(edited), 0o644)
+}
+
 // settingPath is a dotted key's table and key: base is top-level, keys.a.b
-// is "a.b" in [keys], and plugin.agent.default is default in [plugin.agent].
+// is "a.b" in [keys], plugin.agent.default is default in [plugin.agent],
+// and agents.claude.account is account in [agents.claude].
 func settingPath(dotted string) (table, key string) {
 	parts := strings.Split(dotted, ".")
 	switch {
 	case len(parts) == 1:
 		return "", dotted
-	case parts[0] == "plugin" && len(parts) > 2:
-		return "plugin." + parts[1], strings.Join(parts[2:], ".")
+	case (parts[0] == "plugin" || parts[0] == "agents") && len(parts) > 2:
+		return parts[0] + "." + parts[1], strings.Join(parts[2:], ".")
 	}
 	return parts[0], strings.Join(parts[1:], ".")
 }
@@ -1262,6 +1268,19 @@ func setting(config, table, key, value string) string {
 	}
 	lines = append(lines[:at], append([]string{line}, lines[at:]...)...)
 	return strings.Join(lines, "\n") + "\n"
+}
+
+// unsetting is config without key in table: its line taken out, every
+// other line as it was.
+func unsetting(config, table, key string) string {
+	lines := strings.Split(config, "\n")
+	from, to, ok := region(lines, table)
+	for i := from; ok && i < to; i++ {
+		if keyOf(lines[i]) == key {
+			return strings.Join(slices.Delete(lines, i, i+1), "\n")
+		}
+	}
+	return config
 }
 
 const starterConfig = `# mia — this repository's local configuration. Every key is optional, and an

@@ -54,6 +54,12 @@ type Account struct {
 	// Sessions is the worktrees with a window that runs the agent with it,
 	// main for the main agent: this computer's.
 	Sessions []string `json:"sessions"`
+	// UserDefault is true of the account the user-wide config starts the
+	// agent's sessions on, [agents.<name>] account, or of default when it
+	// names none: one agent's are all false when it names one the agent
+	// has not. A repository's config or `mia account use` can say another
+	// for its own sessions.
+	UserDefault bool `json:"user_default"`
 }
 
 const (
@@ -202,12 +208,14 @@ func (a *App) account(agent Agent, named string, set ...string) (string, error) 
 // agent, the default one first, with the worktrees whose windows use each.
 func (a *App) Accounts() []Account {
 	using := a.accountWindows()
+	users, _ := config.Load("") // unreadable, it says none
 	all := []Account{}
 	for _, agent := range a.agents() {
+		chosen := cmp.Or(users.Agents[agent.Name].Account, DefaultAccount)
 		for _, name := range accountsOf(agent) {
 			dir := homeOf(agent, name)
 			all = append(all, Account{Agent: agent.Name, Name: name, Home: dir, Default: name == DefaultAccount,
-				LoggedIn: loggedIn(agent, dir), Sessions: append([]string{}, using[agent.Name+"/"+name]...)})
+				LoggedIn: loggedIn(agent, dir), Sessions: append([]string{}, using[agent.Name+"/"+name]...), UserDefault: name == chosen})
 		}
 	}
 	return all
@@ -324,7 +332,7 @@ func (a *App) AddAccount(agentName, name, in string) (AccountOpened, error) {
 		return AccountOpened{}, errors.New("cannot find a home directory to keep accounts in")
 	}
 	if _, err := os.Stat(dir); err == nil {
-		return AccountOpened{}, fmt.Errorf("%s has an account %s already, in %s", agent.Name, name, dir)
+		return AccountOpened{}, fmt.Errorf("%s has an account %s already, in %s — `mia account login %s %s` signs in to it again", agent.Name, name, dir, agent.Name, name)
 	}
 	if err := os.MkdirAll(filepath.Dir(dir), 0o700); err != nil {
 		return AccountOpened{}, err
@@ -332,9 +340,47 @@ func (a *App) AddAccount(agentName, name, in string) (AccountOpened, error) {
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		return AccountOpened{}, err
 	}
+	return a.signInWindow(agent, name, dir, in)
+}
+
+// LoginAccount opens a window running the agent on an account it has
+// already, default too, for the person to sign in to it again with the
+// agent's own login: one signed out, or one whose sign-in has run out.
+// mia signs nothing in, and nothing out.
+func (a *App) LoginAccount(agentName, name, in string) (AccountOpened, error) {
+	agent, err := a.existingAccount(agentName, name)
+	if err != nil {
+		return AccountOpened{}, err
+	}
+	return a.signInWindow(agent, name, homeOf(agent, name), in)
+}
+
+// existingAccount is the agent of that name, refused when it has no
+// account of that name, with those it has.
+func (a *App) existingAccount(agentName, name string) (Agent, error) {
+	agent, err := a.accountAgent(agentName)
+	if err != nil {
+		return Agent{}, err
+	}
+	if have := accountsOf(agent); !slices.Contains(have, name) {
+		return Agent{}, fmt.Errorf("%s has no account %s — it has %s; `mia account add %s %s` makes it", agent.Name, name, strings.Join(have, ", "), agent.Name, name)
+	}
+	return agent, nil
+}
+
+// HasAccount refuses an account an agent has not, or an agent mia keeps
+// no accounts of.
+func (a *App) HasAccount(agentName, name string) error {
+	_, err := a.existingAccount(agentName, name)
+	return err
+}
+
+// signInWindow opens a window running an agent on one of its accounts, in
+// mia's own session or in a worktree's, for the person to sign in to.
+func (a *App) signInWindow(agent Agent, name, dir, in string) (AccountOpened, error) {
 	command := withAccount(agent, name, agent.start())
-	opened := AccountOpened{Account: Account{Agent: agent.Name, Name: name, Home: dir, LoggedIn: loggedIn(agent, dir), Sessions: []string{}},
-		Command: command}
+	opened := AccountOpened{Account: Account{Agent: agent.Name, Name: name, Home: dir, Default: name == DefaultAccount,
+		LoggedIn: loggedIn(agent, dir), Sessions: []string{}}, Command: command}
 	if in != "" {
 		record, err := a.RecordOrHere(in)
 		if err != nil {
@@ -360,14 +406,21 @@ func (a *App) AddAccount(agentName, name, in string) (AccountOpened, error) {
 		if !host.Available() {
 			return opened, errors.New("tmux not found — an account is signed in to in a window: https://github.com/tmux/tmux/wiki/Installing")
 		}
+		if err := os.MkdirAll(accountsDir(), 0o700); err != nil { // not there before one is added
+			return opened, err
+		}
 		root := git.Resolve(accountsDir())
 		if err := a.Names.Claim(accountsSession, root); err != nil {
 			return opened, fmt.Errorf("mia signs accounts in in the session mia-%s: %w", accountsSession, err)
 		}
 		shell := cmp.Or(a.Config.Dotfiles.Shell, os.Getenv("SHELL"), "/bin/sh")
 		window := freeWindow(host, accountsSession, agent.Name+"-"+name)
+		env := agent.AccountEnv + "=" + dir
+		if name == DefaultAccount {
+			env = "" // the agent finds its own folder as it always does: a variable set to it is another to claude's Keychain
+		}
 		// the window is the agent, and goes when the person has signed in and left it
-		if err := host.StartWindowWith(agent.AccountEnv+"="+dir, accountsSession, root, window, session.What{Kind: session.KindAgent, Label: agent.Name}, []string{shell, "-lc", command}); err != nil {
+		if err := host.StartWindowWith(env, accountsSession, root, window, session.What{Kind: session.KindAgent, Label: agent.Name}, []string{shell, "-lc", command}); err != nil {
 			return opened, err
 		}
 		opened.Worktree, opened.Window = accountsSession, window

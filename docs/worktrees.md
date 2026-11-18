@@ -140,6 +140,8 @@ mia account add codex spare --in monduli # the window in a worktree's session in
 mia account ls                           # every account, signed in or not, and what runs on it
 mia account use claude work              # this repository's claude sessions start on work from now on
 mia account use claude default           # and back to what the config says
+mia account use claude work --global     # every repository that says none starts claude on work
+mia account login claude work            # signed out, or run out: a window to sign in to it again
 mia window new monduli claude --account default   # this one on its own folder, this once
 mia account rename claude work team
 mia account rm claude team
@@ -151,11 +153,21 @@ worktree — and says what it opened. The person signs in there, with the
 agent's own login: mia never reads, copies or moves a sign-in, a
 password or a token.
 
+`mia account login` opens the same window on an account the agent has
+already, `default` too: one that says `logged_in` `no`, or whose sign-in
+ran out. The agent's own folder is started as the agent finds it, its
+variable not set to it — claude names its Keychain item after a folder
+the variable names.
+
 Each repository starts each agent's sessions on one account: the one
 `mia account use` last said for it, kept by mia in
 `~/.config/mia/accounts.json` and never written into a config; failing
 that, `account` under `[agents.<name>]` in the config, the repository's
-own or the user-wide one; failing that, the default. `--account` on
+own or the user-wide one; failing that, the default. `mia account use
+--global` writes the user-wide one, that line of
+`~/.config/mia/config.toml` and no other, and `default` takes it out; a
+rename or a removal of the account it names is followed there, as it is
+in `accounts.json`. `--account` on
 `mia window new`, `mia conversation resume` and `mia main start` starts
 one on another, that once: the next start in that worktree is on the
 repository's again. What mia started a window on is kept for the
