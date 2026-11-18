@@ -170,6 +170,14 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **`mia dev --follow` costs nothing while nothing changes.** Each second
+  it listed the worktree and main with git, both walks of the tree, and
+  read every file of both to compare them: a follow left running burned
+  most of a core. It now stats the files it copied and copies one whose
+  stat changed, and lists the worktree only when a folder of it changed,
+  or every 30 seconds. On 4,000 files: 35% of a core idle before, under
+  2% now.
+
 - **What is said to an agent arrives however long it is.** `mia main
   say`, a role's opening instructions and `mia window send` gave tmux
   the text on its command line, and tmux refused one over about 16 KB:

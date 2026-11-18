@@ -2,8 +2,11 @@ package dev
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/gittest"
 )
@@ -115,5 +118,55 @@ func TestLendingAnotherGivesBackFirst(t *testing.T) {
 	}
 	if got := read(t, filepath.Join(main, "app.js")); got != "main, edited" {
 		t.Errorf("app.js = %q, want main's own edit back", got)
+	}
+}
+
+// Following looks at each file's stat, not its contents, and lists the
+// worktree, which walks it, only when a folder of it changed: a follow
+// with nothing to do runs no git and reads no file.
+func TestFollowingCopiesWhatChangedAndListsOnlyWhenAFolderDid(t *testing.T) {
+	main := repo(t, map[string]string{".gitignore": "*.log\n", "app.js": "main"})
+	branch := repo(t, map[string]string{".gitignore": "*.log\n", "app.js": "branch", "lib/util.js": "u"})
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	runs := filepath.Join(bin, "runs")
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte("#!/bin/sh\necho run >> "+runs+"\nexec "+real+` "$@"`+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	gits := func() int { data, _ := os.ReadFile(runs); return strings.Count(string(data), "run") }
+
+	f := Follow(branch, main)
+	at := time.Date(2026, 11, 18, 10, 0, 0, 0, time.UTC)
+	step := func(after time.Duration, wantChanged, wantGits int, why string) {
+		t.Helper()
+		before := gits()
+		at = at.Add(after)
+		changed, err := f.Step(at)
+		if err != nil || changed != wantChanged || gits()-before != wantGits {
+			t.Errorf("%s: changed %d, ran git %d times, %v; want %d and %d", why, changed, gits()-before, err, wantChanged, wantGits)
+		}
+	}
+	step(0, 2, 1, "the first look compares every file")
+	step(time.Second, 0, 0, "nothing changed")
+	write(t, filepath.Join(branch, "lib", "util.js"), "util, edited")
+	later := time.Now().Add(time.Minute) // a stat that differs even where mtime is coarse
+	os.Chtimes(filepath.Join(branch, "lib", "util.js"), later, later)
+	step(time.Second, 1, 0, "a file edited in place")
+	write(t, filepath.Join(branch, "lib", "new.js"), "n")
+	step(time.Second, 1, 1, "a file added: its folder changed")
+	os.Remove(filepath.Join(branch, "app.js"))
+	step(time.Second, 1, 1, "a file removed")
+	write(t, filepath.Join(branch, "lib", "debug.log"), "ignored")
+	step(time.Second, 0, 1, "an ignored file: listed, not copied")
+	step(time.Second, 0, 0, "nothing changed since")
+	step(relistEvery, 0, 1, "listed again after a while all the same")
+	for rel, want := range map[string]string{"lib/util.js": "util, edited", "lib/new.js": "n", "app.js": "<missing>", "lib/debug.log": "<missing>"} {
+		if got := read(t, filepath.Join(main, rel)); got != want {
+			t.Errorf("main's %s = %q, want %q", rel, got, want)
+		}
 	}
 }

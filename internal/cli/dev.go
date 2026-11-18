@@ -95,12 +95,13 @@ func devFollow(from string, main dev.Main) int {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	fmt.Println("following — ctrl-c stops; main keeps the files until `mia dev off`")
+	follower := dev.Follow(from, main.Path)
 	for {
 		select {
 		case <-stop:
 			return exitOK
-		case <-tick.C:
-			changed, err := dev.Mirror(from, main.Path)
+		case now := <-tick.C:
+			changed, err := follower.Step(now)
 			if err != nil {
 				return fail(err)
 			}

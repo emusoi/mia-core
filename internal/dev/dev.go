@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/run"
 )
@@ -151,6 +153,113 @@ func Mirror(from, to string) (int, error) {
 		changed++
 		removeEmptyParents(filepath.Dir(target), to)
 	}
+	return changed, nil
+}
+
+// Follower keeps main's files the worktree's as they change. Each look
+// stats what it copied last, and copies only a file whose stat changed;
+// the worktree is listed again, which walks it, only when a folder of it
+// changed — a file came or went — or relistEvery has passed.
+type Follower struct {
+	from, to string
+	files    map[string]stamp // each file of the worktree's, as last copied
+	dirs     map[string]stamp // the folders they are in
+	listed   time.Time
+}
+
+// relistEvery is how often the worktree is listed though no folder of it
+// changed: a file can come into one that holds only ignored files.
+const relistEvery = 30 * time.Second
+
+// stamp is what a stat says that changes when a file is written, replaced
+// or made another kind.
+type stamp struct {
+	size, mtime int64
+	mode        os.FileMode
+	ino         uint64
+}
+
+func stampOf(info os.FileInfo) stamp {
+	s := stamp{size: info.Size(), mtime: info.ModTime().UnixNano(), mode: info.Mode()}
+	if sys, ok := info.Sys().(*syscall.Stat_t); ok {
+		s.ino = uint64(sys.Ino)
+	}
+	return s
+}
+
+// Follow is a Follower from the worktree at from into main at to. Its
+// first Step compares every file, as Mirror does.
+func Follow(from, to string) *Follower { return &Follower{from: from, to: to} }
+
+// Step brings main up to the worktree, and says how many files it changed.
+func (f *Follower) Step(now time.Time) (int, error) {
+	relist := f.files == nil || now.Sub(f.listed) >= relistEvery
+	for dir, was := range f.dirs {
+		if relist {
+			break
+		}
+		info, err := os.Lstat(filepath.Join(f.from, dir))
+		relist = err != nil || stampOf(info) != was
+	}
+	names := f.files
+	if relist {
+		listed, err := files(f.from)
+		if err != nil {
+			return 0, err
+		}
+		names, f.listed = map[string]stamp{}, now
+		f.dirs = map[string]stamp{}
+		for rel := range listed {
+			names[rel] = stamp{}
+			for dir := filepath.Dir(rel); ; dir = filepath.Dir(dir) {
+				if _, ok := f.dirs[dir]; ok {
+					break
+				}
+				if info, err := os.Lstat(filepath.Join(f.from, dir)); err == nil {
+					f.dirs[dir] = stampOf(info)
+				}
+				if dir == "." {
+					break
+				}
+			}
+		}
+	}
+	changed := 0
+	next := make(map[string]stamp, len(names))
+	for rel := range names {
+		info, err := os.Lstat(filepath.Join(f.from, rel))
+		if err != nil {
+			continue // gone: taken from main below
+		}
+		// stat before copying: a write after it is copied at the next look
+		now := stampOf(info)
+		if was, ok := f.files[rel]; !ok || was != now {
+			did, err := copyIfDifferent(filepath.Join(f.from, rel), filepath.Join(f.to, rel))
+			if err != nil {
+				return changed, err
+			}
+			if did {
+				changed++
+			}
+		}
+		next[rel] = now
+	}
+	for rel := range f.files {
+		if _, ok := next[rel]; ok {
+			continue
+		}
+		if _, err := os.Lstat(filepath.Join(f.from, rel)); err == nil {
+			continue // there still, and now ignored: main keeps it
+		}
+		target := filepath.Join(f.to, rel)
+		if err := os.Remove(target); err == nil {
+			changed++
+			removeEmptyParents(filepath.Dir(target), f.to)
+		} else if !os.IsNotExist(err) {
+			return changed, err
+		}
+	}
+	f.files = next
 	return changed, nil
 }
 
