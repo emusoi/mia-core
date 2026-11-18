@@ -128,6 +128,11 @@ mia and not written into either. `mia account use <agent> <name>
 --global` sets the user-wide one, and `default` takes it out; `mia
 config --global agents.<agent>.<key> <value>` sets any of these.
 
+An account other than the agent's own has the agent's own setup linked
+into it — claude's `settings.json`, `CLAUDE.md`, skills and the like —
+so what is set there is set for every account; see [its setup,
+shared](worktrees.md#its-setup-shared).
+
 ## Plugins
 
 ```toml

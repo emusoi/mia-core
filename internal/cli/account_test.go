@@ -299,3 +299,48 @@ func TestTheWayToAnAccountsWindowIsPastedAsItIs(t *testing.T) {
 		t.Errorf("zsh took =mia-accounts as it is: %q", out)
 	}
 }
+
+// mia account share links the agent's own setup into an account and says
+// what; --all is every one of mia's, and a usage without a name or --all
+// is refused.
+func TestAnAccountIsSharedTheAgentsSetupFromTheCommandLine(t *testing.T) {
+	gittest.Isolate(t)
+	for _, name := range []string{"CLAUDE_CONFIG_DIR", "CODEX_HOME", "PI_CODING_AGENT_DIR"} {
+		t.Setenv(name, "")
+	}
+	own := filepath.Join(os.Getenv("HOME"), ".claude")
+	work := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "accounts", "claude", "work")
+	for _, dir := range []string{own, work} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(own, "settings.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(own, ".credentials.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+	if code := cmdAccount([]string{"share", "claude"}, false); code != exitUsage {
+		t.Errorf("share with neither a name nor --all: exit %d", code)
+	}
+	if code := cmdAccount([]string{"ls", "--all"}, false); code != exitUsage {
+		t.Errorf("--all to ls: exit %d", code)
+	}
+	if code := cmdAccount([]string{"share", "claude", "--all"}, true); code != exitOK {
+		t.Fatalf("share --all: exit %d", code)
+	}
+	if to, err := os.Readlink(filepath.Join(work, "settings.json")); err != nil || to != filepath.Join(own, "settings.json") {
+		t.Errorf("settings.json: %q %v", to, err)
+	}
+	if _, err := os.Lstat(filepath.Join(work, ".credentials.json")); err == nil {
+		t.Error("the sign-in was shared")
+	}
+	if code := cmdAccount([]string{"share", "claude", "work"}, false); code != exitOK {
+		t.Errorf("share again: exit %d", code)
+	}
+	if code := cmdAccount([]string{"share", "codex", "--all"}, false); code != exitFailed {
+		t.Errorf("an agent mia shares nothing of: exit %d", code)
+	}
+}

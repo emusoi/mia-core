@@ -32,6 +32,12 @@
             "type": "string"
           }
         },
+        "shared": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "user_default": {
           "type": "boolean"
         }

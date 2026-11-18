@@ -74,6 +74,12 @@ type Agent struct {
 	// systems it may, by Go's name for them — so that no file there says
 	// nothing.
 	keychain []string
+	// shared is what of its own folder each account of mia's links to, so
+	// a session on one has the person's setup: settings, instructions,
+	// skills and the like, named one by one. Never a sign-in, a
+	// conversation or anything else the agent keeps state in. Empty for
+	// one mia shares nothing of.
+	shared []string
 }
 
 // start is the word that runs it.
@@ -183,6 +189,11 @@ var builtin = []Agent{
 		// on macOS its sign-in is in the Keychain, under a name made from the
 		// folder's path when the variable is set
 		AccountEnv: "CLAUDE_CONFIG_DIR", home: ".claude", signedIn: ".credentials.json", keychain: []string{"darwin"},
+		// its setup, the hooks in settings.json that tell mia what it does
+		// among it; not .credentials.json, .claude.json (the account it is
+		// signed in as), projects, sessions, todos, history.jsonl or caches
+		shared: []string{"settings.json", "CLAUDE.md", "skills", "commands", "agents", "plugins", "output-styles", "hooks",
+			"statusline.sh", "statusline-command.sh"},
 		// claude writes the session of each of its processes to sessions/<pid>.json
 		// in the folder of the account it runs on: its own, or one of mia's
 		held: `pid="$(ps -o tpgid= -p "$1" | tr -d ' ')"

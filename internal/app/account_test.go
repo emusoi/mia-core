@@ -140,6 +140,98 @@ func TestAnAgentsAccountsAreItsOwnFolderAndEachOfMias(t *testing.T) {
 	}
 }
 
+// An account of mia's links the setup of the agent's own folder that is
+// there, named one by one — never its sign-in or its conversations — and
+// keeps what it has of its own; again, it links only what is missing.
+func TestAnAccountSharesTheAgentsOwnSetupAndNoSignIn(t *testing.T) {
+	gittest.Isolate(t)
+	home, accounts := ownFolders(t)
+	repo := gittest.New(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	own := filepath.Join(home, ".claude")
+	for _, file := range []string{"settings.json", "CLAUDE.md", "skills/x/SKILL.md", "hooks/h.sh", ".credentials.json", ".claude.json",
+		"projects/p/c1.jsonl", "sessions/1.json", "history.jsonl", "todos/t.json"} {
+		put(t, filepath.Join(own, file), "{}")
+	}
+	work, team := filepath.Join(accounts, "claude", "work"), filepath.Join(accounts, "claude", "team")
+	put(t, filepath.Join(team, "CLAUDE.md"), "its own")
+	if err := os.MkdirAll(work, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(home, "gone"), filepath.Join(work, "skills")); err != nil { // one that leads nowhere
+		t.Fatal(err)
+	}
+	if loggedIn := accountOf(a.Accounts(), "claude", "work").LoggedIn; loggedIn != "no" {
+		t.Errorf("a folder with a link only, never run = %s", loggedIn)
+	}
+
+	shared, err := a.ShareAccount("claude", "work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(shared) != 1 || strings.Join(shared[0].Linked, " ") != "settings.json CLAUDE.md skills hooks" || len(shared[0].Kept) != 0 || shared[0].From != own {
+		t.Errorf("shared = %+v", shared)
+	}
+	entries, _ := os.ReadDir(work)
+	var names []string
+	for _, e := range entries {
+		to, err := os.Readlink(filepath.Join(work, e.Name()))
+		if err != nil || to != filepath.Join(own, e.Name()) {
+			t.Errorf("%s is no link to the agent's own: %q %v", e.Name(), to, err)
+		}
+		names = append(names, e.Name())
+	}
+	if strings.Join(names, " ") != "CLAUDE.md hooks settings.json skills" {
+		t.Errorf("the account's folder has %v", names)
+	}
+	if data, err := os.ReadFile(filepath.Join(work, "skills", "x", "SKILL.md")); err != nil || string(data) != "{}\n" {
+		t.Errorf("a skill through the link: %q %v", data, err)
+	}
+	if loggedIn := accountOf(a.Accounts(), "claude", "work").LoggedIn; loggedIn != "no" {
+		t.Errorf("a folder with the shared setup only, never run = %s", loggedIn)
+	}
+
+	// again, for every one: nothing new, and what an account has of its own stays
+	all, err := a.ShareAccount("claude", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 || all[0].Name != "team" || strings.Join(all[0].Kept, " ") != "CLAUDE.md" || strings.Join(all[0].Linked, " ") != "settings.json skills hooks" ||
+		all[1].Name != "work" || len(all[1].Linked) != 0 || strings.Join(all[1].Already, " ") != "settings.json CLAUDE.md skills hooks" {
+		t.Errorf("shared again = %+v", all)
+	}
+	if data, _ := os.ReadFile(filepath.Join(team, "CLAUDE.md")); string(data) != "its own\n" {
+		t.Errorf("the account's own CLAUDE.md = %q", data)
+	}
+	listed := a.Accounts()
+	if work := accountOf(listed, "claude", "work"); strings.Join(work.Shared, " ") != "settings.json CLAUDE.md skills hooks" {
+		t.Errorf("work shares %v", work.Shared)
+	}
+	if own := accountOf(listed, "claude", "default"); own.Shared == nil || len(own.Shared) != 0 {
+		t.Errorf("the agent's own folder shares %v", own.Shared)
+	}
+
+	if _, err := a.ShareAccount("claude", "default"); err == nil {
+		t.Error("the agent's own folder shared with itself")
+	}
+	if _, err := a.ShareAccount("claude", "nobody"); err == nil {
+		t.Error("an account it has not")
+	}
+	if _, err := a.ShareAccount("codex", ""); err == nil || !strings.Contains(err.Error(), "shares nothing of codex") {
+		t.Errorf("an agent mia shares nothing of: %v", err)
+	}
+	// removed, the links go and what they led to stays
+	if _, err := a.RemoveAccount("claude", "work", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(own, "skills", "x", "SKILL.md")); err != nil {
+		t.Errorf("the agent's own skills went with the account: %v", err)
+	}
+}
+
 // Every account's folder of an agent is looked in for conversations, and
 // each says which it is in.
 func TestConversationsAreFoundInEveryAccountOfAnAgent(t *testing.T) {

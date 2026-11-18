@@ -32,7 +32,9 @@ import (
 // it is; every other one is a folder of mia's, accounts/<agent>/<name> in
 // the user-wide config folder. mia makes the folder and opens a window for
 // the person to sign in with the agent's own login: it never reads, copies
-// or moves a sign-in.
+// or moves a sign-in. What of the agent's own folder is the person's setup,
+// and no sign-in or state, each of mia's links to, so a session on any
+// account has it.
 
 // DefaultAccount is the agent's usual folder, which no variable names.
 const DefaultAccount = "default"
@@ -60,6 +62,9 @@ type Account struct {
 	// has not. A repository's config or `mia account use` can say another
 	// for its own sessions.
 	UserDefault bool `json:"user_default"`
+	// Shared is what of the agent's own folder the account links to, by
+	// name; none for the default one, which is that folder.
+	Shared []string `json:"shared"`
 }
 
 const (
@@ -165,8 +170,11 @@ func loggedIn(agent Agent, dir string) string {
 			return loggedYes
 		}
 	}
-	if entries, err := os.ReadDir(dir); err != nil || len(entries) == 0 {
-		return loggedNo // the agent has never run with it
+	entries, err := os.ReadDir(dir)
+	if err != nil || !slices.ContainsFunc(entries, func(e fs.DirEntry) bool {
+		return e.Type()&fs.ModeSymlink == 0 || !slices.Contains(agent.shared, e.Name())
+	}) {
+		return loggedNo // the agent has never run with it: nothing, or only the setup it shares
 	}
 	if agent.signedIn == "" || slices.Contains(agent.keychain, goruntime.GOOS) {
 		return loggedUnknown
@@ -215,7 +223,8 @@ func (a *App) Accounts() []Account {
 		for _, name := range accountsOf(agent) {
 			dir := homeOf(agent, name)
 			all = append(all, Account{Agent: agent.Name, Name: name, Home: dir, Default: name == DefaultAccount,
-				LoggedIn: loggedIn(agent, dir), Sessions: append([]string{}, using[agent.Name+"/"+name]...), UserDefault: name == chosen})
+				LoggedIn: loggedIn(agent, dir), Sessions: append([]string{}, using[agent.Name+"/"+name]...), UserDefault: name == chosen,
+				Shared: sharedIn(agent, name)})
 		}
 	}
 	return all
@@ -290,6 +299,9 @@ type AccountOpened struct {
 	Session  string  `json:"session"`
 	Window   string  `json:"window"`
 	Command  string  `json:"command"`
+	// Shared is what of the agent's own folder the account links to, made
+	// before the agent starts on it.
+	Shared Sharing `json:"shared"`
 }
 
 // accountAgent is the agent of that name, refused when mia keeps no
@@ -340,7 +352,13 @@ func (a *App) AddAccount(agentName, name, in string) (AccountOpened, error) {
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		return AccountOpened{}, err
 	}
-	return a.signInWindow(agent, name, dir, in)
+	shared, err := share(agent, name)
+	if err != nil {
+		return AccountOpened{}, err
+	}
+	opened, err := a.signInWindow(agent, name, dir, in)
+	opened.Shared = shared
+	return opened, err
 }
 
 // LoginAccount opens a window running the agent on an account it has
@@ -352,7 +370,120 @@ func (a *App) LoginAccount(agentName, name, in string) (AccountOpened, error) {
 	if err != nil {
 		return AccountOpened{}, err
 	}
-	return a.signInWindow(agent, name, homeOf(agent, name), in)
+	shared, err := share(agent, name)
+	if err != nil {
+		return AccountOpened{}, err
+	}
+	opened, err := a.signInWindow(agent, name, homeOf(agent, name), in)
+	opened.Shared = shared
+	return opened, err
+}
+
+// Sharing is what of an agent's own folder one of its accounts links to.
+type Sharing struct {
+	Agent string `json:"agent"`
+	Name  string `json:"name"`
+	// From is the agent's own folder, which the links lead to.
+	From string `json:"from"`
+	// Linked is what was linked now: missing from the account's folder,
+	// or a link there that led nowhere.
+	Linked []string `json:"linked"`
+	// Already is what was linked before.
+	Already []string `json:"already"`
+	// Kept is what the account's folder has of its own under that name, a
+	// file, a folder or a link elsewhere: mia links nothing over it.
+	Kept []string `json:"kept"`
+}
+
+// share links, in the folder of one of an agent's accounts, what of the
+// agent's own folder the agent shares and that folder has, each to it
+// there: what is missing, or a link that leads nowhere. Nothing of the
+// account's own is touched, and nothing of the agent's own folder but
+// those names is looked at. The default account is that folder: nothing.
+func share(agent Agent, name string) (Sharing, error) {
+	shared := Sharing{Agent: agent.Name, Name: name, Linked: []string{}, Already: []string{}, Kept: []string{}}
+	from, dir := homeOf(agent, DefaultAccount), homeOf(agent, name)
+	if name == DefaultAccount || from == "" || len(agent.shared) == 0 {
+		return shared, nil
+	}
+	shared.From = from
+	for _, entry := range agent.shared {
+		source, link := filepath.Join(from, entry), filepath.Join(dir, entry)
+		if _, err := os.Lstat(source); err != nil {
+			continue // the agent's own folder has none
+		}
+		there, err := os.Lstat(link)
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+		case err != nil:
+			return shared, err
+		case there.Mode()&fs.ModeSymlink == 0:
+			shared.Kept = append(shared.Kept, entry)
+			continue
+		default:
+			if to, _ := os.Readlink(link); to == source {
+				shared.Already = append(shared.Already, entry)
+				continue
+			}
+			if _, err := os.Stat(link); err == nil {
+				shared.Kept = append(shared.Kept, entry) // a link of its own, that leads somewhere
+				continue
+			}
+			if err := os.Remove(link); err != nil { // one that leads nowhere
+				return shared, err
+			}
+		}
+		if err := os.Symlink(source, link); err != nil {
+			return shared, err
+		}
+		shared.Linked = append(shared.Linked, entry)
+	}
+	return shared, nil
+}
+
+// sharedIn is what of an agent's own folder one of its accounts links to.
+func sharedIn(agent Agent, name string) []string {
+	linked := []string{}
+	from, dir := homeOf(agent, DefaultAccount), homeOf(agent, name)
+	if name == DefaultAccount || from == "" {
+		return linked
+	}
+	for _, entry := range agent.shared {
+		if to, err := os.Readlink(filepath.Join(dir, entry)); err == nil && to == filepath.Join(from, entry) {
+			linked = append(linked, entry)
+		}
+	}
+	return linked
+}
+
+// ShareAccount links, in the folder of an account of an agent, the setup
+// of the agent's own folder that is missing there; again, it links only
+// what is missing still. One named, or every one of mia's when name is "".
+func (a *App) ShareAccount(agentName, name string) ([]Sharing, error) {
+	agent, err := a.accountAgent(agentName)
+	if err != nil {
+		return nil, err
+	}
+	if len(agent.shared) == 0 {
+		return nil, fmt.Errorf("mia shares nothing of %s's own folder yet: only claude's setup is named, one by one, as safe to share", agent.Name)
+	}
+	names := []string{name}
+	if name == "" {
+		names = slices.DeleteFunc(accountsOf(agent), func(n string) bool { return n == DefaultAccount })
+	} else if name == DefaultAccount {
+		return nil, fmt.Errorf("%s is %s's own folder, the one each account shares from", DefaultAccount, agent.Name)
+	} else if _, err := a.existingAccount(agentName, name); err != nil {
+		return nil, err
+	}
+	all := []Sharing{}
+	for _, one := range names {
+		shared, err := share(agent, one)
+		if err != nil {
+			return all, fmt.Errorf("share %s's setup with %s: %w", agent.Name, one, err)
+		}
+		all = append(all, shared)
+	}
+	return all, nil
 }
 
 // existingAccount is the agent of that name, refused when it has no
@@ -380,7 +511,7 @@ func (a *App) HasAccount(agentName, name string) error {
 func (a *App) signInWindow(agent Agent, name, dir, in string) (AccountOpened, error) {
 	command := withAccount(agent, name, agent.start())
 	opened := AccountOpened{Account: Account{Agent: agent.Name, Name: name, Home: dir, Default: name == DefaultAccount,
-		LoggedIn: loggedIn(agent, dir), Sessions: []string{}}, Command: command}
+		LoggedIn: loggedIn(agent, dir), Sessions: []string{}, Shared: sharedIn(agent, name)}, Command: command}
 	if in != "" {
 		record, err := a.RecordOrHere(in)
 		if err != nil {
@@ -499,7 +630,7 @@ func (a *App) RenameAccount(agentName, from, to string) (Account, error) {
 	if err != nil {
 		return Account{}, err
 	}
-	return Account{Agent: agent.Name, Name: to, Home: now, LoggedIn: loggedIn(agent, now), Sessions: []string{}}, nil
+	return Account{Agent: agent.Name, Name: to, Home: now, LoggedIn: loggedIn(agent, now), Sessions: []string{}, Shared: sharedIn(agent, to)}, nil
 }
 
 // Conversations a folder holds: its transcripts, as every agent mia reads
@@ -540,7 +671,7 @@ func (a *App) RemoveAccount(agentName, name string, force bool) (Account, error)
 	if n := transcriptsUnder(dir); n > 0 && !force {
 		return Account{}, fmt.Errorf("the account %s of %s holds %d conversation(s), which go with its folder — `mia account rm --force %s %s` removes them too", name, agent.Name, n, agent.Name, name)
 	}
-	gone := Account{Agent: agent.Name, Name: name, Home: dir, LoggedIn: loggedIn(agent, dir), Sessions: []string{}}
+	gone := Account{Agent: agent.Name, Name: name, Home: dir, LoggedIn: loggedIn(agent, dir), Sessions: []string{}, Shared: []string{}}
 	if err := os.RemoveAll(dir); err != nil {
 		return gone, err
 	}

@@ -368,7 +368,8 @@ list with `accounts` has it.
 |---|---|
 | `name` | `default` for the agent's own folder, or the name it was added under |
 | `home` | its folder: the agent's own, as its variable or its usual place says, or mia's `accounts/<agent>/<name>`; empty for the default of a plugin's agent, whose folder mia does not know |
-| `logged_in` | `yes` when the file the agent writes once signed in is there, `no` when it is not and the agent keeps a sign-in nowhere else — or nothing at all is in the folder yet — and `unknown` when mia cannot tell: claude on macOS, which keeps it in the Keychain, codex, which may keep it in a keyring, and a plugin's agent. Only whether a file is there is read |
+| `logged_in` | `yes` when the file the agent writes once signed in is there, `no` when it is not and the agent keeps a sign-in nowhere else — or nothing but its shared setup is in the folder yet — and `unknown` when mia cannot tell: claude on macOS, which keeps it in the Keychain, codex, which may keep it in a keyring, and a plugin's agent. Only whether a file is there is read |
+| `shared` | what of the agent's own folder it links to, by name, as [its setup is shared](worktrees.md#its-setup-shared); empty for `default`, and for an agent mia shares nothing of |
 | `sessions` | the worktrees with a window that runs the agent on it now — `main` for the main agent, `accounts` for a window signing in to it — on this computer |
 | `user_default` | true of the one the user-wide config starts the agent's sessions on, `[agents.<agent>] account`, or of `default` when it names none; all of an agent's are false when it names one the agent has not. A repository can start its own on another: `--projects` says. A mia has it when its capabilities have `account-user-default`, which `mia account use <agent> <name> --global` sets |
 
@@ -379,8 +380,14 @@ capabilities have `account-login` — say what they opened:
 ```json
 {"account":{"agent":"claude","name":"work","home":"/Users/user/.config/mia/accounts/claude/work",
   "default":false,"logged_in":"no","sessions":[],"user_default":false},
- "worktree":"accounts","session":"mia-accounts","window":"claude-work","command":"CLAUDE_CONFIG_DIR='/Users/user/.config/mia/accounts/claude/work' claude"}
+ "worktree":"accounts","session":"mia-accounts","window":"claude-work","command":"CLAUDE_CONFIG_DIR='/Users/user/.config/mia/accounts/claude/work' claude",
+ "shared":{"agent":"claude","name":"work","from":"/Users/user/.claude","linked":["settings.json","CLAUDE.md","skills"],"already":[],"kept":[]}}
 ```
+
+`shared` is what was linked of the agent's own folder before the agent
+started: `linked` now, `already` linked, and `kept`, a name the account
+has of its own that mia links nothing over. `mia account share --json`
+is a list of the same, one for each account.
 
 `mia api accounts --projects` is which account each repository starts
 each agent's sessions on: every repository mia has named a worktree in,

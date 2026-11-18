@@ -9,6 +9,22 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **An account has the agent's own setup.** Each account is a whole
+  folder of the agent's, so a session on one started without the
+  person's settings, the hooks that tell mia what claude does among
+  them, CLAUDE.md and skills. `mia account add` and `mia account login`
+  now link, before the agent starts, what claude's own folder has of
+  `settings.json`, `CLAUDE.md`, `skills`, `commands`, `agents`,
+  `plugins`, `output-styles`, `hooks`, `statusline.sh` and
+  `statusline-command.sh` into the account's, and `mia account share
+  <agent> <name>` or `--all` does it for those there already. Nothing
+  else is linked or read: no sign-in, no `.claude.json`, no
+  conversations or state. What an account has of its own under one of
+  those names is kept; run again, only what is missing is linked. `mia
+  api accounts` and `mia account ls` say what each `shared`; codex and
+  pi share nothing yet. See [Its setup,
+  shared](worktrees.md#its-setup-shared).
+
 - **An account is signed in to again, and one is the user-wide default.**
   `mia account login <agent> <name> [--in <worktree>]` opens a window
   running the agent on an account it has, `default` too, for the person

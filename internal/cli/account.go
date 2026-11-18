@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/emusoi/mia-core/internal/config"
 )
 
-const accountUsage = "mia account [ls|add <agent> <name> [--in <worktree>]|login <agent> <name> [--in <worktree>]|use <agent> <name> [--repository <name>|--global]|rename <agent> <name> <new name>|rm [--force] <agent> <name>]"
+const accountUsage = "mia account [ls|add <agent> <name> [--in <worktree>]|login <agent> <name> [--in <worktree>]|share <agent> (<name> | --all)|use <agent> <name> [--repository <name>|--global]|rename <agent> <name> <new name>|rm [--force] <agent> <name>]"
 
 // atAccounts is mia where accounts are looked at from: the repository
 // here, whose worktrees a window can sign one in to, or, outside one, the
@@ -40,9 +41,9 @@ func cmdAccount(args []string, asJSON bool) int {
 		sub, args = args[0], args[1:]
 	}
 	in, repository := takeValue(&args, "--in"), takeValue(&args, "--repository")
-	force, global := take(&args, "--force"), take(&args, "--global")
+	force, global, all := take(&args, "--force"), take(&args, "--global"), take(&args, "--all")
 	if (in != "" && sub != "add" && sub != "login") || (force && sub != "rm") || (repository != "" && sub != "use") ||
-		(global && (sub != "use" || repository != "")) {
+		(global && (sub != "use" || repository != "")) || (all && sub != "share") {
 		return usageErr(accountUsage)
 	}
 	a, err := atAccounts()
@@ -63,6 +64,9 @@ func cmdAccount(args []string, asJSON bool) int {
 			if one.UserDefault {
 				using += "  (user-wide default)"
 			}
+			if len(one.Shared) > 0 {
+				using += fmt.Sprintf("  shared: %d", len(one.Shared))
+			}
 			fmt.Printf("%-10s %-12s signed in: %-8s %s%s\n", one.Agent, one.Name, one.LoggedIn, one.Home, using)
 		}
 		return exitOK
@@ -79,9 +83,30 @@ func cmdAccount(args []string, asJSON bool) int {
 			return emit(opened)
 		}
 		fmt.Printf("%s account %s: %s\n", opened.Account.Agent, opened.Account.Name, opened.Account.Home)
+		sayShared(opened.Shared)
 		fmt.Printf("window %s of %s runs `%s` — sign in there with %s's own login; mia signs nothing in\n", opened.Window, opened.Session, opened.Command, opened.Account.Agent)
 		if in == "" {
 			fmt.Println(goesThere(opened.Session, opened.Window, os.Getenv("TMUX") != "") + " goes there")
+		}
+		return exitOK
+	case sub == "share" && ((len(args) == 2 && !all) || (len(args) == 1 && all)):
+		name := ""
+		if !all {
+			name = args[1]
+		}
+		shared, err := a.ShareAccount(args[0], name)
+		if err != nil {
+			return fail(err)
+		}
+		if asJSON {
+			return emit(shared)
+		}
+		for _, one := range shared {
+			fmt.Printf("%s account %s:\n", one.Agent, one.Name)
+			sayShared(one)
+		}
+		if len(shared) == 0 {
+			fmt.Printf("%s has no account of mia's to share its own folder's setup with\n", args[0])
 		}
 		return exitOK
 	case sub == "use" && len(args) == 2 && global:
@@ -146,6 +171,22 @@ func cmdAccount(args []string, asJSON bool) int {
 		return exitOK
 	}
 	return usageErr(accountUsage)
+}
+
+// sayShared says what of the agent's own folder an account links to.
+func sayShared(shared app.Sharing) {
+	if linked := slices.Concat(shared.Linked, shared.Already); len(linked) > 0 {
+		fmt.Printf("shares %s from %s", strings.Join(linked, ", "), shared.From)
+		if len(shared.Linked) > 0 && len(shared.Already) > 0 {
+			fmt.Printf(" (linked now: %s)", strings.Join(shared.Linked, ", "))
+		}
+		fmt.Println()
+	} else if shared.From != "" {
+		fmt.Printf("shares nothing from %s: it has none of the setup mia shares\n", shared.From)
+	}
+	if len(shared.Kept) > 0 {
+		fmt.Printf("keeps its own %s: mia links nothing over what the account has\n", strings.Join(shared.Kept, ", "))
+	}
 }
 
 // goesThere is the tmux command line that takes a terminal to a window of

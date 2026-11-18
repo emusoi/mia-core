@@ -142,6 +142,7 @@ mia account use claude work              # this repository's claude sessions sta
 mia account use claude default           # and back to what the config says
 mia account use claude work --global     # every repository that says none starts claude on work
 mia account login claude work            # signed out, or run out: a window to sign in to it again
+mia account share claude --all           # ~/.claude's settings, CLAUDE.md, skills… linked into each
 mia window new monduli claude --account default   # this one on its own folder, this once
 mia account rename claude work team
 mia account rm claude team
@@ -175,6 +176,33 @@ one on another, that once: the next start in that worktree is on the
 repository's again. What mia started a window on is kept for the
 window, as its model is.
 
+### Its setup, shared
+
+An account's folder is the agent's whole folder, so a session on one
+would start without the person's setup: claude's hooks that tell mia
+what it does, its instructions, its skills. `mia account add` and `mia
+account login` link that setup of the agent's own folder into the
+account's before the agent starts there, and `mia account share <agent>
+<name>` or `--all` does it for one there already. Each is a link to the
+agent's own, so a change to either is the other's; removing the account
+removes the links and not what they lead to.
+
+What is linked is named one by one, and only what the agent's own
+folder has:
+
+| agent | linked |
+|---|---|
+| claude | `settings.json`, `CLAUDE.md`, `skills`, `commands`, `agents`, `plugins`, `output-styles`, `hooks`, `statusline.sh`, `statusline-command.sh` |
+
+Nothing else is linked or read: not the sign-in (`.credentials.json`),
+not `.claude.json`, which says the account claude is signed in as, and
+not its conversations or state — `projects`, `sessions`, `todos`,
+`history.jsonl`, `shell-snapshots`, `statsig`, `ide`, caches and backups.
+A name the account has of its own — a file, a folder or a link elsewhere
+— is kept, and said; only one missing, or a link that leads nowhere, is
+linked. Run again, it links what is missing still and nothing more.
+codex and pi have nothing shared yet: `mia account share` says so.
+
 An agent takes its account when it starts, so one that runs is not put
 on another: `mia window account <worktree> <window> <account>` says how —
 end the agent there, then `mia conversation resume <id> --account
@@ -195,7 +223,8 @@ folder's path — `Claude Code-credentials` for its own folder,
 `Claude Code-credentials-<8 hex of the path's SHA-256>` for any other —
 and codex can keep its in the system's keyring when its config says so.
 mia does not look there, so such an account says `unknown`; one whose
-folder is empty, as it is until the agent first runs there, says `no`.
+folder is empty but for its shared setup, as it is until the agent first
+runs there, says `no`.
 For the same reason, a renamed claude account asks to be signed in to
 again on macOS, and the old Keychain item stays.
 

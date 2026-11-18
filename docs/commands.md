@@ -25,6 +25,7 @@
 | `mia account [ls]` | every agent's accounts: its own folder, `default`, and the ones added — signed in or not, and what runs on each |
 | `mia account add <agent> <name> [--in <worktree>]` | a new account's folder, and a window running the agent on it to sign in to with the agent's own login |
 | `mia account login <agent> <name> [--in <worktree>]` | a window running the agent on an account it has, `default` too, to sign in to it again: one signed out, or whose sign-in ran out |
+| `mia account share <agent> <name>`, `mia account share <agent> --all` | link the agent's own [setup](worktrees.md#its-setup-shared) into an account, or every one of mia's: what is missing there, never a sign-in; `add` and `login` do it first |
 | `mia account use <agent> <name> [--repository <r>]` | the account a repository starts the agent's sessions on from now on; `default` gives it back to the config |
 | `mia account use <agent> <name> --global` | the user-wide one, `[agents.<agent>] account` in `~/.config/mia/config.toml`, for every repository that says none; `default` takes the line out |
 | `mia account rename <agent> <name> <new>`, `mia account rm [--force] <agent> <name>` | rename or remove one; one a window runs on is refused, and so is `default` |
