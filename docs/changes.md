@@ -170,6 +170,12 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **A window tmux names is remembered with no name.** The name it had
+  when mia looked was kept, and a session never looked at keeps the one
+  tmux gave it as it started: `tmux`, which `mia resurrect --list`
+  showed. Such a window now has `Name` `""` and `Auto` true, and is said
+  by what runs in it, its label, or `shell`.
+
 - **`mia dev --follow` costs nothing while nothing changes.** Each second
   it listed the worktree and main with git, both walks of the tree, and
   read every file of both to compare them: a follow left running burned

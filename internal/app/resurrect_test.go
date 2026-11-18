@@ -55,6 +55,15 @@ func TestWhatWentDownWithTmuxComesBackAndWhatWasClosedStaysClosed(t *testing.T) 
 	if err := a.Remember(); err != nil {
 		t.Fatal(err)
 	}
+	// a window tmux names is kept with no name: what tmux called it last it
+	// may not call it again, and a session never looked at stays "tmux"
+	for _, s := range a.Sessions() {
+		for _, w := range s.Windows {
+			if w.Auto == (w.Name != "") {
+				t.Errorf("%s's window %+v: one tmux names has no name kept, one a person named keeps it", s.Name, w)
+			}
+		}
+	}
 	exec.Command("tmux", "kill-session", "-t", "="+session.Name(closed.Name)).Run()
 	if err := a.Remember(); err != nil {
 		t.Fatal(err)

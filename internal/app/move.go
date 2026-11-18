@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -87,8 +88,8 @@ type Window struct {
 	Pane
 	Splits []Pane `json:",omitempty"`
 	Layout string `json:",omitempty"` // tmux's, for a window that is split
-	// Auto is a window tmux names after what runs in it; one a person
-	// named keeps that name when it is opened again.
+	// Auto is a window tmux names after what runs in it, and has no Name;
+	// one a person named keeps that name when it is opened again.
 	Auto bool `json:",omitempty"`
 }
 
@@ -104,8 +105,8 @@ func (w *Window) panes() []*Pane {
 // What says the window in a line: its name and what each pane runs.
 func (w Window) What() string {
 	what := strings.TrimSpace(w.Name + " " + w.Command)
-	if w.Auto && w.Command != "" {
-		what = w.Command // its name only says the same
+	if w.Auto { // tmux names it after what runs there
+		what = cmp.Or(w.Command, w.Label, "shell")
 	}
 	for _, p := range w.Splits {
 		if p.Command == "" {
@@ -579,7 +580,13 @@ func (s side) windows(table []Agent, name, path string, kept map[string]Chosen) 
 			if pid, err := strconv.Atoi(f[5]); err == nil && p.Command != "" {
 				p.Account = kept[chosenKey("mia-"+name, pid)].Account
 			}
-			windows = append(windows, Window{Name: f[1], Pane: p, Auto: f[9] == "1"})
+			w := Window{Name: f[1], Pane: p, Auto: f[9] == "1"}
+			if w.Auto {
+				// what tmux called it last, which it will not call it again:
+				// never looked at, a session's first window stays "tmux"
+				w.Name = ""
+			}
+			windows = append(windows, w)
 			continue
 		}
 		last := &windows[len(windows)-1]
