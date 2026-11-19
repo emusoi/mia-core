@@ -194,6 +194,10 @@
                 "type": "string",
                 "optional": true
               },
+              "app": {
+                "type": "string",
+                "optional": true
+              },
               "command": {
                 "type": "string"
               },
@@ -221,6 +225,10 @@
               },
               "quiet": {
                 "type": "string"
+              },
+              "working": {
+                "type": "boolean",
+                "optional": true
               }
             }
           }

@@ -135,6 +135,19 @@ func Run(args []string) int {
 			a.Config, a.Plugins = c, pluginHost(c)
 			return emit(a.AgentModels())
 		}
+		if len(rest) > 0 && rest[0] == "apps" { // the person's, from anywhere
+			if len(rest) > 1 {
+				return usageErr("mia api apps")
+			}
+			c := configHere()
+			a := app.Outside()
+			a.Config, a.Plugins = c, pluginHost(c)
+			apps, problems := a.Apps()
+			for _, problem := range problems {
+				fmt.Fprintln(os.Stderr, "mia:", problem) // the others are listed all the same
+			}
+			return emit(apps)
+		}
 		if len(rest) > 0 && rest[0] == "accounts" { // the person's, from anywhere
 			projects := take(&rest, "--projects")
 			if len(rest) > 1 {

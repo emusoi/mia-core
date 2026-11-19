@@ -56,6 +56,8 @@ type App struct {
 	Plugins    plugin.Host
 	agentsOnce sync.Once
 	agentTable []Agent
+	appsOnce   sync.Once
+	appTable   session.Apps
 }
 
 type Event struct {
@@ -781,7 +783,7 @@ func (a *App) listOne(ctx *listing, tree git.Worktree) Listing {
 	l.LastWork, l.LastSubject = facts.Last, facts.Subject
 	if l.Session {
 		if panes, ok := ctx.panes[session.Name(record.Name)]; ok {
-			l.Windows = session.WindowsFrom(panes)
+			l.Windows = session.WindowsWith(panes, a.apps())
 		} else {
 			l.Windows = a.Windows(record)
 		}

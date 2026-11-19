@@ -9,6 +9,18 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **An app says what it is.** mia knew a window's program only where it
+  was written into mia. A folder in mia's config folder,
+  `apps/<name>/app.toml`, now declares an app: a `label`, an `icon`
+  beside it, the `[[keys]]` worth showing, and under `[match]` how to
+  tell it — `commands` its pane runs, or a `title` its pane has under a
+  runtime's command in `via`. `mia api apps` lists them from any folder,
+  saying on stderr each manifest it could not read, and a window in
+  `mia api worktrees` and `mia window ls --json` has `app`, the name of
+  the one it runs; told by its title alone, its `command` is that name
+  too, as pi's is. An agent's window is never an app, and no manifest
+  takes an agent's name. Capability `apps`. See [Apps](apps.md).
+
 - **A conversation goes on with another agent.** No agent loads
   another's conversation, so `mia conversation continue <id> --with
   <agent> [--worktree <name>] [--dry-run]` writes it out as a handoff —

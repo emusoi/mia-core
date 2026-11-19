@@ -11,7 +11,7 @@ import (
 )
 
 func (a *App) Windows(record model.Record) []session.Window {
-	return a.sessionOf(record).WindowsOf(record.Name)
+	return session.WindowsWith(a.sessionOf(record).Panes(record.Name), a.apps())
 }
 
 func (a *App) windowNamed(record model.Record, window string) (session.Host, string, error) {

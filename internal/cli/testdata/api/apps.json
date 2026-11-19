@@ -1,0 +1,59 @@
+{
+  "query": "apps",
+  "usage": "mia api apps",
+  "inputs": [],
+  "output": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "fields": {
+        "icon": {
+          "type": "string",
+          "optional": true
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "key": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "label": {
+          "type": "string",
+          "optional": true
+        },
+        "match": {
+          "type": "object",
+          "fields": {
+            "commands": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "title": {
+              "type": "string",
+              "optional": true
+            },
+            "via": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

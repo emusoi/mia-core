@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -524,13 +525,54 @@ type Window struct {
 	// Working: the agent in it is at work now, as the spinner before its
 	// title says. Its title alone does not: claude keeps one while it rests.
 	Working bool `json:"working,omitempty"`
+	// App is the app a manifest says it runs, by name; "" when none does.
+	App string `json:"app,omitempty"`
+}
+
+// App is how a pane is told to run an app: its command is one of Commands,
+// or its command is one of Via and its title matches Title.
+type App struct {
+	Name     string
+	Commands []string
+	Title    *regexp.Regexp
+	Via      []string
+}
+
+// Apps is the apps a window can be, and Agent, which says a pane is an
+// agent's: no app is named over one.
+type Apps struct {
+	Known []App
+	Agent func(command, title string) bool
+}
+
+// of is the app a pane runs, and whether only its title said so: under a
+// runtime's command the title is tried first, for it says more.
+func (a Apps) of(command, title string) (string, bool) {
+	if a.Agent != nil && a.Agent(command, title) {
+		return "", false
+	}
+	for _, one := range a.Known {
+		if one.Title != nil && slices.Contains(one.Via, command) && one.Title.MatchString(title) {
+			return one.Name, true
+		}
+	}
+	for _, one := range a.Known {
+		if slices.Contains(one.Commands, command) {
+			return one.Name, false
+		}
+	}
+	return "", false
 }
 
 func (h Host) WindowsOf(worktree string) []Window {
 	return WindowsFrom(h.Panes(worktree))
 }
 
-func WindowsFrom(panes []Pane) []Window {
+func WindowsFrom(panes []Pane) []Window { return WindowsWith(panes, Apps{}) }
+
+// WindowsWith is WindowsFrom, each window with the app a manifest says it
+// runs. One told by its title alone is called by the app's name, as pi is.
+func WindowsWith(panes []Pane, apps Apps) []Window {
 	seen := map[int]bool{}
 	host, _ := os.Hostname() // unknown: no title is taken for it
 	var windows []Window
@@ -561,6 +603,13 @@ func WindowsFrom(panes []Pane) []Window {
 			}
 			command = "pi"
 		}
+		app, byTitle := apps.of(command, pane.Title)
+		if byTitle {
+			if name == command {
+				name = app
+			}
+			command = app
+		}
 		agent := AgentTitle(pane.Title)
 		if command == "claude" && agent == "" && !hostTitle(strings.TrimSpace(pane.Title), host) {
 			agent = strings.TrimSpace(pane.Title) // claude does not always mark it
@@ -569,7 +618,7 @@ func WindowsFrom(panes []Pane) []Window {
 			agent = "" // its name until it has something to say
 		}
 		windows = append(windows, Window{Index: pane.Index, Name: name, Command: command, PID: pane.PID, Quiet: quiet,
-			Still: quiet.Round(time.Second).String(), Active: pane.Active, Kind: pane.Kind, Agent: agent, Working: agent != "" && spins(pane.Title)})
+			Still: quiet.Round(time.Second).String(), Active: pane.Active, Kind: pane.Kind, Agent: agent, Working: agent != "" && spins(pane.Title), App: app})
 	}
 	return windows
 }

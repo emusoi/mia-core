@@ -22,8 +22,8 @@ introduced by newer builds:
 ```
 
 The actual answer includes every query and feature, not this shortened list.
-`capabilities`, `machines`, `here`, `repos`, `main`, `standing` and
-`agents` answer from any folder; the other queries are about a repository and need one. Check capabilities before using a feature. Existing response shapes are not
+`capabilities`, `machines`, `here`, `repos`, `main`, `standing`,
+`agents` and `apps` answer from any folder; the other queries are about a repository and need one. Check capabilities before using a feature. Existing response shapes are not
 wrapped in a version envelope.
 
 What the apps read is kept: `internal/cli/testdata/api` holds the shape of
@@ -40,7 +40,7 @@ flag that is added passes and says to keep it with
 
 | command | returns |
 |---|---|
-| `mia api <query>` | worktrees, machines, here, repositories, environments, stacks, base, conversations, the main agent, standing and agents |
+| `mia api <query>` | worktrees, machines, here, repositories, environments, stacks, base, conversations, the main agent, standing, agents and apps |
 | `mia config show --json` | effective global, project and local configuration |
 | `mia doctor --json` | every check and an overall `ok`; failures still exit non-zero |
 | `mia gateway status --json` | `running`, `address`, `pac`, `ca`, `trust`, `differentBuild`, `routes` |
@@ -66,6 +66,16 @@ every pane it starts with one, as tmux's pane option `@mia_kind`, and
 keeps it when the session comes back after tmux went down or crossed to
 another machine. A window opened by hand in tmux has none: `kind` is left
 out. See [Pane kinds](tmux.md#pane-kinds) for how each is decided.
+
+A window that runs an app with a [manifest](apps.md) has `app`, the app's
+name; it is left out for any other. When only the pane's title told the
+app, under a command its manifest lists in `via`, the window's `command`
+is the app's name as well, as it is `pi` for pi; told by its command, the
+window keeps the `command` it has. An agent's window never has `app`.
+
+```json
+{"index":2,"name":"notes","command":"notes","quiet":"3s","active":false,"app":"notes"}
+```
 
 `mia api stack [worktree]` and `mia stack show --json` are the same answer:
 the layers of the stack the worktree's branch is in, bottom first, each with
@@ -343,6 +353,27 @@ give a running window are what mia started it with or last switched it
 to, kept by mia for the window: not read from the agent. One switched by
 hand in the agent is not known, and a window mia chose nothing for has
 neither.
+
+## Apps
+
+`mia api apps` is every app with a [manifest](apps.md), by name. It
+answers from any folder, and reads the manifests as they are then. Check
+capabilities for `apps`: an older mia has neither this nor a window's
+`app`.
+
+```json
+[{"name":"lazygit","label":"Git","icon":"/Users/user/.config/mia/apps/lazygit/icon.svg",
+  "match":{"commands":["lazygit"],"via":[]},
+  "keys":[{"key":"c","label":"commit"}]},
+ {"name":"notes","match":{"commands":[],"title":"^notes","via":["node","python3"]},"keys":[]}]
+```
+
+`label` is left out when the manifest has none, `icon` when it names none
+or the file is not there — it is the file's whole path otherwise — and
+`match.title` when the app is told by its command alone. `commands`, `via`
+and `keys` are always lists, empty when there are none. A manifest that
+does not read, or is named as an agent, is left out and said in a line on
+stderr; the others are listed all the same and the exit status is 0.
 
 ## Setups
 
