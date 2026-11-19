@@ -389,6 +389,19 @@ started: `linked` now, `already` linked, and `kept`, a name the account
 has of its own that mia links nothing over. `mia account share --json`
 is a list of the same, one for each account.
 
+`mia account signals <agent> [<name> | --all] [--dry-run] --json` — a mia
+has it when its capabilities have `account-signals` — is a list, one for
+each account, of what was done with the file that [makes pi say what it
+does](tmux.md#pi-says-what-it-does):
+
+```json
+[{"agent":"pi","name":"default","file":"/Users/user/.pi/agent/extensions/mia-signal.ts","did":"written","dry_run":false}]
+```
+
+`did` is `written`, `updated` — mia's own, of another version —
+`already`, or `kept`: a file there that is not mia's, left as it is. With
+`dry_run` nothing was written, and `did` is what would be.
+
 `mia api accounts --projects` is which account each repository starts
 each agent's sessions on: every repository mia has named a worktree in,
 the one asked from, and any `mia account use` named.

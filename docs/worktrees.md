@@ -201,7 +201,9 @@ not its conversations or state — `projects`, `sessions`, `todos`,
 A name the account has of its own — a file, a folder or a link elsewhere
 — is kept, and said; only one missing, or a link that leads nowhere, is
 linked. Run again, it links what is missing still and nothing more.
-codex and pi have nothing shared yet: `mia account share` says so.
+codex and pi have nothing shared yet: `mia account share` says so. What
+tells mia what pi does is written apart, when asked: [`mia account
+signals pi`](tmux.md#pi-says-what-it-does).
 
 An agent takes its account when it starts, so one that runs is not put
 on another: `mia window account <worktree> <window> <account>` says how —

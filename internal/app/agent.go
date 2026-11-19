@@ -80,6 +80,11 @@ type Agent struct {
 	// conversation or anything else the agent keeps state in. Empty for
 	// one mia shares nothing of.
 	shared []string
+	// signals is the file in its folder that makes it say what it does
+	// with mia signal, and says is what mia writes there: an extension of
+	// the agent's own kind. Empty for one mia has none for.
+	signals string
+	says    string
 }
 
 // start is the word that runs it.
@@ -225,6 +230,8 @@ done`,
 	{Name: "pi", Title: regexp.MustCompile(`^\s*π( |$)`), goOn: "--continue", has: []string{"-c", "--continue", "-r", "--resume", "--session"},
 		resume: fixed("pi --session %s"), byFolder: true, carrier: carriers["pi"],
 		AccountEnv: "PI_CODING_AGENT_DIR", home: ".pi/agent", signedIn: "auth.json",
+		// it loads each extensions/*.ts of its folder as it starts
+		signals: "extensions/mia-signal.ts", says: piSignal,
 		talks: transcripts{agent: "pi", files: piFiles, find: piFind, id: piID, decode: piLine},
 		// provider/id, as /model in it takes one exactly; its effort is its thinking level
 		Models: []plugin.Model{{ID: "anthropic/claude-opus-5", Label: "Claude Opus 5"}, {ID: "anthropic/claude-sonnet-5", Label: "Claude Sonnet 5"},

@@ -344,3 +344,49 @@ func TestAnAccountIsSharedTheAgentsSetupFromTheCommandLine(t *testing.T) {
 		t.Errorf("an agent mia shares nothing of: exit %d", code)
 	}
 }
+
+// mia account signals writes pi's extension only when asked, says so, and
+// fails when the file there is the person's own.
+func TestPisSignalsAreInstalledFromTheCommandLine(t *testing.T) {
+	gittest.Isolate(t)
+	for _, name := range []string{"CLAUDE_CONFIG_DIR", "CODEX_HOME", "PI_CODING_AGENT_DIR"} {
+		t.Setenv(name, "")
+	}
+	repo := gittest.New(t)
+	t.Chdir(repo.Root)
+	own := filepath.Join(os.Getenv("HOME"), ".pi", "agent")
+	file := filepath.Join(own, "extensions", "mia-signal.ts")
+	if err := os.MkdirAll(own, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if code := cmdAccount([]string{"signals", "pi", "--dry-run"}, false); code != exitOK {
+		t.Fatalf("a dry run: exit %d", code)
+	}
+	if _, err := os.Stat(file); err == nil {
+		t.Fatal("a dry run wrote")
+	}
+	if code := cmdAccount([]string{"share", "claude", "--all", "--dry-run"}, false); code != exitUsage {
+		t.Errorf("--dry-run to share: exit %d", code)
+	}
+	if code := cmdAccount([]string{"signals", "pi", "default", "--all"}, false); code != exitUsage {
+		t.Errorf("a name and --all: exit %d", code)
+	}
+	if code := cmdAccount([]string{"signals", "pi"}, false); code != exitOK {
+		t.Fatalf("signals: exit %d", code)
+	}
+	if code := cmdAccount([]string{"signals", "pi", "--all"}, true); code != exitOK {
+		t.Errorf("again, every account: exit %d", code)
+	}
+	if err := os.WriteFile(file, []byte("// mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code := cmdAccount([]string{"signals", "pi"}, false); code != exitFailed {
+		t.Errorf("a file of the person's own: exit %d", code)
+	}
+	if now, _ := os.ReadFile(file); string(now) != "// mine\n" {
+		t.Errorf("it was written over: %q", now)
+	}
+	if code := cmdAccount([]string{"signals", "claude"}, false); code != exitFailed {
+		t.Errorf("claude: exit %d", code)
+	}
+}

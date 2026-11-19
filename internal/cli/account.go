@@ -14,7 +14,7 @@ import (
 	"github.com/emusoi/mia-core/internal/config"
 )
 
-const accountUsage = "mia account [ls|add <agent> <name> [--in <worktree>]|login <agent> <name> [--in <worktree>]|share <agent> (<name> | --all)|use <agent> <name> [--repository <name>|--global]|rename <agent> <name> <new name>|rm [--force] <agent> <name>]"
+const accountUsage = "mia account [ls|add <agent> <name> [--in <worktree>]|login <agent> <name> [--in <worktree>]|share <agent> (<name> | --all)|signals <agent> [<name> | --all] [--dry-run]|use <agent> <name> [--repository <name>|--global]|rename <agent> <name> <new name>|rm [--force] <agent> <name>]"
 
 // atAccounts is mia where accounts are looked at from: the repository
 // here, whose worktrees a window can sign one in to, or, outside one, the
@@ -41,9 +41,9 @@ func cmdAccount(args []string, asJSON bool) int {
 		sub, args = args[0], args[1:]
 	}
 	in, repository := takeValue(&args, "--in"), takeValue(&args, "--repository")
-	force, global, all := take(&args, "--force"), take(&args, "--global"), take(&args, "--all")
+	force, global, all, dry := take(&args, "--force"), take(&args, "--global"), take(&args, "--all"), take(&args, "--dry-run")
 	if (in != "" && sub != "add" && sub != "login") || (force && sub != "rm") || (repository != "" && sub != "use") ||
-		(global && (sub != "use" || repository != "")) || (all && sub != "share") {
+		(global && (sub != "use" || repository != "")) || (all && sub != "share" && sub != "signals") || (dry && sub != "signals") {
 		return usageErr(accountUsage)
 	}
 	a, err := atAccounts()
@@ -107,6 +107,35 @@ func cmdAccount(args []string, asJSON bool) int {
 		}
 		if len(shared) == 0 {
 			fmt.Printf("%s has no account of mia's to share its own folder's setup with\n", args[0])
+		}
+		return exitOK
+	case sub == "signals" && ((len(args) == 1) || (len(args) == 2 && !all)):
+		name := ""
+		if len(args) == 2 {
+			name = args[1]
+		}
+		done, err := a.SignalAccount(args[0], name, all, dry)
+		if asJSON && err == nil {
+			return emit(done)
+		}
+		kept := false
+		for _, one := range done {
+			would := map[bool]string{false: "", true: "would be "}[one.DryRun]
+			switch one.Did {
+			case app.SignalsWritten, app.SignalsUpdated:
+				fmt.Printf("%s account %s: %s %s%s — %s says what it does with mia signal from its next start, or /reload in one that runs\n", one.Agent, one.Name, one.File, would, one.Did, one.Agent)
+			case app.SignalsAlready:
+				fmt.Printf("%s account %s: %s is mia's already, as it is now — nothing to write\n", one.Agent, one.Name, one.File)
+			case app.SignalsKept:
+				kept = true
+				fmt.Printf("%s account %s: %s is yours, not one mia wrote — left as it is; move it away to have mia's\n", one.Agent, one.Name, one.File)
+			}
+		}
+		if err != nil {
+			return fail(err)
+		}
+		if kept {
+			return exitFailed
 		}
 		return exitOK
 	case sub == "use" && len(args) == 2 && global:

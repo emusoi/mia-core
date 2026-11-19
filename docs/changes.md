@@ -9,6 +9,18 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **pi says what it does.** Only claude told mia it was working, asking
+  or done, through its hooks. `mia account signals pi [<name> | --all]
+  [--dry-run]` writes an extension of mia's into pi's folder,
+  `extensions/mia-signal.ts`, which runs `mia signal . busy`, `asks` and
+  `done` from pi as those hooks do, `--from pi`: a run begun, an
+  extension's dialog waiting for you, pi settled. It is written only
+  when asked, begins with a line that says it is mia's, and a file of
+  that name without that line is left as it is. Where there is no `mia`
+  or no worktree of mia's it does nothing, and it never holds pi up.
+  Capability `account-signals`. See [pi says what it
+  does](tmux.md#pi-says-what-it-does).
+
 - **An account has the agent's own setup.** Each account is a whole
   folder of the agent's, so a session on one started without the
   person's settings, the hooks that tell mia what claude does among

@@ -172,3 +172,40 @@ A claude hook, in `~/.claude/settings.json`; it reads its event on stdin:
 "Stop": [{"hooks": [{"type": "command", "command":
   "mia signal . done --style green --rank 30 --from claude --until seen"}]}]
 ```
+
+### pi says what it does
+
+pi has no hooks; it loads extensions. mia has one that says the same
+three things, and writes it into pi's folder when you ask, never by
+itself:
+
+```bash
+mia account signals pi --dry-run   # what would be written, and where
+mia account signals pi             # ~/.pi/agent/extensions/mia-signal.ts
+mia account signals pi work        # an account's folder; --all is every one
+```
+
+```
+pi account default: ~/.pi/agent/extensions/mia-signal.ts written — pi says what it does with mia signal from its next start, or /reload in one that runs
+```
+
+The file begins with a line that says it is mia's. Run again, one that is
+as mia has it is left; an older one of mia's is written again; a file of
+that name without that line is yours, is left as it is, and the command
+fails saying so. Nothing else in the folder is read or written, and a pi
+that was never started there is given no folder.
+
+| pi | signal |
+|---|---|
+| a run begins (`agent_start`) | `busy --style dim --rank 60 --from pi` |
+| an extension's dialog waits for you during a run (`ui_prompt_start`) | `asks <its title> --style red --rank 10 --from pi`, and `busy` again once answered |
+| pi goes on with nothing by itself (`agent_settled`) | `done --style green --rank 30 --from pi --until seen` |
+| you stopped the run, or the session ends in one | `clear --from pi` |
+
+It runs `mia signal .` in pi's folder and nothing else. Where there is no
+`mia`, or the folder is no worktree of mia's, the first call says so and no
+other is made. pi waits for no call, each is ended after three seconds,
+and print and JSON modes say nothing. pi asks no permission of its own
+before a tool, so `asks` is what an extension asks — a question tool, a
+permission gate. On a pi older than `agent_settled`, `done` is said a
+second and a half after `agent_end` with no other run begun.
