@@ -9,6 +9,21 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **A conversation goes on with another agent.** No agent loads
+  another's conversation, so `mia conversation continue <worktree>
+  --with <agent> [--from <window|agent|id>] [--dry-run]` writes it out as
+  a handoff — who said what, each thing the agent did in a line, in
+  order, none of what came back from a tool — in the repository's git
+  folder, `.git/mia/handoffs/<worktree>/<agent>-<id>.md`, and opens a
+  window in the worktree's session with the other agent, started with a
+  model, an effort and an account as a window's is, and told as its
+  first message to read the handoff and go on from where it stops. An
+  agent that asks something first, or ends as it starts, is typed
+  nothing, and the message is printed to say there. `--json` says the
+  `handoff`, the `window` and the `agent`; `--dry-run` writes and starts
+  nothing. Capability `conversation-continue`. See [With another
+  agent](worktrees.md#with-another-agent).
+
 - **pi says what it does.** Only claude told mia it was working, asking
   or done, through its hooks. `mia account signals pi [<name> | --all]
   [--dry-run]` writes an extension of mia's into pi's folder,

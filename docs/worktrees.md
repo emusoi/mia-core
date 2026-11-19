@@ -358,6 +358,48 @@ the first stays where it was. From then on the conversation is in both,
 each going its own way: `mia conversation resume <id>` takes up the one
 last written to, and `--worktree <name>` the one in that worktree.
 
+### With another agent
+
+```bash
+mia conversation continue monduli --with codex                # the one last written to there, on with codex
+mia conversation continue monduli --from claude --with pi     # claude's last; or a window's, or one by its id
+mia conversation continue . --with opencode --dry-run         # only says: the file, the window, the message
+```
+
+No agent loads another's conversation: each keeps its own format. So to
+go on with another, mia writes the conversation out as a handoff,
+`.git/mia/handoffs/<worktree>/<agent>-<id>.md` in the repository's git
+folder — the worktree stays as it was — and opens a window in the
+worktree's session with the other agent, as `mia window new <worktree>
+<agent>` starts one: `[launch]`'s command of that name when it runs the
+agent, `--model`, `--effort` and `--account` or the configured ones.
+Once the agent is ready it is sent one message: to read that file, go on
+from where it stops, and look at the worktree before changing anything.
+
+The handoff says where it came from and when, then the conversation in
+order: what you and the agent said, as written, and each thing the agent
+did as one line — `Ran go test ./...`, `Edited view.lua +2 −1` and the
+file — with none of what came back from a tool, and nothing the agent
+only thought. A message over 6,000 characters is cut, and says by how
+much. Nothing else is taken out: what you typed into the conversation is
+in the file, which only you can read, and which is written again each
+time. It is the other agent's to read, not its memory: it knows what the
+file says and what the worktree shows, no more.
+
+`--from` says which conversation: the one a window has open, by the
+window's name or number, one by its id, or an agent's last in the
+worktree; with none it is the one last written to there. The agent is
+typed into as [a role's opening](#a-role) is: never into a question it
+asks first, and never into the shell left by one that ended as it
+started. Then the window is open, the command fails, and the message is
+printed for you to say there.
+
+```
+monduli: claude's conversation 23f98c02-…, 41 turns, written out to /src/app/.git/mia/handoffs/monduli/claude-23f98c02-….md
+monduli: window codex opened — codex
+monduli: window codex was told to read it and go on from where it stops
+```
+
 The agent is started with a model and an effort as [a window's
 is](#an-agents-model): `--model` and `--effort`, or `[agents.<name>]`'s
 when left out, the words put after the one that runs it — `claude

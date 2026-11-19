@@ -92,3 +92,54 @@ func TestConversationsAPIListsThemAndReadsOneAsTurns(t *testing.T) {
 		t.Errorf("a limit that is no number is a usage error, exit %d", code)
 	}
 }
+
+// mia conversation continue --dry-run says, as JSON too, the handoff, the
+// window and the agent it would go on with, and writes and opens nothing.
+func TestConversationContinueDryRunSaysWhatItWouldDo(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	t.Chdir(repo.Root)
+	claude := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", claude)
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("PI_CODING_AGENT_DIR", "")
+	project := filepath.Join(claude, "projects", regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(repo.Root, "-"))
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	root, _ := json.Marshal(repo.Root)
+	line := `{"type":"user","cwd":` + string(root) + `,"timestamp":"2026-11-02T10:00:00Z","message":{"content":"make the list faster"}}` + "\n" +
+		`{"type":"assistant","cwd":` + string(root) + `,"timestamp":"2026-11-02T10:00:05Z","message":{"content":[{"type":"text","text":"It is faster."}]}}` + "\n"
+	if err := os.WriteFile(filepath.Join(project, "c1.jsonl"), []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	data, code := printed(t, "conversation", "continue", ".", "--with", "codex", "--from", "claude", "--dry-run", "--json")
+	var would app.Continued
+	handoffs := filepath.Join(repo.Root, ".git", "mia", "handoffs")
+	if err := json.Unmarshal(data, &would); err != nil || code != exitOK || !would.DryRun || would.Agent != "codex" || would.From != "claude" ||
+		would.Conversation != "c1" || would.Window.Name != "codex" || would.Turns != 2 || filepath.Dir(filepath.Dir(would.Handoff)) != handoffs {
+		t.Fatalf("would = %s, exit %d, %v", data, code, err)
+	}
+	said, code := printed(t, "conversation", "continue", filepath.Base(repo.Root), "--with", "pi", "--dry-run")
+	if code != exitOK || !regexp.MustCompile(`(?s)claude's conversation c1, 2 turns, would be written out to .*claude-c1\.md.*a window pi would open — pi — and be sent:\nRead `).Match(said) {
+		t.Fatalf("said = %s, exit %d", said, code)
+	}
+	if _, err := os.Stat(handoffs); err == nil {
+		t.Error("a dry run wrote the handoff")
+	}
+	for _, args := range [][]string{
+		{"conversation", "continue", "."},                                 // with no agent
+		{"conversation", "continue", "--with", "codex"},                   // of no worktree
+		{"conversation", "resume", "c1", "--with", "codex"},               // resume goes on with its own
+		{"conversation", "resume", "c1", "--dry-run"},                     // and has no dry run
+		{"conversation", "continue", ".", "--with", "codex", "--in", "x"}, // --in is resume's
+	} {
+		if _, code := printed(t, args...); code != exitUsage {
+			t.Errorf("%v: exit %d", args, code)
+		}
+	}
+	if _, code := printed(t, "conversation", "continue", ".", "--with", "nobody", "--dry-run"); code != exitFailed {
+		t.Errorf("an agent mia does not know: exit %d", code)
+	}
+}

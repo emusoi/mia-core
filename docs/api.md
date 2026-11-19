@@ -289,6 +289,30 @@ A mia that can is one whose `mia api capabilities` has `resume-model`.
 started on, and `copied` when the conversation was copied into that
 account's folder first.
 
+`mia conversation continue <worktree|.> --with <agent> [--from
+<window|agent|id>] [--dry-run] --json` — a mia has it when its
+capabilities have `conversation-continue` — goes on with a worktree's
+conversation [with another agent](worktrees.md#with-another-agent), and
+says what it did:
+
+```json
+{"worktree":"monduli","conversation":"23f98c02-c52b-4de9-8c69-b322eb153bff","from":"claude","agent":"codex",
+ "handoff":"/src/app/.git/mia/handoffs/monduli/claude-23f98c02-c52b-4de9-8c69-b322eb153bff.md","turns":41,
+ "window":{"index":3,"name":"codex"},"command":"codex",
+ "instruction":"Read /src/app/.git/mia/handoffs/monduli/claude-23f98c02-….md — a conversation the person had with claude …",
+ "sent":true,"account":"default","dry_run":false}
+```
+
+`handoff` is the file the conversation was written out to, `window` the
+one opened and `agent` what runs in it; `model`, `effort` and `account`
+are as a resume says them. `sent` is whether mia typed `instruction`,
+the agent's first message, into the window: an agent that asked
+something first, or ended as it started, is typed nothing, `problem`
+says which, and the window is open for `instruction` to be said there —
+with `--json` that is exit 0, `sent` false. With `--dry-run` nothing was
+written or opened: `dry_run` is true, `window` has the name it would
+have and no `index`, and `sent` is false.
+
 The `model` and `effort` that `mia api conversations` and `mia api main`
 give a running window are what mia started it with or last switched it
 to, kept by mia for the window: not read from the agent. One switched by
