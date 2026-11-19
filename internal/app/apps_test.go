@@ -105,3 +105,12 @@ func TestAWindowSaysTheAppAManifestTellsItIs(t *testing.T) {
 		}
 	}
 }
+
+func TestAnAgentIsInstalledWhenItsProgramIsOnPath(t *testing.T) {
+	if !installed(Agent{Name: "sh"}) || !installed(Agent{Name: "nowhere-x", Commands: []string{"sh -c"}}) {
+		t.Fatal("a program on PATH, by its name or the first word of its command, is installed")
+	}
+	if installed(Agent{Name: "no-such-agent-here"}) {
+		t.Fatal("a program PATH does not have is not installed")
+	}
+}

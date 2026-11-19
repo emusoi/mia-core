@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -36,6 +37,9 @@ type AgentModels struct {
 	// AccountEnv is the variable that names the folder of each of its
 	// accounts; "" for an agent mia keeps no accounts of.
 	AccountEnv string `json:"account_env"`
+	// Installed: its program is on this machine's PATH. One that is not can
+	// be named in a config, and is not offered to start.
+	Installed bool `json:"installed"`
 }
 
 // AgentModels is every agent mia knows, a plugin's too.
@@ -44,9 +48,22 @@ func (a *App) AgentModels() []AgentModels {
 	for _, agent := range a.agents() {
 		set := a.Config.Agents[agent.Name]
 		all = append(all, AgentModels{Name: agent.Name, Models: modelsOf(agent, set), Efforts: effortsOf(agent, set),
-			Model: set.Model, Effort: set.Effort, Live: agent.to != nil, AccountEnv: agent.AccountEnv})
+			Model: set.Model, Effort: set.Effort, Live: agent.to != nil, AccountEnv: agent.AccountEnv, Installed: installed(agent)})
 	}
 	return all
+}
+
+// installed reports whether an agent's program is on PATH: its name, or the
+// first word of one of its command lines.
+func installed(agent Agent) bool {
+	for _, name := range append([]string{agent.Name}, agent.Commands...) {
+		if word, _, _ := strings.Cut(name, " "); word != "" {
+			if _, err := exec.LookPath(word); err == nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // modelsOf is the models an agent can be given: its own, and one the
