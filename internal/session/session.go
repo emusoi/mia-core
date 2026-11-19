@@ -583,9 +583,11 @@ func hostTitle(title, host string) bool {
 var version = regexp.MustCompile(`^[0-9]+(\.[0-9]+)+$`)
 
 // piTitle reports whether a pane running `command` under `title` is pi: its
-// program is node (or bun), and only its title names it.
+// program is node (or bun), and only its title names it: "π - <folder>", or
+// "pi - <folder>" in plain letters, as it writes once a conversation is on.
 func piTitle(command, title string) bool {
-	return (command == "node" || command == "bun") && strings.HasPrefix(strings.TrimSpace(title), "π")
+	title = strings.TrimSpace(title)
+	return (command == "node" || command == "bun") && (strings.HasPrefix(title, "π") || strings.HasPrefix(title, "pi - "))
 }
 
 // AgentTitle is what claude says it is doing in the title it gives its

@@ -141,6 +141,8 @@ func TestANodePaneTitledPiIsPi(t *testing.T) {
 		want           bool
 	}{
 		{"node", "π - shop", true},
+		{"node", "pi - shop:🚧", true},
+		{"node", "pipeline - shop", false},
 		{"bun", " π - shop", true},
 		{"node", "shop", false},    // any other node program
 		{"zsh", "π - shop", false}, // pi quit and left its title on the shell

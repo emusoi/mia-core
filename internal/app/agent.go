@@ -227,7 +227,7 @@ done`,
 			}
 			return []string{line}
 		}},
-	{Name: "pi", Title: regexp.MustCompile(`^\s*π( |$)`), goOn: "--continue", has: []string{"-c", "--continue", "-r", "--resume", "--session"},
+	{Name: "pi", Title: regexp.MustCompile(`^\s*(π( |$)|pi - )`), goOn: "--continue", has: []string{"-c", "--continue", "-r", "--resume", "--session"},
 		resume: fixed("pi --session %s"), byFolder: true, carrier: carriers["pi"],
 		AccountEnv: "PI_CODING_AGENT_DIR", home: ".pi/agent", signedIn: "auth.json",
 		// it loads each extensions/*.ts of its folder as it starts
