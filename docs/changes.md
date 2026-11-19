@@ -10,19 +10,32 @@ on GitHub; a tag without its section is not released.
 ### Added
 
 - **A conversation goes on with another agent.** No agent loads
-  another's conversation, so `mia conversation continue <worktree>
-  --with <agent> [--from <window|agent|id>] [--dry-run]` writes it out as
-  a handoff — who said what, each thing the agent did in a line, in
-  order, none of what came back from a tool — in the repository's git
-  folder, `.git/mia/handoffs/<worktree>/<agent>-<id>.md`, and opens a
-  window in the worktree's session with the other agent, started with a
-  model, an effort and an account as a window's is, and told as its
-  first message to read the handoff and go on from where it stops. An
-  agent that asks something first, or ends as it starts, is typed
-  nothing, and the message is printed to say there. `--json` says the
-  `handoff`, the `window` and the `agent`; `--dry-run` writes and starts
-  nothing. Capability `conversation-continue`. See [With another
-  agent](worktrees.md#with-another-agent).
+  another's conversation, so `mia conversation continue <id> --with
+  <agent> [--worktree <name>] [--dry-run]` writes it out as a handoff —
+  who said what, each thing the agent did in a line, in order — in the
+  repository's git folder,
+  `.git/mia/handoffs/<worktree>/<agent>-<id>.md`, and opens a window in
+  its worktree's session with the other agent, started with a model, an
+  effort and an account as a window's is, and told as its first message
+  to read the handoff and go on from where it stops. The conversation is
+  said by its id, never guessed: a worktree can have several open, so
+  none is "the last written to", and `--from <window>` in place of the
+  id is the one conversation that window has open, or a refusal that
+  lists the ids. A handoff is less than the conversation, and says so:
+  what the first agent thought and what came back from its tools are not
+  carried over, and one over 60,000 characters keeps the first thing
+  asked and the last turns, with a line for the middle that names
+  `…-full.md`, the file with every turn. With the same agent it is
+  refused: that agent's own `mia conversation resume <id>` loses
+  nothing. An agent that asks something first, or ends as it starts, is
+  typed nothing, and the message is printed to say there. `--json` says
+  `from`, the conversation, and `to`, the agent and its window;
+  `--dry-run` writes and starts nothing. Each handoff is kept beside its
+  file, and `mia api conversations` says the two conversations are one
+  thread — `continues` on the one the other agent began, `continued_by`
+  on the first — for a chat to read on from one into the other.
+  Capabilities `conversation-continue` and `conversation-thread`. See
+  [With another agent](worktrees.md#with-another-agent).
 
 - **pi says what it does.** Only claude told mia it was working, asking
   or done, through its hooks. `mia account signals pi [<name> | --all]

@@ -365,6 +365,11 @@ type Head struct {
 	// it; left out when mia did not choose them.
 	Model  string `json:"model,omitempty"`
 	Effort string `json:"effort,omitempty"`
+	// Continues is the conversation, with another agent, this one was
+	// begun from by a handoff, and ContinuedBy the one that went on from
+	// this: one thread, to read on. Left out of one that is neither.
+	Continues   *Talk `json:"continues,omitempty"`
+	ContinuedBy *Talk `json:"continued_by,omitempty"`
 }
 
 // WindowRef names a window of a worktree's session.

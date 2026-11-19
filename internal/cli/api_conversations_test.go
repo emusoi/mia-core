@@ -114,32 +114,52 @@ func TestConversationContinueDryRunSaysWhatItWouldDo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	data, code := printed(t, "conversation", "continue", ".", "--with", "codex", "--from", "claude", "--dry-run", "--json")
+	data, code := printed(t, "conversation", "continue", "c1", "--with", "codex", "--dry-run", "--json")
 	var would app.Continued
 	handoffs := filepath.Join(repo.Root, ".git", "mia", "handoffs")
-	if err := json.Unmarshal(data, &would); err != nil || code != exitOK || !would.DryRun || would.Agent != "codex" || would.From != "claude" ||
-		would.Conversation != "c1" || would.Window.Name != "codex" || would.Turns != 2 || filepath.Dir(filepath.Dir(would.Handoff)) != handoffs {
+	main := filepath.Base(repo.Root)
+	if err := json.Unmarshal(data, &would); err != nil || code != exitOK || !would.DryRun || would.To.Agent != "codex" || would.To.Window.Name != "codex" ||
+		would.From != (app.ContinuedFrom{Agent: "claude", ID: "c1", Worktree: main}) || would.Turns != 2 || filepath.Dir(filepath.Dir(would.Handoff)) != handoffs {
 		t.Fatalf("would = %s, exit %d, %v", data, code, err)
 	}
-	said, code := printed(t, "conversation", "continue", filepath.Base(repo.Root), "--with", "pi", "--dry-run")
-	if code != exitOK || !regexp.MustCompile(`(?s)claude's conversation c1, 2 turns, would be written out to .*claude-c1\.md.*a window pi would open — pi — and be sent:\nRead `).Match(said) {
+	// the source and the target each as one thing, for a view to read: no window had the one open, and the other's own conversation is not known yet
+	var shape struct {
+		From, To map[string]json.RawMessage
+	}
+	if err := json.Unmarshal(data, &shape); err != nil || len(shape.From) != 3 || len(shape.To) != 2 || string(shape.From["id"]) != `"c1"` || shape.To["window"] == nil || shape.To["id"] != nil {
+		t.Errorf("from %v and to %v, %v", shape.From, shape.To, err)
+	}
+	said, code := printed(t, "conversation", "continue", "c1", "--worktree", main, "--with", "pi", "--dry-run")
+	if code != exitOK || !regexp.MustCompile(`(?s)claude's conversation c1, 2 turns, would be written out to .*claude-c1\.md.*a window pi would open — pi — and be sent:\nRead .*\nnot carried over: what claude thought and what came back from its tools — pi has what was said and each thing done, in a line\n$`).Match(said) {
 		t.Fatalf("said = %s, exit %d", said, code)
 	}
 	if _, err := os.Stat(handoffs); err == nil {
 		t.Error("a dry run wrote the handoff")
 	}
 	for _, args := range [][]string{
-		{"conversation", "continue", "."},                                 // with no agent
-		{"conversation", "continue", "--with", "codex"},                   // of no worktree
-		{"conversation", "resume", "c1", "--with", "codex"},               // resume goes on with its own
-		{"conversation", "resume", "c1", "--dry-run"},                     // and has no dry run
-		{"conversation", "continue", ".", "--with", "codex", "--in", "x"}, // --in is resume's
+		{"conversation", "continue", "c1"},                                        // with no agent
+		{"conversation", "continue", "--with", "codex"},                           // of no conversation
+		{"conversation", "continue", "c1", "--from", "claude", "--with", "codex"}, // said two ways
+		{"conversation", "continue", main, "c1", "--with", "codex"},               // a worktree is not said first
+		{"conversation", "resume", "c1", "--with", "codex"},                       // resume goes on with its own
+		{"conversation", "resume", "c1", "--dry-run"},                             // and has no dry run
+		{"conversation", "continue", "c1", "--with", "codex", "--in", "x"},        // --in is resume's
 	} {
 		if _, code := printed(t, args...); code != exitUsage {
 			t.Errorf("%v: exit %d", args, code)
 		}
 	}
-	if _, code := printed(t, "conversation", "continue", ".", "--with", "nobody", "--dry-run"); code != exitFailed {
-		t.Errorf("an agent mia does not know: exit %d", code)
+	for _, args := range [][]string{
+		{"conversation", "continue", "c1", "--with", "nobody", "--dry-run"},           // an agent mia does not know
+		{"conversation", "continue", "c1", "--with", "claude", "--dry-run"},           // the agent it is with: its own resume loses nothing
+		{"conversation", "continue", "c9", "--with", "codex", "--dry-run"},            // no such conversation
+		{"conversation", "continue", "--from", "claude", "--with", "codex", "--json"}, // a window that has none open
+	} {
+		if data, code := printed(t, args...); code != exitFailed || len(data) != 0 {
+			t.Errorf("%v: exit %d, printed %s", args, code, data)
+		}
+	}
+	if _, err := os.Stat(handoffs); err == nil {
+		t.Error("a refusal wrote a handoff")
 	}
 }

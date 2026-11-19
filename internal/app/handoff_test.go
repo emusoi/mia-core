@@ -1,9 +1,12 @@
 package app_test
 
 import (
+	"encoding/json"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -55,13 +58,13 @@ func TestGoingOnWithAnotherAgentDryRunWritesAndStartsNothing(t *testing.T) {
 	}
 	talked(t, claudeDir, record.Path)
 
-	would, err := a.ContinueConversation(app.Continue{Worktree: record.Name, From: "claude", With: "codex", DryRun: true})
+	would, err := a.ContinueConversation(app.Continue{ID: "c1", With: "codex", DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	file := filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "claude-c1.md")
-	if !would.DryRun || would.Handoff != file || would.Conversation != "c1" || would.From != "claude" || would.Agent != "codex" ||
-		would.Window.Name != "codex" || would.Command != "codex" || would.Turns != 9 || would.Sent || !strings.Contains(would.Instruction, file) {
+	if !would.DryRun || would.Handoff != file || would.From != (app.ContinuedFrom{Agent: "claude", ID: "c1", Worktree: record.Name}) || would.To.Agent != "codex" ||
+		would.To.Window.Name != "codex" || would.To.ID != "" || would.Command != "codex" || would.Turns != 9 || would.LeftOut != 0 || would.Full != "" || would.Sent || !strings.Contains(would.Instruction, file) {
 		t.Fatalf("would = %+v", would)
 	}
 	if _, err := os.Stat(filepath.Join(repo.Root, ".git", "mia", "handoffs")); err == nil {
@@ -70,22 +73,24 @@ func TestGoingOnWithAnotherAgentDryRunWritesAndStartsNothing(t *testing.T) {
 	if session.Here().HasWindow(record.Name, "codex") {
 		t.Error("a dry run opened a window")
 	}
-	// by its id, and the one last written to when nothing names one
-	if by, err := a.ContinueConversation(app.Continue{Worktree: record.Name, From: "p1", With: "claude", DryRun: true}); err != nil || by.From != "pi" ||
+	// pi's, by its id, and in the worktree it is named in
+	if by, err := a.ContinueConversation(app.Continue{ID: "p1", Worktree: record.Name, With: "claude", DryRun: true}); err != nil || by.From.Agent != "pi" ||
 		by.Handoff != filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "pi-p1.md") {
 		t.Errorf("by its id: %+v %v", by, err)
-	}
-	if last, err := a.ContinueConversation(app.Continue{Worktree: record.Name, With: "codex", DryRun: true}); err != nil || last.Conversation == "" {
-		t.Errorf("the last written to: %+v %v", last, err)
 	}
 	for _, refused := range []struct {
 		want app.Continue
 		says string
 	}{
-		{app.Continue{Worktree: record.Name, From: "codex", With: "pi", DryRun: true}, "no conversation codex names"},
-		{app.Continue{Worktree: record.Name, With: "nobody", DryRun: true}, "knows no agent nobody"},
-		{app.Continue{Worktree: record.Name, With: "codex", Model: "no-such-model", DryRun: true}, "no-such-model"},
-		{app.Continue{Worktree: filepath.Base(repo.Root), With: "codex", DryRun: true}, "no conversation in"},
+		{app.Continue{ID: "nobody", With: "pi", DryRun: true}, "no conversation nobody here"},
+		{app.Continue{ID: "c1", Worktree: filepath.Base(repo.Root), With: "pi", DryRun: true}, "no conversation c1 in " + filepath.Base(repo.Root)},
+		{app.Continue{ID: "c1", With: "nobody", DryRun: true}, "knows no agent nobody"},
+		{app.Continue{ID: "c1", With: "codex", Model: "no-such-model", DryRun: true}, "no-such-model"},
+		// no window has one open: a window names none, and none is taken for it
+		{app.Continue{Worktree: record.Name, Window: "claude", With: "codex", DryRun: true}, "no window of " + record.Name + " has a conversation open"},
+		// with the agent it is with there is nothing to hand over: that agent's own resume loses nothing
+		{app.Continue{ID: "c1", With: "claude", DryRun: true}, "is claude's own, and claude goes on with it as it is, with nothing lost: `mia conversation resume c1` takes it up again (claude --resume c1)"},
+		{app.Continue{ID: "p1", With: "pi", Model: "opus", DryRun: true}, "`mia conversation resume p1 --model opus`"},
 	} {
 		if _, err := a.ContinueConversation(refused.want); err == nil || !strings.Contains(err.Error(), refused.says) {
 			t.Errorf("%+v: %v", refused.want, err)
@@ -127,12 +132,13 @@ echo ready; exec cat >> "$HOME/heard"`})
 		t.Fatalf("%s was not sent %q: %q\nits window:\n%s", name, text, got, screen)
 	}
 
-	done, err := a.ContinueConversation(app.Continue{Worktree: record.Name, From: "claude", With: "echo"})
+	done, err := a.ContinueConversation(app.Continue{ID: "c1", With: "echo"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	file := filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "claude-c1.md")
-	if done.DryRun || done.Handoff != file || done.Window.Name != "echo" || done.Command != "echo-agent" || !done.Sent || done.Problem != "" || done.Agent != "echo" || done.Turns != 9 {
+	if done.DryRun || done.Handoff != file || done.To.Window.Name != "echo" || done.Command != "echo-agent" || !done.Sent || done.Problem != "" ||
+		done.To.Agent != "echo" || done.From.ID != "c1" || done.From.Window != nil || done.Turns != 9 || done.LeftOut != 0 || done.Full != "" {
 		t.Fatalf("done = %+v", done)
 	}
 	if !session.Here().HasWindow(record.Name, "echo") {
@@ -151,7 +157,8 @@ echo ready; exec cat >> "$HOME/heard"`})
 		"# Handoff: a conversation with claude, to go on from",
 		"- From: claude, conversation `c1`, on its account default",
 		"- Worktree: " + record.Name + ", `" + record.Path + "`",
-		"9 turns, in order",
+		"9 turns, in order\n",
+		"Nothing claude only thought is here.",
 		"### 1 · user · 2026-11-02 10:00 UTC\n\nmake the list faster\n",
 		"### 2 · claude · 2026-11-02 10:00 UTC\n\nI will **look**.\n",
 		"\nclaude did:\n\n- Read 2 files\n- Edited view.lua +2 −1 (`/w/view.lua`)\n- Ran go test ./...\n- Committed abc1234 The list is faster\n",
@@ -174,11 +181,11 @@ echo ready; exec cat >> "$HOME/heard"`})
 	}
 
 	// pi's, with another agent: its own file, a window of its own
-	from, err := a.ContinueConversation(app.Continue{Worktree: record.Name, From: "pi", With: "echo", Model: "loud"})
+	from, err := a.ContinueConversation(app.Continue{ID: "p1", With: "echo", Model: "loud"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if from.Conversation != "p1" || from.Window.Name != "echo-2" || from.Command != "echo-agent '--model' 'loud'" || from.Model != "loud" || !from.Sent || from.Handoff != filepath.Join(filepath.Dir(file), "pi-p1.md") {
+	if from.From.ID != "p1" || from.To.Window.Name != "echo-2" || from.Command != "echo-agent '--model' 'loud'" || from.Model != "loud" || !from.Sent || from.Handoff != filepath.Join(filepath.Dir(file), "pi-p1.md") {
 		t.Fatalf("from pi = %+v", from)
 	}
 	heard("echo-2", "Read "+from.Handoff)
@@ -200,21 +207,114 @@ echo ready; exec cat >> "$HOME/heard"`})
 	if err := os.WriteFile(filepath.Join(os.Getenv("HOME"), "broken"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	ended, err := a.ContinueConversation(app.Continue{Worktree: record.Name, From: "pi", With: "echo"})
+	ended, err := a.ContinueConversation(app.Continue{ID: "p1", With: "echo"})
 	os.Remove(filepath.Join(os.Getenv("HOME"), "broken"))
 	if err != nil || ended.Sent || !strings.Contains(ended.Problem, "echo ended as soon as it started") || !strings.Contains(ended.Instruction, from.Handoff) {
 		t.Fatalf("an agent that ended = %+v %v", ended, err)
 	}
-	if screen, _ := a.ReadWindow(record, ended.Window.Name); strings.Contains(screen, "Read ") {
+	if screen, _ := a.ReadWindow(record, ended.To.Window.Name); strings.Contains(screen, "Read ") {
 		t.Errorf("its first message was typed into the shell it left:\n%s", screen)
 	}
 
 	// a second time writes the same file again and opens another window
-	again, err := a.ContinueConversation(app.Continue{Worktree: record.Name, From: "c1", With: "echo"})
-	if err != nil || again.Handoff != file || again.Window.Name != "echo-4" || !again.Sent {
+	again, err := a.ContinueConversation(app.Continue{ID: "c1", With: "echo"})
+	if err != nil || again.Handoff != file || again.To.Window.Name != "echo-4" || !again.Sent {
 		t.Errorf("again = %+v %v", again, err)
+	}
+	// each time is kept beside the handoff: which went on with which agent, in which window. The lab's agent writes no
+	// conversation that names the file, so no list says yet which it went on as
+	kept, _ := filepath.Glob(filepath.Join(filepath.Dir(file), "claude-c1.*.json"))
+	if len(kept) != 2 {
+		t.Fatalf("what is kept of c1's two handoffs: %v", kept)
+	}
+	record1, _ := os.ReadFile(kept[0])
+	if want := `{"from":{"agent":"claude","id":"c1","worktree":` + quoted(record.Name) + `},"to":{"agent":"echo","window":{"index":` + strconv.Itoa(done.To.Window.Index) + `,"name":"echo"}},"handoff":` + quoted(file) + `,"at":"`; !strings.HasPrefix(string(record1), want) {
+		t.Errorf("kept = %s, want %s…", record1, want)
+	}
+	if info, _ := os.Stat(kept[0]); info.Mode().Perm() != 0o600 {
+		t.Errorf("what is kept is the person's alone to read: %v", info.Mode())
+	}
+	heads, _ := a.Conversations(app.Wanted{Worktree: record.Name, Agent: "claude"})
+	if len(heads) != 1 || heads[0].ContinuedBy != nil || heads[0].Continues != nil {
+		t.Errorf("a handoff no conversation was begun from yet: %+v", heads)
 	}
 	if out, err := exec.Command("git", "-C", record.Path, "status", "--porcelain").Output(); err != nil || len(out) != 0 {
 		t.Errorf("the worktree is not as it was: %q %v", out, err)
+	}
+}
+
+// A handoff's record says which conversation went on with which agent; the
+// conversation that agent began from it is the first of its own in the
+// worktree, begun no earlier, whose first message names the handoff's
+// file. A list says the two as one thread, and once found it is kept in
+// the record, not looked for again.
+func TestAListSaysWhichConversationGoesOnFromWhich(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	claudeDir := agentHomes(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := a.New("feature")
+	if err != nil {
+		t.Fatal(err)
+	}
+	talked(t, claudeDir, record.Path) // claude's c1 and pi's p1, begun 10:00
+	file := filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "pi-p1.md")
+	kept := filepath.Join(filepath.Dir(file), "pi-p1.1793613600000.json")
+	put(t, kept, `{"from":{"agent":"pi","id":"p1","worktree":`+quoted(record.Name)+`,"window":{"index":1,"name":"pi"}},"to":{"agent":"claude","window":{"index":2,"name":"claude"}},"handoff":`+quoted(file)+`,"at":"2026-11-02T10:30:00.250Z"}`)
+	began := func(id, at, asked string) {
+		t.Helper()
+		put(t, filepath.Join(claudeDir(record.Path), id+".jsonl"),
+			strings.ReplaceAll(claudeSays(record.Path, "user", quoted(asked), ""), "2026-11-02T10:00:00Z", at),
+			strings.ReplaceAll(claudeSays(record.Path, "assistant", `[{"type":"text","text":"I have read it."}]`, ""), "2026-11-02T10:00:00Z", at))
+	}
+	threads := func() map[string]string {
+		t.Helper()
+		heads, problems := a.Conversations(app.Wanted{})
+		if len(problems) > 0 {
+			t.Fatal(problems)
+		}
+		said := map[string]string{}
+		for _, h := range heads {
+			data, _ := json.Marshal(struct {
+				Continues   *app.Talk `json:"continues,omitempty"`
+				ContinuedBy *app.Talk `json:"continued_by,omitempty"`
+			}{h.Continues, h.ContinuedBy})
+			if whole, _ := json.Marshal(h); !strings.Contains(string(whole), strings.Trim(string(data), "{}")) {
+				t.Errorf("%s is not listed with %s: %s", h.ID, data, whole)
+			}
+			said[h.ID] = string(data)
+		}
+		return said
+	}
+
+	// one begun before the handoff, one of another agent's and one that names another file are none of them it
+	began("c0", "2026-11-02T09:00:00Z", "Read "+file+" — said before there was one")
+	began("c2", "2026-11-02T10:31:00Z", "Read "+filepath.Join(filepath.Dir(file), "claude-c1.md")+" — another's")
+	if said := threads(); said["p1"] != "{}" || said["c0"] != "{}" || said["c2"] != "{}" || len(said) != 4 {
+		t.Fatalf("nothing goes on from p1 yet: %v", said)
+	}
+	// the first begun at or after it that names the file is it, a later one that does too is not
+	began("c4", "2026-11-02T10:40:00Z", "Read "+file+" — once more")
+	began("c3", "2026-11-02T10:30:00Z", "Read "+file+" — a conversation the person had with pi in this worktree, written out by mia. "+strings.Repeat("Go on. ", 60))
+	want := map[string]string{"p1": `{"continued_by":{"agent":"claude","id":"c3"}}`, "c3": `{"continues":{"agent":"pi","id":"p1"}}`, "c0": "{}", "c1": "{}", "c2": "{}", "c4": "{}"}
+	if said := threads(); !maps.Equal(said, want) {
+		t.Fatalf("threads = %v, want %v", said, want)
+	}
+	if data, _ := os.ReadFile(kept); !strings.Contains(string(data), `"to":{"agent":"claude","window":{"index":2,"name":"claude"},"id":"c3"}`) || !strings.Contains(string(data), `"at":"2026-11-02T10:30:00.25Z"`) {
+		t.Errorf("what was found is not kept: %s", data)
+	}
+	if left, _ := filepath.Glob(filepath.Join(filepath.Dir(file), ".handed-*")); len(left) != 0 {
+		t.Errorf("left behind: %v", left)
+	}
+	// kept, it is not looked for again: an earlier one that turns up changes nothing, and it is said of p1 with claude's not listed
+	began("c5", "2026-11-02T10:30:00Z", "Read "+file)
+	if said := threads(); said["p1"] != want["p1"] || said["c5"] != "{}" {
+		t.Errorf("found once, looked for again: %v", said)
+	}
+	if heads, _ := a.Conversations(app.Wanted{Agent: "pi"}); len(heads) != 1 || heads[0].ContinuedBy == nil || *heads[0].ContinuedBy != (app.Talk{Agent: "claude", ID: "c3"}) {
+		t.Errorf("pi's alone: %+v", heads)
 	}
 }

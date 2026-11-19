@@ -105,11 +105,23 @@ the agents' own transcripts, so nothing is recorded as they work.
 | `turns` | how many things the person asked |
 | `running`, `window` | a window of that worktree's session runs this agent with this conversation; `window` is left out otherwise |
 | `model`, `effort` | of a running one, what mia started its window's agent with or last switched it to — see [Agents](#agents); left out when mia chose none |
+| `continues`, `continued_by` | `{"agent":…,"id":…}`, another conversation of this list: the one this was begun from by a [handoff](worktrees.md#with-another-agent), and the one that went on from this. Left out of one that is neither |
 
 A conversation taken up in another worktree, or on another account, was
 copied there, so it is listed once for each folder it lives in: the same
 `id`, told apart by `worktree`, `cwd` and `account`, each with its own
 turns from where they parted.
+
+`mia conversation continue` hands a conversation to another agent, and
+the two are one thread: the first has `continued_by`, the conversation
+the other agent began from the handoff has `continues`, and a chat reads
+the first's turns, then the second's. A mia that says them is one whose
+capabilities have `conversation-thread`. The second is known once that
+agent has written its first turn — it is the first of that agent's in
+the worktree, begun no earlier than the handoff, whose first message
+names the handoff's file — and until then neither field is there; the
+`to.window` the command gave is where it is starting. Of a conversation
+handed on more than once, `continued_by` is the last that began.
 
 Which conversation a window has open, claude says itself. Of any other
 agent it is the newest of that agent's in the worktree on the account
@@ -289,29 +301,42 @@ A mia that can is one whose `mia api capabilities` has `resume-model`.
 started on, and `copied` when the conversation was copied into that
 account's folder first.
 
-`mia conversation continue <worktree|.> --with <agent> [--from
-<window|agent|id>] [--dry-run] --json` — a mia has it when its
-capabilities have `conversation-continue` — goes on with a worktree's
-conversation [with another agent](worktrees.md#with-another-agent), and
-says what it did:
+`mia conversation continue <id> --with <agent> [--worktree <name>]
+[--dry-run] --json` — a mia has it in this form when its capabilities
+have `conversation-thread` — goes on with one conversation [with another
+agent](worktrees.md#with-another-agent), and says what it did. `<id>` is
+the conversation's `id` as `mia api conversations` lists it, and
+`--worktree` its `worktree` there, needed only for one listed in two.
+`--from <window>` in place of the id is the one that window has open.
 
 ```json
-{"worktree":"monduli","conversation":"23f98c02-c52b-4de9-8c69-b322eb153bff","from":"claude","agent":"codex",
- "handoff":"/src/app/.git/mia/handoffs/monduli/claude-23f98c02-c52b-4de9-8c69-b322eb153bff.md","turns":41,
- "window":{"index":3,"name":"codex"},"command":"codex",
+{"from":{"agent":"claude","id":"23f98c02-c52b-4de9-8c69-b322eb153bff","worktree":"monduli","window":{"index":2,"name":"claude"}},
+ "to":{"agent":"codex","window":{"index":3,"name":"codex"}},
+ "handoff":"/src/app/.git/mia/handoffs/monduli/claude-23f98c02-c52b-4de9-8c69-b322eb153bff.md",
+ "full":"/src/app/.git/mia/handoffs/monduli/claude-23f98c02-c52b-4de9-8c69-b322eb153bff-full.md",
+ "turns":212,"left_out":158,"command":"codex",
  "instruction":"Read /src/app/.git/mia/handoffs/monduli/claude-23f98c02-….md — a conversation the person had with claude …",
  "sent":true,"account":"default","dry_run":false}
 ```
 
-`handoff` is the file the conversation was written out to, `window` the
-one opened and `agent` what runs in it; `model`, `effort` and `account`
-are as a resume says them. `sent` is whether mia typed `instruction`,
-the agent's first message, into the window: an agent that asked
-something first, or ended as it started, is typed nothing, `problem`
-says which, and the window is open for `instruction` to be said there —
-with `--json` that is exit 0, `sent` false. With `--dry-run` nothing was
-written or opened: `dry_run` is true, `window` has the name it would
-have and no `index`, and `sent` is false.
+`from` is the conversation and the worktree it is in, with the `window`
+that has it open when one does. `to` is the agent it goes on with and
+the `window` opened for it; the conversation that agent begins has no id
+yet, so `to` has none: `continued_by` in [`mia api
+conversations`](#conversations) says it once the agent has written its
+first turn. `handoff` is the file the conversation was written out to,
+of `turns` turns; when it was over the budget, `left_out` is how many of
+its middle are not in it and `full` the file that has every one, both
+left out otherwise. `model`, `effort` and `account` are as a resume says
+them. `sent` is whether mia typed `instruction`, the agent's first
+message, into the window: an agent that asked something first, or ended
+as it started, is typed nothing, `problem` says which, and the window is
+open for `instruction` to be said there — with `--json` that is exit 0,
+`sent` false. With `--dry-run` nothing was written or opened: `dry_run`
+is true, `to.window` has the name it would have and no `index`, and
+`sent` is false. Refused — no such conversation, a window with none or
+several open, the agent it is already with — it prints no JSON, says why
+on standard error and exits 1.
 
 The `model` and `effort` that `mia api conversations` and `mia api main`
 give a running window are what mia started it with or last switched it

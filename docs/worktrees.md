@@ -361,43 +361,72 @@ last written to, and `--worktree <name>` the one in that worktree.
 ### With another agent
 
 ```bash
-mia conversation continue monduli --with codex                # the one last written to there, on with codex
-mia conversation continue monduli --from claude --with pi     # claude's last; or a window's, or one by its id
-mia conversation continue . --with opencode --dry-run         # only says: the file, the window, the message
+mia conversation continue 23f98c02-c52b-4de9-8c69-b322eb153bff --with codex   # that conversation, on with codex
+mia conversation continue --from claude --with pi             # the one the window claude has open, here
+mia conversation continue 23f98c02-… --with opencode --dry-run   # only says: the file, the window, the message
 ```
 
 No agent loads another's conversation: each keeps its own format. So to
 go on with another, mia writes the conversation out as a handoff,
 `.git/mia/handoffs/<worktree>/<agent>-<id>.md` in the repository's git
 folder — the worktree stays as it was — and opens a window in the
-worktree's session with the other agent, as `mia window new <worktree>
-<agent>` starts one: `[launch]`'s command of that name when it runs the
-agent, `--model`, `--effort` and `--account` or the configured ones.
-Once the agent is ready it is sent one message: to read that file, go on
-from where it stops, and look at the worktree before changing anything.
+session of the worktree the conversation is in with the other agent, as
+`mia window new <worktree> <agent>` starts one: `[launch]`'s command of
+that name when it runs the agent, `--model`, `--effort` and `--account`
+or the configured ones. Once the agent is ready it is sent one message:
+to read that file, go on from where it stops, and look at the worktree
+before changing anything.
 
-The handoff says where it came from and when, then the conversation in
-order: what you and the agent said, as written, and each thing the agent
-did as one line — `Ran go test ./...`, `Edited view.lua +2 −1` and the
-file — with none of what came back from a tool, and nothing the agent
-only thought. A message over 6,000 characters is cut, and says by how
-much. Nothing else is taken out: what you typed into the conversation is
-in the file, which only you can read, and which is written again each
-time. It is the other agent's to read, not its memory: it knows what the
-file says and what the worktree shows, no more.
+Which conversation is said exactly, by its id, as `mia api
+conversations` and `mia recall` give it: a worktree can have three open
+at once, and none is taken for the one meant. Its worktree, its session
+and the agent it was with are the conversation's own. One that was
+copied to another worktree is in both under one id, so `--worktree
+<name>` says whose. `--from <window>` says it by the window that has it
+open instead, by the window's name or number, in the session of the
+worktree you are in or of `--worktree`: when that is one window with one
+conversation open it is that one, and otherwise the command is refused
+and lists the ids of those open there.
 
-`--from` says which conversation: the one a window has open, by the
-window's name or number, one by its id, or an agent's last in the
-worktree; with none it is the one last written to there. The agent is
-typed into as [a role's opening](#a-role) is: never into a question it
-asks first, and never into the shell left by one that ended as it
-started. Then the window is open, the command fails, and the message is
-printed for you to say there.
+A handoff carries over less than the conversation was. It says where it
+came from and when, then the conversation in order: what you and the
+agent said, as written, and each thing the agent did as one line — `Ran
+go test ./...`, `Edited view.lua +2 −1` and the file. What came back
+from a tool is not in it, and nothing the agent only thought: the other
+agent reads the files and runs the commands again for that, and the
+command says so in its last line. A message over 6,000 characters is
+cut, and says by how much. A conversation over 60,000 characters keeps
+the first thing you asked and the last turns, as many as fit, whole; the
+turns between are one line saying how many are left out and naming
+`<agent>-<id>-full.md` beside it, which has every turn, for the agent to
+look up what it needs. What you typed into the conversation is in these
+files, which only you can read, and which are written again each time.
+It is the other agent's to read, not its memory: it knows what the file
+says and what the worktree shows, no more.
+
+So with the same agent nothing is handed over. `--with` the agent the
+conversation is with is refused, and says what goes on with nothing
+lost: `mia conversation resume <id>`, the agent's own resume, with
+`--model` for another model, or `mia window model` for the window that
+has it open.
+
+Each time is also kept, `<agent>-<id>.<when>.json` beside the handoff:
+which conversation went on with which agent, in which window, when. The
+conversation the other agent then begins is told by its first message,
+which names the handoff's file, and from then on `mia api conversations`
+says the two are [one thread](api.md#conversations): `continues` on the
+new one, `continued_by` on the first.
+
+The agent is typed into as [a role's opening](#a-role) is: never into a
+question it asks first, and never into the shell left by one that ended
+as it started. Then the window is open, the command fails, and the
+message is printed for you to say there.
 
 ```
 monduli: claude's conversation 23f98c02-…, 41 turns, written out to /src/app/.git/mia/handoffs/monduli/claude-23f98c02-….md
 monduli: window codex opened — codex
 monduli: window codex was told to read it and go on from where it stops
+not carried over: what claude thought and what came back from its tools — codex has what was said and each thing done, in a line
 ```
 
 The agent is started with a model and an effort as [a window's

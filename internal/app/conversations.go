@@ -70,6 +70,7 @@ func (a *App) Conversations(want Wanted) (heads []Head, problems []string) {
 		heads[i].Started, heads[i].Active = instant(heads[i].Started), instant(heads[i].Active)
 	}
 	heads = a.markRunning(heads, records)
+	a.thread(heads)
 	heads = slices.DeleteFunc(heads, func(h Head) bool {
 		// an agent in a window is listed with what it has open, wanted or not
 		return (want.Worktree != "" && h.Worktree != want.Worktree) || (want.Agent != "" && h.Agent != want.Agent)
