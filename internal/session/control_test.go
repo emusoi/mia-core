@@ -153,3 +153,9 @@ func TestANodePaneTitledPiIsPi(t *testing.T) {
 		}
 	}
 }
+
+func TestAnAgentWorksOnlyWhileItsTitleSpins(t *testing.T) {
+	if !spins("⠋ Fix the retry loop") || spins("✳ Fix the retry loop") || spins("") || spins("shop") {
+		t.Fatal("the spinner before a title is what says an agent is at work; its idle mark and a plain title do not")
+	}
+}

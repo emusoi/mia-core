@@ -521,6 +521,9 @@ type Window struct {
 	// Agent is what an agent in the window says it is doing, from the title
 	// it gives its pane; "" for anything else.
 	Agent string `json:"agent,omitempty"`
+	// Working: the agent in it is at work now, as the spinner before its
+	// title says. Its title alone does not: claude keeps one while it rests.
+	Working bool `json:"working,omitempty"`
 }
 
 func (h Host) WindowsOf(worktree string) []Window {
@@ -566,7 +569,7 @@ func WindowsFrom(panes []Pane) []Window {
 			agent = "" // its name until it has something to say
 		}
 		windows = append(windows, Window{Index: pane.Index, Name: name, Command: command, PID: pane.PID, Quiet: quiet,
-			Still: quiet.Round(time.Second).String(), Active: pane.Active, Kind: pane.Kind, Agent: agent})
+			Still: quiet.Round(time.Second).String(), Active: pane.Active, Kind: pane.Kind, Agent: agent, Working: agent != "" && spins(pane.Title)})
 	}
 	return windows
 }
@@ -588,6 +591,13 @@ var version = regexp.MustCompile(`^[0-9]+(\.[0-9]+)+$`)
 func piTitle(command, title string) bool {
 	title = strings.TrimSpace(title)
 	return (command == "node" || command == "bun") && (strings.HasPrefix(title, "π") || strings.HasPrefix(title, "pi - "))
+}
+
+// spins reports whether a title begins with the braille spinner an agent
+// puts before it while it works.
+func spins(title string) bool {
+	mark, _ := utf8.DecodeRuneInString(title)
+	return mark >= 0x2800 && mark <= 0x28FF
 }
 
 // AgentTitle is what claude says it is doing in the title it gives its
