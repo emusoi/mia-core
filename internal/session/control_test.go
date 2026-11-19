@@ -134,3 +134,20 @@ func TestAServerMiaStartsKeepsNoPluginCallVars(t *testing.T) {
 		}
 	}
 }
+
+func TestANodePaneTitledPiIsPi(t *testing.T) {
+	for _, c := range []struct {
+		command, title string
+		want           bool
+	}{
+		{"node", "π - shop", true},
+		{"bun", " π - shop", true},
+		{"node", "shop", false},    // any other node program
+		{"zsh", "π - shop", false}, // pi quit and left its title on the shell
+		{"claude", "π - shop", false},
+	} {
+		if got := piTitle(c.command, c.title); got != c.want {
+			t.Errorf("piTitle(%q, %q) = %v, want %v", c.command, c.title, got, c.want)
+		}
+	}
+}

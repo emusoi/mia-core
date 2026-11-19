@@ -222,7 +222,7 @@ done`,
 			}
 			return []string{line}
 		}},
-	{Name: "pi", goOn: "--continue", has: []string{"-c", "--continue", "-r", "--resume", "--session"},
+	{Name: "pi", Title: regexp.MustCompile(`^\s*π( |$)`), goOn: "--continue", has: []string{"-c", "--continue", "-r", "--resume", "--session"},
 		resume: fixed("pi --session %s"), byFolder: true, carrier: carriers["pi"],
 		AccountEnv: "PI_CODING_AGENT_DIR", home: ".pi/agent", signedIn: "auth.json",
 		talks: transcripts{agent: "pi", files: piFiles, find: piFind, id: piID, decode: piLine},

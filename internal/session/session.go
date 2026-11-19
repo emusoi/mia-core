@@ -551,6 +551,13 @@ func WindowsFrom(panes []Pane) []Window {
 				name = command
 			}
 		}
+		// pi runs as node, and says who it is in its pane's title: "π - <folder>".
+		if piTitle(command, pane.Title) {
+			if name == command {
+				name = "pi"
+			}
+			command = "pi"
+		}
 		agent := AgentTitle(pane.Title)
 		if command == "claude" && agent == "" && !hostTitle(strings.TrimSpace(pane.Title), host) {
 			agent = strings.TrimSpace(pane.Title) // claude does not always mark it
@@ -574,6 +581,12 @@ func hostTitle(title, host string) bool {
 }
 
 var version = regexp.MustCompile(`^[0-9]+(\.[0-9]+)+$`)
+
+// piTitle reports whether a pane running `command` under `title` is pi: its
+// program is node (or bun), and only its title names it.
+func piTitle(command, title string) bool {
+	return (command == "node" || command == "bun") && strings.HasPrefix(strings.TrimSpace(title), "π")
+}
 
 // AgentTitle is what claude says it is doing in the title it gives its
 // pane — "✳ Fix the retry loop" idle, a braille spinner before it while it
