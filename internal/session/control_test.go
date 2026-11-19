@@ -91,6 +91,8 @@ func TestAServerMiaStartsKeepsNoPluginCallVars(t *testing.T) {
 	for _, name := range pluginCall {
 		t.Setenv(name, "leaked")
 	}
+	// (What the caller has does reach it: on macOS the server is launchd's, whose own is bare.)
+	t.Setenv("MIA_CALLER", "kept")
 	starts := map[string]func() error{
 		"command line": func() error {
 			_, err := Host{}.local("new-session", "-d", "-s", "mia-probe", "sleep 60")
@@ -126,6 +128,9 @@ func TestAServerMiaStartsKeepsNoPluginCallVars(t *testing.T) {
 			if strings.Contains(string(out), name+"=") {
 				t.Errorf("a server started by the %s kept %s:\n%s", how, name, out)
 			}
+		}
+		if !strings.Contains(string(out), "MIA_CALLER=kept") {
+			t.Errorf("a server started by the %s lost the caller's environment:\n%s", how, out)
 		}
 	}
 }

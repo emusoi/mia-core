@@ -55,6 +55,7 @@ func client() *control {
 }
 
 func startControl() (*control, error) {
+	up()
 	cmd := run.Tool{Binary: "tmux", Drop: pluginCall}.Command("-u", "-C", "new-session", "-A", "-D", "-s", controlSession, "-x", "20", "-y", "5", "sleep 2147483647")
 	in, err := cmd.StdinPipe()
 	if err != nil {
@@ -139,6 +140,9 @@ func (h Host) local(args ...string) (string, error) {
 		if err == nil || !c.dead.Load() {
 			return out, err
 		}
+	}
+	if len(args) > 0 && args[0] == "new-session" {
+		up()
 	}
 	return run.Tool{Binary: "tmux", Drop: pluginCall, Verbose: trace}.Combined(append([]string{"-u"}, args...)...)
 }
