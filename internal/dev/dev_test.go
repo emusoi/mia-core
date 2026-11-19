@@ -123,7 +123,8 @@ func TestLendingAnotherGivesBackFirst(t *testing.T) {
 
 // Following looks at each file's stat, not its contents, and lists the
 // worktree, which walks it, only when a folder of it changed: a follow
-// with nothing to do runs no git and reads no file.
+// with nothing to do runs no git and reads no file, and looks at every
+// file only every lookEvery.
 func TestFollowingCopiesWhatChangedAndListsOnlyWhenAFolderDid(t *testing.T) {
 	main := repo(t, map[string]string{".gitignore": "*.log\n", "app.js": "main"})
 	branch := repo(t, map[string]string{".gitignore": "*.log\n", "app.js": "branch", "lib/util.js": "u"})
@@ -155,7 +156,8 @@ func TestFollowingCopiesWhatChangedAndListsOnlyWhenAFolderDid(t *testing.T) {
 	write(t, filepath.Join(branch, "lib", "util.js"), "util, edited")
 	later := time.Now().Add(time.Minute) // a stat that differs even where mtime is coarse
 	os.Chtimes(filepath.Join(branch, "lib", "util.js"), later, later)
-	step(time.Second, 1, 0, "a file edited in place")
+	step(time.Second, 0, 0, "a file edited in place: no folder changed, so not looked at yet")
+	step(lookEvery, 1, 0, "a file edited in place, seen when every file is looked at")
 	write(t, filepath.Join(branch, "lib", "new.js"), "n")
 	step(time.Second, 1, 1, "a file added: its folder changed")
 	os.Remove(filepath.Join(branch, "app.js"))

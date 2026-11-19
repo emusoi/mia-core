@@ -165,11 +165,19 @@ type Follower struct {
 	files    map[string]stamp // each file of the worktree's, as last copied
 	dirs     map[string]stamp // the folders they are in
 	listed   time.Time
+	looked   time.Time // when every file was last looked at
 }
 
 // relistEvery is how often the worktree is listed though no folder of it
 // changed: a file can come into one that holds only ignored files.
 const relistEvery = 30 * time.Second
+
+// lookEvery is how often every file is looked at while no folder changed. A
+// file saved by renaming another over it (most editors), added or removed
+// changes its folder and is seen at the next step; one written in place
+// changes none, and waits for this. Stat-ing a big worktree every second is
+// most of what following costs.
+const lookEvery = 5 * time.Second
 
 // stamp is what a stat says that changes when a file is written, replaced
 // or made another kind.
@@ -201,6 +209,10 @@ func (f *Follower) Step(now time.Time) (int, error) {
 		info, err := os.Lstat(filepath.Join(f.from, dir))
 		relist = err != nil || stampOf(info) != was
 	}
+	if !relist && now.Sub(f.looked) < lookEvery {
+		return 0, nil
+	}
+	f.looked = now
 	names := f.files
 	if relist {
 		listed, err := files(f.from)
