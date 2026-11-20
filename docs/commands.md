@@ -16,7 +16,7 @@
 | `mia open [worktree]` | open it in your editor |
 | `mia window …` | its session's windows |
 | `mia chat [--window <index>] [--conversation <id>]` | the worktree's conversation with its agent as a [chat](api.md#conversations) mia desk draws over the pane, followed as it is written |
-| `mia git` | how the worktree it is run in stands in git, as an [app](api.md#mia-git) mia desk draws over the pane: its files and commits ahead in a list, the diff of one beside it, and keys that stage, unstage and commit |
+| `mia git` | how the worktree it is run in stands in git, as an [app](api.md#mia-git) mia desk draws over the pane: its files, commits ahead and stashes in a list, the diff of one beside it, and keys that stage a file, a hunk or a line, discard, commit, amend, undo the last commit, stash, switch branch, fetch, pull and push |
 | `mia files` | the files of the worktree it is run in, as an [app](api.md#mia-files) mia desk draws over the pane: the tree with what changed against the base marked, the file under the keys beside it, keys that find a file, find in files and hand one to your editor |
 | `mia review [<range> \| pr <number> \| w]` | the review sawa keeps of the worktree it is run in, as an [app](api.md#mia-review) mia desk draws over the pane: its files, and the diff of one with each finding under its line, and keys that go through the findings, answer and resolve them, comment, mark a file read and give the verdict |
 | `mia window new <worktree> <agent> [--model <m>] [--effort <e>] [-- command]` | a window running an agent, started with a model and an effort |

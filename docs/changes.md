@@ -21,9 +21,28 @@ on GitHub; a tag without its section is not released.
   The standing is read again after each, and when `git status`, asked
   every 2 s, says something else. A long diff goes on in patches and
   ends at 1500 lines. What fails is the view's status and the app stays
-  up. Not yet: discard, amend, push, pull, fetch, switching branches,
-  the stash, colour by syntax. `mia api capabilities` lists `git-app`.
+  up. `mia api capabilities` lists `git-app`.
   See [mia git](api.md#mia-git).
+
+- **`mia git` does what a daily git tool does.** `d` discards what is
+  changed in a file, the hunk under the keys, or deletes an untracked
+  file; `⏎` on a line added or deleted stages that line alone, and
+  unstages it in a staged file's diff; `u` on the last commit takes it
+  off and leaves its changes staged; the commit screen has **Amend the
+  last one**; `b` brings up the branches, to switch to one, follow a
+  remote's or make the one named; `s` stashes everything, and a stash,
+  listed under the commits with its diff, is applied with `space`,
+  popped with `p` and dropped with `d`; `f` fetches, `P` pulls where the
+  branch can only be moved on, `p` pushes to what the branch follows, or
+  to `origin` under its own name. What loses something or sends it —
+  discard, drop, undo, push — is asked twice: the first press says
+  exactly what in the status, the second does it. Nothing is merged,
+  rebased or pushed by force, and a commit the upstream has is neither
+  amended nor undone. With a remote git runs beside the app and the
+  status says so. The head says what is to push and to pull, a commit
+  says its subject and files over its diff, and the foot says the keys
+  of where the keys are. Not yet: merging and rebasing, conflicts, a
+  push by force, deleting a branch, tags, colour by syntax.
 
 - **A worktree's files are an app mia desk draws.** `mia files`, run in a
   pane in any folder of a repository, says them to mia desk by its UI

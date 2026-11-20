@@ -2,6 +2,7 @@ package git
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -45,11 +46,17 @@ type Change struct {
 }
 
 // Standing is how a worktree stands: its branch ("" detached), the commit
-// it is at ("" before the first), and its files staged, changed and not
-// staged, and untracked. A file staged in part is in two groups.
+// it is at ("" before the first), what the branch follows ("" nothing)
+// with its commits that has not and those of it the branch has not, and
+// its files staged, changed and not staged, and untracked. A file staged
+// in part is in two groups. Gone, what it follows is no longer there.
 type Standing struct {
 	Branch    string
 	Head      string
+	Upstream  string
+	Gone      bool
+	ToPush    int
+	ToPull    int
 	Staged    []Change
 	Changed   []Change
 	Untracked []Change
@@ -66,10 +73,18 @@ func ParseStatus(out string) Standing {
 	var s Standing
 	state := map[byte]string{'A': "new", 'C': "new", 'D': "deleted", 'R': "renamed"}
 	entries := strings.Split(out, "\x00")
+	counted := false
 	for i := 0; i < len(entries); i++ {
 		entry := entries[i]
 		var fields []string
 		switch {
+		case strings.HasPrefix(entry, "# branch.upstream "):
+			s.Upstream = entry[len("# branch.upstream "):]
+			continue
+		case strings.HasPrefix(entry, "# branch.ab "):
+			_, err := fmt.Sscanf(entry, "# branch.ab +%d -%d", &s.ToPush, &s.ToPull)
+			counted = err == nil
+			continue
 		case strings.HasPrefix(entry, "# branch.oid "):
 			if s.Head = entry[len("# branch.oid "):]; s.Head == "(initial)" {
 				s.Head = ""
@@ -111,6 +126,7 @@ func ParseStatus(out string) Standing {
 			s.Changed = append(s.Changed, change)
 		}
 	}
+	s.Gone = s.Upstream != "" && !counted // git counts only against what is there
 	return s
 }
 
