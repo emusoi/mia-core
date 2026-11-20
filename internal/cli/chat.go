@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/x/term"
 
 	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/model"
 )
 
 const chatUsage = "mia chat [--window <index>] [--conversation <id>]"
@@ -240,23 +241,36 @@ func chatOf(heads []app.Head, worktree, window, id string) (app.Head, error) {
 // drawn by mia desk over its pane, and follows it as it is written. What
 // the person sends, chooses and stops there is typed into the window that
 // has the conversation open; one no window has open is only shown.
-// chatWaits is what the window is told while a window has no conversation
-// mia can read: one quiet line, which the chat takes the place of.
-func chatWaits(pane, window string) []byte {
-	return encode(struct {
-		V     int    `json:"v"`
-		Pane  string `json:"pane,omitempty"`
-		Title string `json:"title"`
-		View  any    `json:"view"`
-	}{1, pane, "chat", map[string]string{"t": "text", "style": "dim", "text": "No conversation in window " + window + " that mia can read yet. It is shown here as soon as its agent has one; q or esc leaves."}})
+// chatWaits is the chat of a window that has no conversation mia can read
+// yet: nothing said but what the person sent from here, and the field that
+// types to its agent, so the first thing said to an agent can be said from
+// its chat. refused is why the last thing sent did not go, if it did not.
+func chatWaits(pane, agent string, sent []string, refused string) []byte {
+	turns := make([]json.RawMessage, 0, len(sent))
+	for n, text := range sent {
+		turns = append(turns, encode(map[string]any{"n": n + 1, "kind": "asked", "text": text}))
+	}
+	message := muiMessage{V: 1, Pane: pane, Title: agent, View: &chatPiece{T: "chat", ID: "chat", Agent: agent, Reply: true, Turns: turns}}
+	if refused != "" {
+		message.Status = &muiStatus{Text: cutTo(refused, 200), Tone: "bad"}
+	}
+	return encode(message)
 }
 
-// chatAwaited waits for a window of a worktree to have a conversation open,
-// asking each second, with a line saying so drawn over the pane: the
-// conversation once there is one, or left when the person went first.
-func chatAwaited(a *app.App, worktree, window string) (head app.Head, left bool, err error) {
+// chatAwaited is the chat of a window until it has a conversation open: what
+// is sent there is typed into the window, whatever agent runs in it, and
+// shown at once; mia looks each second for the conversation, and gives it
+// once there is one — the chat then goes on from its transcript. left: the
+// person went first.
+func chatAwaited(a *app.App, record model.Record, window string) (head app.Head, left bool, err error) {
+	agent := "window " + window
+	for _, w := range a.Windows(record) {
+		if strconv.Itoa(w.Index) == window {
+			agent = w.Name
+		}
+	}
 	pane := os.Getenv("TMUX_PANE")
-	say, shut, err := muiOpen(pane, "mia chat: waiting for window "+window+" to have a conversation; q or ⌃C leaves.")
+	say, shut, err := muiOpen(pane, "mia chat: "+agent+" has no conversation yet; what is sent here is typed to it. q or ⌃C leaves.")
 	if err != nil {
 		return app.Head{}, false, err
 	}
@@ -266,7 +280,9 @@ func chatAwaited(a *app.App, worktree, window string) (head app.Head, left bool,
 	// ponytail: what is typed in the instant the conversation opens goes to this
 	// reader and is lost; one reader handed on to the chat if that is ever felt.
 	keys, buffer := muiKeys(stop), ""
-	say(chatWaits(pane, window))
+	var sent []string
+	refused := ""
+	say(chatWaits(pane, agent, sent, refused))
 	for {
 		select {
 		case data, open := <-keys:
@@ -275,15 +291,31 @@ func chatAwaited(a *app.App, worktree, window string) (head app.Head, left bool,
 			}
 			events, rest, sight, leave := typed(buffer, data)
 			buffer = rest
-			if leave || slices.ContainsFunc(events, func(e chatEvent) bool { return e.E == "close" }) {
+			if leave {
 				return app.Head{}, true, nil
 			}
+			for _, event := range events {
+				switch {
+				case event.E == "close":
+					return app.Head{}, true, nil
+				case event.E == "stop":
+					_ = a.StopInWindow(record, window)
+				case event.E == "send" && strings.TrimSpace(event.Text) != "":
+					text := strings.TrimSpace(event.Text)
+					if err := a.SendToWindow(record, window, text); err != nil {
+						refused = err.Error()
+					} else {
+						sent, refused = append(sent, text), ""
+					}
+					sight = true
+				}
+			}
 			if sight {
-				say(chatWaits(pane, window))
+				say(chatWaits(pane, agent, sent, refused))
 			}
 		case <-time.After(time.Second):
-			heads, _ := a.Conversations(app.Wanted{Worktree: worktree})
-			if head, err := chatOf(heads, worktree, window, ""); err == nil {
+			heads, _ := a.Conversations(app.Wanted{Worktree: record.Name})
+			if head, err := chatOf(heads, record.Name, window, ""); err == nil {
 				return head, false, nil
 			}
 		}
@@ -308,7 +340,7 @@ func cmdChat(a *app.App, args []string) int {
 		// A window whose agent has said nothing mia can read yet: waited for,
 		// where a tab opened for it would only have shut again.
 		var left bool
-		if head, left, err = chatAwaited(a, record.Name, window); left {
+		if head, left, err = chatAwaited(a, record, window); left {
 			return exitOK
 		}
 	}

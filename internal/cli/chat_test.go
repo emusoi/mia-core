@@ -340,17 +340,34 @@ func TestChatRefusesWhatIsNotATerminal(t *testing.T) {
 	}
 }
 
-// A window with no conversation yet is said as one quiet line, not a chat.
-func TestAWindowWithNoConversationYetIsSaidAsALineThatWaits(t *testing.T) {
+// A window with no conversation yet is a chat all the same: its field
+// types to the agent, and what was sent from it is shown at once.
+func TestAWindowWithNoConversationYetIsAChatThatCanSayTheFirstThing(t *testing.T) {
 	var said struct {
-		V    int               `json:"v"`
-		Pane string            `json:"pane"`
-		View map[string]string `json:"view"`
+		V      int        `json:"v"`
+		Pane   string     `json:"pane"`
+		Status *muiStatus `json:"status"`
+		View   struct {
+			T     string `json:"t"`
+			Agent string `json:"agent"`
+			Reply bool   `json:"reply"`
+			Turns []struct {
+				N    int    `json:"n"`
+				Kind string `json:"kind"`
+				Text string `json:"text"`
+			} `json:"turns"`
+		} `json:"view"`
 	}
-	if err := json.Unmarshal(chatWaits("%4", "2"), &said); err != nil {
+	if err := json.Unmarshal(chatWaits("%4", "codex", []string{"what is in here?"}, "it asks something first"), &said); err != nil {
 		t.Fatal(err)
 	}
-	if said.V != 1 || said.Pane != "%4" || said.View["t"] != "text" || !strings.Contains(said.View["text"], "window 2") {
+	if said.V != 1 || said.Pane != "%4" || said.View.T != "chat" || said.View.Agent != "codex" || !said.View.Reply {
 		t.Errorf("said = %+v", said)
+	}
+	if len(said.View.Turns) != 1 || said.View.Turns[0].N != 1 || said.View.Turns[0].Kind != "asked" || said.View.Turns[0].Text != "what is in here?" {
+		t.Errorf("turns = %+v", said.View.Turns)
+	}
+	if said.Status == nil || said.Status.Tone != "bad" || said.Status.Text != "it asks something first" {
+		t.Errorf("status = %+v", said.Status)
 	}
 }
