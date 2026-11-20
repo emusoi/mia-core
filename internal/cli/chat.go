@@ -257,6 +257,16 @@ func chatAbout(runs app.Runs) string {
 	return strings.Join(said, " · ")
 }
 
+// chatRuns is what a window runs with the model its conversation says it
+// runs on, where mia chose none for the window and the agent is the
+// conversation's: opencode says a conversation's.
+func chatRuns(runs app.Runs, head app.Head) app.Runs {
+	if runs.Model == "" && runs.Agent == head.Agent {
+		runs.Model = head.Model
+	}
+	return runs
+}
+
 // talk is a conversation as the window is shown it.
 type talk struct {
 	pane, agent    string
@@ -768,12 +778,19 @@ func (v *chatView) models(placed bool) []byte {
 		case agent.Live:
 			item.Does = "switch"
 			item.About = []string{chatAbout(app.Runs{Agent: row.agent, Account: v.runs.Account}), "switches this window now"}
+		case agent.Again:
+			item.Does = "switch"
+			item.About = []string{chatAbout(app.Runs{Agent: row.agent, Account: v.runs.Account}), "starts it again in this window, on this conversation"}
 		default:
 			item.Does = "nothing"
 			item.About = []string{row.agent, "cannot be switched while it runs"}
 		}
 		if row.model == "" && !row.used {
 			item.Note = "its model is chosen inside it"
+		}
+		// one named by what comes after its provider says whose it is
+		if provider, name, ok := strings.Cut(row.model, "/"); ok && name == row.label {
+			item.Note = provider
 		}
 		if row.used {
 			item.Note, item.Right = row.agent, effortWord(row.effort)
@@ -982,7 +999,7 @@ func (v *chatView) deed(event chatEvent) chatDeed {
 			return chatDeed{do: chatHand, agent: row.agent, model: row.model, effort: effort}
 		case row.model == "" && effort == "":
 			return chatDeed{do: chatSay, text: row.agent + " is started with no model, and takes none from mia: it is chosen in its terminal"}
-		case !agent.Live:
+		case !agent.Live && !agent.Again:
 			return chatDeed{do: chatSay, text: row.agent + " cannot be switched to another model while it runs — restart it with --model"}
 		}
 		return chatDeed{do: chatSwitch, model: row.model, effort: effort}
@@ -1151,7 +1168,7 @@ func (r *chatRun) aim(head app.Head, window string) {
 	v.runs = app.Runs{Agent: head.Agent, Model: head.Model, Effort: head.Effort, Account: head.Account, Reads: true}
 	if window != "" {
 		if runs := r.a.WindowRuns(r.record, window); runs.Agent != "" {
-			v.runs = runs
+			v.runs = chatRuns(runs, head)
 		}
 	}
 	v.talk = &talk{pane: os.Getenv("TMUX_PANE"), agent: cmp.Or(v.runs.Agent, "window "+window), about: chatAbout(v.runs), reply: window != "", anew: anew}
@@ -1211,7 +1228,7 @@ func (r *chatRun) looks() {
 		heads, _ := r.a.Conversations(app.Wanted{Worktree: r.record.Name})
 		if head, err := chatOf(heads, r.record.Name, v.window, ""); err == nil {
 			v.id = head.ID
-			if runs := r.a.WindowRuns(r.record, v.window); runs.Agent != "" && runs != v.runs {
+			if runs := chatRuns(r.a.WindowRuns(r.record, v.window), head); runs.Agent != "" && runs != v.runs {
 				v.runs, v.talk.agent, v.talk.about = runs, runs.Agent, chatAbout(runs)
 				r.out([][]byte{v.talk.whole()})
 			}

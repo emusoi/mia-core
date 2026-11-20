@@ -754,6 +754,17 @@ func (h Host) StartWindowWith(env, worktree, dir, window string, what What, argv
 	return nil
 }
 
+// RestartPane ends what a pane of a worktree's session runs, the pane said
+// by tmux's id of it, and starts argv in its place, in dir: the pane, its
+// window and what both are marked with stay as they are.
+func (h Host) RestartPane(worktree, pane, dir string, argv []string) error {
+	args := append([]string{"respawn-pane", "-k", "-t", pane, "-c", dir, "-e", "MIA_WORKTREE=" + worktree, "--"}, argv...)
+	if out, err := h.run(args...); err != nil {
+		return fmt.Errorf("start %s again in %s: %s", strings.Join(argv, " "), worktree, strings.TrimSpace(out))
+	}
+	return nil
+}
+
 func (h Host) HasWindow(worktree, window string) bool {
 	for _, name := range h.Windows(worktree) {
 		if name == window {

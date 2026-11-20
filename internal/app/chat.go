@@ -104,6 +104,8 @@ type Runs struct {
 	Reads bool
 	// Live: it is switched to another model while it runs.
 	Live bool
+	// Again: it is switched by being started again on its conversation.
+	Again bool
 }
 
 // WindowRuns is what the window of a worktree's session runs, the window
@@ -113,9 +115,30 @@ func (a *App) WindowRuns(record model.Record, window string) Runs {
 	if err != nil {
 		return Runs{}
 	}
-	// as SwitchWindow tells it: a window is its first pane, claude's binary
-	// named for its version is claude, and one behind node says who it is
-	panes := host.Panes(record.Name)
+	var front func() map[int]string
+	if host.SSH == "" {
+		front = foreground
+	}
+	agent, pane, known := agentInWindow(a.agents(), host.Panes(record.Name), window, front)
+	if !known {
+		return Runs{}
+	}
+	kept := a.chosen()[chosenKey(session.Name(record.Name), pane.PID)]
+	runs := Runs{Agent: agent.Name, Model: kept.Model, Effort: kept.Effort, Account: kept.Account, Reads: agent.talks != nil,
+		Live: agent.to != nil, Again: agent.again}
+	if runs.Account == "" && agent.AccountEnv != "" {
+		runs.Account = DefaultAccount
+	}
+	return runs
+}
+
+// agentInWindow is the agent a window of a session's panes runs, the
+// window said by its name or number, and the window. It is told as
+// SwitchWindow tells it — a window is its first pane, claude's binary
+// named for its version is claude, and one behind node, or behind the
+// shell mia started it by, is who front says it is — and failing that by
+// its window's name, when it is named for its agent.
+func agentInWindow(table []Agent, panes []session.Pane, window string, front func() map[int]string) (Agent, session.Window, bool) {
 	var pane session.Window
 	for _, one := range session.WindowsFrom(panes) {
 		if one.Name == window || strconv.Itoa(one.Index) == window {
@@ -128,23 +151,11 @@ func (a *App) WindowRuns(record model.Record, window string) Runs {
 			title = one.Title
 		}
 	}
-	command := pane.Command
-	if (command == "node" || command == "bun") && host.SSH == "" {
-		command = foreground()[pane.PID]
-	}
-	agent, known := agentNamed(a.agents(), agentIn(a.agents(), command, title))
+	agent, known := agentNamed(table, agentBehind(table, pane.Command, title, pane.Kind, pane.PID, front))
 	if !known {
-		agent, known = agentNamed(a.agents(), pane.Name) // a window named for its agent
+		agent, known = agentNamed(table, pane.Name)
 	}
-	if !known {
-		return Runs{}
-	}
-	kept := a.chosen()[chosenKey(session.Name(record.Name), pane.PID)]
-	runs := Runs{Agent: agent.Name, Model: kept.Model, Effort: kept.Effort, Account: kept.Account, Reads: agent.talks != nil, Live: agent.to != nil}
-	if runs.Account == "" && agent.AccountEnv != "" {
-		runs.Account = DefaultAccount
-	}
-	return runs
+	return agent, pane, known
 }
 
 // SayToWindow types text into a window as one message and submits it, as

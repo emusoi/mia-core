@@ -13,7 +13,8 @@ import (
 
 // fakeOpencode puts an opencode on PATH that answers from a folder as the
 // real one does from its server — sessions.json for the list, <id>.json
-// for an export, a failure for one it has not — and writes each thing it
+// for an export, a failure for one it has not, models for its models and
+// a failure with none — and writes each thing it
 // was asked to asked. It makes the data folder that says opencode has
 // kept something, and returns the store.
 func fakeOpencode(t *testing.T) (store string) {
@@ -24,6 +25,7 @@ echo "$*" >> "` + store + `/asked"
 case "$1 $2" in
 "api GET") case "$3" in /api/session\?order=desc\&limit=1000) exec cat "` + store + `/sessions.json" ;; esac ;;
 "session export") [ -f "` + store + `/$3.json" ] && exec cat "` + store + `/$3.json"; echo "Session not found: $3" >&2; exit 1 ;;
+"models ") [ -f "` + store + `/models" ] && exec cat "` + store + `/models"; echo "Error: not signed in" >&2; exit 1 ;;
 esac
 echo "not asked as mia asks: $*" >&2
 exit 2

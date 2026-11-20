@@ -117,8 +117,8 @@ each is read again only once it has changed.
 | `asked`, `said` | the first thing the person asked and the last thing the agent said, each on one line, cut at 200 characters |
 | `started`, `active` | when the first thing in it was said and when it was last written to, both in UTC as RFC 3339, to the millisecond at most |
 | `turns` | how many things the person asked |
-| `running`, `window` | a window of that worktree's session runs this agent with this conversation; `window` is left out otherwise |
-| `model`, `effort` | of a running one, what mia started its window's agent with or last switched it to — see [Agents](#agents); left out when mia chose none |
+| `running`, `window` | a window of that worktree's session runs this agent with this conversation — one mia started too, which to tmux has the shell it was started by in front; `window` is left out otherwise |
+| `model`, `effort` | of a running one, what mia started its window's agent with or last switched it to — see [Agents](#agents); left out when mia chose none. Of opencode's, running or not, `model` is otherwise the `provider/model` opencode says the conversation runs on |
 | `continues`, `continued_by` | `{"agent":…,"id":…}`, another conversation of this list: the one this was begun from by a [handoff](worktrees.md#with-another-agent), and the one that went on from this. Left out of one that is neither |
 
 A conversation taken up in another worktree, or on another account, was
@@ -182,6 +182,10 @@ terminal is refused, exit 1. `mia api capabilities` lists `chat`.
 The view fills its pane: one quiet line over the chat says the agent, the
 model and effort mia started it with or last switched it to, and the
 account it is on, with two buttons at its right, `models` and `earlier`.
+Of opencode, where mia chose no model, it is the one opencode says the
+conversation runs on. The agent is the one the window runs, with a
+conversation or none yet: the one tmux names, or the one behind node,
+bun or the shell mia started the window by, as `ps` says it.
 The chat's field types every letter, so `tab` goes from it to the
 buttons, where `m` and `e` (or `⏎`) press them. A window named by
 `--window` that has no conversation mia can read yet is a chat all the
@@ -205,8 +209,11 @@ that its replies are in its terminal.
 - **Models** (`m`), in place of the chat: a search line over one list —
   the setups used in this repository, then the models of each agent
   installed under its head, the one that runs checked, an item's menu
-  (`→`) its efforts. `⏎` on a model of the chat's own agent switches the
-  window as `mia window model` does. On another agent's it hands the
+  (`→`) its efforts. opencode's are those it lists, each with its
+  provider beside it, and none when it lists none: one row then, its
+  model chosen inside it. `⏎` on a model of the chat's own agent switches
+  the window as `mia window model` does — opencode by starting it again
+  on the conversation, in the same window. On another agent's it hands the
   conversation over, in one step: its turns written out as
   `mia conversation continue` writes a handoff, that agent started on
   the model in a window of its own and told nothing, the old agent's
@@ -371,8 +378,11 @@ repository, with that repository's config.
   "models":[{"id":"opus","label":"Opus"},{"id":"sonnet","label":"Sonnet"},
             {"id":"haiku","label":"Haiku"},{"id":"fable","label":"Fable"}],
   "efforts":["low","medium","high","xhigh","max"],
-  "model":"opus","effort":"","live":true,"account_env":"CLAUDE_CONFIG_DIR"},
- {"name":"opencode","models":[],"efforts":[],"model":"","effort":"","live":false,"account_env":""}]
+  "model":"opus","effort":"","live":true,"again":false,"account_env":"CLAUDE_CONFIG_DIR","installed":true},
+ {"name":"opencode",
+  "models":[{"id":"openai/gpt-5","label":"gpt-5"},{"id":"ollama/qwen3:4b","label":"qwen3:4b"}],
+  "efforts":[],"model":"","effort":"","live":false,"again":true,"account_env":"","installed":true},
+ {"name":"cursor-agent","models":[],"efforts":[],"model":"","effort":"","live":false,"again":false,"account_env":"","installed":false}]
 ```
 
 | field | is |
@@ -380,8 +390,31 @@ repository, with that repository's config.
 | `models` | what it can be started with: `id` as the agent takes it, `label` to show. Empty for an agent mia knows none of |
 | `efforts` | its effort levels, how hard it thinks; empty when it has none mia knows |
 | `model`, `effort` | what the config starts it with, `[agents.<name>]`; empty when it says none, and the agent's own default is used |
-| `live` | it can be switched to another model while it runs |
+| `live` | it can be switched to another model while it runs, by what is typed into it |
+| `again` | it takes a model only as it starts: `mia window model` ends it and starts it again in its window, on the conversation it has open |
 | `account_env` | the variable that names the folder of each of its [accounts](#accounts); empty for an agent mia keeps no accounts of |
+| `installed` | its program is on this machine's `PATH` |
+
+opencode's models are those of the providers it is signed in to, which
+only it knows: mia asks it, `opencode models`, and lists each
+`provider/model` it prints under that id, labelled by what comes after
+the provider. What it said is kept for an hour, in the repository's
+`mia/cache/models/opencode.json`, so asking for the agents does not
+start opencode each time. When it cannot say — not installed, nothing
+kept by it yet, not signed in, no answer in 5 s — its `models` are
+empty, and that is kept for a minute. opencode's own interface has no
+word to be started with a model; its minimal one has, so with a model
+mia starts it as `opencode mini --model <provider/model>`, and with none
+as `opencode`. It has no effort mia can choose: its help names a variant
+of a model only for `opencode run`, and lists none. Neither has it a
+line to type that switches it, so it is switched by being started again,
+as `opencode mini --model <provider/model> --session <id>` in the pane
+it ran in: the window, its number and what is kept on it stay. One with
+no conversation yet is refused: close it and start it with `--model`.
+
+gemini has a word for a model, `--model`, and neither lists its models
+nor names any in its help: its `models` are those the config names,
+`[agents.gemini] model = "…"`, which it is then started with.
 
 A model the config names that the list has not is in the list too.
 Start one with `mia window new <worktree> <agent> --model <id> --effort
@@ -396,7 +429,9 @@ To restart an agent with another model, stop it — `mia window key
 `mia conversation resume --json` says the `model` and `effort` it was
 started with, or those of the window that has it open already; resumed
 with `--model` or `--effort` while a window has it open, it is refused.
-A mia that can is one whose `mia api capabilities` has `resume-model`.
+A mia that can is one whose `mia api capabilities` has `resume-model`;
+one that lists opencode's models and starts it again to switch it has
+`agent-again`.
 
 `mia conversation resume --json` also says the `account` the agent was
 started on, and `copied` when the conversation was copied into that
@@ -806,8 +841,9 @@ The usual one comes first, then the last used first. After them come
 what the config starts agents with, `[main]` and `[agents.<name>]`, that
 were not used there, with `uses` 0: someone who has chosen nothing yet
 still has those. One of them with no model is there for its effort; one
-that says neither, or names an agent mia does not start with a model and
-an effort — opencode, or one no enabled plugin adds — is left out.
+that says neither, or names an agent mia does not start with what it
+says — cursor-agent, an effort of opencode's or gemini's, or one no
+enabled plugin adds — is left out.
 
 Last come the roles, by name, each with `uses` 0: the agent, model and
 effort it starts, those it leaves out the default setup's, as `mia window

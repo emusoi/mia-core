@@ -62,6 +62,8 @@ to others while it runs:
 mia window new monduli claude --model sonnet --effort high   # claude, in a window named for it
 mia window new monduli claude --model opus -- claude "fix the login page"
 mia window model monduli claude haiku --effort low           # typed into it: /model haiku, /effort low
+mia window new monduli opencode --model openai/gpt-5         # opencode mini --model openai/gpt-5
+mia window model monduli opencode ollama/qwen3:4b            # started again on its conversation, with the model
 ```
 
 With no command, a window named for an agent runs that agent. With one,
@@ -72,11 +74,19 @@ those it has; `mia api agents` lists them. Left out, they are the ones
 window — unless its command already says one.
 
 `mia window model` types what the agent takes for it into its window, as
-a paste, and Enter. An agent that cannot be switched while it runs is
+a paste, and Enter. opencode has nothing to type and takes a model only
+as it starts — as its minimal interface, `opencode mini --model
+<provider/model>`, the only one with a word for it — so mia ends it and
+starts it again in the same pane on the conversation it has open, with
+`--session <id>`: the window stays. One with no conversation yet is
+refused. Its models are those `opencode models` lists; it has no effort
+mia can choose. gemini has those the config names, started with
+`--model`. Any other agent that cannot be switched while it runs is
 refused: restart it with `--model`. mia does not restart it. What mia
 says a window runs is what it started it with or last switched it to,
 not what the agent says: switched by hand in the agent, mia does not
-know.
+know — but where mia chose none, a conversation of opencode's says the
+model opencode says it runs on.
 
 ## A role
 

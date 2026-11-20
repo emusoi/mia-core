@@ -9,6 +9,30 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **opencode has models, and gemini a word for one.** opencode's models
+  are those of the providers it is signed in to, so mia asks it —
+  `opencode models`, a `provider/model` a line — and keeps what it said
+  for an hour: `mia api agents` lists them, each labelled by what comes
+  after its provider, and the chat's models have them under Opencode
+  with the provider beside each. When opencode cannot say — not
+  installed, nothing kept yet, not signed in, no answer in 5 s — it has
+  none, and one row as before. opencode's own interface has no word for
+  a model and its minimal one has, so `mia window new <worktree>
+  opencode --model <provider/model>` starts `opencode mini --model …`,
+  and with no model `opencode` as before. Nothing typed into it switches
+  it, so `mia window model`, and a pick in the chat, end it and start it
+  again in the same pane with the model and `--session <id>`: the
+  window, its number and what is kept on it stay; `mia api agents` says
+  so with `again`, and `mia api capabilities` lists `agent-again`. A
+  model of opencode's picked from another agent's chat hands the
+  conversation over to it on that model. A conversation of opencode's
+  says the model opencode says it runs on, as `model` in
+  `mia api conversations` and over its chat, until mia chooses one for
+  its window. It has no effort mia can choose. gemini's help has
+  `--model` and names no model: it is started with the one
+  `[agents.gemini]` names. mia reads neither's sign-in nor config.
+  See [Agents](api.md#agents).
+
 - **How a worktree stands in git is an app mia desk draws.** `mia git`,
   run in a pane in any folder of a repository, says it to mia desk by its
   UI protocol: the branch and where it stands against its base — the
@@ -385,6 +409,16 @@ on GitHub; a tag without its section is not released.
   never run again.
 
 ### Fixed
+
+- **A window mia started is its agent's.** A conversation taken up
+  again, handed over or continued is started by the session's shell,
+  which is what tmux names in front of it: such a window was no agent's
+  to `mia chat` — "no agent mia knows" over it — had no conversation in
+  `mia api conversations`, and could not be switched. Its agent is now
+  read from what `ps` says the shell runs, for a pane mia marked as an
+  agent's, and it is no agent's again once the agent ends. So a
+  conversation resumed twice in one worktree is the window that has it,
+  not a second window.
 
 - **The way to an account's window is pasted as it is.** `mia account
   add` said `tmux attach -t =mia-accounts goes there`, and zsh reads

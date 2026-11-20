@@ -356,18 +356,8 @@ func TestResumingOnAnotherAccountCopiesTheConversationThere(t *testing.T) {
 	if want := "ran " + filepath.Join(os.Getenv("TMUX_TMPDIR"), "bin", "claude") + " on " + work + "\n"; string(ran) != want {
 		t.Fatalf("what ran: %q, wanted %q", ran, want)
 	}
-	// a window started by its shell has the shell in front, to tmux: one
-	// that runs the agent itself, on the account, is the one looked for
-	direct := filepath.Join(os.Getenv("TMUX_TMPDIR"), "hold", "claude")
-	if _, err := a.NewWindow(record, "direct", session.What{}, []string{"env", "CLAUDE_CONFIG_DIR=" + work, direct}); err != nil {
-		t.Fatal(err)
-	}
-	if err := a.KeepChosen(record, "direct", "claude", app.Chosen{Account: "work"}); err != nil {
-		t.Fatal(err)
-	}
-	for i := 0; i < 250 && !slices.ContainsFunc(session.Here().WindowsOf(record.Name), func(w session.Window) bool { return w.Command == "claude" }); i++ {
-		time.Sleep(20 * time.Millisecond)
-	}
+	// the window has the shell it was started by in front, to tmux: the
+	// agent behind it, on the account, is the one looked for
 	heads, _ := a.Conversations(app.Wanted{Worktree: record.Name})
 	var running []string
 	for _, h := range heads {
@@ -375,16 +365,16 @@ func TestResumingOnAnotherAccountCopiesTheConversationThere(t *testing.T) {
 			running = append(running, h.ID+"/"+h.Account+"/"+h.Window.Name)
 		}
 	}
-	if !slices.Equal(running, []string{"c1/work/direct"}) {
+	if !slices.Equal(running, []string{"c1/work/claude"}) {
 		t.Errorf("running = %v: the window's is the copy on its account", running)
 	}
 	if again, err := a.ResumeConversation("c1", "", "", "", "", "default"); err == nil || again.Already {
 		t.Errorf("one a window has open on another account, asked on its own: %+v %v", again, err)
 	}
-	if err := a.AccountOfWindow(record, "direct", "default"); err == nil || !strings.Contains(err.Error(), "mia conversation resume c1 --account default") {
+	if err := a.AccountOfWindow(record, "claude", "default"); err == nil || !strings.Contains(err.Error(), "mia conversation resume c1 --account default") {
 		t.Errorf("a running agent is put on another account by a restart, which mia says and does not do: %v", err)
 	}
-	if !session.Here().HasWindow(record.Name, "direct") {
+	if !session.Here().HasWindow(record.Name, "claude") {
 		t.Error("the window was closed")
 	}
 }

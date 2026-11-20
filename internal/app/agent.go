@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/emusoi/mia-core/internal/plugin"
+	"github.com/emusoi/mia-core/internal/session"
 )
 
 // Agent is everything mia knows that is one coding agent's own: how to tell
@@ -60,6 +61,12 @@ type Agent struct {
 	// to is the lines typed into its window to switch it while it runs;
 	// nil for one that cannot.
 	to func(model, effort string) []string
+	// lists asks the agent itself for its models, for one whose models are
+	// what its providers have and not mia's to know; nil for any other.
+	lists func() []plugin.Model
+	// again is an agent that takes a model only as it starts, and is
+	// switched by being started again on the conversation it has open.
+	again bool
 
 	// AccountEnv is the variable that names the folder it keeps its
 	// sign-in, its settings and its conversations in: one folder for each
@@ -94,6 +101,15 @@ func (a Agent) start() string {
 		return a.Commands[0]
 	}
 	return a.Name
+}
+
+// takes reports whether it has words to be started with a model, and
+// with an effort.
+func (a Agent) takes() (model, effort bool) {
+	if a.with == nil {
+		return false, false
+	}
+	return len(a.with("a", "")) > 0, len(a.with("", "a")) > 0
 }
 
 func (a Agent) notesFile() string {
@@ -245,11 +261,16 @@ done`,
 			{ID: "openai-codex/gpt-5.6-sol", Label: "GPT-5.6 Sol"}, {ID: "openai-codex/gpt-5.6-luna", Label: "GPT-5.6 Luna"}},
 		Efforts: []string{"off", "minimal", "low", "medium", "high", "xhigh", "max"},
 		with:    words([]string{"--model", "%s"}, []string{"--thinking", "%s"}), to: typing("/model %s", "/thinking %s")},
-	// its conversations are in one database whatever the folder, and it is
-	// started with no model: it has no word for one, and picks one from a list
+	// its conversations are in one database whatever the folder. Its models
+	// are its providers', asked of it; its own interface has no word for
+	// one, so with a model it is started as its minimal one, which has, and
+	// it is switched by being started so again on its conversation
 	{Name: "opencode", goOn: "--continue", has: []string{"-c", "--continue", "-s", "--session"},
-		resume: fixed("opencode --session %s"), talks: opencodeTalks{}},
-	{Name: "gemini", goOn: "--resume latest", has: []string{"-r", "--resume"}},
+		resume: fixed("opencode --session %s"), talks: opencodeTalks{},
+		with: words([]string{"mini", "--model", "%s"}, nil), lists: opencodeModels{}.models, again: true},
+	// its help has a word for a model and names none: it has those the config names
+	{Name: "gemini", goOn: "--resume latest", has: []string{"-r", "--resume"},
+		with: words([]string{"--model", "%s"}, nil)},
 	{Name: "cursor-agent", goOn: "--continue", has: []string{"--continue", "--resume", "resume"}},
 }
 
@@ -273,6 +294,7 @@ func (a *App) agents() []Agent {
 			case opencodeTalks:
 				t.cache = cache
 				a.agentTable[i].talks = t
+				a.agentTable[i].lists = opencodeModels{cache: filepath.Join(a.MiaDir, "cache", "models")}.models
 			}
 		}
 		for _, one := range a.pluginAgents() {
@@ -318,13 +340,52 @@ func agentOf(table []Agent, command string) (string, []string) {
 
 // launcher is how many words of a command line come before the one that
 // runs its agent: env, its flags and the variables it sets, variables set
-// as a shell sets them, and node or bun.
+// as a shell sets them, and node or bun, or the shell a script is run by.
 func launcher(words []string) int {
 	at := withoutEnv(words)
-	if len(words)-at > 1 && (filepath.Base(words[at]) == "node" || filepath.Base(words[at]) == "bun") {
-		at++
+	if len(words)-at > 1 {
+		by := filepath.Base(words[at])
+		if by == "node" || by == "bun" || (shells[by] && !strings.HasPrefix(words[at+1], "-")) {
+			at++
+		}
 	}
 	return min(at, len(words))
+}
+
+// launched is the command a shell was started to run, as ps says it of a
+// window mia started — <shell> -lc "<command>; exec <shell> -l", the
+// command after its cd when it has one — each word without the quotes it
+// was written in; any other command line is left as it is. Once the
+// command ends the shell is its own again, and says so.
+func launched(command string) string {
+	words := strings.Fields(command)
+	if len(words) < 3 || !shells[filepath.Base(words[0])] || (words[1] != "-lc" && words[1] != "-c") {
+		return command
+	}
+	var said []string
+	for _, word := range words[2:] {
+		last := strings.HasSuffix(word, ";")
+		if word = strings.Replace(strings.Trim(strings.TrimSuffix(word, ";"), "'"), "='", "=", 1); word == "&&" {
+			said = nil // before it, the cd
+			continue
+		}
+		said = append(said, word)
+		if last {
+			break
+		}
+	}
+	return strings.Join(said, " ")
+}
+
+// agentBehind is agentIn of a window's first pane, as tmux says it, where
+// tmux may name only what launched the agent: node or bun, or the shell
+// mia starts an agent's window by. Of those front, the command line in
+// front in each terminal, is asked, when there is one to ask.
+func agentBehind(table []Agent, command, title string, kind session.Kind, pid int, front func() map[int]string) string {
+	if (command == "node" || command == "bun" || (kind == session.KindAgent && shells[command])) && front != nil {
+		command = launched(front()[pid])
+	}
+	return agentIn(table, command, title)
 }
 
 // withoutEnv is where a command line's command is, after env and the
@@ -380,7 +441,8 @@ type Head struct {
 	Running  bool       `json:"running"`
 	Window   *WindowRef `json:"window,omitempty"` // the window that has it open, when running
 	// Model and Effort are the window's, as mia started it or last switched
-	// it; left out when mia did not choose them.
+	// it; left out when mia did not choose them. Of opencode's, the model
+	// is otherwise the one opencode says the conversation runs on.
 	Model  string `json:"model,omitempty"`
 	Effort string `json:"effort,omitempty"`
 	// Continues is the conversation, with another agent, this one was

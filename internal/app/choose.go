@@ -34,6 +34,9 @@ type AgentModels struct {
 	Effort string `json:"effort"`
 	// Live: it can be switched to another while it runs.
 	Live bool `json:"live"`
+	// Again: it takes a model only as it starts, and is switched by being
+	// started again on the conversation it has open.
+	Again bool `json:"again"`
 	// AccountEnv is the variable that names the folder of each of its
 	// accounts; "" for an agent mia keeps no accounts of.
 	AccountEnv string `json:"account_env"`
@@ -48,7 +51,7 @@ func (a *App) AgentModels() []AgentModels {
 	for _, agent := range a.agents() {
 		set := a.Config.Agents[agent.Name]
 		all = append(all, AgentModels{Name: agent.Name, Models: modelsOf(agent, set), Efforts: effortsOf(agent, set),
-			Model: set.Model, Effort: set.Effort, Live: agent.to != nil, AccountEnv: agent.AccountEnv, Installed: installed(agent)})
+			Model: set.Model, Effort: set.Effort, Live: agent.to != nil, Again: agent.again, AccountEnv: agent.AccountEnv, Installed: installed(agent)})
 	}
 	return all
 }
@@ -66,14 +69,18 @@ func installed(agent Agent) bool {
 	return false
 }
 
-// modelsOf is the models an agent can be given: its own, and one the
-// config names that it has not. None for one mia cannot start with one.
+// modelsOf is the models an agent can be given: its own, those it says
+// it has when it is one that is asked, and one the config names that it
+// has not. None for one mia cannot start with one.
 func modelsOf(agent Agent, set ...config.Agent) []plugin.Model {
 	models := []plugin.Model{}
-	if agent.with == nil {
+	if takes, _ := agent.takes(); !takes {
 		return models
 	}
 	models = append(models, agent.Models...)
+	if agent.lists != nil {
+		models = append(models, agent.lists()...)
+	}
 	for _, one := range set {
 		if one.Model != "" && !slices.ContainsFunc(models, func(m plugin.Model) bool { return m.ID == one.Model }) {
 			models = append(models, plugin.Model{ID: one.Model, Label: one.Model})
@@ -84,7 +91,7 @@ func modelsOf(agent Agent, set ...config.Agent) []plugin.Model {
 
 func effortsOf(agent Agent, set ...config.Agent) []string {
 	efforts := []string{}
-	if agent.with == nil {
+	if _, takes := agent.takes(); !takes {
 		return efforts
 	}
 	efforts = append(efforts, agent.Efforts...)
@@ -95,6 +102,9 @@ func effortsOf(agent Agent, set ...config.Agent) []string {
 	}
 	return efforts
 }
+
+// manyModels is how many models are more than a refusal names one by one.
+const manyModels = 12
 
 // allowed refuses a model or an effort the agent does not have, and says
 // what it has.
@@ -107,6 +117,9 @@ func allowed(agent Agent, model, effort string, set ...config.Agent) error {
 		ids := make([]string, len(models))
 		for i, m := range models {
 			ids[i] = m.ID
+		}
+		if !slices.Contains(ids, model) && len(ids) > manyModels {
+			return fmt.Errorf("%s has no model %s — `mia api agents` lists the %d it has", agent.Name, model, len(ids))
 		}
 		if !slices.Contains(ids, model) {
 			return fmt.Errorf("%s has no model %s — it has %s", agent.Name, model, strings.Join(ids, ", "))
@@ -136,12 +149,13 @@ func choose(agent Agent, command, model, effort string, set ...config.Agent) ([]
 		return nil, Chosen{}, nil
 	}
 	said := strings.Fields(command)
-	says := func(words []string) bool { return len(words) > 0 && slices.Contains(said, words[0]) }
+	// taken: the agent has words for it, and the command line does not say them
+	taken := func(words []string) bool { return len(words) > 0 && !slices.Contains(said, words[0]) }
 	for _, one := range set {
-		if model == "" && one.Model != "" && !says(agent.with(one.Model, "")) {
+		if model == "" && one.Model != "" && taken(agent.with(one.Model, "")) {
 			model = one.Model
 		}
-		if effort == "" && one.Effort != "" && !says(agent.with("", one.Effort)) {
+		if effort == "" && one.Effort != "" && taken(agent.with("", one.Effort)) {
 			effort = one.Effort
 		}
 	}
@@ -324,7 +338,8 @@ func (a *App) KeepChosen(record model.Record, window, agent string, chosen Chose
 
 // SwitchWindow switches the agent in a worktree's window to another
 // model, and effort when one is given, by typing what the agent takes for
-// it, as the main agent is said something to.
+// it, as the main agent is said something to; one that takes a model only
+// as it starts is started again in its window, on its conversation.
 func (a *App) SwitchWindow(record model.Record, window, model, effort string) (Chosen, error) {
 	host, window, err := a.windowNamed(record, window)
 	if err != nil {
@@ -342,23 +357,84 @@ func (a *App) SwitchWindow(record model.Record, window, model, effort string) (C
 			command = one.Command // claude's binary named for its version is claude
 		}
 	}
-	if (command == "node" || command == "bun") && host.SSH == "" {
-		command = foreground()[pane.PID]
+	var front func() map[int]string
+	if host.SSH == "" {
+		front = foreground
 	}
-	name := agentIn(a.agents(), command, pane.Title)
+	name := agentBehind(a.agents(), command, pane.Title, pane.Kind, pane.PID, front)
 	if name == "" {
 		return Chosen{}, fmt.Errorf("window %s of %s runs no agent mia knows", window, record.Name)
 	}
 	agent, _ := agentNamed(a.agents(), name)
 	was := a.chosen()[chosenKey(session.Name(record.Name), pane.PID)]
-	chosen, err := switchTo(host, record.Name, window, agent, model, effort, was, a.Config.Agents[name])
+	pid := pane.PID
+	var chosen Chosen
+	if agent.to == nil && agent.again {
+		chosen, pid, err = a.startAgain(host, record, pane, agent, model, effort, was)
+	} else {
+		chosen, err = switchTo(host, record.Name, window, agent, model, effort, was, a.Config.Agents[name])
+	}
 	if err != nil {
 		return Chosen{}, err
 	}
-	if err := a.keep(host, record.Name, pane.PID, chosen); err != nil {
+	if err := a.keep(host, record.Name, pid, chosen); err != nil {
 		return chosen, err
 	}
 	return chosen, a.used(name, record.Name, machineOf(record), chosen)
+}
+
+// startAgain switches an agent that takes a model only as it starts: it
+// is ended, and started in its pane again on the conversation it had
+// open, with the model. The window stays, and what is kept on it; said
+// are what it runs then, as far as mia knows, and the process its pane
+// was started with.
+func (a *App) startAgain(host session.Host, record model.Record, pane session.Pane, agent Agent, model, effort string, was Chosen) (Chosen, int, error) {
+	if err := allowed(agent, model, effort, a.Config.Agents[agent.Name]); err != nil {
+		return Chosen{}, 0, err
+	}
+	heads, _ := a.Conversations(Wanted{Worktree: record.Name, Agent: agent.Name})
+	at := slices.IndexFunc(heads, func(h Head) bool { return h.Running && h.Window != nil && h.Window.Index == pane.Index })
+	if at < 0 {
+		return Chosen{}, 0, fmt.Errorf("%s in window %s of %s has no conversation yet to be started again on — close it, and start it with --model", agent.Name, pane.Window, record.Name)
+	}
+	command, err := againCommand(agent, heads[at].ID, heads[at].Cwd, record.Path, model, effort, was.Account)
+	if err != nil {
+		return Chosen{}, 0, err
+	}
+	argv, err := a.LaunchArgv(record, command)
+	if err != nil {
+		return Chosen{}, 0, err
+	}
+	if err := host.RestartPane(record.Name, pane.ID, record.Path, argv); err != nil {
+		return Chosen{}, 0, err
+	}
+	pid := 0
+	for _, one := range host.Panes(record.Name) {
+		if one.ID == pane.ID {
+			pid = one.PID
+		}
+	}
+	was.Model = model
+	if effort != "" {
+		was.Effort = effort
+	}
+	return was, pid, nil
+}
+
+// againCommand is the command line that starts an agent again on a
+// conversation with a model, and an effort when one is given, typed in
+// the worktree's folder: on the account it was on, and in the folder the
+// conversation was made in when that is another.
+func againCommand(agent Agent, id, cwd, dir, model, effort, account string) (string, error) {
+	command, err := agent.resume(id)
+	if err != nil {
+		return "", fmt.Errorf("agent %s: %w", agent.Name, err)
+	}
+	command = withAccount(agent, account, put(command, agent.with(model, effort)))
+	if cwd != "" && cwd != dir {
+		command = "cd " + shellQuote(cwd) + " && " + command
+	}
+	return command, nil
 }
 
 // typedApart is how long an agent is given to take one line typed into it

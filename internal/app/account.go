@@ -275,11 +275,7 @@ func (a *App) accountWindows() map[string][]string {
 			titles[pane.Index] = pane.Title // a window is its first pane
 		}
 		for _, window := range session.WindowsFrom(panes[name]) {
-			command := window.Command
-			if command == "node" || command == "bun" {
-				command = behind()[window.PID]
-			}
-			agent, known := agentNamed(table, agentIn(table, command, titles[window.Index]))
+			agent, known := agentNamed(table, agentBehind(table, window.Command, titles[window.Index], window.Kind, window.PID, behind))
 			if !known || agent.AccountEnv == "" {
 				continue
 			}
@@ -875,7 +871,7 @@ func (a *App) AccountOfWindow(record model.Record, window, name string) error {
 	var pane session.Pane
 	for _, one := range session.WindowsFrom(host.Panes(record.Name)) {
 		if one.Name == window || strconv.Itoa(one.Index) == window {
-			pane = session.Pane{Index: one.Index, Window: one.Name, PID: one.PID, Command: one.Command}
+			pane = session.Pane{Index: one.Index, Window: one.Name, PID: one.PID, Command: one.Command, Kind: one.Kind}
 		}
 	}
 	for _, p := range host.Panes(record.Name) {
@@ -883,11 +879,11 @@ func (a *App) AccountOfWindow(record model.Record, window, name string) error {
 			pane.Title = p.Title
 		}
 	}
-	command := pane.Command
-	if (command == "node" || command == "bun") && host.SSH == "" {
-		command = foreground()[pane.PID]
+	var front func() map[int]string
+	if host.SSH == "" {
+		front = foreground
 	}
-	agent, known := agentNamed(a.agents(), agentIn(a.agents(), command, pane.Title))
+	agent, known := agentNamed(a.agents(), agentBehind(a.agents(), pane.Command, pane.Title, pane.Kind, pane.PID, front))
 	if !known {
 		return fmt.Errorf("window %s of %s runs no agent mia knows", window, record.Name)
 	}

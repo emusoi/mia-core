@@ -605,6 +605,75 @@ func TestTheModelsAreAPaletteInPlaceOfTheChat(t *testing.T) {
 	}
 }
 
+// opencode's models are under its head as it lists them, each named by
+// what comes after its provider with the provider beside it, the one its
+// conversation runs on checked; a pick starts it again on the model in
+// its window, and from another agent's chat hands the conversation to it.
+func TestOpencodesModelsAreInThePaletteAndAPickStartsItAgain(t *testing.T) {
+	agents := []app.AgentModels{
+		{Name: "claude", Models: []plugin.Model{{ID: "opus", Label: "Opus"}}, Efforts: []string{"low", "high"}, Live: true, Installed: true},
+		{Name: "pi", Models: []plugin.Model{{ID: "anthropic/claude-opus-5", Label: "Claude Opus 5"}}, Live: true, Installed: true},
+		{Name: "opencode", Models: []plugin.Model{{ID: "openai/gpt-5", Label: "gpt-5"}, {ID: "ollama/qwen3:4b", Label: "qwen3:4b"}}, Efforts: []string{}, Again: true, Installed: true},
+	}
+	// mia chose no model for the window: the conversation's own is the one that runs
+	runs := chatRuns(app.Runs{Agent: "opencode", Reads: true, Again: true}, app.Head{Agent: "opencode", Model: "openai/gpt-5"})
+	if runs.Model != "openai/gpt-5" || chatAbout(runs) != "opencode · openai/gpt-5" {
+		t.Fatalf("runs = %+v", runs)
+	}
+	if kept := chatRuns(app.Runs{Agent: "opencode", Model: "ollama/qwen3:4b"}, app.Head{Agent: "opencode", Model: "openai/gpt-5"}); kept.Model != "ollama/qwen3:4b" {
+		t.Errorf("what mia chose is not said over: %+v", kept)
+	}
+	if other := chatRuns(app.Runs{Agent: "claude"}, app.Head{Agent: "opencode", Model: "openai/gpt-5"}); other.Model != "" {
+		t.Errorf("another agent's conversation says nothing of this one: %+v", other)
+	}
+	view := &chatView{talk: &talk{pane: "%5", agent: "opencode"}, mode: picking, worktree: "monduli", window: "3", id: "ses_1", runs: runs, agents: agents}
+	list := read(t, view.whole(true)).Whole.find("list")
+	var said []string
+	for _, item := range list.Items {
+		said = append(said, cmp.Or(item.ID, "# "+item.Head))
+	}
+	if want := []string{"# Claude", "a|claude|opus", "# Pi", "a|pi|anthropic/claude-opus-5", "# Opencode", "a|opencode|openai/gpt-5", "a|opencode|ollama/qwen3:4b"}; !slices.Equal(said, want) || list.Selected != "a|opencode|openai/gpt-5" {
+		t.Fatalf("items %q, the keys on %q", said, list.Selected)
+	}
+	if head := list.Items[4]; head.Tag != "this chat" {
+		t.Errorf("head = %+v", head)
+	}
+	on := list.Items[5]
+	if !on.Checked || on.Title != "gpt-5" || on.Note != "openai" || on.Icon != "opencode" || on.Does != "switch" || on.More != "" || len(on.Menu) != 0 ||
+		len(on.About) != 2 || on.About[1] != "starts it again in this window, on this conversation" {
+		t.Errorf("the one that runs = %+v", on)
+	}
+	if other := list.Items[6]; other.Checked || other.Title != "qwen3:4b" || other.Note != "ollama" || other.Does != "switch" {
+		t.Errorf("another of its models = %+v", other)
+	}
+	if named := list.Items[3]; named.Note != "" || named.Does != "go on in pi" {
+		t.Errorf("a model with a name of its own says no provider: %+v", named)
+	}
+	if got := view.deed(chatEvent{E: "pick", List: "models", ID: "a|opencode|ollama/qwen3:4b"}); got != (chatDeed{do: chatSwitch, model: "ollama/qwen3:4b"}) {
+		t.Errorf("a pick of its own asks %+v", got)
+	}
+	if got := view.deed(chatEvent{E: "pick", List: "models", ID: "a|claude|opus", Sub: "high"}); got != (chatDeed{do: chatHand, agent: "claude", model: "opus", effort: "high"}) {
+		t.Errorf("a pick of another agent's asks %+v", got)
+	}
+	view.query = "OLLAMA"
+	if list := read(t, view.whole(false)).Whole.find("list"); len(list.Items) != 2 || list.Items[1].ID != "a|opencode|ollama/qwen3:4b" {
+		t.Errorf("narrowed by a provider to %+v", list.Items)
+	}
+
+	// from claude's chat, one of opencode's is the conversation handed over to it on that model
+	view = &chatView{talk: &talk{pane: "%5", agent: "claude"}, mode: picking, worktree: "monduli", window: "2", id: "c2", runs: app.Runs{Agent: "claude", Live: true}, agents: agents}
+	if got := view.deed(chatEvent{E: "pick", List: "models", ID: "a|opencode|openai/gpt-5"}); got != (chatDeed{do: chatHand, agent: "opencode", model: "openai/gpt-5"}) {
+		t.Errorf("a pick of opencode's from another agent's chat asks %+v", got)
+	}
+	// with none listed it is as it was: one row, its model chosen inside it
+	agents[2].Models = []plugin.Model{}
+	view.agents, view.query = agents, ""
+	list = read(t, view.whole(false)).Whole.find("list")
+	if none := list.Items[len(list.Items)-1]; none.ID != "a|opencode|" || none.Note != "its model is chosen inside it" {
+		t.Errorf("with no models listed = %+v", none)
+	}
+}
+
 // What an event asks of the app, as the view stands.
 func TestWhatAnEventAsksOfTheChat(t *testing.T) {
 	running := app.Head{ID: "c2", Agent: "claude", Running: true, Window: &app.WindowRef{Index: 2, Name: "claude"}}

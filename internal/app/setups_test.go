@@ -69,7 +69,7 @@ func TestSetupsAreTheUsualFirstThenTheLastUsed(t *testing.T) {
 	}
 	a := &App{Config: config.Config{
 		Main: config.Main{Model: "sonnet"},
-		// opencode is started with no model nor effort, and nobody is no agent
+		// opencode is started with no effort, and nobody is no agent
 		Agents: map[string]config.Agent{"claude": {Model: "opus", Effort: "high"}, "pi": {Effort: "low"}, "codex": {},
 			"opencode": {Effort: "high"}, "nobody": {Model: "x"}},
 	}}

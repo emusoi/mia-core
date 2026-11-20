@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/emusoi/mia-core/internal/plugin"
 	"github.com/emusoi/mia-core/internal/run"
 )
 
@@ -48,6 +49,21 @@ type opencodeSession struct {
 	Location struct {
 		Directory string `json:"directory"`
 	} `json:"location"`
+	// Model is the model it runs on: an object, its id and its provider's.
+	Model json.RawMessage `json:"model"`
+}
+
+// model is the model it runs on as opencode takes one, provider/model;
+// "" when it does not say, or says it in a shape mia does not know.
+func (s opencodeSession) model() string {
+	var on struct {
+		ID         string `json:"id"`
+		ProviderID string `json:"providerID"`
+	}
+	if json.Unmarshal(s.Model, &on) != nil || on.ID == "" || on.ProviderID == "" {
+		return ""
+	}
+	return on.ProviderID + "/" + on.ID
 }
 
 // active is when it was last written to, as far as it says.
@@ -353,7 +369,7 @@ func (o opencodeTalks) heads(in folders) ([]Head, error) {
 			continue // not read, or nothing said in it yet
 		}
 		heads = append(heads, Head{ID: s.ID, Agent: "opencode", Cwd: s.Location.Directory, Asked: k.Asked, Said: k.Said,
-			Started: opencodeTime(s.Time.Created), Active: opencodeTime(s.active()), Turns: k.Asks})
+			Started: opencodeTime(s.Time.Created), Active: opencodeTime(s.active()), Turns: k.Asks, Model: s.model()})
 	}
 	return heads, err
 }
@@ -420,6 +436,74 @@ func (o opencodeTalks) search(in folders, text string, limit int) ([]Recalled, e
 		}
 	}
 	return found, err
+}
+
+// opencodeModels is opencode's models: those of the providers it is
+// signed in to, which only it knows, so its own program is asked —
+// opencode models, a provider/model a line. What it said is kept for
+// modelsKept, so that a list of agents does not start it each time; that
+// it said none, or could not say, for a minute. It is asked only where
+// its conversations are: on this machine, with something kept.
+type opencodeModels struct {
+	// cache is the folder what it said is kept in; nothing is kept with none.
+	cache string
+}
+
+const modelsKept = time.Hour
+
+// opencodeListing is what is kept of what opencode said its models are.
+type opencodeListing struct {
+	At     time.Time      `json:"at"`
+	Models []plugin.Model `json:"models"`
+}
+
+// fresh reports whether what is kept still stands at now.
+func (l opencodeListing) fresh(now time.Time) bool {
+	kept := modelsKept
+	if len(l.Models) == 0 {
+		kept = time.Minute
+	}
+	return !l.At.IsZero() && now.Sub(l.At) < kept
+}
+
+func (o opencodeModels) models() []plugin.Model {
+	file := ""
+	if o.cache != "" {
+		file = filepath.Join(o.cache, "opencode.json")
+	}
+	var kept opencodeListing
+	if data, err := os.ReadFile(file); err == nil && json.Unmarshal(data, &kept) == nil && kept.fresh(time.Now()) {
+		return kept.Models
+	}
+	if !(opencodeTalks{}).there() {
+		return nil
+	}
+	out, _ := run.Tool{Binary: "opencode", Within: AgentTimeout}.Capture("models") // one that fails has none
+	kept = opencodeListing{At: time.Now().UTC(), Models: opencodeListed(out)}
+	if file != "" && os.MkdirAll(o.cache, 0o755) == nil {
+		if data, err := json.Marshal(kept); err == nil {
+			_ = writeAtomic(file, data)
+		}
+	}
+	return kept.Models
+}
+
+// opencodeListed is the models in what opencode models prints: each line
+// that is a provider/model and nothing more, once, named by what comes
+// after its provider. Anything else it prints is no model.
+func opencodeListed(out string) []plugin.Model {
+	models := []plugin.Model{}
+	for _, line := range strings.Split(out, "\n") {
+		id := strings.TrimSpace(line)
+		provider, name, ok := strings.Cut(id, "/")
+		if !ok || provider == "" || name == "" || strings.ContainsAny(id, " \t") {
+			continue
+		}
+		if !slices.ContainsFunc(models, func(m plugin.Model) bool { return m.ID == id }) {
+			models = append(models, plugin.Model{ID: id, Label: name})
+		}
+	}
+	return models
 }
 
 func opencodeTime(ms int64) time.Time {

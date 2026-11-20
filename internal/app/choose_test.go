@@ -49,11 +49,11 @@ func TestAnAgentIsStartedWithWhatItHas(t *testing.T) {
 	if _, chosen, err := choose(claude, "claude", "", "", config.Agent{Model: "claude-opus-5"}); err != nil || chosen.Model != "claude-opus-5" {
 		t.Errorf("one the config names: %+v, %v", chosen, err)
 	}
-	opencode, _ := agentNamed(builtin, "opencode")
-	if _, _, err := choose(opencode, "opencode", "big", ""); err == nil || err.Error() != "mia knows no models of opencode" {
+	cursor, _ := agentNamed(builtin, "cursor-agent")
+	if _, _, err := choose(cursor, "cursor-agent", "big", ""); err == nil || err.Error() != "mia knows no models of cursor-agent" {
 		t.Errorf("an agent mia knows no models of: %v", err)
 	}
-	if _, err := switchTo(session.Here(), "kilwa", "opencode", opencode, "big", "", Chosen{}); err == nil || !strings.Contains(err.Error(), "restart it with --model") {
+	if _, err := switchTo(session.Here(), "kilwa", "cursor-agent", cursor, "big", "", Chosen{}); err == nil || !strings.Contains(err.Error(), "restart it with --model") {
 		t.Errorf("one that cannot switch while it runs: %v", err)
 	}
 

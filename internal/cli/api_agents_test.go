@@ -33,13 +33,13 @@ func TestTheAgentsAndTheirModelsAnswerFromAnywhere(t *testing.T) {
 		t.Errorf("claude = %+v", agents)
 	}
 	at = slices.IndexFunc(agents, func(a app.AgentModels) bool { return a.Name == "opencode" })
-	if at < 0 || agents[at].Live || agents[at].Models == nil || len(agents[at].Models) != 0 {
-		t.Errorf("an agent mia knows no models of = %+v", agents[at])
+	if at < 0 || agents[at].Live || !agents[at].Again || agents[at].Models == nil || len(agents[at].Models) != 0 {
+		t.Errorf("opencode, which has kept nothing here and so is not asked for its models = %+v", agents[at])
 	}
 	if _, code := answered(t, "agents", "claude"); code != exitUsage {
 		t.Errorf("api agents with more exited %d", code)
 	}
-	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "agents") || !slices.Contains(caps.Features, "agent-models") || !slices.Contains(caps.Features, "resume-model") {
+	if caps := apiCapabilities(); !slices.Contains(caps.Queries, "agents") || !slices.Contains(caps.Features, "agent-models") || !slices.Contains(caps.Features, "resume-model") || !slices.Contains(caps.Features, "agent-again") {
 		t.Errorf("capabilities = %+v", caps)
 	}
 	// a model is an agent's to switch, and the main agent's is refused only because nothing runs

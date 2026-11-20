@@ -469,8 +469,9 @@ func TestResumingAClaudeConversationInAnotherWorktreeCopiesItThere(t *testing.T)
 	if kept, _ := os.ReadFile(filepath.Join(claudeDir(two.Path), "c9.jsonl")); !strings.Contains(string(kept), "and go on here") {
 		t.Error("the copy was written over")
 	}
-	if again.Window.Name != "claude-2" {
-		t.Errorf("a window beside the first: %+v", again)
+	// the window mia started has it open, behind the shell it was started by
+	if !again.Already || again.Window.Name != "claude" {
+		t.Errorf("the window that has it, and none beside it: %+v", again)
 	}
 	back, err := a.ResumeConversation("c9", "", one.Name, "", "", "")
 	if err != nil || back.Copied || back.Worktree != one.Name {

@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -215,5 +216,126 @@ func TestTheMainAgentIsStartedAsAnotherAgent(t *testing.T) {
 	}
 	if state := open().Main(); state.Running || state.Agent != "echo" {
 		t.Errorf("stopped, the main agent is [main]'s again: %+v", state)
+	}
+}
+
+// opencode is started on one of the models it lists, as its minimal
+// interface, and switched by being started again in its window on the
+// conversation it has open: the window stays, behind the shell mia
+// started it by. A conversation says the model opencode says it runs on,
+// until mia chooses one for its window.
+func TestOpencodeIsStartedOnAModelItListsAndSwitchedByStartingItAgain(t *testing.T) {
+	// the list, an export and its models from $TMUX_TMPDIR/store; anything else is it started: it says how, and waits
+	lab(t, map[string]string{"opencode": `store="$TMUX_TMPDIR/store"
+case "$1 $2" in
+"api GET") exec cat "$store/sessions.json" ;;
+"session export") exec cat "$store/$3.json" ;;
+"models ") exec cat "$store/models" ;;
+esac
+echo "opencode $*"
+cat`,
+		// a login shell puts the machine's own programs before the lab's,
+		// a real opencode among them: this one keeps the lab's first
+		"sh": `[ "$1" = -lc ] && shift && exec /bin/sh -c "$@"
+exec /bin/sh "$@"`})
+	bin := filepath.Join(os.Getenv("TMUX_TMPDIR"), "bin")
+	tmux, err := exec.LookPath("tmux")
+	if err != nil {
+		t.Skip("no tmux")
+	}
+	if err := os.Symlink(tmux, filepath.Join(bin, "tmux")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+":/usr/bin:/bin:/usr/sbin:/sbin")
+	t.Setenv("SHELL", filepath.Join(bin, "sh"))
+	if out, err := exec.Command(os.Getenv("SHELL"), "-lc", "command -v opencode").Output(); err != nil || strings.TrimSpace(string(out)) != filepath.Join(bin, "opencode") {
+		t.Fatalf("a window's shell finds opencode at %q, not the lab's: no window is opened", out)
+	}
+	store := filepath.Join(os.Getenv("TMUX_TMPDIR"), "store")
+	if err := os.MkdirAll(filepath.Join(os.Getenv("HOME"), ".local", "share", "opencode"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	repo := gittest.New(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := a.New("feature")
+	if err != nil {
+		t.Fatal(err)
+	}
+	info := `{"id":"ses_cart","location":{"directory":"` + record.Path + `"},"time":{"created":1793613600000,"updated":1793613601000},"model":{"id":"gpt-5","providerID":"openai","variant":"max"}}`
+	put(t, filepath.Join(store, "sessions.json"), `{"data":[`+info+`]}`)
+	put(t, filepath.Join(store, "ses_cart.json"), `{"info":`+info+`,"messages":[{"type":"user","time":{"created":1793613601000},"text":"fix the cart total"}]}`)
+	put(t, filepath.Join(store, "models"), "openai/gpt-5", "ollama/qwen3:4b")
+
+	var its app.AgentModels
+	for _, one := range a.AgentModels() {
+		if one.Name == "opencode" {
+			its = one
+		}
+	}
+	if len(its.Models) != 2 || its.Models[1].ID != "ollama/qwen3:4b" || its.Models[1].Label != "qwen3:4b" || len(its.Efforts) != 0 || its.Live || !its.Again || !its.Installed {
+		t.Fatalf("opencode = %+v", its)
+	}
+	if argv, chosen, err := a.ArgvWith([]string{"opencode"}, "openai/gpt-5", "", ""); err != nil || !slices.Equal(argv, []string{"opencode", "mini", "--model", "openai/gpt-5"}) || chosen != (app.Chosen{Model: "openai/gpt-5"}) {
+		t.Errorf("started with = %q, %+v, %v", argv, chosen, err)
+	}
+	if _, _, err := a.ArgvWith([]string{"opencode"}, "openai/gpt-9", "", ""); err == nil || err.Error() != "opencode has no model openai/gpt-9 — it has openai/gpt-5, ollama/qwen3:4b" {
+		t.Errorf("a model it does not list: %v", err)
+	}
+	if heads, _ := a.Conversations(app.Wanted{Agent: "opencode"}); len(heads) != 1 || heads[0].Model != "openai/gpt-5" || heads[0].Effort != "" || heads[0].Running {
+		t.Fatalf("with no window, the model opencode says it runs on: %+v", heads)
+	}
+
+	done, err := a.ResumeConversation("ses_cart", "", "", "", "", "")
+	if err != nil || done.Command != "opencode --session ses_cart" {
+		t.Fatalf("resumed = %+v, %v", done, err)
+	}
+	screenOf(t, record.Name, "opencode", "opencode --session ses_cart")
+	running := func() app.Head {
+		t.Helper()
+		heads, _ := a.Conversations(app.Wanted{Agent: "opencode"})
+		if len(heads) != 1 || !heads[0].Running || heads[0].Window == nil || heads[0].Window.Index != done.Window.Index {
+			t.Fatalf("the window has it open, behind its shell: %+v", heads)
+		}
+		return heads[0]
+	}
+	if head := running(); head.Model != "openai/gpt-5" {
+		t.Errorf("mia chose none: opencode's own: %+v", head)
+	}
+	if runs := a.WindowRuns(record, "opencode"); runs.Agent != "opencode" || runs.Model != "" || !runs.Reads || runs.Live || !runs.Again {
+		t.Errorf("the window runs %+v", runs)
+	}
+
+	if _, err := a.SwitchWindow(record, "opencode", "openai/gpt-9", ""); err == nil || !strings.Contains(err.Error(), "has no model openai/gpt-9") {
+		t.Errorf("switched to a model it does not list: %v", err)
+	}
+	if _, err := a.SwitchWindow(record, "opencode", "openai/gpt-5", "high"); err == nil || !strings.Contains(err.Error(), "no efforts of opencode") {
+		t.Errorf("switched to an effort: %v", err)
+	}
+	now, err := a.SwitchWindow(record, "opencode", "ollama/qwen3:4b", "")
+	if err != nil || now != (app.Chosen{Model: "ollama/qwen3:4b"}) {
+		t.Fatalf("switched: %+v, %v", now, err)
+	}
+	screenOf(t, record.Name, "opencode", "opencode mini --model ollama/qwen3:4b --session ses_cart")
+	if head := running(); head.Model != "ollama/qwen3:4b" {
+		t.Errorf("as switched, what mia chose over what opencode last said: %+v", head)
+	}
+	if runs := a.WindowRuns(record, "opencode"); runs.Agent != "opencode" || runs.Model != "ollama/qwen3:4b" {
+		t.Errorf("the window runs %+v", runs)
+	}
+	windows := a.Windows(record)
+	at := slices.IndexFunc(windows, func(w session.Window) bool { return w.Name == "opencode" })
+	if at < 0 || windows[at].Index != done.Window.Index || windows[at].Kind != session.KindAgent || windows[at].Panes != 1 {
+		t.Errorf("the window is the one it was: %+v", windows)
+	}
+	// again, from the model mia chose
+	if now, err := a.SwitchWindow(record, "opencode", "openai/gpt-5", ""); err != nil || now != (app.Chosen{Model: "openai/gpt-5"}) {
+		t.Fatalf("switched back: %+v, %v", now, err)
+	}
+	screenOf(t, record.Name, "opencode", "opencode mini --model openai/gpt-5 --session ses_cart")
+	if setups := a.Setups(filepath.Base(a.Root)); len(setups) != 2 || setups[0].Agent != "opencode" || setups[0].Model != "openai/gpt-5" || setups[1].Model != "ollama/qwen3:4b" {
+		t.Errorf("each switch is a setup used: %+v", setups)
 	}
 }

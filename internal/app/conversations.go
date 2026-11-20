@@ -140,11 +140,7 @@ func (a *App) markRunning(heads []Head, records []model.Record) []Head {
 				Index, PID int
 				Window     string
 			}{window.Index, window.PID, window.Name}
-			command := window.Command
-			if command == "node" || command == "bun" {
-				command = behind()[window.PID]
-			}
-			name := agentIn(table, command, titles[window.Index])
+			name := agentBehind(table, window.Command, titles[window.Index], window.Kind, window.PID, behind)
 			if name == "" {
 				continue
 			}
@@ -184,7 +180,8 @@ func (a *App) markRunning(heads []Head, records []model.Record) []Head {
 			}
 			if its != nil {
 				its.Running, its.Window = true, &WindowRef{Index: pane.Index, Name: pane.Window}
-				its.Model, its.Effort = kept.Model, kept.Effort
+				// what mia chose for this window, over what the agent said the conversation ran on
+				its.Model, its.Effort = cmp.Or(kept.Model, its.Model), kept.Effort
 				if its.Account == "" && agent.AccountEnv != "" {
 					its.Account = account // a plugin's agent, which does not say whose folder it is in
 				}

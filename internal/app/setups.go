@@ -163,12 +163,19 @@ func (a *App) usedSetups(repository string) []Setup {
 // configuredSetups is what the config starts agents with: the main
 // agent's first, then each in [agents] by its name. One with no model is
 // there for its effort; one with neither, or for an agent mia does not
-// start with them, is none.
+// start with them, is none, and what an agent has no word for is left out.
 func (a *App) configuredSetups() []Setup {
 	setups := []Setup{}
 	add := func(name, model, effort string) {
-		agent, known := agentNamed(a.agents(), name)
-		if known && agent.with != nil && (model != "" || effort != "") {
+		agent, _ := agentNamed(a.agents(), name)
+		withModel, withEffort := agent.takes()
+		if !withModel {
+			model = ""
+		}
+		if !withEffort {
+			effort = ""
+		}
+		if model != "" || effort != "" {
 			setups = append(setups, Setup{Agent: name, Model: model, Effort: effort})
 		}
 	}
