@@ -59,3 +59,11 @@ func TestAWindowToldByItsTitleIsCalledByItsApp(t *testing.T) {
 		}
 	}
 }
+
+func TestAWindowSaysHowManyPanesItIsSplitInto(t *testing.T) {
+	panes := []Pane{{Index: 1, Window: "a", Command: "zsh"}, {Index: 1, Window: "a", Command: "zsh"}, {Index: 2, Window: "b", Command: "zsh"}}
+	got := WindowsFrom(panes)
+	if len(got) != 2 || got[0].Panes != 2 || got[1].Panes != 1 {
+		t.Fatalf("panes per window: %+v", got)
+	}
+}

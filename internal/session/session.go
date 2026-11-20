@@ -527,6 +527,9 @@ type Window struct {
 	Working bool `json:"working,omitempty"`
 	// App is the app a manifest says it runs, by name; "" when none does.
 	App string `json:"app,omitempty"`
+	// Panes is how many panes tmux has the window split into: what a
+	// machine's windows are said with, where tmux cannot be asked of them.
+	Panes int `json:"panes,omitempty"`
 }
 
 // App is how a pane is told to run an app: its command is one of Commands,
@@ -573,7 +576,10 @@ func WindowsFrom(panes []Pane) []Window { return WindowsWith(panes, Apps{}) }
 // WindowsWith is WindowsFrom, each window with the app a manifest says it
 // runs. One told by its title alone is called by the app's name, as pi is.
 func WindowsWith(panes []Pane, apps Apps) []Window {
-	seen := map[int]bool{}
+	seen, count := map[int]bool{}, map[int]int{}
+	for _, pane := range panes {
+		count[pane.Index]++
+	}
 	host, _ := os.Hostname() // unknown: no title is taken for it
 	var windows []Window
 	for _, pane := range panes {
@@ -618,7 +624,7 @@ func WindowsWith(panes []Pane, apps Apps) []Window {
 			agent = "" // its name until it has something to say
 		}
 		windows = append(windows, Window{Index: pane.Index, Name: name, Command: command, PID: pane.PID, Quiet: quiet,
-			Still: quiet.Round(time.Second).String(), Active: pane.Active, Kind: pane.Kind, Agent: agent, Working: agent != "" && spins(pane.Title), App: app})
+			Still: quiet.Round(time.Second).String(), Active: pane.Active, Kind: pane.Kind, Agent: agent, Working: agent != "" && spins(pane.Title), App: app, Panes: count[pane.Index]})
 	}
 	return windows
 }

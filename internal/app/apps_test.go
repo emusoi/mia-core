@@ -93,12 +93,12 @@ func TestAWindowSaysTheAppAManifestTellsItIs(t *testing.T) {
 		{Index: 6, Window: "vim", Command: "vim", Title: "notes - shop"},
 	}, Outside().apps())
 	for i, want := range []string{
-		`{"index":1,"name":"lazygit","command":"lazygit","quiet":"0s","active":false,"app":"lazygit"}`,
-		`{"index":2,"name":"notes","command":"notes","quiet":"0s","active":false,"app":"notes"}`,
-		`{"index":3,"name":"codex","command":"codex","quiet":"0s","active":false}`,
-		`{"index":4,"name":"pi","command":"pi","quiet":"0s","active":false}`,
-		`{"index":5,"name":"claude","command":"claude","quiet":"0s","active":false,"agent":"Ship it"}`,
-		`{"index":6,"name":"vim","command":"vim","quiet":"0s","active":false}`,
+		`{"index":1,"name":"lazygit","command":"lazygit","quiet":"0s","active":false,"app":"lazygit","panes":1}`,
+		`{"index":2,"name":"notes","command":"notes","quiet":"0s","active":false,"app":"notes","panes":1}`,
+		`{"index":3,"name":"codex","command":"codex","quiet":"0s","active":false,"panes":1}`,
+		`{"index":4,"name":"pi","command":"pi","quiet":"0s","active":false,"panes":1}`,
+		`{"index":5,"name":"claude","command":"claude","quiet":"0s","active":false,"agent":"Ship it","panes":1}`,
+		`{"index":6,"name":"vim","command":"vim","quiet":"0s","active":false,"panes":1}`,
 	} {
 		if got, _ := json.Marshal(windows[i]); string(got) != want {
 			t.Errorf("window %d = %s, want %s", i+1, got, want)
