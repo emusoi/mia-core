@@ -16,7 +16,7 @@ import (
 var AgentTimeout = 5 * time.Second
 
 // pluginAgents is the agent of each enabled plugin that declares one. What
-// mia has built in for claude, codex and pi it asks such a plugin for:
+// mia has built in for claude, codex, pi and opencode it asks such a plugin for:
 //
 //	mia-<name> agent conversations <main checkout> <worktree>…   a JSON list: id, cwd, asked, said, started, active, turns
 //	mia-<name> agent turns <id> [--after N]                      a turn a line, as JSON, in mia's own shape

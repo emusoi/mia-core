@@ -12,9 +12,10 @@ import (
 
 // Agent is everything mia knows that is one coding agent's own: how to tell
 // it in a window, how it goes on with a conversation, where it keeps them
-// and how they cross to another machine. claude, codex and pi are compiled
-// in — a move runs from the binary on the other machine, and listing has to
-// be fast — and a plugin adds one by declaring it in its manifest.
+// and how they cross to another machine. claude, codex, pi and opencode are
+// compiled in — a move runs from the binary on the other machine, and
+// listing has to be fast — and a plugin adds one by declaring it in its
+// manifest.
 type Agent struct {
 	Name string
 	// Commands are the first words of a command line that mean this agent;
@@ -185,7 +186,7 @@ func fixed(format string) func(string) (string, error) {
 	return func(id string) (string, error) { return strings.ReplaceAll(format, "%s", id), nil }
 }
 
-// builtin is each coding agent mia knows without a plugin. The first three
+// builtin is each coding agent mia knows without a plugin. The first four
 // have conversations mia reads; of the others it knows only how to start
 // them again.
 var builtin = []Agent{
@@ -238,7 +239,10 @@ done`,
 			{ID: "openai-codex/gpt-5.6-sol", Label: "GPT-5.6 Sol"}, {ID: "openai-codex/gpt-5.6-luna", Label: "GPT-5.6 Luna"}},
 		Efforts: []string{"off", "minimal", "low", "medium", "high", "xhigh", "max"},
 		with:    words([]string{"--model", "%s"}, []string{"--thinking", "%s"}), to: typing("/model %s", "/thinking %s")},
-	{Name: "opencode", goOn: "--continue", has: []string{"-c", "--continue", "-s", "--session"}},
+	// its conversations are in one database whatever the folder, and it is
+	// started with no model: it has no word for one, and picks one from a list
+	{Name: "opencode", goOn: "--continue", has: []string{"-c", "--continue", "-s", "--session"},
+		resume: fixed("opencode --session %s"), talks: opencodeTalks{}},
 	{Name: "gemini", goOn: "--resume latest", has: []string{"-r", "--resume"}},
 	{Name: "cursor-agent", goOn: "--continue", has: []string{"--continue", "--resume", "resume"}},
 }
@@ -252,8 +256,16 @@ func (a *App) agents() []Agent {
 	a.agentsOnce.Do(func() {
 		a.agentTable = slices.Clone(builtin)
 		for i := range a.agentTable {
-			if t, ok := a.agentTable[i].talks.(transcripts); ok && a.MiaDir != "" {
-				t.cache = filepath.Join(a.MiaDir, "cache", "conversations")
+			if a.MiaDir == "" {
+				continue
+			}
+			cache := filepath.Join(a.MiaDir, "cache", "conversations")
+			switch t := a.agentTable[i].talks.(type) {
+			case transcripts:
+				t.cache = cache
+				a.agentTable[i].talks = t
+			case opencodeTalks:
+				t.cache = cache
 				a.agentTable[i].talks = t
 			}
 		}

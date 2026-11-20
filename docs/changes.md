@@ -9,6 +9,19 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **opencode's conversations are read as claude's, codex's and pi's
+  are.** opencode keeps them in a database of its own, so mia asks
+  opencode for them as JSON — `opencode api GET /api/session` for the
+  list, `opencode session export <id>` for one — and only when it is
+  installed and has a data folder. They are in `mia api conversations`,
+  placed in the window that runs opencode in their worktree, read by
+  `mia api conversation <id>` and `mia recall`, taken up again by
+  `mia conversation resume <id>` as `opencode --session <id>`, and handed
+  to another agent by `mia conversation continue <id> --with <agent>`.
+  What a list read of each is kept, and one is exported again only once
+  it has changed or while it is at work; a subagent's conversation is
+  its parent's.
+
 - **An app says what it is.** mia knew a window's program only where it
   was written into mia. A folder in mia's config folder,
   `apps/<name>/app.toml`, now declares an app: a `label`, an `icon`

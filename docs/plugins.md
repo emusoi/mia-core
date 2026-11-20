@@ -50,7 +50,7 @@ radar runs it there and keeps its output up until a key.
 
 ## An agent
 
-mia knows claude, codex and pi. A plugin adds another by declaring it:
+mia knows claude, codex, pi and opencode. A plugin adds another by declaring it:
 
 ```json
 {"protocol":1,"agent":{"name":"echo","commands":["echo-agent"],"title":"^echo-agent "}}

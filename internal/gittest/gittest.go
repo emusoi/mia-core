@@ -97,6 +97,8 @@ func Isolate(t *testing.T) {
 	t.Setenv("TMUX", "")
 	t.Setenv("TMUX_PANE", "")
 	t.Setenv("HOME", t.TempDir())
+	// where opencode keeps its data is under HOME unless this says otherwise
+	t.Setenv("XDG_DATA_HOME", "")
 	// a session's shell is sh: a login zsh, killed with tmux, writes its
 	// history into HOME as the test removes it
 	t.Setenv("SHELL", "/bin/sh")
