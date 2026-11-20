@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
+	"syscall"
 	"unicode/utf16"
 	"unicode/utf8"
 
@@ -167,4 +169,76 @@ func muiOpen(pane, line string) (say func(messages ...[]byte), shut func(), err 
 	}
 	_, _ = os.Stdout.WriteString("\033[?2004h\033[?1004h" + line + "\r\n")
 	return say, shut, nil
+}
+
+// editorWords is the editor's command: $EDITOR, else nvim.
+func editorWords() []string {
+	if words := strings.Fields(os.Getenv("EDITOR")); len(words) > 0 {
+		return words
+	}
+	return []string{"nvim"}
+}
+
+// editorAt is the command that edits a file at a line: the editor
+// with +<line> and the file's path from the worktree's top, run there
+// with this terminal as its own.
+func editorAt(top, path string, line int) *exec.Cmd {
+	words := editorWords()
+	if strings.HasPrefix(path, "-") || strings.HasPrefix(path, "+") { // a path, not an option
+		path = "./" + path
+	}
+	command := exec.Command(words[0], append(words[1:], fmt.Sprintf("+%d", line), path)...)
+	command.Dir = top
+	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
+	return command
+}
+
+// muiKeysInTurn is what is typed into the terminal, a read at a time, until
+// stop. The next read is begun only once next says the last was dealt
+// with: while an editor has the terminal, nothing typed to it is read
+// here. It is closed when the terminal ends.
+func muiKeysInTurn(stop, next <-chan struct{}) <-chan string {
+	keys := make(chan string)
+	go func() {
+		data := make([]byte, 64<<10)
+		for {
+			n, err := os.Stdin.Read(data)
+			if n > 0 {
+				select {
+				case keys <- string(data[:n]):
+				case <-stop:
+					return
+				}
+			}
+			if err != nil {
+				close(keys)
+				return
+			}
+			if n > 0 {
+				select {
+				case <-next:
+				case <-stop:
+					return
+				}
+			}
+		}
+	}()
+	return keys
+}
+
+// muiLent is the terminal taken back from a program it was lent to, an
+// editor: ⌃C typed in one that takes it as a signal was the editor's,
+// and is passed over; any other signal come in meanwhile is this
+// program's, and it reports false: it is to leave.
+func muiLent(signals <-chan os.Signal) bool {
+	for {
+		select {
+		case signal := <-signals:
+			if signal != syscall.SIGINT {
+				return false
+			}
+		default:
+			return true
+		}
+	}
 }

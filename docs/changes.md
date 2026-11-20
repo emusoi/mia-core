@@ -76,14 +76,23 @@ on GitHub; a tag without its section is not released.
   them the diff of the file under the keys with each finding as a note
   under the line it is about. `n` and `N` go through the findings across
   files; `⏎` opens one, to reply or reply and resolve; `c` comments on a
-  line; `space` marks a file read and shows the next unread; `v` gives
-  the verdict; `u` shows the resolved; `r` looks again. Each is done by
-  `sw` as you, never as an agent, and what sawa refuses is the view's
-  status. The review is read again when sawa's record changes, so an
-  agent's findings and answers come in as you read. Not yet: sawa's map
-  and patterns, gates, applying a suggested edit, colour by syntax, a
-  pull request's GitHub comments. `mia api capabilities` lists
-  `review-app`. See [mia review](api.md#mia-review).
+  line; `space` marks a file read and shows the next unread, and when
+  all are read puts the keys on the verdict; `v` gives the verdict; `u`
+  shows the resolved; `r` looks again. A finding on the review as a
+  whole is listed in the header under the summary. One that suggests an
+  edit shows it as a small diff with **Apply**, and one resolved has
+  **Reopen**. `f` shows every open finding, those that wait on you, or
+  the resolved too; `g` shows sawa's gates, and `⏎` on one what was
+  judged, with Pass, Warn and Fail to record it; `e` hands the file to
+  your editor at the line; `[` and `]` go to the layer under and over
+  where sawa reviews a stack. A hunk's head says the function it is in,
+  as git names it. Each is done by `sw` as you, never as an agent, and
+  what sawa refuses is the view's status. The review is read again when
+  sawa's record changes, so an agent's findings and answers come in as
+  you read. Not yet: changing the words of a finding you filed (sawa has
+  no verb for it), sawa's map and patterns, a pull request's GitHub
+  comments. `mia api capabilities` lists `review-app`. See [mia
+  review](api.md#mia-review).
 
 - **The chat does what desk's own chat did.** `mia chat` fills its pane
   under a line that says the agent, its model, effort and account. What

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/emusoi/mia-core/internal/git"
 	"github.com/emusoi/mia-core/internal/gittest"
 )
 
@@ -24,6 +26,7 @@ var reviewNow = time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)
 type sawaFake struct {
 	state  sawaState
 	rows   map[string][]sawaRow
+	layers []sawaLayer
 	refuse map[string]string
 	ran    [][]string
 }
@@ -61,6 +64,25 @@ func (f *sawaFake) run(args ...string) ([]byte, error) {
 		told.Posts = append(told.Posts, sawaPost{Author: "user", At: reviewNow, Body: flag("-m")})
 	case "resolve":
 		finding(args[1]).State = "resolved"
+	case "reopen":
+		told := finding(args[1])
+		if told.State = "open"; flag("-m") != "" {
+			told.Posts = append(told.Posts, sawaPost{Author: "user", At: reviewNow, Body: flag("-m")})
+		}
+	case "apply":
+		finding(args[1]).AppliedAt = &reviewNow
+	case "gate":
+		for i := range f.state.Gates {
+			if f.state.Gates[i].Name == args[1] {
+				f.state.Gates[i].Gate = &sawaJudged{State: args[2], Note: flag("-m"), By: "user", At: reviewNow}
+			}
+		}
+	case "stack":
+		data = sawaStack{Layers: f.layers}
+	case "open":
+		if flag("-r") != "" && f.layers != nil { // a layer's review
+			data = sawaListed{Slug: "range_" + flag("-r")}
+		}
 	case "verdict":
 		f.state.Verdict = sawaVerdict{Verdict: args[1], Label: args[1] + " given"}
 	case "add":
@@ -85,7 +107,7 @@ func (f *sawaFake) run(args ...string) ([]byte, error) {
 func (f *sawaFake) asked() [][]string {
 	var wrote [][]string
 	for _, args := range f.ran {
-		if args[0] != "state" && args[0] != "rows" && args[0] != "list" {
+		if args[0] != "state" && args[0] != "rows" && args[0] != "list" && args[0] != "stack" {
 			wrote = append(wrote, args)
 		}
 	}
@@ -266,7 +288,7 @@ func TestTheFilesAreListedByFolderAndInReadingOrder(t *testing.T) {
 	state := reviewFixed().state
 	state.Files = append(state.Files, sawaFile{Path: "README.md", Added: 1}, sawaFile{Path: "7", Added: 2, Read: true, Stale: true})
 
-	entries, rows := reviewList(state, false, reviewRowsMost)
+	entries, rows := reviewList(state, false, reviewStanding, reviewRowsMost)
 	want := []reviewEntry{
 		{Head: "Files", Tag: "by folder", Note: "2 of 9 read"},
 		{ID: "f:7", Title: "7", Right: "+2"},
@@ -291,7 +313,7 @@ func TestTheFilesAreListedByFolderAndInReadingOrder(t *testing.T) {
 		t.Errorf("its files are %v", rows)
 	}
 
-	entries, rows = reviewList(state, true, reviewRowsMost)
+	entries, rows = reviewList(state, true, reviewStanding, reviewRowsMost)
 	want = []reviewEntry{
 		{Head: "Files", Tag: "reading order", Note: "2 of 9 read"},
 		{ID: "src/mui/patch.rs", Title: "src/mui/patch.rs", Note: "what a change is, and how one is made", Right: "1 finding  +96", Checked: true},
@@ -308,7 +330,7 @@ func TestTheFilesAreListedByFolderAndInReadingOrder(t *testing.T) {
 	}
 
 	// No more files are listed than asked for, and the head says so.
-	entries, rows = reviewList(state, false, 2)
+	entries, rows = reviewList(state, false, reviewStanding, 2)
 	if len(rows) != 2 || entries[0].Note != "2 of 9 read · 2 shown" {
 		t.Errorf("cut to 2 files the list has %d under %q", len(rows), entries[0].Note)
 	}
@@ -400,9 +422,9 @@ func TestAnOpenFindingHasItsThreadUnderIt(t *testing.T) {
 		t.Error("the finding that is not open has pieces under it")
 	}
 
-	// One with no reply has no markdown, and one resolved only Reply.
+	// One with no reply has no markdown, and one resolved Reply and Reopen.
 	under := reviewThread(fake.state.Threads[3], "", reviewNow)
-	if len(under) != 2 || under[0].T != "field" || len(under[1].Children) != 1 || under[1].Children[0].Label != "Reply" {
+	if len(under) != 2 || under[0].T != "field" || len(under[1].Children) != 2 || under[1].Children[0].Label != "Reply" || under[1].Children[1].Label != "Reopen" {
 		t.Errorf("under a resolved finding are %+v", under)
 	}
 
@@ -493,6 +515,7 @@ func TestTheNextUnreadFileIsAfterTheOneReadAndRoundAgain(t *testing.T) {
 // the review is of and sawa's summary under it, and a split row of the
 // list of files and the code of one.
 func TestTheViewIsTheShapeMiaDeskDraws(t *testing.T) {
+	t.Setenv("EDITOR", "")
 	view := reviewOf(reviewFixed())
 	view.act(view.deed(reviewEvent{E: "move", List: "files", ID: "src/talk.rs"}), reviewNow)
 	messages := view.messages(reviewAim{list: true, code: true}, reviewNow)
@@ -501,6 +524,7 @@ func TestTheViewIsTheShapeMiaDeskDraws(t *testing.T) {
 		t.Fatalf("the message is %+v", first)
 	}
 	wantKeys := []gitKey{{"n", "next finding", "next"}, {"N", "previous finding", "prev"}, {"c", "comment", "comment"}, {"space", "read, next file", "read"},
+		{"e", "edit in nvim", "edit"}, {"f", "mine to answer", "filter"}, {"g", "gates", "gates"},
 		{"o", "reading order", "order"}, {"u", "show resolved", "resolved"}, {"v", "verdict", "verdict"}, {"r", "ask again", "again"}}
 	if !reflect.DeepEqual(first.Keys, wantKeys) {
 		t.Errorf("the keys are %+v", first.Keys)
@@ -558,7 +582,7 @@ func TestTheViewIsTheShapeMiaDeskDraws(t *testing.T) {
 	// o puts the files in reading order, and says so where sawa has none.
 	view.act(view.deed(reviewEvent{E: "press", ID: "order"}), reviewNow)
 	first, _ = reviewSaid(t, view.messages(reviewAim{}, reviewNow))
-	if items := reviewPieceOf(first.View, "files").Items; items[0].Tag != "reading order" || items[1].ID != "src/mui/patch.rs" || first.Keys[4].Label != "by folder" {
+	if items := reviewPieceOf(first.View, "files").Items; items[0].Tag != "reading order" || items[1].ID != "src/mui/patch.rs" || first.Keys[7].Label != "by folder" {
 		t.Errorf("in reading order the list is %+v", items[:2])
 	}
 	if got := reviewTexts(first.View.Children[2].Children[2].Children[0]); got[1] != "file 3 of 7" {
@@ -921,9 +945,11 @@ func TestAReviewIsReadAndWrittenThroughSw(t *testing.T) {
 	if !say || aim.focus != "diff" || view.file != "src/talk.txt" || view.marks[view.at].note != "t1" {
 		t.Fatalf("n went to %s %+v", view.file, view.marks[view.at])
 	}
+	// (Each run is under the words git has over its hunk: of a file of
+	// plain words, the line before it that begins with a letter.)
 	_, lines := reviewSaid(t, view.messages(aim, time.Now()))
-	want := []string{"head @@ line 2", "2 2", "3 3", "4 4", "del 5 0", "add 0 5", "6 6", "7 7", "8 8",
-		"gap 18 lines the same", "head @@ line 27", "27 27", "28 28", "29 29", "del 30 0", "add 0 30", "note issue · major", "31 31", "32 32", "33 33"}
+	want := []string{"head @@ line 1", "2 2", "3 3", "4 4", "del 5 0", "add 0 5", "6 6", "7 7", "8 8",
+		"gap 18 lines the same", "head @@ line 26", "27 27", "28 28", "29 29", "del 30 0", "add 0 30", "note issue · major", "31 31", "32 32", "33 33"}
 	if got := brief(lines); !reflect.DeepEqual(got, want) {
 		t.Fatalf("the code is\n%q\nwant\n%q", got, want)
 	}
@@ -995,5 +1021,655 @@ func TestReviewRefusesWhatIsNotATerminal(t *testing.T) {
 	}
 	if caps := apiCapabilities(); !slices.Contains(caps.Features, "review-app") {
 		t.Error("capabilities do not list review-app")
+	}
+}
+
+// reviewDone does what an event asks of a view, and gives what it then says.
+func reviewDone(view *reviewView, event reviewEvent) (bool, reviewAim) {
+	return view.act(view.deed(event), reviewNow)
+}
+
+// A finding on no file is on the review as a whole: it is listed in the
+// header under the summary, by its first line with its label and how it
+// stands, counted with the others; n and N reach it before the first
+// file's, ⏎ opens it there to reply or reply and resolve as a file's,
+// and esc shuts it.
+func TestAFindingOnTheReviewAsAWholeIsInTheHeader(t *testing.T) {
+	fake := reviewFixed()
+	fake.state.Threads = append(fake.state.Threads, sawaFinding{ID: "t5", Type: "question", State: "open", Posts: []sawaPost{
+		{Author: "sawa", At: reviewNow.Add(-time.Minute), Body: "Why a patch and not a second view?\nThe description does not say."},
+		{Author: "user", At: reviewNow, Body: "A view is too many bytes."},
+	}})
+	view := reviewOf(fake)
+	first, lines := reviewSaid(t, view.messages(reviewAim{list: true, code: true}, reviewNow))
+	list := reviewPieceOf(first.View, "general")
+	want := []reviewEntry{{Head: "On the review as a whole", Note: "1"}, {ID: "t5", Title: "Why a patch and not a second view?", Right: "sawa · open", Lead: "question"}}
+	if list == nil || !reflect.DeepEqual(list.Items, want) || !list.Live || list.Max != 4 || list.Selected != "" {
+		t.Fatalf("the list is %+v", list)
+	}
+	if head := reviewTexts(first.View.Children[0]); head[1] != "4 open" || len(first.View.Children[0].Children) != 4 {
+		t.Errorf("the head says %q", head)
+	}
+	if slices.ContainsFunc(lines, func(line reviewLine) bool { return line.Kind == "note" }) {
+		t.Errorf("it is under a line of %s: %q", view.file, brief(lines))
+	}
+
+	// N from the first file is on it, n from it on the first file's, and N back
+	say, aim := reviewDone(view, reviewEvent{E: "press", ID: "prev"})
+	if !say || view.above != "t5" || !aim.above || aim.focus != "general" || view.file != "docs/apps.md" {
+		t.Fatalf("N went to %q with %+v", view.above, aim)
+	}
+	first, _ = reviewSaid(t, view.messages(aim, reviewNow))
+	if got := reviewPieceOf(first.View, "general"); got.Selected != "t5" || first.Focus != "general" {
+		t.Errorf("the keys are said on %q of %q", got.Selected, first.Focus)
+	}
+	if _, aim = reviewDone(view, reviewEvent{E: "press", ID: "next"}); view.above != "" || view.file != "src/talk.rs" || view.marks[view.at].note != "t1" || aim.focus != "diff" {
+		t.Errorf("n went to %s %+v, the keys over the files on %q", view.file, view.marks[view.at], view.above)
+	}
+	if reviewDone(view, reviewEvent{E: "press", ID: "prev"}); view.above != "t5" || view.file != "src/talk.rs" {
+		t.Errorf("N went to %q beside %s", view.above, view.file)
+	}
+	// the keys come on it by themselves, and leave it for a line of the diff
+	view.above = ""
+	if say, _ := reviewDone(view, reviewEvent{E: "move", List: "general", ID: "t5"}); say || view.above != "t5" {
+		t.Errorf("the keys on it: said %v, %q", say, view.above)
+	}
+	if reviewDone(view, reviewEvent{E: "move", List: "diff", ID: "2"}); view.above != "" {
+		t.Error("the keys on a line of the diff are still on it")
+	}
+	if deed := view.deed(reviewEvent{E: "pick", List: "general", ID: "t1"}); deed != (reviewDeed{}) {
+		t.Errorf("⏎ on a file's finding in that list does %+v", deed)
+	}
+
+	// ⏎ opens it under the list: its words, the replies, the area and the buttons
+	if _, aim = reviewDone(view, reviewEvent{E: "pick", List: "general", ID: "t5"}); view.open != "t5" || aim.focus != "reply" || !aim.words || !aim.above {
+		t.Fatalf("⏎ opened %q with %+v", view.open, aim)
+	}
+	reviewDone(view, reviewEvent{E: "change", ID: "reply", Text: "said in the description now"})
+	first, _ = reviewSaid(t, view.messages(aim, reviewNow))
+	head := first.View.Children[0].Children
+	if len(head) != 8 || head[3].ID != "general" || head[4].T != "markdown" || head[4].Text != "Why a patch and not a second view?\nThe description does not say." ||
+		head[5].Text != "**user** · just now\n\nA view is too many bytes." || head[6].ID != "reply" || *head[6].Value != "said in the description now" || head[7].Children[1].ID != "resolve" || first.Keys[0].Key != "esc" {
+		t.Errorf("under the list are %+v", head[3:])
+	}
+	if first, _ = reviewSaid(t, view.messages(reviewAim{}, reviewNow)); first.View.Children[0].Children[6].Value != nil {
+		t.Error("a view said again says what is typed")
+	}
+	if _, aim = reviewDone(view, reviewEvent{E: "press", ID: "shut"}); view.open != "" || aim.focus != "general" || view.typed["t5"] == "" {
+		t.Errorf("esc left %q open, the keys on %q", view.open, aim.focus)
+	}
+	reviewDone(view, reviewEvent{E: "pick", List: "general", ID: "t5"})
+	reviewDone(view, reviewEvent{E: "press", ID: "send"})
+	_, aim = reviewDone(view, reviewEvent{E: "press", ID: "resolve"})
+	wantRan := [][]string{{"reply", "t5", "--json", "-t", "range_main..HEAD", "-m", "said in the description now"}, {"resolve", "t5", "--json", "-t", "range_main..HEAD"}}
+	if got := fake.asked(); !reflect.DeepEqual(got, wantRan) || aim.focus != "general" {
+		t.Errorf("Reply, then Reply and resolve, ran %q with %+v", got, aim)
+	}
+	if first, _ = reviewSaid(t, view.messages(reviewAim{}, reviewNow)); reviewPieceOf(first.View, "general") != nil {
+		t.Error("resolved, it is still listed")
+	}
+}
+
+// f shows every open finding, then only those an agent addressed and
+// that wait on the person, then the resolved too, and then every open
+// one again: the header's count, each file's, the notes in the code and
+// where n goes all follow; u shows the resolved, or not.
+func TestTheFindingsAreFilteredByWhoTheyWaitOn(t *testing.T) {
+	state := reviewFixed().state
+	for filter, want := range map[reviewFilter]string{reviewStanding: "3 open", reviewMine: "1 to answer", reviewAll: "3 open, 1 resolved"} {
+		if got, asks := reviewStands(state, filter); got != want || !asks {
+			t.Errorf("the findings stand as %q (asking: %v), want %q", got, asks, want)
+		}
+	}
+	for filter, want := range map[reviewFilter]string{reviewStanding: "none open", reviewMine: "none to answer", reviewAll: "none open, none resolved"} {
+		if got, asks := reviewStands(sawaState{}, filter); got != want || asks {
+			t.Errorf("no finding stands as %q (asking: %v), want %q", got, asks, want)
+		}
+	}
+	for _, c := range []struct {
+		filter reviewFilter
+		want   []bool // of open, addressed, resolved, wontfix
+	}{{reviewStanding, []bool{true, true, false, false}}, {reviewMine, []bool{false, true, false, false}}, {reviewAll, []bool{true, true, true, true}}} {
+		for n, state := range []string{"open", "addressed", "resolved", "wontfix"} {
+			if got := c.filter.takes(sawaFinding{State: state}); got != c.want[n] {
+				t.Errorf("filter %d takes one %s: %v", c.filter, state, got)
+			}
+		}
+	}
+
+	view := reviewOf(reviewFixed())
+	reviewDone(view, reviewEvent{E: "move", List: "files", ID: "src/talk.rs"})
+	shown := func() (head string, file reviewEntry, notes []string, key string) {
+		t.Helper()
+		first, lines := reviewSaid(t, view.messages(reviewAim{}, reviewNow))
+		for at, line := range lines {
+			if line.Kind == "note" {
+				notes = append(notes, view.marks[at].note)
+			}
+		}
+		items := reviewPieceOf(first.View, "files").Items
+		return reviewTexts(first.View.Children[0])[1], items[slices.IndexFunc(items, func(e reviewEntry) bool { return e.ID == "src/talk.rs" })], notes, first.Keys[5].Label
+	}
+	if head, file, notes, key := shown(); head != "3 open" || file.Note != "2 findings" || !slices.Equal(notes, []string{"t1", "t2"}) || key != "mine to answer" {
+		t.Errorf("every open finding: %q, %q, %q, the key %q", head, file.Note, notes, key)
+	}
+	if say, _ := reviewDone(view, reviewEvent{E: "press", ID: "filter"}); !say || view.filter != reviewMine || view.status == nil {
+		t.Fatalf("f: said %v, filter %d", say, view.filter)
+	}
+	if head, file, notes, key := shown(); head != "1 to answer" || file.Note != "1 finding" || !slices.Equal(notes, []string{"t2"}) || key != "resolved too" {
+		t.Errorf("mine to answer: %q, %q, %q, the key %q", head, file.Note, notes, key)
+	}
+	// n goes only to what is shown, and says so where that is nothing
+	for range 2 {
+		if reviewDone(view, reviewEvent{E: "press", ID: "next"}); view.marks[view.at].note != "t2" {
+			t.Errorf("n went to %+v", view.marks[view.at])
+		}
+	}
+	reviewDone(view, reviewEvent{E: "press", ID: "filter"})
+	if head, file, notes, key := shown(); head != "3 open, 1 resolved" || file.Note != "3 findings" || !slices.Equal(notes, []string{"t1", "t4", "t2"}) || key != "all open" {
+		t.Errorf("resolved too: %q, %q, %q, the key %q", head, file.Note, notes, key)
+	}
+	if reviewDone(view, reviewEvent{E: "press", ID: "filter"}); view.filter != reviewStanding {
+		t.Errorf("f a third time: filter %d", view.filter)
+	}
+	if reviewDone(view, reviewEvent{E: "press", ID: "resolved"}); view.filter != reviewAll {
+		t.Errorf("u: filter %d", view.filter)
+	}
+	if reviewDone(view, reviewEvent{E: "press", ID: "resolved"}); view.filter != reviewStanding {
+		t.Errorf("u again: filter %d", view.filter)
+	}
+	none := reviewFixed()
+	none.state.Threads[1].State = "open"
+	view = reviewOf(none)
+	reviewDone(view, reviewEvent{E: "press", ID: "filter"})
+	if reviewDone(view, reviewEvent{E: "press", ID: "next"}); *view.status != (muiStatus{Text: "no finding waits on you"}) {
+		t.Errorf("n with none to answer: %+v", view.status)
+	}
+}
+
+// A finding that suggests an edit shows it under its words as a small
+// diff, the lines as they were deleted and the lines suggested added,
+// with Apply, which has sawa make the edit in the working tree; once it
+// is applied the thread says when, and Apply is gone. A finding that
+// stands no more has Reopen, which sends it back with the words typed.
+func TestASuggestedEditIsAppliedAndAResolvedFindingReopened(t *testing.T) {
+	finding := sawaFinding{Line: 247, Suggest: "\t\treturn Heard::Dropped(n);\n\t\t// which change\n", SuggestFrom: "\t\treturn Heard::Dropped;"}
+	want := []reviewLine{{Kind: "del", Old: 247, Text: "        return Heard::Dropped;"}, {Kind: "add", New: 247, Text: "        return Heard::Dropped(n);"}, {Kind: "add", New: 248, Text: "        // which change"}}
+	if got := reviewSuggested(finding, reviewEditMost); !reflect.DeepEqual(got, want) {
+		t.Errorf("the edit is %+v", got)
+	}
+	if got := reviewSuggested(finding, 2); len(got) != 3 || got[2].Kind != "gap" || got[2].Text != "1 more line" {
+		t.Errorf("cut to two lines the edit is %+v", got)
+	}
+	if got := reviewSuggested(sawaFinding{Line: 3}, 9); got != nil {
+		t.Errorf("a finding that suggests nothing has %+v", got)
+	}
+
+	fake := reviewFixed()
+	fake.state.Threads[1].Suggest, fake.state.Threads[1].SuggestFrom = finding.Suggest, finding.SuggestFrom
+	view := reviewOf(fake)
+	reviewDone(view, reviewEvent{E: "move", List: "files", ID: "src/talk.rs"})
+	if deed := view.deed(reviewEvent{E: "press", ID: "apply"}); deed != (reviewDeed{}) {
+		t.Errorf("Apply with nothing open does %+v", deed)
+	}
+	reviewDone(view, reviewEvent{E: "pick", List: "diff", ID: strconv.Itoa(view.place("t2"))})
+	_, lines := reviewSaid(t, view.messages(reviewAim{words: true}, reviewNow))
+	under := lines[view.place("t2")].Under
+	var edit []reviewLine
+	if len(under) != 3 || under[0].T != "code" || under[0].ID != "suggested" || json.Unmarshal(under[0].Lines, &edit) != nil || !reflect.DeepEqual(edit, want) {
+		t.Fatalf("under the finding are %+v", under)
+	}
+	if buttons := under[2].Children; len(buttons) != 3 || !reflect.DeepEqual(buttons[2], reviewPiece{T: "button", ID: "apply", Label: "Apply"}) {
+		t.Errorf("the buttons are %+v", buttons)
+	}
+	reviewDone(view, reviewEvent{E: "press", ID: "apply"})
+	if got, want := fake.asked(), [][]string{{"apply", "t2", "--json", "-t", "range_main..HEAD"}}; !reflect.DeepEqual(got, want) || *view.status != (muiStatus{Text: "t2 applied to the working tree", Tone: "ok"}) {
+		t.Errorf("Apply ran %q, status %+v", got, view.status)
+	}
+	_, lines = reviewSaid(t, view.messages(reviewAim{}, reviewNow))
+	under = lines[view.place("t2")].Under
+	if len(under) != 4 || !reflect.DeepEqual(under[1], reviewPiece{T: "text", Text: "applied just now", Style: "dim", Tone: "ok"}) || len(under[3].Children) != 2 {
+		t.Errorf("once applied, under the finding are %+v", under)
+	}
+	// what sawa refuses — the file changed since — is the status
+	fake.state.Threads[1].AppliedAt = nil
+	fake.refuse = map[string]string{"apply": "`src/talk.rs` has changed since this was suggested; read it again before applying"}
+	view.read(reviewNow)
+	if reviewDone(view, reviewEvent{E: "press", ID: "apply"}); view.status.Tone != "bad" || !strings.Contains(view.status.Text, "has changed since") {
+		t.Errorf("a refusal: %+v", view.status)
+	}
+	fake.refuse = nil
+	fake.asked()
+
+	// a resolved finding, shown by u, is reopened with what is typed
+	reviewDone(view, reviewEvent{E: "press", ID: "shut"})
+	if deed := view.deed(reviewEvent{E: "press", ID: "reopen"}); deed != (reviewDeed{}) {
+		t.Errorf("Reopen with nothing open does %+v", deed)
+	}
+	reviewDone(view, reviewEvent{E: "press", ID: "resolved"})
+	reviewDone(view, reviewEvent{E: "pick", List: "diff", ID: strconv.Itoa(view.place("t4"))})
+	_, lines = reviewSaid(t, view.messages(reviewAim{}, reviewNow))
+	if buttons := lines[view.place("t4")].Under[1].Children; len(buttons) != 2 || !reflect.DeepEqual(buttons[1], reviewPiece{T: "button", ID: "reopen", Label: "Reopen"}) {
+		t.Errorf("under a resolved finding the buttons are %+v", buttons)
+	}
+	reviewDone(view, reviewEvent{E: "change", ID: "reply", Text: "it is not the old loop"})
+	reviewDone(view, reviewEvent{E: "press", ID: "reopen"})
+	if got, want := fake.asked(), [][]string{{"reopen", "t4", "--json", "-t", "range_main..HEAD", "-m", "it is not the old loop"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Reopen ran %q, want %q", got, want)
+	}
+	if finding, _ := view.finding("t4"); finding.State != "open" || view.typed["t4"] != "" || *view.status != (muiStatus{Text: "t4 reopened", Tone: "ok"}) {
+		t.Errorf("reopened, it is %s, status %+v", finding.State, view.status)
+	}
+	// one that stands has no Reopen, and with no words only the verb is run
+	if deed := view.deed(reviewEvent{E: "press", ID: "reopen"}); deed != (reviewDeed{}) {
+		t.Errorf("Reopen on a finding that stands does %+v", deed)
+	}
+	fake.state.Threads[3].State = "wontfix"
+	view.read(reviewNow)
+	reviewDone(view, reviewEvent{E: "press", ID: "reopen"})
+	if got, want := fake.asked(), [][]string{{"reopen", "t4", "--json", "-t", "range_main..HEAD"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Reopen with no words ran %q, want %q", got, want)
+	}
+}
+
+// g shows sawa's gates in place of the summary: each by its name with
+// what must hold, how it was judged, by whom and when, and why; ⏎ on one
+// shows what was judged, with an area for why and Pass, Warn and Fail,
+// which record its result through sw as the person; esc goes back to the
+// gates, and again to the summary.
+func TestTheGatesAreShownAndJudged(t *testing.T) {
+	gates := []sawaGate{
+		{Name: "tests", Text: "go test ./... passes", Gate: &sawaJudged{State: "pass", Note: "ran it: all ok", By: "sawa", At: reviewNow.Add(-5 * time.Minute)}},
+		{Name: "docs", Text: "what changed is in docs/changes.md", Gate: &sawaJudged{State: "fail", By: "sawa", At: reviewNow.Add(-2 * time.Hour)}},
+		{Name: "description", Text: "the description says what and why"},
+	}
+	want := []reviewEntry{
+		{Head: "Gates", Note: "2 of 3 judged"},
+		{ID: "g:tests", Title: "tests", Note: "go test ./... passes", Right: "pass · sawa · 5 min ago", Tone: "ok", Under: "ran it: all ok"},
+		{ID: "g:docs", Title: "docs", Note: "what changed is in docs/changes.md", Right: "fail · sawa · 2 h ago", Tone: "bad"},
+		{ID: "g:description", Title: "description", Note: "the description says what and why", Right: "not judged"},
+	}
+	if got := reviewGates(gates, reviewGatesMost, reviewNow); !reflect.DeepEqual(got, want) {
+		t.Errorf("the gates are %+v", got)
+	}
+	if got := reviewGates(gates, 1, reviewNow); len(got) != 2 {
+		t.Errorf("at a most of one the gates are %+v", got)
+	}
+
+	fake := reviewFixed()
+	view := reviewOf(fake)
+	if say, _ := reviewDone(view, reviewEvent{E: "press", ID: "gates"}); !say || view.gating || view.status == nil || !strings.Contains(view.status.Text, "no gates") {
+		t.Errorf("g with no gates: gating %v, status %+v", view.gating, view.status)
+	}
+	fake.state.Gates = gates
+	view.read(reviewNow)
+	say, aim := reviewDone(view, reviewEvent{E: "press", ID: "gates"})
+	first, _ := reviewSaid(t, view.messages(aim, reviewNow))
+	list := reviewPieceOf(first.View, "gates")
+	if !say || aim.focus != "gates" || list == nil || !reflect.DeepEqual(list.Items, want) || list.Selected != "g:tests" || first.Keys[0] != (gitKey{"esc", "back to the summary", "shut"}) {
+		t.Fatalf("g: said %v with %+v, the list %+v", say, aim, list)
+	}
+	if texts := reviewTexts(first.View.Children[0]); slices.ContainsFunc(texts, func(text string) bool { return strings.HasPrefix(text, "Adds patch") }) {
+		t.Errorf("the summary is said with the gates up: %q", texts)
+	}
+
+	// ⏎ on one shows what was judged, and a person may record its result
+	if _, aim = reviewDone(view, reviewEvent{E: "pick", List: "gates", ID: "g:tests"}); view.gate != "tests" || aim.focus != "why" {
+		t.Fatalf("⏎ shows %q with %+v", view.gate, aim)
+	}
+	first, _ = reviewSaid(t, view.messages(aim, reviewNow))
+	head := first.View.Children[0]
+	if texts := reviewTexts(head); !slices.Equal(texts[4:], []string{"gate  tests", "go test ./... passes", "pass · sawa · 5 min ago: ran it: all ok"}) || first.Keys[0] != (gitKey{"esc", "back to the gates", "shut"}) {
+		t.Errorf("the gate says %q", texts)
+	}
+	if why, buttons := reviewPieceOf(&head, "why"), head.Children[len(head.Children)-1].Children; why == nil || why.T != "field" || len(buttons) != 3 || !reflect.DeepEqual(buttons[1], reviewPiece{T: "button", ID: "gate-warn", Label: "Warn"}) {
+		t.Errorf("under it are %+v and %+v", why, buttons)
+	}
+	reviewDone(view, reviewEvent{E: "change", ID: "why", Text: "-race is not run"})
+	_, aim = reviewDone(view, reviewEvent{E: "press", ID: "gate-warn"})
+	if got, want := fake.asked(), [][]string{{"gate", "tests", "warn", "--json", "-t", "range_main..HEAD", "-m", "-race is not run"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Warn ran %q, want %q", got, want)
+	}
+	if view.gate != "" || !view.gating || aim.focus != "gates" || *view.status != (muiStatus{Text: "tests: warn", Tone: "warn"}) || view.state.Gates[0].Gate.State != "warn" || view.typed["g:tests"] != "" {
+		t.Errorf("judged: the gate shown %q, status %+v, sawa has %+v", view.gate, view.status, view.state.Gates[0].Gate)
+	}
+	// with no words only the result is recorded; a button with no gate shown does nothing
+	if deed := view.deed(reviewEvent{E: "press", ID: "gate-pass"}); deed != (reviewDeed{}) {
+		t.Errorf("Pass with no gate shown does %+v", deed)
+	}
+	reviewDone(view, reviewEvent{E: "pick", List: "gates", ID: "g:description"})
+	reviewDone(view, reviewEvent{E: "press", ID: "gate-pass"})
+	if got, want := fake.asked(), [][]string{{"gate", "description", "pass", "--json", "-t", "range_main..HEAD"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Pass ran %q, want %q", got, want)
+	}
+	// esc: from a gate to the gates, from the gates to the summary
+	reviewDone(view, reviewEvent{E: "pick", List: "gates", ID: "g:docs"})
+	if _, aim = reviewDone(view, reviewEvent{E: "press", ID: "shut"}); view.gate != "" || !view.gating || aim.focus != "gates" {
+		t.Errorf("esc on a gate: %q shown, gating %v", view.gate, view.gating)
+	}
+	if _, aim = reviewDone(view, reviewEvent{E: "press", ID: "shut"}); view.gating || aim.focus != "files" {
+		t.Errorf("esc on the gates: gating %v with %+v", view.gating, aim)
+	}
+	if deed := view.deed(reviewEvent{E: "pick", List: "gates", ID: "g:docs"}); deed != (reviewDeed{}) {
+		t.Errorf("⏎ on a gate with the gates down does %+v", deed)
+	}
+}
+
+// The words over a run of lines are those git has over the hunk the run
+// is in — the function it is in, where git knows one — found by the
+// run's first line in the new file, or in the old where it has none; a
+// run in no hunk says where it begins.
+func TestAHunkIsNamedAsGitNamesIt(t *testing.T) {
+	hunks := []git.Hunk{
+		{OldStart: 214, OldLines: 6, NewStart: 216, NewLines: 9, Section: "impl Talk {"},
+		{OldStart: 236, OldLines: 6, NewStart: 240, NewLines: 12, Section: "fn hear(&mut self, said: Said) -> Heard {"},
+		{OldStart: 300, OldLines: 4, NewStart: 310, NewLines: 0, Section: "fn gone()"},
+	}
+	for _, c := range []struct {
+		old, new int
+		want     string
+	}{{0, 219, "impl Talk {"}, {217, 221, "impl Talk {"}, {239, 243, "fn hear(&mut self, said: Said) -> Heard {"}, {240, 0, "fn hear(&mut self, said: Said) -> Heard {"},
+		{301, 0, "fn gone()"}, {0, 120, ""}, {0, 280, ""}, {120, 0, ""}} {
+		if got := reviewSection(hunks, c.old, c.new); got != c.want {
+			t.Errorf("the run from %d, %d is in %q, want %q", c.old, c.new, got, c.want)
+		}
+	}
+	fake := reviewFixed()
+	lines, _ := reviewCode(fake.rows["src/talk.rs"], reviewNotes{hunks: hunks[:1], now: reviewNow})
+	var heads []string
+	for _, line := range lines {
+		if line.Kind == "head" {
+			heads = append(heads, line.Text+" · "+line.Right)
+		}
+	}
+	if want := []string{"@@ impl Talk { · hunk 1 of 2", "@@ line 243 · hunk 2 of 2"}; !slices.Equal(heads, want) {
+		t.Errorf("the heads are %q, want %q", heads, want)
+	}
+	// a new file's head says so, whatever git has
+	lines, _ = reviewCode(fake.rows["src/mui/patch.rs"], reviewNotes{hunks: []git.Hunk{{NewStart: 1, NewLines: 2, Section: "x"}}, now: reviewNow})
+	if lines[0].Text != "@@ new file" {
+		t.Errorf("a new file's head is %q", lines[0].Text)
+	}
+}
+
+// When the last unread file is marked read there is no next one: the
+// status says every file is read, and the keys are on the verdicts.
+func TestWhenEveryFileIsReadTheKeysAreOnTheVerdict(t *testing.T) {
+	fake := reviewFixed()
+	for at := range fake.state.Files {
+		fake.state.Files[at].Read = fake.state.Files[at].Path != "src/talk.rs"
+	}
+	view := reviewOf(fake)
+	say, aim := reviewDone(view, reviewEvent{E: "press", ID: "read", Item: "src/talk.rs"})
+	if !say || !view.judging || aim.focus != "verdict" || !aim.list || *view.status != (muiStatus{Text: "every file is read: the verdict is yours", Tone: "ok"}) {
+		t.Fatalf("space on the last unread file: said %v with %+v, status %+v", say, aim, view.status)
+	}
+	first, _ := reviewSaid(t, view.messages(aim, reviewNow))
+	if verdicts := reviewPieceOf(first.View, "verdict"); verdicts == nil || verdicts.Selected != "approve" || first.Focus != "verdict" {
+		t.Errorf("the verdicts are %+v, the keys on %q", verdicts, first.Focus)
+	}
+	// while another is unread, the next one is shown and no verdict asked
+	fake.state.Files[0].Read, fake.state.Files[5].Read = false, false
+	view = reviewOf(fake)
+	if reviewDone(view, reviewEvent{E: "press", ID: "read", Item: "src/talk.rs"}); view.judging || view.file != "docs/apps.md" {
+		t.Errorf("with a file unread: judging %v, on %s", view.judging, view.file)
+	}
+}
+
+// e hands the file to the editor as mia files does, at the line of the
+// file the keys are on in the diff — a deleted line's and a note's being
+// the next line the file has — and at its first line on its row in the
+// list; nothing is asked of sawa.
+func TestEHandsTheFileToTheEditorAtTheLine(t *testing.T) {
+	fake := reviewFixed()
+	view := reviewOf(fake)
+	reviewDone(view, reviewEvent{E: "move", List: "files", ID: "src/talk.rs"})
+	place := func(mark reviewMark) string { return strconv.Itoa(slices.Index(view.marks, mark)) }
+	for item, want := range map[string]reviewDeed{
+		place(reviewMark{kind: "add", new: 246}):            {do: reviewEdit, file: "src/talk.rs", place: 246},
+		place(reviewMark{kind: "same", old: 239, new: 243}): {do: reviewEdit, file: "src/talk.rs", place: 243},
+		place(reviewMark{kind: "del", old: 240}):            {do: reviewEdit, file: "src/talk.rs", place: 244},
+		place(reviewMark{kind: "note", note: "t1"}):         {do: reviewEdit, file: "src/talk.rs", place: 246},
+		"0":          {do: reviewEdit, file: "src/talk.rs", place: 219}, // a hunk's head
+		"":           {do: reviewEdit, file: "src/talk.rs", place: 219},
+		"src/mui.rs": {do: reviewEdit, file: "src/mui.rs", place: 1},
+		"d:src/":     {},
+	} {
+		if got := view.deed(reviewEvent{E: "press", ID: "edit", Item: item}); got != want {
+			t.Errorf("e on %q does %+v, want %+v", item, got, want)
+		}
+	}
+	if say, _ := view.act(reviewDeed{do: reviewEdit, file: "src/talk.rs", place: 246}, reviewNow); say || len(fake.asked()) != 0 {
+		t.Error("e said the view again, or asked sawa")
+	}
+
+	gittest.Isolate(t)
+	view.top = git.Resolve(t.TempDir())
+	said := filepath.Join(t.TempDir(), "said")
+	editor := filepath.Join(t.TempDir(), "editor")
+	if err := os.WriteFile(editor, []byte("#!/bin/sh\npwd > \"$REVIEW_SAID\"\nprintf '%s\\n' \"$@\" >> \"$REVIEW_SAID\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("REVIEW_SAID", said)
+	t.Setenv("EDITOR", editor+" --wait")
+	view.edit(reviewDeed{do: reviewEdit, file: "src/talk.rs", place: 246})
+	out, err := os.ReadFile(said)
+	if want := []string{view.top, "--wait", "+246", "src/talk.rs"}; err != nil || !slices.Equal(strings.Split(strings.TrimSpace(string(out)), "\n"), want) || view.status != nil {
+		t.Errorf("the editor was run as %q, %v, status %+v", out, err, view.status)
+	}
+	if first, _ := reviewSaid(t, view.messages(reviewAim{}, reviewNow)); first.Keys[4] != (gitKey{"e", "edit in editor", "edit"}) {
+		t.Errorf("the key says %+v", first.Keys[4])
+	}
+	t.Setenv("EDITOR", filepath.Join(t.TempDir(), "no-such-editor"))
+	if view.edit(reviewDeed{do: reviewEdit, file: "src/talk.rs", place: 1}); view.status == nil || view.status.Tone != "bad" || !strings.Contains(view.status.Text, "no-such-editor") {
+		t.Errorf("no such editor: %+v", view.status)
+	}
+}
+
+// Where sawa reviews a stack the header says which layer of how many
+// this is, and [ and ] show the layer under and the one over: sawa opens
+// that layer's review, and this worktree's own is the one that was
+// found. At the bottom and at the top the status says so, and where
+// sawa knows no stack there are no layers.
+func TestTheLayersOfAStackAreGoneThrough(t *testing.T) {
+	fake := reviewFixed()
+	view := reviewOf(fake)
+	if view.stacked(); len(view.layers) != 0 {
+		t.Fatalf("with no stack the layers are %+v", view.layers)
+	}
+	first, _ := reviewSaid(t, view.messages(reviewAim{}, reviewNow))
+	if slices.ContainsFunc(first.Keys, func(key gitKey) bool { return key.Key == "[" }) || strings.Contains(reviewTexts(first.View.Children[0])[3], "layer") {
+		t.Errorf("with no stack the keys are %+v", first.Keys)
+	}
+	if reviewDone(view, reviewEvent{E: "press", ID: "under"}); *view.status != (muiStatus{Text: "sawa reviews no stack here"}) {
+		t.Errorf("[ with no stack: %+v", view.status)
+	}
+
+	fake.layers = []sawaLayer{{Branch: "mui", Revset: "main..mui", Slug: "range_main..mui"}, {Branch: "mui-patch", Revset: "mui..mui-patch", Slug: "range_mui..mui-patch", Current: true}, {Branch: "mui-chat", Revset: "mui-patch..mui-chat", Slug: "range_mui-patch..mui-chat"}}
+	view.status = nil
+	view.stacked()
+	fake.asked()
+	if len(view.layers) != 3 || view.layer != 1 || view.home != 1 || view.homeSlug != "range_main..HEAD" {
+		t.Fatalf("the layers are %+v, this one %d", view.layers, view.layer)
+	}
+	first, _ = reviewSaid(t, view.messages(reviewAim{}, reviewNow))
+	if about := reviewTexts(first.View.Children[0])[3]; !strings.HasSuffix(about, " · layer 2 of 3") || first.Keys[10] != (gitKey{"[", "layer under", "under"}) || first.Keys[11] != (gitKey{"]", "layer over", "over"}) {
+		t.Errorf("the header says %q, the keys %+v", about, first.Keys)
+	}
+	reviewDone(view, reviewEvent{E: "move", List: "files", ID: "src/talk.rs"})
+	say, aim := reviewDone(view, reviewEvent{E: "press", ID: "under"})
+	if got, want := fake.asked(), [][]string{{"open", "-r", "main..mui", "--json"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("[ ran %q, want %q", got, want)
+	}
+	if !say || view.layer != 0 || view.slug != "range_main..mui" || view.file != "docs/apps.md" || !aim.list || !aim.code || view.title != "mui" {
+		t.Errorf("[: said %v with %+v, layer %d, the review %q titled %q on %s", say, aim, view.layer, view.slug, view.title, view.file)
+	}
+	if first, _ = reviewSaid(t, view.messages(aim, reviewNow)); !strings.HasSuffix(reviewTexts(first.View.Children[0])[3], " · layer 1 of 3") {
+		t.Errorf("the header says %q", reviewTexts(first.View.Children[0])[3])
+	}
+	if reviewDone(view, reviewEvent{E: "press", ID: "under"}); view.layer != 0 || *view.status != (muiStatus{Text: "this is the bottom layer"}) || len(fake.asked()) != 0 {
+		t.Errorf("[ at the bottom: layer %d, status %+v", view.layer, view.status)
+	}
+	// what is done is done to the review of the layer shown
+	reviewDone(view, reviewEvent{E: "press", ID: "read", Item: "docs/apps.md"})
+	if got, want := fake.asked(), [][]string{{"read", "--json", "-t", "range_main..mui", "-f", "docs/apps.md"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("space ran %q, want %q", got, want)
+	}
+	// ] back to this worktree's own, which is not opened again, and on
+	if reviewDone(view, reviewEvent{E: "press", ID: "over"}); view.layer != 1 || view.slug != "range_main..HEAD" || len(fake.asked()) != 0 || view.title != "mui-patch" {
+		t.Errorf("]: layer %d, the review %q titled %q", view.layer, view.slug, view.title)
+	}
+	reviewDone(view, reviewEvent{E: "press", ID: "over"})
+	if got, want := fake.asked(), [][]string{{"open", "-r", "mui-patch..mui-chat", "--json"}}; !reflect.DeepEqual(got, want) || view.layer != 2 {
+		t.Errorf("] ran %q, layer %d", got, view.layer)
+	}
+	if reviewDone(view, reviewEvent{E: "press", ID: "over"}); view.layer != 2 || *view.status != (muiStatus{Text: "this is the top layer"}) {
+		t.Errorf("] at the top: layer %d, status %+v", view.layer, view.status)
+	}
+	// a layer sawa cannot open is the status, and the layer shown stays
+	reviewDone(view, reviewEvent{E: "press", ID: "under"})
+	fake.refuse = map[string]string{"open": "no such revision"}
+	if reviewDone(view, reviewEvent{E: "press", ID: "over"}); view.layer != 1 || view.slug != "range_main..HEAD" || view.status.Tone != "bad" {
+		t.Errorf("a refusal: layer %d, status %+v", view.layer, view.status)
+	}
+}
+
+// Against real sw, in a throwaway repository: a finding on the review as
+// a whole is in the header and is answered there; the edit a finding
+// suggests is made in the working tree by Apply; a gate of the
+// repository's is recorded by the person, whom sawa lets; a resolved
+// finding is reopened; and the hunks are named as git names them.
+func TestGatesEditsAndReopeningGoThroughSw(t *testing.T) {
+	if _, err := exec.LookPath("sw"); err != nil {
+		t.Skip("sw is not on PATH")
+	}
+	gittest.Isolate(t)
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("SAWA_TARGET", "")
+	os.Unsetenv("SAWA_TARGET")
+	t.Setenv("SAWA_AGENT", "1")
+	t.Setenv("SAWA_AUTHOR", "sawa")
+	repo := gittest.New(t)
+	talk := []string{"package talk", "", "func Five() string {", "\ta := 1", "\tb := 2", "\tc := 3", "\tn := a + b + c - 1", "\treturn \"five\"", "}", "", "// the end"}
+	repo.Write("talk.go", strings.Join(talk, "\n")+"\n")
+	repo.Write(".sawa/gates.md", "- tests: go test ./... passes\n- docs: what changed is written down\n")
+	repo.Commit("talk")
+	repo.Git("checkout", "-q", "-b", "words")
+	talk[7] = "\treturn \"fives\""
+	repo.Write("talk.go", strings.Join(talk, "\n")+"\n")
+	repo.Commit("Five says fives")
+
+	view := &reviewView{pane: "%1", dir: repo.Root, run: sawaIn(repo.Root), typed: map[string]string{}}
+	view.find(reviewNow)
+	if view.failed != "" || view.status != nil {
+		t.Fatalf("the review was not opened: %q %+v", view.failed, view.status)
+	}
+	if !strings.HasPrefix(view.state.Store, repo.Root+"/.git/sawa/") {
+		t.Fatalf("sawa keeps the review at %s, outside the throwaway repository %s", view.state.Store, repo.Root)
+	}
+	if len(view.layers) != 0 || len(view.state.Gates) != 2 || view.state.Gates[0].Gate != nil {
+		t.Fatalf("layers %+v, gates %+v", view.layers, view.state.Gates)
+	}
+	// git names the hunk by the function it is in
+	if _, lines := reviewSaid(t, view.messages(reviewAim{}, time.Now())); view.file != "talk.go" || lines[0].Text != "@@ func Five() string {" {
+		t.Errorf("the head of %s is %q", view.file, lines[0].Text)
+	}
+
+	// sawa, an agent, files one on the review as a whole and one that suggests an edit.
+	edit := filepath.Join(t.TempDir(), "edit")
+	if err := os.WriteFile(edit, []byte("\treturn \"five\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"add", "--json", "-m", "question: why fives\nThe commit does not say."},
+		{"add", "--json", "-f", "talk.go", "-l", "8", "--suggest-file", edit, "-m", "suggestion: five is one word"},
+	} {
+		file := exec.Command("sw", args...)
+		file.Dir = repo.Root
+		if out, err := file.CombinedOutput(); err != nil {
+			t.Fatalf("sw %s: %v\n%s", args[0], err, out)
+		}
+	}
+	view.read(time.Now())
+	do := func(event reviewEvent) reviewAim {
+		t.Helper()
+		_, aim := view.act(view.deed(event), time.Now())
+		if view.status != nil && view.status.Tone == "bad" {
+			t.Fatalf("%+v: %s", event, view.status.Text)
+		}
+		return aim
+	}
+	sawa := func() sawaState {
+		t.Helper()
+		state, err := sawaAsk[sawaState](sawaIn(repo.Root), "state", "--json", "-t", view.slug)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return state
+	}
+	first, _ := reviewSaid(t, view.messages(reviewAim{}, time.Now()))
+	if list := reviewPieceOf(first.View, "general"); list == nil || len(list.Items) != 2 || list.Items[1].ID != "t1" || list.Items[1].Title != "why fives" || list.Items[1].Lead != "question" {
+		t.Fatalf("the findings on the review as a whole are %+v", list)
+	}
+
+	// N from the top is on it; ⏎ and a reply answer it; Reply and resolve, then Reopen.
+	if aim := do(reviewEvent{E: "press", ID: "prev"}); view.above != "t1" || aim.focus != "general" {
+		t.Errorf("N went to %q with %+v", view.above, aim)
+	}
+	do(reviewEvent{E: "pick", List: "general", ID: "t1"})
+	do(reviewEvent{E: "submit", ID: "reply", Text: "it is a typo"})
+	do(reviewEvent{E: "press", ID: "resolve"})
+	if got := sawa().Threads[0]; got.State != "resolved" || len(got.Posts) != 2 || got.Posts[1].Author != "test" || got.Posts[1].Body != "it is a typo" {
+		t.Errorf("sawa has the finding as %+v", got)
+	}
+	do(reviewEvent{E: "press", ID: "resolved"})
+	do(reviewEvent{E: "pick", List: "general", ID: "t1"})
+	do(reviewEvent{E: "change", ID: "reply", Text: "not fixed yet"})
+	do(reviewEvent{E: "press", ID: "reopen"})
+	if got := sawa().Threads[0]; got.State != "open" || len(got.Posts) != 3 || got.Posts[2].Body != "not fixed yet" || got.Posts[2].Author != "test" {
+		t.Errorf("reopened, sawa has the finding as %+v", got)
+	}
+	do(reviewEvent{E: "press", ID: "shut"})
+
+	// The edit is under the finding's words, and Apply makes it in the working tree.
+	do(reviewEvent{E: "press", ID: "next"})
+	if view.marks[view.at].note != "t2" {
+		t.Fatalf("n went to %+v", view.marks[view.at])
+	}
+	do(reviewEvent{E: "pick", List: "diff", ID: strconv.Itoa(view.at)})
+	_, lines := reviewSaid(t, view.messages(reviewAim{}, time.Now()))
+	var suggested []reviewLine
+	want := []reviewLine{{Kind: "del", Old: 8, Text: "    return \"fives\""}, {Kind: "add", New: 8, Text: "    return \"five\""}}
+	if under := lines[view.place("t2")].Under; len(under) < 2 || under[0].ID != "suggested" || json.Unmarshal(under[0].Lines, &suggested) != nil || !reflect.DeepEqual(suggested, want) {
+		t.Fatalf("under the finding are %+v", under)
+	}
+	do(reviewEvent{E: "press", ID: "apply"})
+	talk[7] = "\treturn \"five\""
+	if got, err := os.ReadFile(filepath.Join(repo.Root, "talk.go")); err != nil || string(got) != strings.Join(talk, "\n")+"\n" {
+		t.Errorf("the file is now %q, %v", got, err)
+	}
+	if got := sawa().Threads[1]; got.AppliedAt == nil || *view.status != (muiStatus{Text: "t2 applied to the working tree", Tone: "ok"}) {
+		t.Errorf("sawa has the finding as %+v, status %+v", got, view.status)
+	}
+	if view.act(view.deed(reviewEvent{E: "press", ID: "apply"}), time.Now()); view.status == nil || view.status.Tone != "bad" {
+		t.Errorf("applied again: %+v", view.status)
+	}
+	do(reviewEvent{E: "press", ID: "shut"})
+
+	// The gates are sawa's, and a person records one's result.
+	do(reviewEvent{E: "press", ID: "gates"})
+	first, _ = reviewSaid(t, view.messages(reviewAim{list: true}, time.Now()))
+	if list := reviewPieceOf(first.View, "gates"); list == nil || len(list.Items) != 3 || list.Items[1].Title != "tests" || list.Items[1].Note != "go test ./... passes" || list.Items[1].Right != "not judged" {
+		t.Fatalf("the gates are %+v", list)
+	}
+	do(reviewEvent{E: "pick", List: "gates", ID: "g:tests"})
+	do(reviewEvent{E: "change", ID: "why", Text: "-ran it here"})
+	do(reviewEvent{E: "press", ID: "gate-warn"})
+	if got := sawa().Gates[0].Gate; got == nil || got.State != "warn" || got.Note != "-ran it here" || got.By != "test" {
+		t.Errorf("sawa has the gate as %+v", got)
+	}
+	if got := view.state.Gates[0].Gate; got == nil || got.State != "warn" || view.gate != "" || !view.gating {
+		t.Errorf("the view has the gate as %+v", got)
 	}
 }

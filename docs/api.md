@@ -688,13 +688,16 @@ another of these keys.
 Not yet: editing in place, and a diff or a commit of more than 1500
 lines read past them.
 ### mia review
+
 `mia review [<range> | pr <number> | w]` is an app of mia's own: run in a
 pane of a worktree, it has mia desk draw a code review of that worktree
 over the pane, by desk's UI protocol. The review itself is
 sawa's — `sw`, the local code-review tool, keeps the files, what was
-read, the findings and the verdict — and `mia review` is a face on it:
-everything it shows it asks `sw` for as JSON, and everything it does
-it has `sw` do, as you. `mia api capabilities` lists `review-app`.
+read, the findings, the gates and the verdict — and `mia review` is a
+face on it: everything it shows it asks `sw` for as JSON, and everything
+it does it has `sw` do, as you. `mia api capabilities` lists
+`review-app`.
+
 With no argument it shows the review sawa already has for this worktree:
 the one of the branch against its base (`<base>..HEAD`), else the one of
 this worktree last written to — never a pull request's, which is every
@@ -702,12 +705,21 @@ worktree's. With none it opens one, `sw open -r <base>..HEAD`; the base
 is found as [`mia git`](#mia-git) finds it. An argument is opened as `sw
 nvim` takes one: `pr 14`, `w` for the working tree, anything else a
 range.
+
 Over the view is the change's title — a pull request's own, a branch's
-one commit's subject, else the branch — with, at its right, how many
-findings stand and the verdict. Under it are what the review is of
-(`words → main · 3 files · +5 -3 · sawa read it 4 min ago`, the age that
-of the finding filed last) and sawa's summary, cut to 400 characters.
+one commit's subject, else the branch — with, at its right, how the
+findings stand (`3 open`; by the filter `1 to answer`, or `3 open, 1
+resolved`) and the verdict. Under it are what the review is of (`words →
+main · 3 files · +5 -3 · sawa read it 4 min ago · layer 2 of 3`, the age
+that of the finding filed last, the layer said only where sawa reviews a
+stack) and sawa's summary, cut to 400 characters. Under the summary is a
+list, `general`, of the findings on the review as a whole — those on no
+file — each by its first line with its label before it and who filed it
+and how it stands at its right; `⏎` on one opens it under the list, all
+its words and its thread, as a file's is opened under its line.
+
 Under those, side by side:
+
 - A list, `files`, by folder: each folder open over its files, a file
   with its lines added and deleted, how many findings stand on it, and
   checked once read. `o` puts them in reading order instead — the files
@@ -718,17 +730,29 @@ Under those, side by side:
   out between two, and each finding as a note directly under the line it
   is about: `issue · major` in its tone (bad for a blocker and a major
   one, a warning below that), its first line, who filed it and how it
-  stands. A finding on no line shown is over them all. Findings resolved
-  or closed are left out until `u`. Past 1500 lines the code ends in a
-  gap that says how many more there are.
-| `n` `N` | the keys on the next finding that stands, or the one before, across files and round again (the code's `selected`, and the message's `focus`) |
-| `⏎` | on a note: opens it — all its words, the replies with who and when, a text area and **Reply** (`⌘⏎` in the area: `sw reply <id> -m`) and **Reply and resolve** (then `sw resolve <id>`; with no words, only that). On a file: the keys on its diff |
+  stands. A run's head says what it is in as git names it — `@@ fn
+  hear(&mut self)`, the words after the `@@` of `git diff <base> <head>
+  -- <file>` for the hunk that has the run's first line — and where git
+  has none, the line it begins at. A finding on no line shown is over
+  them all. Findings resolved or closed are left out until `u` or `f`.
+  Past 1500 lines the code ends in a gap that says how many more there
+  are.
+
+| key | does |
+|---|---|
+| `n` `N` | the keys on the next finding that is shown, or the one before, round again: those on the review as a whole first (the list `general`), then across files (the code's `selected`, and the message's `focus`) |
+| `⏎` | on a note, or a finding on the review as a whole: opens it — all its words, the edit it suggests as a small code of the lines deleted and added, the replies with who and when, a text area and **Reply** (`⌘⏎` in the area: `sw reply <id> -m`), **Reply and resolve** while it stands (then `sw resolve <id>`; with no words, only that), **Reopen** once it does not (`sw reopen <id>`, with the words typed as its `-m`), and **Apply** while it suggests an edit no one has applied (`sw apply <id>`: sawa makes the edit in the working tree, and refuses where the lines changed since). On a file: the keys on its diff |
 | `esc` | shuts what is open and keeps the words typed |
 | `c` | on a line of the diff: a comment under it, filed by **Comment** as a finding on that line (`sw add -f <file> -l <line> --side new\|old -m`); `issue:` or `suggestion:` before the words says its type, as in sawa |
-| `space` | marks the file under the keys read (`sw read -f`) and shows the next unread one |
+| `space` | marks the file under the keys read (`sw read -f`) and shows the next unread one; when every file is read the status says so and the verdicts come up with the keys on them |
+| `e` | hands the file to the editor as [`mia files`](#mia-files) does — `$EDITOR +<line> <path>`, else `nvim`, run in the worktree's top folder, the view said again when it leaves — at the line of the file the keys are on in the diff (a deleted line's and a note's being the next line the file has), and at its first on its row in the list |
+| `f` | which findings are shown: every open one, then only those an agent says it addressed and that wait on you, then the resolved too, and round again; the header's count, each file's, the notes and `n` follow |
+| `g` | sawa's gates in place of the summary, a list `gates`: each by its name with what must hold (`.sawa/gates.md`), how it was judged, by whom and when at its right, and why on a line under it. `⏎` on one shows what was judged, with a text area for why and **Pass**, **Warn** and **Fail**, which record its result (`sw gate <name> pass\|warn\|fail -m`): sawa lets a person record one as it lets an agent. `esc` goes back to the gates, and again to the summary |
 | `v` | the verdicts in place of the summary — approve, request changes, comment only, and none once one is given; `⏎` gives it (`sw verdict`), `esc` leaves it |
 | `o` `u` | reading order or by folder; resolved findings shown or not |
+| `[` `]` | where sawa reviews a stack (`sw stack --json` says its layers): the layer under and the one over, each a review of its own (`sw open -r <parent>..<branch>`), this worktree's own being the one found as above; the header says `layer 2 of 3`, and the status says so at the bottom and at the top |
 | `r` | has sawa look at the change again (`sw open` of the same target) |
+
 Every `sw` is run with `-t <review>` and without `SAWA_AGENT`,
 `SAWA_AUTHOR` and `SAWA_SNAPSHOT`, so what is written is the person's
 whatever the pane's environment says. After each the review is read
@@ -737,15 +761,18 @@ the file `sw state` names as its `store` is looked at every 2 s — so a
 finding an agent files or answers comes in while you read; the view is
 said again only when it would say something else, and the keys stay on
 the line they were on.
+
 What sawa refuses — approving over a blocker, a line the file does not
-have — is the view's status, cut to 200 characters, and the app stays
-up; so it does with no `sw` on `PATH` and with nothing to review, which
-the view says, and `r` asks again. `q` or `⌃C` in the plain terminal
-leaves, as closing the view does; stdin that is no terminal is refused,
-exit 1.
-Not yet: sawa's map and its patterns, gates, applying a suggested edit,
-findings on the review as a whole, colour by syntax, and a pull
-request's comments on GitHub.
+have, an edit whose lines changed — is the view's status, cut to 200
+characters, and the app stays up; so it does with no `sw` on `PATH` and
+with nothing to review, which the view says, and `r` asks again. `q` or
+`⌃C` in the plain terminal leaves, as closing the view does; stdin that
+is no terminal is refused, exit 1.
+
+Not yet: changing the words of a finding you filed (sawa has no verb for
+it: `sw type` changes only its type), filing a finding on the review as
+a whole, sawa's map and its patterns, and a pull request's comments on
+GitHub.
 
 ## Setups
 

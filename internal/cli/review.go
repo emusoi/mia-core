@@ -25,10 +25,15 @@ const reviewUsage = "mia review [<range> | pr <number> | w]"
 
 // What a view of a review holds at most, all of it under the pieces the
 // window takes of a UI (muiPieces): the rows of its list of files, with
-// the lines of a file's diff (gitLinesMost); and the characters said of
-// sawa's summary, of a finding's words and of what is typed under one.
+// the lines of a file's diff (gitLinesMost), the findings on the review
+// as a whole, the gates and the lines of a suggested edit; and the
+// characters said of sawa's summary, of a finding's words and of what is
+// typed under one.
 const (
 	reviewRowsMost    = 400
+	reviewAboveMost   = 12
+	reviewGatesMost   = 20
+	reviewEditMost    = 40
 	reviewSummaryMost = 400
 	reviewNoteMost    = 8000
 	reviewAreaMost    = 4000
@@ -52,12 +57,15 @@ type sawaState struct {
 	Slug    string        `json:"slug"`
 	Label   string        `json:"label"`
 	Store   string        `json:"store"`
+	Base    string        `json:"base"` // the commit the change is against
+	Head    string        `json:"head"` // the commit it ends at, "" for the working tree
 	Target  sawaTarget    `json:"target"`
 	Summary string        `json:"summary"`
 	Files   []sawaFile    `json:"files"`
 	Threads []sawaFinding `json:"threads"`
 	Path    []sawaStop    `json:"path"`
 	Verdict sawaVerdict   `json:"verdict"`
+	Gates   []sawaGate    `json:"gates"`
 	Counts  struct {
 		Added   int `json:"added"`
 		Removed int `json:"removed"`
@@ -81,17 +89,23 @@ type sawaFile struct {
 	Stale   bool   `json:"stale"` // read, and changed since
 }
 
-// sawaFinding is a finding: where it is, what kind and how bad, how it
-// stands, and what was said, the finding itself first.
+// sawaFinding is a finding: where it is — on no file, it is on the
+// review as a whole — what kind and how bad, how it stands, and what was
+// said, the finding itself first. One that suggests an edit carries the
+// lines it would put in place of those it is on, those lines as they
+// were when it was filed, and when the edit was applied.
 type sawaFinding struct {
-	ID       string     `json:"id"`
-	File     string     `json:"file"`
-	Line     int        `json:"line"`
-	Side     string     `json:"side"`
-	Type     string     `json:"type"`
-	Severity string     `json:"severity"`
-	State    string     `json:"state"`
-	Posts    []sawaPost `json:"posts"`
+	ID          string     `json:"id"`
+	File        string     `json:"file"`
+	Line        int        `json:"line"`
+	Side        string     `json:"side"`
+	Type        string     `json:"type"`
+	Severity    string     `json:"severity"`
+	State       string     `json:"state"`
+	Posts       []sawaPost `json:"posts"`
+	Suggest     string     `json:"suggest"`
+	SuggestFrom string     `json:"suggest_from"`
+	AppliedAt   *time.Time `json:"applied_at"`
 }
 
 type sawaPost struct {
@@ -109,6 +123,38 @@ type sawaStop struct {
 type sawaVerdict struct {
 	Verdict string `json:"verdict"`
 	Label   string `json:"label"`
+}
+
+// sawaGate is a gate of the repository's: something that must hold
+// before a change merges, in words, and what was judged of it for this
+// review, nil while no one has.
+type sawaGate struct {
+	Name string      `json:"name"`
+	Text string      `json:"text"`
+	Gate *sawaJudged `json:"gate"`
+}
+
+// sawaJudged is a gate's recorded result: pass, warn or fail, why, who
+// said so and when.
+type sawaJudged struct {
+	State string    `json:"state"`
+	Note  string    `json:"note"`
+	By    string    `json:"by"`
+	At    time.Time `json:"at"`
+}
+
+// sawaStack is a stack as sw stack says it: its layers, bottom first.
+type sawaStack struct {
+	Layers []sawaLayer `json:"layers"`
+}
+
+// sawaLayer is a layer of a stack: its branch, the range sawa reviews
+// it by, the review of that range, and whether the worktree is on it.
+type sawaLayer struct {
+	Branch  string `json:"branch"`
+	Revset  string `json:"revset"`
+	Slug    string `json:"slug"`
+	Current bool   `json:"current"`
 }
 
 // sawaListed is a review as sw list says it.
@@ -232,6 +278,28 @@ func (f sawaFinding) stands() bool {
 	return f.State != "resolved" && f.State != "wontfix"
 }
 
+// reviewFilter is which findings are shown: those that stand, of them
+// only those an agent says it addressed and that wait on the person, or
+// all of them, the resolved too.
+type reviewFilter int
+
+const (
+	reviewStanding reviewFilter = iota
+	reviewMine
+	reviewAll
+)
+
+// takes reports whether a finding is one the filter shows.
+func (filter reviewFilter) takes(f sawaFinding) bool {
+	switch filter {
+	case reviewMine:
+		return f.State == "addressed"
+	case reviewAll:
+		return true
+	}
+	return f.stands()
+}
+
 // first is the finding itself, and by is who filed it.
 func (f sawaFinding) first() sawaPost {
 	if len(f.Posts) == 0 {
@@ -277,10 +345,13 @@ type reviewPiece struct {
 	Placeholder string          `json:"placeholder,omitempty"`
 	Value       *string         `json:"value,omitempty"`
 	Children    []reviewPiece   `json:"children,omitempty"`
+	Max         int             `json:"max,omitempty"`
 }
 
 // reviewEntry is what a list holds: the head over the files, a folder
-// (open, at depth 0), a file, or a verdict to pick.
+// (open, at depth 0), a file, a verdict to pick, a finding on the review
+// as a whole (its label a lead in its tone), or a gate (why it was
+// judged so on a line under it).
 type reviewEntry struct {
 	ID      string `json:"id,omitempty"`
 	Title   string `json:"title,omitempty"`
@@ -291,6 +362,9 @@ type reviewEntry struct {
 	Checked bool   `json:"checked,omitempty"`
 	Head    string `json:"head,omitempty"`
 	Tag     string `json:"tag,omitempty"`
+	Lead    string `json:"lead,omitempty"`
+	Tone    string `json:"tone,omitempty"`
+	Under   string `json:"under,omitempty"`
 }
 
 // reviewLine is a line of the code: a hunk's head, a line added, deleted
@@ -380,11 +454,12 @@ func reviewOrder(s sawaState, reading bool) ([]sawaFile, map[string]string) {
 	return files, why
 }
 
-// reviewOpen is how many findings still stand, on each file and in all.
-func reviewOpen(s sawaState) (map[string]int, int) {
+// reviewOpen is how many findings a filter shows, on each file — those
+// on the review as a whole on none — and in all.
+func reviewOpen(s sawaState, filter reviewFilter) (map[string]int, int) {
 	on, all := map[string]int{}, 0
 	for _, finding := range s.Threads {
-		if finding.stands() {
+		if filter.takes(finding) {
 			on[finding.File]++
 			all++
 		}
@@ -392,14 +467,144 @@ func reviewOpen(s sawaState) (map[string]int, int) {
 	return on, all
 }
 
+// reviewStands is how the findings stand, as the header says it by the
+// filter: how many are open, how many of them wait on the person, or
+// how many are open and how many resolved; and whether that asks
+// anything of anyone.
+func reviewStands(s sawaState, filter reviewFilter) (words string, asks bool) {
+	open, mine := 0, 0
+	for _, finding := range s.Threads {
+		if finding.stands() {
+			open++
+		}
+		if finding.State == "addressed" {
+			mine++
+		}
+	}
+	some := func(n int, what string) string {
+		if n == 0 {
+			return "none " + what
+		}
+		return fmt.Sprintf("%d %s", n, what)
+	}
+	switch filter {
+	case reviewMine:
+		return some(mine, "to answer"), mine > 0
+	case reviewAll:
+		return some(open, "open") + ", " + some(len(s.Threads)-open, "resolved"), open > 0
+	}
+	return some(open, "open"), open > 0
+}
+
+// reviewSection is the words git found over the hunk a run of lines is
+// in, of a file's hunks: the one that has the run's first line, by its
+// number in the new file, or in the old where it has none in the new.
+// git's hunks begin a few lines of context before sawa's runs do.
+func reviewSection(hunks []git.Hunk, old, new int) string {
+	const context = 3
+	for _, hunk := range hunks {
+		start, lines, line := hunk.NewStart, hunk.NewLines, new
+		if new == 0 {
+			start, lines, line = hunk.OldStart, hunk.OldLines, old
+		}
+		if line >= start-context && line < start+max(lines, 1)+context {
+			return hunk.Section
+		}
+	}
+	return ""
+}
+
+// reviewSuggested is the edit a finding suggests as lines of code: the
+// lines it is on as they were, deleted, then those it would put in
+// their place, added; no more than most of them, a gap saying how many
+// more there are.
+func reviewSuggested(f sawaFinding, most int) []reviewLine {
+	if f.Suggest == "" {
+		return nil
+	}
+	var lines []reviewLine
+	for n, text := range strings.Split(f.SuggestFrom, "\n") {
+		lines = append(lines, reviewLine{Kind: "del", Old: f.Line + n, Text: gitShown(text)})
+	}
+	for n, text := range strings.Split(strings.TrimRight(f.Suggest, "\n"), "\n") {
+		lines = append(lines, reviewLine{Kind: "add", New: f.Line + n, Text: gitShown(text)})
+	}
+	if more := len(lines) - most; more > 0 {
+		lines = append(lines[:most:most], reviewLine{Kind: "gap", Text: counted(more, "more line")})
+	}
+	return lines
+}
+
+// reviewGateTone is the tone of what was judged of a gate.
+func reviewGateTone(state string) string {
+	switch state {
+	case "pass":
+		return "ok"
+	case "warn":
+		return "warn"
+	case "fail":
+		return "bad"
+	}
+	return ""
+}
+
+// reviewJudgedAs is what was judged of a gate in a few words: how, by
+// whom and how long ago, and "not judged" while no one has.
+func reviewJudgedAs(judged *sawaJudged, now time.Time) string {
+	if judged == nil {
+		return "not judged"
+	}
+	words := judged.State
+	if judged.By != "" {
+		words += " · " + judged.By
+	}
+	return words + " · " + reviewAge(now.Sub(judged.At))
+}
+
+// reviewGates is the gates as a list holds them, no more than most: each
+// by its name with what must hold after it, how it was judged at the
+// right in its tone, and why on a line under it.
+func reviewGates(gates []sawaGate, most int, now time.Time) []reviewEntry {
+	judged := 0
+	for _, gate := range gates {
+		if gate.Gate != nil {
+			judged++
+		}
+	}
+	entries := []reviewEntry{{Head: "Gates", Note: fmt.Sprintf("%d of %d judged", judged, len(gates))}}
+	for _, gate := range gates[:min(len(gates), most)] {
+		entry := reviewEntry{ID: cutTo("g:"+gate.Name, gitWordsMost), Title: cutTo(gate.Name, gitWordsMost), Note: cutTo(gate.Text, gitWordsMost), Right: reviewJudgedAs(gate.Gate, now)}
+		if gate.Gate != nil {
+			entry.Tone, entry.Under = reviewGateTone(gate.Gate.State), cutTo(gate.Gate.Note, gitWordsMost)
+		}
+		entries = append(entries, entry)
+	}
+	return entries
+}
+
+// reviewAbove is the findings on the review as a whole as a list holds
+// them, no more than most: each by its first line, its label a lead in
+// its tone, and who filed it and how it stands at the right.
+func reviewAbove(findings []sawaFinding, most int) []reviewEntry {
+	entries := []reviewEntry{{Head: "On the review as a whole", Note: strconv.Itoa(len(findings))}}
+	for _, finding := range findings[:min(len(findings), most)] {
+		label, tone := reviewLabel(finding)
+		said := finding.first()
+		title, _, _ := strings.Cut(said.Body, "\n")
+		entries = append(entries, reviewEntry{ID: finding.ID, Title: cutTo(title, gitWordsMost), Lead: label, Tone: tone, Right: cutTo(said.Author+" · "+finding.State, gitWordsMost)})
+	}
+	return entries
+}
+
 // reviewList is the list of a review's files, no more than most of them:
 // by folder, each folder open over its files, a file with its lines
 // added and deleted at the right, its findings that stand as its note
-// and checked once read; or in reading order, each file by its whole
-// path with why it is read as its note. With it, its files in order.
-func reviewList(s sawaState, reading bool, most int) ([]reviewEntry, []reviewRow) {
+// (those the filter shows) and checked once read; or in reading order,
+// each file by its whole path with why it is read as its note. With it,
+// its files in order.
+func reviewList(s sawaState, reading bool, filter reviewFilter, most int) ([]reviewEntry, []reviewRow) {
 	files, why := reviewOrder(s, reading)
-	open, _ := reviewOpen(s)
+	open, _ := reviewOpen(s, filter)
 	read := 0
 	for _, file := range files {
 		if file.Read && !file.Stale {
@@ -511,12 +716,20 @@ func reviewLabel(f sawaFinding) (label, tone string) {
 	return label, tone
 }
 
-// reviewThread is the pieces under a finding that is open: what was said
-// in reply, each with who and when; the area to answer in, holding the
+// reviewThread is the pieces under a finding that is open: the edit it
+// suggests, as a small diff, and when that was applied; what was said in
+// reply, each with who and when; the area to answer in, holding the
 // words typed and not sent; and Reply, with Reply and resolve while the
-// finding stands.
+// finding stands and Reopen once it does not, and Apply while it
+// suggests an edit no one has applied.
 func reviewThread(f sawaFinding, typed string, now time.Time) []reviewPiece {
 	var under []reviewPiece
+	if edit := reviewSuggested(f, reviewEditMost); len(edit) > 0 {
+		under = append(under, reviewPiece{T: "code", ID: "suggested", Lines: json.RawMessage(encode(edit))})
+	}
+	if f.AppliedAt != nil {
+		under = append(under, reviewPiece{T: "text", Text: "applied " + reviewAge(now.Sub(*f.AppliedAt)), Style: "dim", Tone: "ok"})
+	}
 	var replies []string
 	for _, post := range f.Posts[min(1, len(f.Posts)):] {
 		replies = append(replies, fmt.Sprintf("**%s** · %s\n\n%s", post.Author, reviewAge(now.Sub(post.At)), post.Body))
@@ -527,6 +740,11 @@ func reviewThread(f sawaFinding, typed string, now time.Time) []reviewPiece {
 	buttons := []reviewPiece{{T: "button", ID: "send", Label: "Reply", Key: "⌘⏎", Primary: true}}
 	if f.stands() {
 		buttons = append(buttons, reviewPiece{T: "button", ID: "resolve", Label: "Reply and resolve", Key: "⌘R"})
+	} else {
+		buttons = append(buttons, reviewPiece{T: "button", ID: "reopen", Label: "Reopen"})
+	}
+	if f.Suggest != "" && f.AppliedAt == nil {
+		buttons = append(buttons, reviewPiece{T: "button", ID: "apply", Label: "Apply"})
 	}
 	return append(under,
 		reviewPiece{T: "field", ID: "reply", Lines: json.RawMessage("3"), Live: true, Placeholder: "Reply", Value: &typed},
@@ -547,9 +765,11 @@ func reviewWriting(typed string) []reviewPiece {
 
 // reviewNotes is what is said under a file's lines: its findings that
 // are shown, the one that is open and the words typed under it, and the
-// line a comment is being written under.
+// line a comment is being written under; and with them the hunks git
+// has of the file, whose words go over its runs of lines.
 type reviewNotes struct {
 	findings []sawaFinding
+	hunks    []git.Hunk
 	open     string
 	typed    string
 	writing  *reviewMark
@@ -575,7 +795,8 @@ func (n reviewNotes) note(f sawaFinding) reviewLine {
 
 // reviewCode is a file's rows, as sw rows says them with the lines the
 // same left out, as lines of code: each run of lines under a head that
-// says where it begins and which hunk of how many it is, the lines left
+// says what it is in, as git names it, else where it begins, and which
+// hunk of how many it is, the lines left
 // out between two as a gap, and each finding as a note directly under
 // the line it is about. A finding on no line shown is over them all.
 // With them, what each line is.
@@ -640,11 +861,14 @@ func reviewCode(rows []sawaRow, notes reviewNotes) ([]reviewLine, []reviewMark) 
 				put(reviewLine{Kind: "gap", Text: counted(same[run], "line") + " the same"}, reviewMark{kind: "gap", new: number})
 			}
 			head := fmt.Sprintf("@@ line %d", number)
+			section := reviewSection(notes.hunks, row.Old, row.New)
 			switch {
 			case added:
 				head = "@@ new file"
 			case deleted:
 				head = "@@ deleted file"
+			case section != "":
+				head = gitShown("@@ " + section)
 			}
 			run++
 			put(reviewLine{Kind: "head", Text: head, Right: fmt.Sprintf("hunk %d of %d", run, len(begins))}, reviewMark{kind: "head", new: number})
@@ -685,18 +909,19 @@ func reviewCut(lines []reviewLine, marks []reviewMark, most int) ([]reviewLine, 
 
 // reviewAim is what a message says of where the person is, which stays
 // as they have it when a message does not say: the file the list is on,
-// the line the code is on, the words in the area under a note, and the
-// piece the keys are put on.
+// the line the code is on, the words in the area under a note, the
+// finding on the review as a whole the keys are on, and the piece the
+// keys are put on.
 type reviewAim struct {
-	list, code, words bool
-	focus             string
+	list, code, words, above bool
+	focus                    string
 }
 
 func (a reviewAim) with(b reviewAim) reviewAim {
 	if b.focus == "" {
 		b.focus = a.focus
 	}
-	return reviewAim{a.list || b.list, a.code || b.code, a.words || b.words, b.focus}
+	return reviewAim{a.list || b.list, a.code || b.code, a.words || b.words, a.above || b.above, b.focus}
 }
 
 // reviewView is a review as the window is shown it.
@@ -708,12 +933,20 @@ type reviewView struct {
 	branch    string
 	slug      string // the review, as sawa names it
 	state     sawaState
-	raw       []byte // the state as sw printed it
-	title     string // the change's title
-	failed    string // why there is no review to show
-	reading   bool   // the files are in reading order
-	resolved  bool   // findings that stand no more are shown too
-	judging   bool   // the verdicts are up
+	raw       []byte       // the state as sw printed it
+	title     string       // the change's title
+	failed    string       // why there is no review to show
+	reading   bool         // the files are in reading order
+	filter    reviewFilter // which findings are shown
+	judging   bool         // the verdicts are up
+	gating    bool         // the gates are up
+	gate      string       // the gate that is shown, "" for their list
+	above     string       // the finding on the review as a whole the keys are on, "" where they are not
+	hunks     []git.Hunk   // the hunks git has of the file shown
+	layers    []sawaLayer  // the layers of the stack sawa reviews, none where it reviews no stack
+	layer     int          // the one of them that is shown
+	home      int          // the one this worktree is on
+	homeSlug  string       // and the review of it that was found
 	entries   []reviewEntry
 	rows      []reviewRow
 	file      string    // the file whose diff is shown
@@ -760,7 +993,26 @@ func (v *reviewView) find(now time.Time) {
 		}
 		v.slug = opened.Slug
 	}
+	v.stacked()
 	v.read(now)
+}
+
+// stacked asks sawa whether it reviews a stack here, and which of its
+// layers the review found is of: the one sawa keeps by that name, else
+// the one the worktree is on. Where sawa knows no stack there are none.
+func (v *reviewView) stacked() {
+	v.layers, v.layer, v.home, v.homeSlug = nil, 0, 0, v.slug
+	stack, err := sawaAsk[sawaStack](v.run, "stack", "--json")
+	if err != nil || len(stack.Layers) < 2 {
+		return
+	}
+	at := slices.IndexFunc(stack.Layers, func(layer sawaLayer) bool { return layer.Slug == v.slug })
+	if at < 0 {
+		at = slices.IndexFunc(stack.Layers, func(layer sawaLayer) bool { return layer.Current })
+	}
+	if at >= 0 {
+		v.layers, v.layer, v.home = stack.Layers, at, at
+	}
 }
 
 // read reads the review again, and reports whether the line under the
@@ -797,6 +1049,8 @@ func (v *reviewView) titled() string {
 	switch {
 	case target.Title != "":
 		return target.Title
+	case len(v.layers) > 0 && v.layer != v.home:
+		return v.layers[v.layer].Branch
 	case v.top != "" && target.Kind == "range" && ranged && head == "HEAD" && !strings.HasPrefix(base, "-"):
 		if ahead := git.Ahead(v.top, base, 2); len(ahead) == 1 {
 			return ahead[0].Subject
@@ -808,11 +1062,24 @@ func (v *reviewView) titled() string {
 	return v.state.Label
 }
 
-// show reads the rows of the file shown.
+// show reads the rows of the file shown, and the hunks git has of it
+// between the commits the review is of, for the words over each: none
+// where the commits are not in this repository.
 func (v *reviewView) show() {
-	v.fileRows = nil
+	v.fileRows, v.hunks = nil, nil
 	if v.file == "" {
 		return
+	}
+	if v.top != "" && v.state.Base != "" {
+		var diff []git.FileDiff
+		if v.state.Head != "" {
+			diff, _ = git.DiffBetween(v.top, v.state.Base, v.state.Head, v.file)
+		} else {
+			diff, _ = git.DiffAgainst(v.top, v.state.Base, v.file)
+		}
+		if len(diff) > 0 {
+			v.hunks = diff[0].Hunks
+		}
 	}
 	files, err := sawaAsk[[]sawaRows](v.run, "rows", "--changed", "--json", "-t", v.slug, "-f", v.file)
 	if err != nil {
@@ -844,14 +1111,14 @@ func (v *reviewView) build(now time.Time) (moved bool) {
 	// (Paths past ASCII are six bytes a character in a message: fewer files
 	// are listed until the list leaves the diff most of the message.)
 	for most := reviewRowsMost; ; most /= 2 {
-		v.entries, v.rows = reviewList(v.state, v.reading, most)
+		v.entries, v.rows = reviewList(v.state, v.reading, v.filter, most)
 		if most <= 1 || len(encode(v.entries)) < muiLimit/4 {
 			break
 		}
 	}
-	notes := reviewNotes{open: v.open, typed: v.typed[v.open], writing: v.writing, now: now}
+	notes := reviewNotes{open: v.open, typed: v.typed[v.open], writing: v.writing, hunks: v.hunks, now: now}
 	for _, finding := range v.state.Threads {
-		if finding.File == v.file && (finding.stands() || v.resolved || finding.ID == v.open) {
+		if finding.File == v.file && finding.File != "" && v.shows(finding) {
 			notes.findings = append(notes.findings, finding)
 		}
 	}
@@ -865,14 +1132,47 @@ func (v *reviewView) build(now time.Time) (moved bool) {
 	return v.at != before
 }
 
+// shows reports whether a finding is shown: one the filter takes, and
+// the one that is open.
+func (v *reviewView) shows(f sawaFinding) bool {
+	return v.filter.takes(f) || f.ID == v.open
+}
+
+// finding is the finding of an id.
+func (v *reviewView) finding(id string) (sawaFinding, bool) {
+	at := slices.IndexFunc(v.state.Threads, func(f sawaFinding) bool { return f.ID == id })
+	if at < 0 {
+		return sawaFinding{}, false
+	}
+	return v.state.Threads[at], true
+}
+
+// wholes is the findings on the review as a whole that are shown.
+func (v *reviewView) wholes() []sawaFinding {
+	var findings []sawaFinding
+	for _, finding := range v.state.Threads {
+		if finding.File == "" && v.shows(finding) {
+			findings = append(findings, finding)
+		}
+	}
+	return findings
+}
+
+// isAbove reports whether a finding is on the review as a whole.
+func (v *reviewView) isAbove(id string) bool {
+	finding, ok := v.finding(id)
+	return ok && finding.File == ""
+}
+
 // place is the place of a finding's note in the code, -1 where it has none.
 func (v *reviewView) place(id string) int {
 	return slices.Index(v.marks, reviewMark{kind: "note", note: id})
 }
 
-// spots is the findings that stand on the files listed, in the order n
-// and N go through them: file by file as listed, and down each. Those of
-// the file shown are known by their place in its code.
+// spots is the findings that are shown, in the order n and N go through
+// them: those on the review as a whole, which are before every file,
+// then file by file as listed, and down each. Those of the file shown
+// are known by their place in its code.
 func (v *reviewView) spots() ([]reviewSpot, reviewSpot) {
 	files, _ := reviewOrder(v.state, v.reading)
 	index := func(file string) int {
@@ -881,7 +1181,7 @@ func (v *reviewView) spots() ([]reviewSpot, reviewSpot) {
 	var spots []reviewSpot
 	for n, finding := range v.state.Threads {
 		file := index(finding.File)
-		if !finding.stands() || file < 0 {
+		if !v.filter.takes(finding) || file < 0 && finding.File != "" {
 			continue
 		}
 		spot := reviewSpot{file: file, line: finding.Line, n: n, id: finding.ID}
@@ -900,6 +1200,9 @@ func (v *reviewView) spots() ([]reviewSpot, reviewSpot) {
 	})
 	here := reviewSpot{file: index(v.file), line: v.at, n: -1}
 	if at := slices.IndexFunc(spots, func(s reviewSpot) bool { return s.file == here.file && s.line == here.line }); at >= 0 {
+		here = spots[at]
+	}
+	if at := slices.IndexFunc(spots, func(s reviewSpot) bool { return s.id == v.above }); v.above != "" && at >= 0 {
 		here = spots[at]
 	}
 	return spots, here
@@ -939,6 +1242,9 @@ func (v *reviewView) about(now time.Time) string {
 	if !last.IsZero() {
 		words = append(words, "sawa read it "+reviewAge(now.Sub(last)))
 	}
+	if len(v.layers) > 0 {
+		words = append(words, fmt.Sprintf("layer %d of %d", v.layer+1, len(v.layers)))
+	}
 	return cutTo(strings.Join(words, " · "), gitWordsMost)
 }
 
@@ -947,21 +1253,33 @@ func (v *reviewView) keys() []gitKey {
 	if v.failed != "" {
 		return []gitKey{{"r", "ask again", "again"}}
 	}
-	order, resolved := "reading order", "show resolved"
+	order, resolved, filter := "reading order", "show resolved", "mine to answer"
 	if v.reading {
 		order = "by folder"
 	}
-	if v.resolved {
-		resolved = "hide resolved"
+	switch v.filter {
+	case reviewMine:
+		filter = "resolved too"
+	case reviewAll:
+		resolved, filter = "hide resolved", "all open"
 	}
 	keys := []gitKey{
 		{"n", "next finding", "next"}, {"N", "previous finding", "prev"}, {"c", "comment", "comment"},
-		{"space", "read, next file", "read"}, {"o", order, "order"}, {"u", resolved, "resolved"},
-		{"v", "verdict", "verdict"}, {"r", "ask again", "again"},
+		{"space", "read, next file", "read"}, {"e", "edit in " + filepath.Base(editorWords()[0]), "edit"},
+		{"f", filter, "filter"}, {"g", "gates", "gates"}, {"o", order, "order"}, {"u", resolved, "resolved"},
+		{"v", "verdict", "verdict"},
 	}
+	if len(v.layers) > 0 {
+		keys = append(keys, gitKey{"[", "layer under", "under"}, gitKey{"]", "layer over", "over"})
+	}
+	keys = append(keys, gitKey{"r", "ask again", "again"})
 	switch {
 	case v.judging:
 		return append([]gitKey{{"esc", "no verdict now", "shut"}}, keys...)
+	case v.gate != "":
+		return append([]gitKey{{"esc", "back to the gates", "shut"}}, keys...)
+	case v.gating:
+		return append([]gitKey{{"esc", "back to the summary", "shut"}}, keys...)
 	case v.open != "":
 		return append([]gitKey{{"esc", "shut it, keep the words", "shut"}}, keys...)
 	}
@@ -990,6 +1308,67 @@ func (v *reviewView) verdicts(aim reviewAim) reviewPiece {
 	return list
 }
 
+// gates is the gates in place of the summary: their list, each with how
+// it was judged and why; or the one that is shown — what must hold, what
+// was judged of it, and since sawa lets a person record a gate's result
+// as it lets an agent, an area for why and Pass, Warn and Fail.
+func (v *reviewView) gates(aim reviewAim, now time.Time) []reviewPiece {
+	at := slices.IndexFunc(v.state.Gates, func(gate sawaGate) bool { return gate.Name == v.gate })
+	if at < 0 {
+		list := reviewPiece{T: "list", ID: "gates", Max: 6, Items: reviewGates(v.state.Gates, reviewGatesMost, now)}
+		if aim.list && len(list.Items) > 1 {
+			list.Selected = list.Items[1].ID
+		}
+		return []reviewPiece{list}
+	}
+	gate := v.state.Gates[at]
+	judged, tone := "not judged yet", ""
+	if gate.Gate != nil {
+		judged, tone = reviewJudgedAs(gate.Gate, now), reviewGateTone(gate.Gate.State)
+		if gate.Gate.Note != "" {
+			judged += ": " + gate.Gate.Note
+		}
+	}
+	why := reviewPiece{T: "field", ID: "why", Lines: json.RawMessage("2"), Live: true, Placeholder: "Why, if you record a result"}
+	if typed := v.typed["g:"+gate.Name]; aim.words {
+		why.Value = &typed
+	}
+	return slices.Concat(
+		reviewWords(cutTo("gate  "+gate.Name, gitWordsMost), "mono", ""),
+		reviewWords(cutTo(gate.Text, reviewNoteMost), "", ""),
+		reviewWords(cutTo(judged, reviewNoteMost), "", tone),
+		[]reviewPiece{why, {T: "row", Children: []reviewPiece{
+			{T: "button", ID: "gate-pass", Label: "Pass"},
+			{T: "button", ID: "gate-warn", Label: "Warn"},
+			{T: "button", ID: "gate-fail", Label: "Fail"},
+		}}})
+}
+
+// overall is the findings on the review as a whole, under the summary:
+// their list, and under it the one that is open — all its words and its
+// thread, as under a file's.
+func (v *reviewView) overall(aim reviewAim, now time.Time) []reviewPiece {
+	findings := v.wholes()
+	if len(findings) == 0 {
+		return nil
+	}
+	list := reviewPiece{T: "list", ID: "general", Live: true, Max: 4, Items: reviewAbove(findings, reviewAboveMost)}
+	if aim.above && v.above != "" {
+		list.Selected = v.above
+	}
+	pieces := []reviewPiece{list}
+	if open, ok := v.finding(v.open); ok && open.File == "" {
+		pieces = append(pieces, reviewPiece{T: "markdown", Text: cutTo(open.first().Body, reviewNoteMost)})
+		for _, under := range reviewThread(open, v.typed[v.open], now) {
+			if !aim.words {
+				under.Value = nil
+			}
+			pieces = append(pieces, under)
+		}
+	}
+	return pieces
+}
+
 // whole is the message that says the whole view with these lines of the
 // diff in it, and of where the person is what aim says.
 func (v *reviewView) whole(lines json.RawMessage, aim reviewAim, now time.Time) []byte {
@@ -999,10 +1378,11 @@ func (v *reviewView) whole(lines json.RawMessage, aim reviewAim, now time.Time) 
 		return encode(message)
 	}
 	s := v.state
-	on, open := reviewOpen(s)
-	standing, quiet, tone := "none open", "dim", ""
-	if open > 0 {
-		standing, quiet, tone = fmt.Sprintf("%d open", open), "", "warn"
+	on, _ := reviewOpen(s, v.filter)
+	standing, asks := reviewStands(s, v.filter)
+	quiet, tone := "dim", ""
+	if asks {
+		quiet, tone = "", "warn"
 	}
 	top := reviewPiece{T: "row", Gap: 10, Children: append(append(append(
 		reviewWords(cutTo(v.title, gitWordsMost), "title", ""),
@@ -1014,10 +1394,13 @@ func (v *reviewView) whole(lines json.RawMessage, aim reviewAim, now time.Time) 
 	if runes := []rune(summary); len(runes) > reviewSummaryMost {
 		summary = string(runes[:reviewSummaryMost]) + "…"
 	}
-	if v.judging {
+	switch {
+	case v.judging:
 		head.Children = append(head.Children, v.verdicts(aim))
-	} else {
-		head.Children = append(head.Children, reviewWords(summary, "", "")...)
+	case v.gating:
+		head.Children = append(head.Children, v.gates(aim, now)...)
+	default:
+		head.Children = append(append(head.Children, reviewWords(summary, "", "")...), v.overall(aim, now)...)
 	}
 	if len(s.Files) == 0 {
 		head.Children = append(head.Children, reviewWords("nothing to review: "+s.Label+" changes no file", "dim", "")...)
@@ -1114,6 +1497,15 @@ const (
 	reviewRead     // a file marked read, and the next unread one shown
 	reviewVerdict  // a verdict given
 	reviewAgain    // the change looked at again
+	reviewOnWhole  // a finding on the review as a whole under the keys
+	reviewFiltered // the findings shown by the next filter
+	reviewGated    // the gates brought up
+	reviewGate     // one gate shown
+	reviewJudged   // a gate's result recorded
+	reviewApply    // the edit a finding suggests made in the working tree
+	reviewReopen   // a finding that stands no more sent back
+	reviewEdit     // a file handed to the editor at a line
+	reviewLayer    // the layer under, or over, shown
 )
 
 // reviewDeed is what an event does: with a file, a line's place, a
@@ -1156,6 +1548,26 @@ func (v *reviewView) deed(event reviewEvent) reviewDeed {
 		}
 	case event.E == "pick" && event.List == "verdict" && v.judging:
 		return reviewDeed{do: reviewVerdict, id: event.ID}
+	case event.E == "move" && event.List == "general":
+		if v.isAbove(event.ID) && event.ID != v.above {
+			return reviewDeed{do: reviewOnWhole, id: event.ID}
+		}
+	case event.E == "pick" && event.List == "general":
+		switch {
+		case !v.isAbove(event.ID):
+		case event.ID == v.open:
+			return reviewDeed{do: reviewShut}
+		default:
+			return reviewDeed{do: reviewUnfold, id: event.ID}
+		}
+	case event.E == "pick" && event.List == "gates" && v.gating:
+		if name, ok := strings.CutPrefix(event.ID, "g:"); ok {
+			if at := slices.IndexFunc(v.state.Gates, func(gate sawaGate) bool { return cutTo(gate.Name, gitWordsMost-2) == name }); at >= 0 {
+				return reviewDeed{do: reviewGate, id: v.state.Gates[at].Name}
+			}
+		}
+	case event.E == "change" && event.ID == "why" && v.gate != "":
+		return reviewDeed{do: reviewTyped, id: "g:" + v.gate, text: event.Text}
 	case event.E == "pick" && event.List == "diff" && onLine:
 		switch note := v.marks[place].note; note {
 		case "", reviewNew:
@@ -1164,8 +1576,8 @@ func (v *reviewView) deed(event reviewEvent) reviewDeed {
 		default:
 			return reviewDeed{do: reviewUnfold, id: note}
 		}
-	case event.E == "change" && (event.ID == "reply" || event.ID == "comment"):
-		return reviewDeed{do: reviewTyped, text: event.Text}
+	case event.E == "change" && (event.ID == "reply" || event.ID == "comment") && v.open != "":
+		return reviewDeed{do: reviewTyped, id: v.open, text: event.Text}
 	case event.E == "submit" && event.ID == "reply" && v.open != "" && v.open != reviewNew:
 		return reviewDeed{do: reviewReply, id: v.open, text: event.Text}
 	case event.E == "submit" && event.ID == "comment" && v.open == reviewNew:
@@ -1183,6 +1595,33 @@ func (v *reviewView) deed(event reviewEvent) reviewDeed {
 		return reviewDeed{do: reviewOrdered}
 	case "resolved":
 		return reviewDeed{do: reviewResolved}
+	case "filter":
+		return reviewDeed{do: reviewFiltered}
+	case "gates":
+		return reviewDeed{do: reviewGated}
+	case "gate-pass", "gate-warn", "gate-fail":
+		if v.gate != "" {
+			return reviewDeed{do: reviewJudged, id: strings.TrimPrefix(event.ID, "gate-"), text: v.typed["g:"+v.gate]}
+		}
+	case "under":
+		return reviewDeed{do: reviewLayer, place: -1}
+	case "over":
+		return reviewDeed{do: reviewLayer, place: 1}
+	case "apply":
+		if open, ok := v.finding(v.open); ok && open.Suggest != "" {
+			return reviewDeed{do: reviewApply, id: v.open}
+		}
+	case "reopen":
+		if open, ok := v.finding(v.open); ok && !open.stands() {
+			return reviewDeed{do: reviewReopen, id: v.open, text: v.typed[v.open]}
+		}
+	case "edit":
+		if file, ok := v.fileOf(event.Item); ok {
+			return reviewDeed{do: reviewEdit, file: file, place: 1}
+		}
+		if at, err := strconv.Atoi(event.Item); (err == nil || event.Item == "") && v.file != "" {
+			return reviewDeed{do: reviewEdit, file: v.file, place: v.lineAt(at)} // on a line of the diff, which is of the file shown
+		}
 	case "verdict":
 		return reviewDeed{do: reviewJudge}
 	case "again":
@@ -1218,13 +1657,43 @@ func (v *reviewView) deed(event reviewEvent) reviewDeed {
 	return reviewDeed{}
 }
 
+// lineAt is the line of the file, as it is now, that a line of the code
+// is: its own number in the new file, a deleted line's and a note's that
+// of the line of the file nearest after it, else before it.
+func (v *reviewView) lineAt(place int) int {
+	place = max(min(place, len(v.marks)-1), 0)
+	for at := place; at < len(v.marks); at++ {
+		if v.marks[at].kind != "note" && v.marks[at].kind != "head" && v.marks[at].kind != "gap" && v.marks[at].new > 0 {
+			return v.marks[at].new
+		}
+	}
+	for at := place; at >= 0 && at < len(v.marks); at-- {
+		if v.marks[at].kind != "note" && v.marks[at].kind != "head" && v.marks[at].kind != "gap" && v.marks[at].new > 0 {
+			return v.marks[at].new
+		}
+	}
+	return 1
+}
+
 // asks is what a deed asks of sawa: the arguments of each sw it runs, in
 // turn. Every one names the review, and words go after -m, so none is
 // read as a flag.
 func (v *reviewView) asks(deed reviewDeed) [][]string {
 	resolve := []string{"resolve", deed.id, "--json", "-t", v.slug}
 	reply := []string{"reply", deed.id, "--json", "-t", v.slug, "-m", deed.text}
+	said := func(args ...string) [][]string { // with the words typed, where there are some
+		if strings.TrimSpace(deed.text) != "" {
+			args = append(args, "-m", deed.text)
+		}
+		return [][]string{args}
+	}
 	switch deed.do {
+	case reviewApply:
+		return [][]string{{"apply", deed.id, "--json", "-t", v.slug}}
+	case reviewReopen:
+		return said("reopen", deed.id, "--json", "-t", v.slug)
+	case reviewJudged:
+		return said("gate", v.gate, deed.id, "--json", "-t", v.slug)
 	case reviewReply:
 		return [][]string{reply}
 	case reviewSettle:
@@ -1254,22 +1723,28 @@ func (v *reviewView) asks(deed reviewDeed) [][]string {
 // act does a deed, and reports whether the view is to be said again, and
 // what of where the person is it then says.
 func (v *reviewView) act(deed reviewDeed, now time.Time) (say bool, aim reviewAim) {
-	onto := func(id string) reviewAim { // the keys on a finding's note
+	onto := func(id string) reviewAim { // the keys on a finding's note, or on it in the list over the files
+		if v.isAbove(id) {
+			v.above = id
+			return reviewAim{above: true, focus: "general"}
+		}
+		v.above = ""
 		if at := v.place(id); at >= 0 {
 			v.at = at
 		}
 		return reviewAim{code: true, focus: "diff"}
 	}
 	switch deed.do {
-	case reviewNothing, reviewLeave:
+	case reviewNothing, reviewLeave, reviewEdit:
 		return false, aim
 	case reviewTyped:
-		if v.open != "" {
-			v.typed[v.open] = cutTo(deed.text, reviewAreaMost)
-		}
+		v.typed[deed.id] = cutTo(deed.text, reviewAreaMost)
 		return false, aim
 	case reviewOnLine:
-		v.at = deed.place
+		v.at, v.above = deed.place, ""
+		return false, aim
+	case reviewOnWhole:
+		v.above = deed.id
 		return false, aim
 	}
 	v.status = nil
@@ -1282,6 +1757,7 @@ func (v *reviewView) act(deed reviewDeed, now time.Time) (say bool, aim reviewAi
 	}
 	switch deed.do {
 	case reviewFile, reviewInto:
+		v.above = ""
 		if deed.file != v.file {
 			v.turn(deed.file, now)
 			aim.code = true
@@ -1294,11 +1770,14 @@ func (v *reviewView) act(deed reviewDeed, now time.Time) (say bool, aim reviewAi
 		spots, here := v.spots()
 		to, found := reviewStep(spots, here, deed.do == reviewNext)
 		if !found {
-			v.status = &muiStatus{Text: "no finding stands"}
+			v.status = &muiStatus{Text: map[reviewFilter]string{reviewStanding: "no finding stands", reviewMine: "no finding waits on you", reviewAll: "no finding at all"}[v.filter]}
 			return true, aim
 		}
 		files, _ := reviewOrder(v.state, v.reading)
-		if file := files[to.file].Path; file != v.file {
+		if to.file < 0 { // on the review as a whole
+			v.judging, v.gating, v.gate, v.open, v.writing = false, false, "", "", nil
+			v.build(now)
+		} else if file := files[to.file].Path; file != v.file {
 			v.turn(file, now)
 		} else {
 			v.open, v.writing = "", nil
@@ -1312,7 +1791,17 @@ func (v *reviewView) act(deed reviewDeed, now time.Time) (say bool, aim reviewAi
 		return true, aim
 	case reviewShut:
 		was, judged := v.open, v.judging
-		v.judging, v.open, v.writing = false, "", nil
+		switch {
+		case judged:
+			v.judging = false
+		case v.gate != "":
+			v.gate = ""
+			return true, reviewAim{list: true, focus: "gates"}
+		case v.gating:
+			v.gating = false
+			return true, reviewAim{focus: "files"}
+		}
+		v.open, v.writing = "", nil
 		v.build(now)
 		switch {
 		case judged && was == "":
@@ -1339,11 +1828,55 @@ func (v *reviewView) act(deed reviewDeed, now time.Time) (say bool, aim reviewAi
 		v.build(now)
 		return true, reviewAim{list: true}
 	case reviewResolved:
-		v.resolved = !v.resolved
+		if v.filter == reviewAll {
+			v.filter = reviewStanding
+		} else {
+			v.filter = reviewAll
+		}
+		return true, reviewAim{code: v.build(now)}
+	case reviewFiltered:
+		v.filter = (v.filter + 1) % (reviewAll + 1)
+		v.status = &muiStatus{Text: map[reviewFilter]string{reviewStanding: "every open finding", reviewMine: "the findings an agent addressed, which wait on you", reviewAll: "every finding, the resolved too"}[v.filter]}
 		return true, reviewAim{code: v.build(now)}
 	case reviewJudge:
-		v.judging = true
+		v.judging, v.gating, v.gate = true, false, ""
 		return true, reviewAim{list: true, focus: "verdict"}
+	case reviewGated:
+		if len(v.state.Gates) == 0 {
+			v.status = &muiStatus{Text: "this repository has no gates: .sawa/gates.md lists them, one `- name: what must hold` a line"}
+			return true, aim
+		}
+		v.gating, v.gate, v.judging = true, "", false
+		return true, reviewAim{list: true, focus: "gates"}
+	case reviewGate:
+		v.gate = deed.id
+		return true, reviewAim{words: true, focus: "why"}
+	case reviewLayer:
+		to := v.layer + deed.place
+		switch {
+		case len(v.layers) == 0:
+			v.status = &muiStatus{Text: "sawa reviews no stack here"}
+			return true, aim
+		case to < 0:
+			v.status = &muiStatus{Text: "this is the bottom layer"}
+			return true, aim
+		case to >= len(v.layers):
+			v.status = &muiStatus{Text: "this is the top layer"}
+			return true, aim
+		}
+		slug := v.homeSlug
+		if to != v.home { // sawa opens the layer's review, or looks at it again
+			opened, err := sawaAsk[sawaListed](v.run, "open", "-r", v.layers[to].Revset, "--json")
+			if err != nil {
+				v.status = &muiStatus{Text: cutTo(err.Error(), gitWordsMost), Tone: "bad"}
+				return true, aim
+			}
+			slug = opened.Slug
+		}
+		v.slug, v.layer = slug, to
+		v.file, v.at, v.marks, v.open, v.writing, v.above, v.judging, v.gating, v.gate = "", 0, nil, "", nil, "", false, false, ""
+		v.read(now)
+		return true, reviewAim{list: true, code: true, focus: "files"}
 	}
 
 	// What is left is asked of sawa, and what it refuses is the status.
@@ -1374,6 +1907,20 @@ func (v *reviewView) act(deed reviewDeed, now time.Time) (say bool, aim reviewAi
 		v.open = ""
 		v.status = &muiStatus{Text: deed.id + " resolved", Tone: "ok"}
 		aim = reviewAim{focus: "diff"}
+		if v.isAbove(deed.id) {
+			aim = reviewAim{focus: "general"}
+		}
+	case reviewReopen:
+		delete(v.typed, deed.id)
+		v.status = &muiStatus{Text: deed.id + " reopened", Tone: "ok"}
+		aim = reviewAim{words: true}
+	case reviewApply:
+		v.status = &muiStatus{Text: deed.id + " applied to the working tree", Tone: "ok"}
+	case reviewJudged:
+		delete(v.typed, "g:"+v.gate)
+		v.status = &muiStatus{Text: v.gate + ": " + deed.id, Tone: reviewGateTone(deed.id)}
+		v.gate = ""
+		aim = reviewAim{list: true, focus: "gates"}
 	case reviewComment:
 		var filed sawaFinding
 		_ = json.Unmarshal(answer, &filed) // without its id the keys stay where they are
@@ -1391,14 +1938,29 @@ func (v *reviewView) act(deed reviewDeed, now time.Time) (say bool, aim reviewAi
 	moved := v.read(now)
 	if deed.do == reviewRead {
 		files, _ := reviewOrder(v.state, v.reading)
-		if next := reviewUnread(files, deed.file); next == "" {
-			v.status = &muiStatus{Text: "every file is read", Tone: "ok"}
+		if next := reviewUnread(files, deed.file); next == "" { // all read: what is left is the verdict
+			v.status = &muiStatus{Text: "every file is read: the verdict is yours", Tone: "ok"}
+			v.judging, v.gating, v.gate = true, false, ""
+			return true, reviewAim{list: true, focus: "verdict"}
 		} else if next != v.file {
 			v.turn(next, now)
 			return true, reviewAim{list: true, code: true}
 		}
 	}
 	return true, aim.with(reviewAim{code: moved})
+}
+
+// edit hands a file to the editor at a line, as mia files does, run in
+// the worktree's top folder, waits for it to leave and reads the review
+// again. An editor that cannot be run is the view's status; one that
+// left with an error of its own has said so itself.
+func (v *reviewView) edit(deed reviewDeed) {
+	err := editorAt(v.top, deed.file, deed.place).Run()
+	v.read(time.Now())
+	var exit *exec.ExitError
+	if err != nil && !errors.As(err, &exit) {
+		v.status = &muiStatus{Text: cutTo(err.Error(), gitWordsMost), Tone: "bad"}
+	}
 }
 
 // reviewStamp is what changes when a review does, cheap to ask for: the
@@ -1415,8 +1977,10 @@ func reviewStamp(store string) string {
 // drawn by mia desk over its pane: the change's title, findings and
 // verdict over its files and, beside them, the diff of the one under the
 // keys with each finding under its line; and the keys that go through
-// the findings, answer and resolve them, file one, mark a file read and
-// give the verdict, each through sw as the person. It reads the review
+// the findings, answer, resolve and reopen them, apply an edit one
+// suggests, file one, mark a file read, show the gates and record one's
+// result, go to another layer of a stack and give the verdict, each
+// through sw as the person; e hands the file to the editor. It reads the review
 // again after each and when sawa's record of it changes.
 func cmdReview(args []string) int {
 	if slices.ContainsFunc(args, func(arg string) bool { return strings.HasPrefix(arg, "-") }) {
@@ -1432,17 +1996,18 @@ func cmdReview(args []string) int {
 	view := &reviewView{pane: os.Getenv("TMUX_PANE"), dir: dir, run: sawaIn(dir), target: strings.Join(args, " "), typed: map[string]string{}}
 	view.find(time.Now())
 
-	stop := make(chan struct{})
+	stop, next := make(chan struct{}), make(chan struct{}, 1)
 	defer close(stop)
-	keys := muiKeys(stop)
+	keys := muiKeysInTurn(stop, next)
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer signal.Stop(signals)
-	say, shut, err := muiOpen(view.pane, "mia review: the plain terminal. In mia desk sawa's review of "+filepath.Base(dir)+" is drawn over it; q or ⌃C leaves.")
+	under := "mia review: the plain terminal. In mia desk sawa's review of " + filepath.Base(dir) + " is drawn over it; q or ⌃C leaves."
+	say, shut, err := muiOpen(view.pane, under)
 	if err != nil {
 		return fail(err)
 	}
-	defer shut()
+	defer func() { shut() }()
 
 	var shown []byte // what the view said last, but for where the person is
 	show := func(aim reviewAim) {
@@ -1490,6 +2055,20 @@ func cmdReview(args []string) int {
 				if deed.do == reviewFile && i+1 < len(events) && events[i+1].E == "move" && events[i+1].List == "files" {
 					continue // the keys held down: only where they came to rest is read
 				}
+				if deed.do == reviewEdit { // the editor has the terminal until it leaves
+					shut()
+					shut = func() {}
+					view.edit(deed)
+					if !muiLent(signals) {
+						return exitOK
+					}
+					if say, shut, err = muiOpen(view.pane, under); err != nil {
+						shut = func() {}
+						return fail(err)
+					}
+					again, aim = true, reviewAim{list: true, code: true, words: true}
+					continue
+				}
 				said, here := view.act(deed, time.Now())
 				again, aim = again || said, aim.with(here)
 			}
@@ -1497,6 +2076,7 @@ func cmdReview(args []string) int {
 				show(aim)
 			}
 			stamp = reviewStamp(view.state.Store)
+			next <- struct{}{}
 		}
 	}
 }

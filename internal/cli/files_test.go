@@ -912,11 +912,11 @@ func TestTheEditorIsHandedTheFileAtTheLine(t *testing.T) {
 		t.Errorf("the editor was run as %q", got)
 	}
 	// a path that begins as an option does is said as a path
-	if got := filesEditor(repo.Root, "-n.txt", 4).Args; !slices.Equal(got, []string{editor, "--wait", "+4", "./-n.txt"}) {
+	if got := editorAt(repo.Root, "-n.txt", 4).Args; !slices.Equal(got, []string{editor, "--wait", "+4", "./-n.txt"}) {
 		t.Errorf("args = %q", got)
 	}
 	t.Setenv("EDITOR", "")
-	if got := filesEditor(repo.Root, "a.txt", 1); filepath.Base(got.Path) != "nvim" || got.Dir != repo.Root {
+	if got := editorAt(repo.Root, "a.txt", 1); filepath.Base(got.Path) != "nvim" || got.Dir != repo.Root {
 		t.Errorf("with no $EDITOR: %q in %q", got.Path, got.Dir)
 	}
 

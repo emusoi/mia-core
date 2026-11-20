@@ -621,28 +621,6 @@ func filesWalk(dir string, most int) ([]string, error) {
 	return paths, err
 }
 
-// filesEditorWords is the editor's command: $EDITOR, else nvim.
-func filesEditorWords() []string {
-	if words := strings.Fields(os.Getenv("EDITOR")); len(words) > 0 {
-		return words
-	}
-	return []string{"nvim"}
-}
-
-// filesEditor is the command that edits a file at a line: the editor
-// with +<line> and the file's path from the worktree's top, run there
-// with this terminal as its own.
-func filesEditor(top, path string, line int) *exec.Cmd {
-	words := filesEditorWords()
-	if strings.HasPrefix(path, "-") || strings.HasPrefix(path, "+") { // a path, not an option
-		path = "./" + path
-	}
-	command := exec.Command(words[0], append(words[1:], fmt.Sprintf("+%d", line), path)...)
-	command.Dir = top
-	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
-	return command
-}
-
 // filesBatched is some of what a search found: the hits of whole files,
 // and with the last of them how the search ended — at the most hits that
 // are shown, or refused.
@@ -1169,7 +1147,7 @@ func (v *filesView) items() (entries []filesEntry, at string) {
 // that turns something on saying what it now turns off; over what a
 // search found, and while something is asked or a commit shown, e and esc.
 func (v *filesView) keys() []gitKey {
-	edit := gitKey{"e", "edit in " + filepath.Base(filesEditorWords()[0]), "edit"}
+	edit := gitKey{"e", "edit in " + filepath.Base(editorWords()[0]), "edit"}
 	switch {
 	case v.asking != filesAskNothing:
 		return []gitKey{{"esc", "never mind", "back"}}
@@ -2012,7 +1990,7 @@ func (v *filesView) take(batch filesBatched) (whole bool, place filesPlace) {
 // be run is the view's status; one that left with an error of its own
 // has said so itself.
 func (v *filesView) run(deed filesDeed) {
-	err := filesEditor(v.top, deed.path, deed.line).Run()
+	err := editorAt(v.top, deed.path, deed.line).Run()
 	v.read()
 	var exit *exec.ExitError
 	if err != nil && !errors.As(err, &exit) {
@@ -2028,39 +2006,6 @@ func (v *filesView) changed() string {
 		mark += fmt.Sprintf("%d %d\n", info.Size(), info.ModTime().UnixNano())
 	}
 	return mark
-}
-
-// filesKeys is what is typed into the terminal, a read at a time, until
-// stop. The next read is begun only once next says the last was dealt
-// with: while an editor has the terminal, nothing typed to it is read
-// here. It is closed when the terminal ends.
-func filesKeys(stop, next <-chan struct{}) <-chan string {
-	keys := make(chan string)
-	go func() {
-		data := make([]byte, 64<<10)
-		for {
-			n, err := os.Stdin.Read(data)
-			if n > 0 {
-				select {
-				case keys <- string(data[:n]):
-				case <-stop:
-					return
-				}
-			}
-			if err != nil {
-				close(keys)
-				return
-			}
-			if n > 0 {
-				select {
-				case <-next:
-				case <-stop:
-					return
-				}
-			}
-		}
-	}()
-	return keys
 }
 
 // cmdFiles shows the files of the worktree it is run in, drawn by mia
@@ -2089,7 +2034,7 @@ func cmdFiles(args []string) int {
 
 	stop, next := make(chan struct{}), make(chan struct{}, 1)
 	defer close(stop)
-	keys := filesKeys(stop, next)
+	keys := muiKeysInTurn(stop, next)
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer signal.Stop(signals)
@@ -2162,15 +2107,8 @@ func cmdFiles(args []string) int {
 					shut()
 					shut = func() {}
 					view.run(deed)
-					for waiting := true; waiting; { // ⌃C in an editor that takes it as a signal was the editor's
-						select {
-						case signal := <-signals:
-							if signal != syscall.SIGINT {
-								return exitOK
-							}
-						default:
-							waiting = false
-						}
+					if !muiLent(signals) {
+						return exitOK
 					}
 					if say, shut, err = muiOpen(view.pane, under); err != nil {
 						shut = func() {}
