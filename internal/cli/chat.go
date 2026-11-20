@@ -1496,7 +1496,7 @@ func (r *chatRun) act(deed chatDeed) {
 			return
 		}
 		done := went.done
-		to := strconv.Itoa(done.To.Window.Index)
+		to := r.nowAt(done.To.Window)
 		// kept on its window: whichever chat of it sends first says it, this one or one started after
 		kept := r.a.CarryInWindow(r.record, to, app.Carried{From: from, ID: v.id, File: done.Handoff, Full: done.Full})
 		r.aim(app.Head{Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
@@ -1536,7 +1536,7 @@ func (r *chatRun) act(deed chatDeed) {
 			return
 		}
 		done := went.done
-		to := strconv.Itoa(done.To.Window.Index)
+		to := r.nowAt(done.To.Window)
 		kept := r.a.CarryInWindow(r.record, to, app.Carried{From: head.Agent, ID: deed.id, File: done.Handoff, Full: done.Full})
 		r.aim(app.Head{Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
 		if kept != nil {
@@ -1544,6 +1544,18 @@ func (r *chatRun) act(deed chatDeed) {
 		}
 		r.shows(went.text, went.tone)
 	}
+}
+
+// nowAt is where a window stands now, by its name: closing the window of
+// the agent a conversation was with moves those after it down one where
+// tmux renumbers them, so where it was opened is no longer where it is.
+func (r *chatRun) nowAt(window app.WindowRef) string {
+	for _, one := range r.a.Windows(r.record) {
+		if one.Name == window.Name {
+			return strconv.Itoa(one.Index)
+		}
+	}
+	return strconv.Itoa(window.Index)
 }
 
 // read reads back the conversation under the keys in Earlier, and what
