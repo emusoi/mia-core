@@ -539,7 +539,15 @@ side:
   **Stashes**, newest first, 10 at most. An item's id says its group:
   `s:<path>`, `c:<path>`, `u:<path>`, `k:<short hash>`, `t:<the stash's
   commit, 10 characters>`. At most 400 files are listed, and a head then
-  says how many of its group are shown.
+  says how many of its group are shown. With more than 30 files the list
+  is behind `tabs` — **Changes**, **Commits**, **Stashes**, each with its
+  count, one with nothing left out — and shows the chosen one's groups
+  alone; with fewer it is the one list. Each row carries a menu of what
+  can be done to it, opened beside it with `→` and under the pointer's
+  other button, each choice with the key that does the same at its
+  right: on a file Stage or Unstage, Discard… (Delete… on an untracked
+  one), Open in editor, Copy path; on a commit Copy its hash, and Undo…
+  on the last one where it can be undone; on a stash Apply, Pop, Drop….
 - The diff of the row under the keys, a code `diff`: of a staged file
   what is staged (`git diff --cached`), of a changed one what is not
   (`git diff`), of an untracked one its lines as added, of a commit its
@@ -558,38 +566,52 @@ side:
 | `space` | a file | stages it, or unstages one that is staged |
 | `space` | a line of the diff | stages the hunk that line is in (`git apply --cached`), or unstages it in a staged file's (`--reverse`); in an untracked file's, stages the file |
 | `⏎` | a line added or deleted | stages that line alone, or unstages it in a staged file's: a patch of the hunk with that one change, the others written as the index has them |
-| `d` | a changed file, a line of its diff, an untracked file | discards what is changed and not staged (`git restore`), the hunk that line is in (`git apply --reverse`), or deletes the file (`git clean`). Asked twice. A staged file is refused: unstage it first |
-| `u` | the last commit | takes it off the branch and leaves what it changed staged (`git reset --soft HEAD~1`). Asked twice. Refused on an older commit, and on one the branch's upstream has |
-| `space` `p` `d` | a stash | applies it and keeps it, pops it, drops it (asked twice) |
+| `d` | a changed file, a line of its diff, an untracked file | discards what is changed and not staged (`git restore`), the hunk that line is in (`git apply --reverse`), or deletes the file (`git clean`). Asked first. A staged file is refused: unstage it first |
+| `e` | a file, a line of its diff | hands the file to `$EDITOR` (else `nvim`), at that line of it, as [`mia files`](#mia-files) does, and takes the pane again when it leaves. A deleted file is refused |
+| `y` | a file, a commit | copies the file's path, or the commit's hash, to the clipboard (the window's `copy`) |
+| `u` | the last commit | takes it off the branch and leaves what it changed staged (`git reset --soft HEAD~1`). Asked first. Refused on an older commit, and on one the branch's upstream has |
+| `space` `p` `d` | a stash | applies it and keeps it, pops it, drops it (asked first) |
 | `a` | | stages every file (`git add --all`) |
 | `c` | | the commit screen |
 | `b` | | the branches |
 | `s` | | stashes every change and every untracked file (`git stash push --include-untracked`) under `mia git: <branch> <date time>` |
 | `f` | | fetches the remote the branch follows, else `origin` (`git fetch --prune`) |
 | `P` | | pulls where the branch can only be moved on (`git pull --ff-only --no-rebase`); it never merges and never rebases, and says git's reason where it cannot |
-| `p` | | pushes the branch to what it follows, or with `--set-upstream` to `origin` under its own name where it follows nothing. Asked twice. Never by force |
+| `p` | | pushes the branch to what it follows, or with `--set-upstream` to `origin` under its own name where it follows nothing. Asked first. Never by force |
 | `r` | | reads the standing again |
 
 The foot says the keys of where the keys are: a file's on a file, a
-hunk's and a line's in its diff, `u` on the last commit, a stash's on a
-stash, then those of the worktree whole; `a` and `s` only when there is
-something to stage or stash. The window says a line of the diff only as
-the keys move in it, so the foot follows them into the diff with the
-first line moved to, and back with the first row.
+hunk's in its diff, `u` on the last commit, a stash's on a stash, then
+those of the worktree whole; `a` and `s` only when there is something to
+stage or stash. The window says the piece the keys are on as it changes
+(`focus`), and the keys are said again alone, by a patch's `keys`; what
+`⏎` does on a line of the diff is the code's own `does`, `stage line` or
+`unstage line`.
 
-**Asked twice**: the first press does nothing and says in the status, in
-the tone `warn`, exactly what is lost or sent and which key does it —
-`discard hunk 2 of 2 of talk.txt (+1 -1); d again to discard`, `push 2
-commits to origin/talk; p again to push`. The same key on the same row,
-with the same words still true, does it. Any other key and any move of
-the keys drops the asking.
+**Asked first**: the first press does nothing and puts up a modal,
+`sure`, whose title says exactly what is lost or sent — `Discard hunk 2
+of 2 of talk.txt (+1 -1)?`, `Push 2 commits to origin/talk?` — over a
+line of what that means, with two buttons: the one that does it, `yes`,
+whose key is the key that asked, so the key pressed twice does it as `⏎`
+does; and `no`, which with `esc` takes the modal away and does nothing.
+What it says is checked again as it is confirmed: where the file or the
+count is another by then, nothing is done and the modal is said again in
+the new words. When it goes the keys are back on the piece they were on.
+
+**What was just done** — `committed a41c9e2`, `staged 3 files`,
+`discarded a hunk of talk.txt`, `on flags`, `copied src/talk.rs`, the
+line git wrote of a fetch — is a toast, said once. The status is for
+what was refused or failed and is yours to act on, and stays until the
+next thing is done; it and the keys are said by a patch's `status` and
+`keys` where nothing else of the view is another.
 
 **With a remote** (`f`, `P`, `p`) git runs beside the app, one at a time:
-the status says `fetching origin…` in the plain tone and the keys are
-taken meanwhile; the line git wrote last, or of one that failed the
-first that says why, is the status after, and the standing is read
-again. git has no terminal there: a remote that wants a password typed
-fails and says so, and nothing is asked over the view.
+a `progress` bar at the head's end says `fetching origin…` and the keys
+are taken meanwhile, another deed with a remote refused in a toast; the
+line git wrote last is a toast after, or of one that failed the first
+that says why is the status, and the standing is read again. git has no
+terminal there: a remote that wants a password typed fails and says so,
+and nothing is asked over the view.
 
 After each of these the standing is read again, and the keys stay on the
 same file where it still is — a file staged is followed into Staged —
@@ -607,8 +629,8 @@ the diff of the row under the keys under them; the list stays, and `space` and `
 back to the files and keeps the words typed. The commit is `git commit
 -m` with the message as typed: nothing is added to it, and hooks run.
 With nothing staged, or no message, nothing is done and the view's status
-says why; a hook that fails is said by its first line. Made, the status
-is `committed <short hash>`, back on the files.
+says why; a hook that fails is said by its first line. Made, a toast
+says `committed <short hash>`, back on the files.
 
 **Amend the last one** (`amend`; `tab` to it and `⏎` — the `⌘A` on it is
 said and is no key the window takes) makes the last commit again with
@@ -618,7 +640,8 @@ status, when the branch's upstream has that commit already, when the
 commit is the base's and not this branch's, and with nothing staged and
 no message.
 
-**The branches** (`b`) take the list's place: a search field, `q`, over
+**The branches** (`b`) are a modal, `switch`, over the view: a search
+field, `q`, over
 a list, `branches` — the repository's own (`l:<name>`), the one the
 worktree is on checked, each with how it stands against what it follows
 (`↑2 ↓1`, `level`, `gone`, `no upstream`), then under **Remote** the
@@ -629,7 +652,8 @@ switch`); on a remote's it makes the branch that follows it (`git switch
 <current>` (`n:<name>`, `git switch --create`) — first where they are in
 no name, else last. What git refuses — a file changed that the branch
 has otherwise, a branch another worktree is on — is the status, in git's
-first line, and the branches stay up. `esc` goes back to the files.
+first line, said in the modal too, and the branches stay up. `esc` goes
+back to the files.
 
 What fails — a folder in no repository, git not installed, a hunk git
 will not apply — is the view's status, cut to 200 characters, and the app

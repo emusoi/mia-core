@@ -82,6 +82,22 @@ on GitHub; a tag without its section is not released.
   of where the keys are. Not yet: merging and rebasing, conflicts, a
   push by force, deleting a branch, tags, colour by syntax.
 
+- **`mia git` asks in a modal, says what it did in a toast, and has a
+  menu on every row.** Discard, delete, drop, undo and push put up a
+  modal that says what is lost or sent, with a button that does it —
+  its key the key that asked, so the key twice still does it — and one
+  that keeps things as they are, as `esc` does; what it says is checked
+  again as it is confirmed. The branches are a modal too. What was just
+  done is a toast, and the status is kept for what was refused or
+  failed; it and the keys are said alone, by a patch. Each file, commit
+  and stash has a menu, under `→` and the pointer's other button: stage,
+  discard, open in the editor (`e`), copy its path or hash (`y`), undo,
+  apply, pop, drop. The foot's keys follow the piece the window says the
+  keys are on, and the diff names what `⏎` does on a line. With more
+  than 30 files the list is behind tabs, Changes, Commits and Stashes;
+  and a fetch, pull or push is a bar at the head's end while it runs.
+  See [mia git](api.md#mia-git).
+
 - **A worktree's files are an app mia desk draws.** `mia files`, run in a
   pane in any folder of a repository, says them to mia desk by its UI
   protocol: the tree of the files git does not ignore, a folder opened

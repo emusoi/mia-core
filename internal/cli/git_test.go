@@ -314,18 +314,23 @@ func TestTheViewIsAListAndTheDiffSideBySide(t *testing.T) {
 	if left := sides.Children[0]; left.T != "col" || left.W != 360 || !left.Scroll {
 		t.Errorf("the left side = %+v", left)
 	}
+	// (The right side is said again whole on every move: it comes in at once.)
+	if right := sides.Children[2]; right.ID != "side" || right.Motion != "none" {
+		t.Errorf("the right side = %+v", right)
+	}
 	list := piece(got.View, "files")
-	if list == nil || list.T != "list" || !list.Live || list.Selected != "c:src/talk.rs" || len(list.Items) != 4 || list.Items[3].ID != "u:notes — née.md" {
+	if list == nil || list.T != "list" || !list.Live || list.Selected != "c:src/talk.rs" || len(list.Items) != 4 || list.Items[3].ID != "u:notes — née.md" || list.Menu == "" {
 		t.Errorf("the list = %+v", list)
 	}
-	if diff := piece(got.View, "diff"); diff == nil || diff.T != "code" || !diff.Live {
+	if diff := piece(got.View, "diff"); diff == nil || diff.T != "code" || !diff.Live || diff.Does != "stage line" {
 		t.Errorf("the code = %+v", diff)
 	}
 	if lines := code(t, messages); !reflect.DeepEqual(lines, view.lines) {
 		t.Errorf("the code's lines = %+v", lines)
 	}
-	if want := []gitKey{{"space", "stage", "stage"}, {"d", "discard", "discard"}, {"a", "stage all", "all"}, {"c", "commit", "commit"}, {"b", "branches", "branches"}, {"s", "stash", "stash"}, {"f", "fetch", "fetch"}, {"P", "pull", "pull"}, {"p", "push", "push"}, {"r", "ask again", "again"}}; !slices.Equal(got.Keys, want) {
-		t.Errorf("keys = %+v", got.Keys)
+	t.Setenv("EDITOR", "ed -s")
+	if want := []gitKey{{"space", "stage", "stage"}, {"d", "discard", "discard"}, {"e", "edit in ed", "edit"}, {"y", "copy the path", "copy"}, {"a", "stage all", "all"}, {"c", "commit", "commit"}, {"b", "branches", "branches"}, {"s", "stash", "stash"}, {"f", "fetch", "fetch"}, {"P", "pull", "pull"}, {"p", "push", "push"}, {"r", "ask again", "again"}}; !slices.Equal(heard(t, view.messages(true)[0]).Keys, want) {
+		t.Errorf("keys = %+v", heard(t, view.messages(true)[0]).Keys)
 	}
 
 	// said after the person moved: the keys stay where they put them
@@ -412,6 +417,22 @@ func TestWhatAnEventDoes(t *testing.T) {
 		{`{"e":"submit","id":"message","text":"Sent\nas typed"}`, gitCommit, "", "", "Sent\nas typed"},
 		{`{"e":"press","id":"send"}`, gitCommit, "", "", "typed so far"},
 		{`{"e":"pick","list":"files","id":"u:notes.md"}`, gitNothing, "", "", ""},
+		// a choice of a row's menu does what the key of its id does on that row
+		{`{"e":"pick","list":"files","id":"u:notes.md","sub":"stage"}`, gitStage, "u:notes.md", "", ""},
+		{`{"e":"pick","list":"files","id":"s:src/talk.rs","sub":"stage"}`, gitUnstage, "s:src/talk.rs", "", ""},
+		{`{"e":"pick","list":"files","id":"c:src/talk.rs","sub":"copy"}`, gitCopy, "", "", "src/talk.rs"},
+		{`{"e":"pick","list":"files","id":"k:a41c9e2","sub":"copy"}`, gitCopy, "", "", "a41c9e2"},
+		{`{"e":"press","id":"copy","item":"3"}`, gitNothing, "", "", ""}, // on a line of the diff
+		{`{"e":"pick","list":"files","id":"c:src/talk.rs","sub":"edit"}`, gitEdit, "c:src/talk.rs", "", ""},
+		{`{"e":"press","id":"edit","item":"k:a41c9e2"}`, gitNothing, "", "", ""},
+		// where the window says the keys are, and what a modal is answered with
+		{`{"e":"focus","id":"diff"}`, gitFocus, "", "", "diff"},
+		{`{"e":"focus","id":"files"}`, gitFocus, "", "", "files"},
+		{`{"e":"focus","id":"yes"}`, gitNothing, "", "", ""},
+		{`{"e":"dismiss","id":"sure"}`, gitKeep, "", "", ""},
+		{`{"e":"press","id":"no"}`, gitKeep, "", "", ""},
+		{`{"e":"press","id":"yes"}`, gitNothing, "", "", ""},                  // nothing is asked
+		{`{"e":"pick","list":"tabs","id":"commits"}`, gitNothing, "", "", ""}, // so few files have no tabs
 	} {
 		events, rest, _, leave := muiTyped[gitEvent]("", "\033[200~\x1fmia:"+c.event+"\033[201~")
 		if len(events) != 1 || rest != "" || leave {
@@ -429,6 +450,220 @@ func TestWhatAnEventDoes(t *testing.T) {
 		if got := view.deed(gitEvent{E: "press", ID: "stage", Item: "2"}); got.do != want || want != gitNothing && got.row.id != at {
 			t.Errorf("space in the diff of %s does %d on %q", at, got.do, got.row.id)
 		}
+	}
+	// e on a line of the diff edits the file at that line as it is now, a
+	// deleted line's being the line after it; a deleted file has nothing to edit
+	view.at = "c:src/talk.rs"
+	for item, want := range map[string]int{"c:src/talk.rs": 1, "1": 212, "2": 213, "3": 213, "10": 242} {
+		if got := view.deed(gitEvent{E: "press", ID: "edit", Item: item}); got.do != gitEdit || got.line != want || got.row.change.Path != "src/talk.rs" {
+			t.Errorf("e on %s edits line %d of %q", item, got.line, got.row.change.Path)
+		}
+	}
+	view.rows[1].change.State = "deleted"
+	if got := view.deed(gitEvent{E: "press", ID: "edit", Item: "c:src/talk.rs"}); got.do != gitRefuse || got.text != "src/talk.rs is deleted: there is nothing to edit" {
+		t.Errorf("e on a deleted file: %+v", got)
+	}
+}
+
+// Each file, commit and stash carries the menu of what can be done to it,
+// each choice by the id of the key that does the same with that key at
+// its right: a staged file is unstaged, one that is not is staged and
+// discarded, an untracked one deleted, each handed to the editor unless
+// it is deleted and its path copied; a commit's hash is copied and the
+// last one undone where it can be; a stash is applied, popped and dropped.
+func TestEachRowCarriesTheMenuOfWhatCanBeDoneToIt(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	standing := git.Standing{Branch: "talk",
+		Staged:    []git.Change{{Path: "a.rs"}},
+		Changed:   []git.Change{{Path: "b.rs"}, {Path: "old.md", State: "deleted"}},
+		Untracked: []git.Change{{Path: "c.rs"}},
+	}
+	menus := func(undo bool) map[string]string {
+		entries, rows := gitList(standing, []git.Commit{{SHA: "a41c9e2", When: now}, {SHA: "19f2c6a", When: now}}, "main", 2, gitRowsMost, now)
+		entries, rows = gitStashed(entries, rows, []git.Stash{{SHA: "5e6f7a8b9c0d1e2f", Subject: "On talk: earlier"}}, now)
+		all := map[string]string{}
+		for _, entry := range gitMenus(entries, rows, undo) {
+			var choices []string
+			for _, choice := range entry.Menu {
+				choices = append(choices, choice.ID+"="+choice.Title+" "+choice.Right)
+			}
+			if entry.ID == "" && len(choices) > 0 {
+				t.Errorf("a head or a rule has a menu: %+v", entry)
+			}
+			all[entry.ID] = strings.Join(choices, ", ")
+		}
+		return all
+	}
+	for id, want := range map[string]string{
+		"s:a.rs":       "stage=Unstage space, edit=Open in editor e, copy=Copy path y",
+		"c:b.rs":       "stage=Stage space, discard=Discard… d, edit=Open in editor e, copy=Copy path y",
+		"c:old.md":     "stage=Stage space, discard=Discard… d, copy=Copy path y",
+		"u:c.rs":       "stage=Stage space, discard=Delete… d, edit=Open in editor e, copy=Copy path y",
+		"k:a41c9e2":    "copy=Copy its hash y, undo=Undo… u",
+		"k:19f2c6a":    "copy=Copy its hash y",
+		"t:5e6f7a8b9c": "stage=Apply space, push=Pop p, discard=Drop… d",
+	} {
+		if got := menus(true)[id]; got != want {
+			t.Errorf("the menu of %s = %q", id, got)
+		}
+	}
+	if got := menus(false)["k:a41c9e2"]; got != "copy=Copy its hash y" {
+		t.Errorf("the menu of a last commit a remote has = %q", got)
+	}
+}
+
+// With more files than a screen of them the list is behind tabs, Changes,
+// Commits and Stashes, each with its count, and shows the chosen one's
+// groups alone; a tab picked puts the keys of the list on its first row,
+// and the tab follows the row under the keys. With fewer there are none.
+func TestALongListIsBehindTabs(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	view := &gitView{pane: "%3", base: "main", ahead: 2, standing: git.Standing{Branch: "talk", Head: "0123456789"}}
+	for n := range gitTabsOver {
+		view.standing.Changed = append(view.standing.Changed, git.Change{Path: fmt.Sprintf("src/%02d.rs", n)})
+	}
+	commits := []git.Commit{{SHA: "a41c9e2", Subject: "A subject", When: now}, {SHA: "19f2c6a", Subject: "Another", When: now}}
+	list := func() {
+		view.entries, view.rows = gitList(view.standing, commits, "main", 2, gitRowsMost, now)
+		view.entries, view.rows = gitStashed(view.entries, view.rows, view.stashes, now)
+	}
+	list()
+	view.at, view.tab = "c:src/00.rs", "changes"
+	if got := heard(t, view.messages(true)[0]); view.tabs() != nil || piece(got.View, "tabs") != nil || len(piece(got.View, "files").Items) != len(view.entries) {
+		t.Fatalf("%d files are behind tabs: %+v", gitTabsOver, view.tabs())
+	}
+
+	view.standing.Untracked = []git.Change{{Path: "notes.md"}}
+	list()
+	if want := []gitEntry{{ID: "changes", Title: "Changes", Note: "31"}, {ID: "commits", Title: "Commits", Note: "2"}}; !reflect.DeepEqual(view.tabs(), want) {
+		t.Fatalf("tabs = %+v", view.tabs())
+	}
+	view.stashes = []git.Stash{{SHA: "5e6f7a8b9c0d1e2f", Subject: "On talk: earlier"}}
+	list()
+	got := heard(t, view.messages(true)[0])
+	tabs, files := piece(got.View, "tabs"), piece(got.View, "files")
+	if tabs == nil || tabs.T != "tabs" || tabs.Selected != "changes" || len(tabs.Items) != 3 || !reflect.DeepEqual(tabs.Items[2], gitEntry{ID: "stashes", Title: "Stashes", Note: "1"}) {
+		t.Fatalf("the tabs = %+v", tabs)
+	}
+	if len(files.Items) != 33 || files.Items[0].Head != "Changed" || files.Items[31].Head != "Untracked" || files.Items[32].ID != "u:notes.md" {
+		t.Errorf("behind Changes: %d entries, %+v", len(files.Items), files.Items[len(files.Items)-1])
+	}
+	for tab, want := range map[string][]string{"commits": {"Commits", "k:a41c9e2", "k:19f2c6a"}, "stashes": {"Stashes", "t:5e6f7a8b9c"}} {
+		var behind []string
+		for _, entry := range gitBehind(view.entries, tab) {
+			behind = append(behind, entry.Head+entry.ID)
+		}
+		if !slices.Equal(behind, want) {
+			t.Errorf("behind %s: %q", tab, behind)
+		}
+	}
+
+	deed := view.deed(gitEvent{E: "pick", List: "tabs", ID: "commits"})
+	if deed.do != gitTab || deed.row.id != "k:a41c9e2" || deed.text != "commits" {
+		t.Fatalf("a tab picked: %+v", deed)
+	}
+	if say, placed := view.act(deed, now); !say || !placed || view.tab != "commits" || view.at != "k:a41c9e2" {
+		t.Fatalf("on %q behind %q", view.at, view.tab)
+	}
+	got = heard(t, view.messages(true)[0])
+	if files := piece(got.View, "files"); piece(got.View, "tabs").Selected != "commits" || len(files.Items) != 3 || files.Selected != "k:a41c9e2" || got.Focus != "tabs" {
+		t.Errorf("behind Commits: %+v, focus %q", files, got.Focus)
+	}
+	if again := view.deed(gitEvent{E: "pick", List: "tabs", ID: "commits"}); again.do != gitNothing {
+		t.Errorf("the tab that is chosen, picked: %+v", again)
+	}
+	if none := view.deed(gitEvent{E: "pick", List: "tabs", ID: "tags"}); none.do != gitNothing {
+		t.Errorf("a tab there is none of, picked: %+v", none)
+	}
+}
+
+// What the window is told of a view after it was told once: the view
+// whole where more than its status and its keys is another, and where it
+// says where the keys are; the status and the keys alone, as the changes
+// of a patch, where only they are; nothing where nothing is; and after
+// any of them what was just done, in a toast, and what is copied, once.
+func TestOnlyWhatIsAnotherIsSaidAgain(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	view := &gitView{pane: "%3", top: "/src/app", at: "c:src/talk.rs", standing: git.Standing{Branch: "talk", Head: "0123456789", Changed: []git.Change{{Path: "src/talk.rs", Added: 3, Deleted: 1}}}}
+	view.entries, view.rows = gitList(view.standing, nil, "", 0, gitRowsMost, now)
+	view.files = git.ParseDiff(gitTwoHunks)
+	view.lines, view.hunks = gitCode(view.files)
+	var told muiTold
+	says := func(placed bool) []string {
+		var where [][]byte
+		if placed {
+			where = view.messages(true)
+		}
+		var said []string
+		for _, message := range told.says(view.pane, view.messages(false), where, &view.passing) {
+			got := heard(t, message)
+			if got.View != nil {
+				said = append(said, "whole")
+				continue
+			}
+			var patch struct {
+				Patch []struct {
+					Op, Text, Tone string
+					Keys           []gitKey
+				} `json:"patch"`
+			}
+			if err := json.Unmarshal(message, &patch); err != nil || got.Pane != "%3" {
+				t.Fatalf("%v in %s", err, message)
+			}
+			for _, change := range patch.Patch {
+				text := strings.TrimSpace(change.Op + " " + change.Text + " " + change.Tone)
+				if len(change.Keys) > 0 {
+					text += fmt.Sprintf(" %s %d", change.Keys[0].Label, len(change.Keys))
+				}
+				said = append(said, text)
+			}
+		}
+		return said
+	}
+	t.Setenv("EDITOR", "ed")
+	if got := says(true); !slices.Equal(got, []string{"whole"}) {
+		t.Fatalf("first: %q", got)
+	}
+	if got := says(false); got != nil {
+		t.Errorf("as it was told: %q", got)
+	}
+	// the keys cross to the diff: only the keys are said
+	if say, placed := view.act(view.deed(gitEvent{E: "focus", ID: "diff"}), now); !say || placed || !view.inDiff {
+		t.Fatal("the keys in the diff are not known to be")
+	}
+	if got := says(false); !slices.Equal(got, []string{"keys stage hunk 11"}) {
+		t.Errorf("the keys crossed: %q", got)
+	}
+	// a refusal is the status alone, and taken away alone
+	view.act(view.deed(gitEvent{E: "pick", List: "diff", ID: "1"}), now)
+	if got := says(false); !slices.Equal(got, []string{"status ⏎ stages a line added or deleted: the keys are on neither bad"}) {
+		t.Errorf("a refusal: %q", got)
+	}
+	view.status = nil
+	if got := says(false); !slices.Equal(got, []string{"status"}) {
+		t.Errorf("the status gone: %q", got)
+	}
+	// what is copied and the toast that says so are said once
+	view.act(view.deed(gitEvent{E: "focus", ID: "files"}), now)
+	view.act(view.deed(gitEvent{E: "press", ID: "copy", Item: "c:src/talk.rs"}), now)
+	if got := says(false); !slices.Equal(got, []string{"keys stage 12", "copy src/talk.rs", "toast copied src/talk.rs"}) {
+		t.Errorf("a path copied: %q", got)
+	}
+	if got := says(false); got != nil {
+		t.Errorf("said twice: %q", got)
+	}
+	// a modal is of the view: said whole, and whole again when it goes
+	view.act(view.deed(gitEvent{E: "press", ID: "discard", Item: "c:src/talk.rs"}), now)
+	if got := says(false); !slices.Equal(got, []string{"whole"}) {
+		t.Errorf("a modal up: %q", got)
+	}
+	view.act(view.deed(gitEvent{E: "dismiss", ID: "sure"}), now)
+	if got := says(false); !slices.Equal(got, []string{"whole"}) {
+		t.Errorf("a modal gone: %q", got)
+	}
+	// placed, it is said whole though nothing is another
+	if got := says(true); !slices.Equal(got, []string{"whole"}) {
+		t.Errorf("placed: %q", got)
 	}
 }
 
@@ -472,6 +707,36 @@ func press(t *testing.T, view *gitView, id, item string) {
 	if say, _ := view.act(view.deed(gitEvent{E: "press", ID: id, Item: item}), time.Now()); !say {
 		t.Fatalf("%s on %q changes nothing said", id, item)
 	}
+}
+
+// asks is the modal a view says, with its title, the words under it and
+// its buttons each as its label and its key; nil where it says none.
+func asks(t *testing.T, view *gitView) []string {
+	t.Helper()
+	got := heard(t, view.messages(false)[0])
+	modal := piece(got.View, "sure")
+	if modal == nil {
+		return nil
+	}
+	if modal.T != "modal" || got.Focus != "yes" || got.View.Children[len(got.View.Children)-1].ID != "sure" {
+		t.Fatalf("the modal = %+v, focus %q", modal, got.Focus)
+	}
+	said := append([]string{modal.Title}, texts(*modal)...)
+	for _, button := range modal.Children[len(modal.Children)-1].Children {
+		said = append(said, button.ID+"="+button.Label+" "+button.Key)
+		if button.T != "button" || button.Primary != (button.ID == "yes") {
+			t.Fatalf("the button = %+v", button)
+		}
+	}
+	return said
+}
+
+// toasted is what a view just did, as its toast says it; none is no words.
+func toasted(view *gitView) muiStatus {
+	if view.passing.toast == nil {
+		return muiStatus{}
+	}
+	return *view.passing.toast
 }
 
 func ids(view *gitView) []string {
@@ -655,8 +920,8 @@ func TestACommitIsMadeOfWhatIsStagedWithTheMessageAsTyped(t *testing.T) {
 
 	view.act(view.deed(gitEvent{E: "submit", ID: "message", Text: message}), time.Now())
 	hash := repo.Git("rev-parse", "--short", "HEAD")
-	if view.status == nil || *view.status != (muiStatus{"committed " + hash, "ok"}) || view.writing || view.message != "" {
-		t.Fatalf("committed: %+v, writing %v", view.status, view.writing)
+	if toasted(view) != (muiStatus{"committed " + hash, "ok"}) || view.status != nil || view.writing || view.message != "" {
+		t.Fatalf("committed: %+v, writing %v", toasted(view), view.writing)
 	}
 	if got := repo.Git("log", "-1", "--format=%B"); got != message {
 		t.Errorf("the message = %q", got)
@@ -665,7 +930,7 @@ func TestACommitIsMadeOfWhatIsStagedWithTheMessageAsTyped(t *testing.T) {
 		t.Errorf("rows = %v, on %q, %d ahead", ids(view), view.at, view.ahead)
 	}
 	got = heard(t, view.messages(true)[0])
-	if want := []string{"words", "1 ahead of main, none behind", "1 untracked", "notes.txt", "untracked", "+1"}; !slices.Equal(texts(*got.View), want) || got.Status == nil || got.Status.Tone != "ok" {
+	if want := []string{"words", "1 ahead of main, none behind", "1 untracked", "notes.txt", "untracked", "+1"}; !slices.Equal(texts(*got.View), want) || got.Status != nil || got.Focus != "files" {
 		t.Errorf("texts = %q, status %+v", texts(*got.View), got.Status)
 	}
 	view.act(view.deed(gitEvent{E: "move", List: "files", ID: "k:" + hash}), time.Now())
@@ -774,8 +1039,10 @@ func TestGitRefusesWhatIsNotATerminal(t *testing.T) {
 // The keys said are those of where the keys are: on a file what stages
 // and discards it, in its diff what does so to a hunk and a line, on the
 // last commit what undoes it, on a stash what applies, pops and drops it,
-// and then those of the worktree whole; the branches have esc alone.
+// and then those of the worktree whole. What ⏎ does on a line of the
+// diff the code says itself.
 func TestTheKeysAreThoseOfWhereTheKeysAre(t *testing.T) {
+	t.Setenv("EDITOR", "ed")
 	now := time.Unix(1_800_000_000, 0)
 	view := &gitView{base: "main", ahead: 2, standing: git.Standing{Branch: "talk", Head: "0123456789",
 		Staged: []git.Change{{Path: "a.rs"}}, Changed: []git.Change{{Path: "b.rs"}}, Untracked: []git.Change{{Path: "c.rs"}}}}
@@ -790,13 +1057,13 @@ func TestTheKeysAreThoseOfWhereTheKeysAre(t *testing.T) {
 		inDiff bool
 		want   string
 	}{
-		{"s:a.rs", false, "space:unstage " + whole},
-		{"c:b.rs", false, "space:stage d:discard " + whole},
-		{"u:c.rs", false, "space:stage d:delete " + whole},
-		{"c:b.rs", true, "space:stage hunk ⏎:stage line d:discard hunk " + whole},
-		{"s:a.rs", true, "space:unstage hunk ⏎:unstage line " + whole},
-		{"k:a41c9e2", false, "u:undo the commit " + whole},
-		{"k:19f2c6a", false, whole},
+		{"s:a.rs", false, "space:unstage e:edit in ed y:copy the path " + whole},
+		{"c:b.rs", false, "space:stage d:discard e:edit in ed y:copy the path " + whole},
+		{"u:c.rs", false, "space:stage d:delete e:edit in ed y:copy the path " + whole},
+		{"c:b.rs", true, "space:stage hunk d:discard hunk e:edit in ed " + whole},
+		{"s:a.rs", true, "space:unstage hunk e:edit in ed " + whole},
+		{"k:a41c9e2", false, "u:undo the commit y:copy the hash " + whole},
+		{"k:19f2c6a", false, "y:copy the hash " + whole},
 		{"t:5e6f7a8b9c", false, "space:apply p:pop d:drop a:stage all c:commit b:branches s:stash f:fetch P:pull r:ask again"},
 	} {
 		view.at, view.inDiff = c.at, c.inDiff
@@ -811,12 +1078,16 @@ func TestTheKeysAreThoseOfWhereTheKeysAre(t *testing.T) {
 	// a commit a remote has is not undone, and a clean worktree has nothing to stage or stash
 	view.at, view.inDiff = "k:a41c9e2", false
 	view.standing = git.Standing{Branch: "talk", Head: "0123456789", Upstream: "origin/talk"}
-	if got := view.keys(); got[0] != (gitKey{"c", "commit", "commit"}) || len(got) != 6 {
+	if got := view.keys(); got[0] != (gitKey{"y", "copy the hash", "copy"}) || got[1] != (gitKey{"c", "commit", "commit"}) || len(got) != 7 {
 		t.Errorf("on a commit origin has, in a clean worktree: %+v", got)
 	}
-	view.picking = true
-	if got := view.keys(); !slices.Equal(got, []gitKey{{"esc", "back to the files", "back"}}) {
-		t.Errorf("picking a branch: %+v", got)
+	// ⏎ on a line stages it in a changed file's diff and unstages it in a staged one's
+	view.standing = git.Standing{Branch: "talk", Head: "0123456789"}
+	for at, want := range map[string]string{"c:b.rs": "stage line", "s:a.rs": "unstage line", "u:c.rs": "", "k:a41c9e2": ""} {
+		view.at = at
+		if got := piece(heard(t, view.messages(false)[0]).View, "diff").Does; got != want {
+			t.Errorf("⏎ in the diff of %s does %q", at, got)
+		}
 	}
 
 	for _, c := range []struct {
@@ -836,10 +1107,11 @@ func TestTheKeysAreThoseOfWhereTheKeysAre(t *testing.T) {
 }
 
 // What the keys of a daily git tool ask for: d, u and p say first what
-// they lose or send, and are sure only when the same is asked again; ⏎
-// on a line added or deleted stages that line alone; on a stash space, p
-// and d apply, pop and drop it; and what cannot be done is refused with
-// why. An event says where the keys are.
+// they lose or send, in a modal, and are sure only when the same is asked
+// again, by the modal's button or by the key; esc and its other button
+// leave it undone; ⏎ on a line added or deleted stages that line alone;
+// on a stash space, p and d apply, pop and drop it; and what cannot be
+// done is refused with why.
 func TestWhatTheKeysOfADailyToolAsk(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	view := &gitView{at: "c:src/talk.rs", base: "main", ahead: 2, standing: git.Standing{Branch: "talk", Head: "0123456789",
@@ -860,73 +1132,105 @@ func TestWhatTheKeysOfADailyToolAsk(t *testing.T) {
 		row   string
 		patch string
 		ask   string
-		where byte
+		yes   string
 	}{
-		{`{"e":"press","id":"discard","item":"c:src/talk.rs"}`, gitDiscard, "c:src/talk.rs", "", "discard what is changed in src/talk.rs and not staged (+3 -1); d again to discard", 'f'},
-		{`{"e":"press","id":"discard","item":"u:notes.md"}`, gitDiscard, "u:notes.md", "", "delete notes.md, untracked and in no commit; d again to discard", 'f'},
-		{`{"e":"press","id":"discard","item":"10"}`, gitDiscardHunk, "c:src/talk.rs", view.files[0].Patch(1), "discard hunk 2 of 2 of src/talk.rs (+1); d again to discard", 'd'},
-		{`{"e":"press","id":"discard","item":"7"}`, gitNothing, "", "", "", 'd'}, // the gap between two hunks
-		{`{"e":"press","id":"discard","item":"s:src/hear.rs"}`, gitRefuse, "", "", "", 'f'},
-		{`{"e":"press","id":"discard","item":"k:a41c9e2"}`, gitNothing, "", "", "", 'f'},
-		{`{"e":"press","id":"discard","item":"t:5e6f7a8b9c"}`, gitStashDrop, "t:5e6f7a8b9c", "", `drop the stash "On talk: earlier" and what it holds; d again to drop`, 'f'},
-		{`{"e":"press","id":"stage","item":"t:5e6f7a8b9c"}`, gitStashApply, "t:5e6f7a8b9c", "", "", 'f'},
-		{`{"e":"press","id":"push","item":"t:5e6f7a8b9c"}`, gitStashPop, "t:5e6f7a8b9c", "", "", 'f'},
-		{`{"e":"press","id":"push","item":"c:src/talk.rs"}`, gitPush, "", "", "push 2 commits to origin/talk; p again to push", 'f'},
-		{`{"e":"press","id":"undo","item":"k:a41c9e2"}`, gitUndo, "k:a41c9e2", "", `undo a41c9e2 "A subject": what it changed stays staged; u again to undo`, 'f'},
-		{`{"e":"press","id":"undo","item":"k:19f2c6a"}`, gitRefuse, "", "", "", 'f'},
-		{`{"e":"press","id":"undo","item":"c:src/talk.rs"}`, gitNothing, "", "", "", 'f'},
-		{`{"e":"pick","list":"diff","id":"3"}`, gitStageLine, "c:src/talk.rs", line, "", 'd'},
-		{`{"e":"press","id":"line","item":"3"}`, gitStageLine, "c:src/talk.rs", line, "", 'd'},
-		{`{"e":"pick","list":"diff","id":"1"}`, gitRefuse, "", "", "", 'd'}, // a line the same
-		{`{"e":"pick","list":"diff","id":"0"}`, gitRefuse, "", "", "", 'd'}, // the hunk's head
-		{`{"e":"move","list":"diff","id":"4"}`, gitNothing, "", "", "", 'd'},
-		{`{"e":"move","list":"files","id":"u:notes.md"}`, gitMove, "u:notes.md", "", "", 'f'},
-		{`{"e":"press","id":"branches","item":"c:src/talk.rs"}`, gitBranches, "", "", "", 'f'},
-		{`{"e":"press","id":"stash"}`, gitStash, "", "", "", 0},
-		{`{"e":"press","id":"fetch"}`, gitFetch, "", "", "", 0},
-		{`{"e":"press","id":"pull"}`, gitRefuse, "", "", "", 0}, // it follows nothing
-		{`{"e":"press","id":"amend"}`, gitAmend, "", "", "", 0},
-		{`{"e":"pick","list":"branches","id":"l:main"}`, gitNothing, "", "", "", 0}, // the branches are not up
-		{`{"e":"change","id":"q","text":"ma"}`, gitNothing, "", "", "", 0},
+		{`{"e":"press","id":"discard","item":"c:src/talk.rs"}`, gitDiscard, "c:src/talk.rs", "", "Discard what is changed in src/talk.rs and not staged (+3 -1)?", "Discard"},
+		{`{"e":"pick","list":"files","id":"c:src/talk.rs","sub":"discard"}`, gitDiscard, "c:src/talk.rs", "", "Discard what is changed in src/talk.rs and not staged (+3 -1)?", "Discard"},
+		{`{"e":"press","id":"discard","item":"u:notes.md"}`, gitDiscard, "u:notes.md", "", "Delete notes.md, untracked and in no commit?", "Delete"},
+		{`{"e":"press","id":"discard","item":"10"}`, gitDiscardHunk, "c:src/talk.rs", view.files[0].Patch(1), "Discard hunk 2 of 2 of src/talk.rs (+1)?", "Discard"},
+		{`{"e":"press","id":"discard","item":"7"}`, gitNothing, "", "", "", ""}, // the gap between two hunks
+		{`{"e":"press","id":"discard","item":"s:src/hear.rs"}`, gitRefuse, "", "", "", ""},
+		{`{"e":"press","id":"discard","item":"k:a41c9e2"}`, gitNothing, "", "", "", ""},
+		{`{"e":"press","id":"discard","item":"t:5e6f7a8b9c"}`, gitStashDrop, "t:5e6f7a8b9c", "", `Drop the stash "On talk: earlier" and what it holds?`, "Drop"},
+		{`{"e":"press","id":"stage","item":"t:5e6f7a8b9c"}`, gitStashApply, "t:5e6f7a8b9c", "", "", ""},
+		{`{"e":"press","id":"push","item":"t:5e6f7a8b9c"}`, gitStashPop, "t:5e6f7a8b9c", "", "", ""},
+		{`{"e":"pick","list":"files","id":"t:5e6f7a8b9c","sub":"push"}`, gitStashPop, "t:5e6f7a8b9c", "", "", ""},
+		{`{"e":"press","id":"push","item":"c:src/talk.rs"}`, gitPush, "", "", "Push 2 commits to origin/talk?", "Push"},
+		{`{"e":"press","id":"undo","item":"k:a41c9e2"}`, gitUndo, "k:a41c9e2", "", `Undo a41c9e2 "A subject"?`, "Undo"},
+		{`{"e":"pick","list":"files","id":"k:a41c9e2","sub":"undo"}`, gitUndo, "k:a41c9e2", "", `Undo a41c9e2 "A subject"?`, "Undo"},
+		{`{"e":"press","id":"undo","item":"k:19f2c6a"}`, gitRefuse, "", "", "", ""},
+		{`{"e":"press","id":"undo","item":"c:src/talk.rs"}`, gitNothing, "", "", "", ""},
+		{`{"e":"pick","list":"diff","id":"3"}`, gitStageLine, "c:src/talk.rs", line, "", ""},
+		{`{"e":"pick","list":"diff","id":"1"}`, gitRefuse, "", "", "", ""}, // a line the same
+		{`{"e":"pick","list":"diff","id":"0"}`, gitRefuse, "", "", "", ""}, // the hunk's head
+		{`{"e":"move","list":"diff","id":"4"}`, gitNothing, "", "", "", ""},
+		{`{"e":"move","list":"files","id":"u:notes.md"}`, gitMove, "u:notes.md", "", "", ""},
+		{`{"e":"press","id":"branches","item":"c:src/talk.rs"}`, gitBranches, "", "", "", ""},
+		{`{"e":"press","id":"stash"}`, gitStash, "", "", "", ""},
+		{`{"e":"press","id":"fetch"}`, gitFetch, "", "", "", ""},
+		{`{"e":"press","id":"pull"}`, gitRefuse, "", "", "", ""}, // it follows nothing
+		{`{"e":"press","id":"amend"}`, gitAmend, "", "", "", ""},
+		{`{"e":"pick","list":"branches","id":"l:main"}`, gitNothing, "", "", "", ""}, // the branches are not up
+		{`{"e":"change","id":"q","text":"ma"}`, gitNothing, "", "", "", ""},
 	} {
-		got := view.deed(gitEvent{})
-		if err := json.Unmarshal([]byte(c.event), new(gitEvent)); err != nil {
+		var event gitEvent
+		if err := json.Unmarshal([]byte(c.event), &event); err != nil {
 			t.Fatal(err)
 		}
-		var event gitEvent
-		_ = json.Unmarshal([]byte(c.event), &event)
-		if got = view.deed(event); got.do != c.do || got.row.id != c.row || got.patch != c.patch || got.ask != c.ask || got.where != c.where || got.sure {
-			t.Errorf("%s does %d on %q with %q, asks %q, where %q, sure %v", c.event, got.do, got.row.id, got.patch, got.ask, got.where, got.sure)
+		if got := view.deed(event); got.do != c.do || got.row.id != c.row || got.patch != c.patch || got.ask != c.ask || got.yes != c.yes || got.sure || (got.ask == "") != (got.told == "") {
+			t.Errorf("%s does %d on %q with %q, asks %q under %q, sure %v", c.event, got.do, got.row.id, got.patch, got.ask, got.yes, got.sure)
 		}
 	}
 	if line != "diff --git a/src/talk.rs b/src/talk.rs\n--- a/src/talk.rs\n+++ b/src/talk.rs\n@@ -212,4 +212,5 @@\n \tlet ui = self.uis.entry(pane);\n \tui.view = msg.view;\n+\tui.take(msg);\n \tHeard::Drawn\n }\n" {
 		t.Errorf("the patch of one line = %q", line)
 	}
 
-	// asked again the same, it is sure; anything else between drops the asking
+	// asked once it is a modal over the view, the keys on the button that
+	// does it, and nothing is the status
 	asked := view.deed(gitEvent{E: "press", ID: "discard", Item: "c:src/talk.rs"})
-	if say, placed := view.act(asked, now); !say || placed || view.status == nil || *view.status != (muiStatus{asked.ask, "warn"}) {
-		t.Fatalf("asked once: %+v", view.status)
+	if say, placed := view.act(asked, now); !say || placed || view.status != nil || view.armed.ask != asked.ask {
+		t.Fatalf("asked once: %+v, %+v", view.status, view.armed)
 	}
-	if again := view.deed(gitEvent{E: "press", ID: "discard", Item: "c:src/talk.rs"}); !again.sure || again.do != gitDiscard {
-		t.Errorf("asked again: %+v", again)
+	if want := []string{"Discard what is changed in src/talk.rs and not staged (+3 -1)?", "Git cannot bring it back. What is staged of it stays.", "yes=Discard d", "no=Keep things as they are esc"}; !slices.Equal(asks(t, view), want) {
+		t.Errorf("the modal says %q", asks(t, view))
+	}
+	// asked again the same, by its button or by the key, it is sure
+	for _, again := range []gitEvent{{E: "press", ID: "yes"}, {E: "press", ID: "discard", Item: "c:src/talk.rs"}} {
+		if got := view.deed(again); !got.sure || got.do != gitDiscard || got.row.id != "c:src/talk.rs" {
+			t.Errorf("%+v asked again: %+v", again, got)
+		}
 	}
 	if other := view.deed(gitEvent{E: "press", ID: "discard", Item: "u:notes.md"}); other.sure {
 		t.Error("d on another row is sure of what was asked of the first")
 	}
-	if say, _ := view.act(view.deed(gitEvent{E: "press", ID: "stage"}), now); !say || view.status != nil || view.armed != (gitArmed{}) {
-		t.Errorf("a key that does nothing leaves the asking: %+v", view.status)
+	// the keys passed between its buttons leave it up; esc and its other
+	// button take it away, and the keys go back to where they were
+	if say, _ := view.act(view.deed(gitEvent{E: "focus", ID: "no"}), now); say || view.armed.ask == "" {
+		t.Errorf("the keys on its other button: said %v, %+v", say, view.armed)
 	}
-	if again := view.deed(gitEvent{E: "press", ID: "discard", Item: "c:src/talk.rs"}); again.sure {
-		t.Error("d is sure after another key")
+	for _, never := range []gitEvent{{E: "dismiss", ID: "sure"}, {E: "press", ID: "no"}} {
+		view.act(asked, now)
+		if say, _ := view.act(view.deed(never), now); !say || view.armed != (gitArmed{}) || view.status != nil || asks(t, view) != nil {
+			t.Errorf("%+v leaves the modal up: %+v", never, view.armed)
+		}
+		if got := heard(t, view.messages(false)[0]); got.Focus != "files" {
+			t.Errorf("after %+v the keys are put on %q", never, got.Focus)
+		}
+		if again := view.deed(gitEvent{E: "press", ID: "discard", Item: "c:src/talk.rs"}); again.sure {
+			t.Errorf("d is sure after %+v", never)
+		}
 	}
-	view.act(asked, now)
-	if say, _ := view.act(view.deed(gitEvent{E: "move", List: "diff", ID: "2"}), now); !say || view.status != nil || !view.inDiff {
-		t.Errorf("a move leaves the asking: %+v, in the diff %v", view.status, view.inDiff)
+	// asked from the diff, the keys go back to the diff
+	view.act(view.deed(gitEvent{E: "focus", ID: "diff"}), now)
+	view.act(view.deed(gitEvent{E: "press", ID: "discard", Item: "10"}), now)
+	if want := []string{"Discard hunk 2 of 2 of src/talk.rs (+1)?", "Git cannot bring it back.", "yes=Discard d", "no=Keep things as they are esc"}; !slices.Equal(asks(t, view), want) {
+		t.Errorf("the modal says %q", asks(t, view))
 	}
-	// a move in the diff that changes no key says nothing again
-	if say, _ := view.act(view.deed(gitEvent{E: "move", List: "diff", ID: "3"}), now); say {
-		t.Error("a line moved to in the same diff says the view again")
+	if again := view.deed(gitEvent{E: "press", ID: "yes"}); !again.sure || again.do != gitDiscardHunk || again.patch != view.files[0].Patch(1) {
+		t.Errorf("its button: %+v", again)
+	}
+	view.act(view.deed(gitEvent{E: "dismiss", ID: "sure"}), now)
+	if got := heard(t, view.messages(false)[0]); got.Focus != "diff" || !view.inDiff {
+		t.Errorf("after esc the keys are put on %q", got.Focus)
+	}
+	view.act(view.deed(gitEvent{E: "focus", ID: "files"}), now)
+	// the keys of the other modals are the keys that ask for them
+	for id, want := range map[string]string{"undo": "yes=Undo u", "push": "yes=Push p"} {
+		view.act(view.deed(gitEvent{E: "press", ID: id, Item: "k:a41c9e2"}), now)
+		if got := asks(t, view); len(got) != 4 || got[2] != want {
+			t.Errorf("%s asks %q", id, got)
+		}
+		view.act(view.deed(gitEvent{E: "dismiss", ID: "sure"}), now)
 	}
 
 	// with a remote that has every commit: nothing to push, amend or undo
@@ -941,7 +1245,7 @@ func TestWhatTheKeysOfADailyToolAsk(t *testing.T) {
 		}
 	}
 	view.standing.ToPush, view.standing.ToPull = 1, 2
-	if got := view.deed(gitEvent{E: "press", ID: "push"}); got.do != gitPush || got.ask != "push 1 commit to origin/talk; p again to push" {
+	if got := view.deed(gitEvent{E: "press", ID: "push"}); got.do != gitPush || got.ask != "Push 1 commit to origin/talk?" || got.told != "Nothing is forced: a remote that has moved on refuses it." {
 		t.Errorf("push: %+v", got)
 	}
 	if got := view.deed(gitEvent{E: "press", ID: "amend"}); got.do != gitAmend || got.text != "Other words" {
@@ -956,14 +1260,15 @@ func TestWhatTheKeysOfADailyToolAsk(t *testing.T) {
 		t.Errorf("amend with nothing: %+v", got)
 	}
 
-	// the branches up: words narrow them, ⏎ switches, and on the branch the worktree is on goes back
+	// the branches up: words narrow them, ⏎ switches, and on the branch
+	// the worktree is on goes back, as esc does
 	view.picking = true
 	for event, want := range map[gitEvent]gitDeed{
 		{E: "change", ID: "q", Text: "ma"}:           {do: gitNarrow, text: "ma"},
 		{E: "pick", List: "branches", ID: "l:main"}:  {do: gitSwitch, text: "l:main"},
 		{E: "pick", List: "branches", ID: "n:other"}: {do: gitSwitch, text: "n:other"},
 		{E: "pick", List: "branches", ID: "l:talk"}:  {do: gitBack},
-		{E: "press", ID: "back"}:                     {do: gitBack},
+		{E: "dismiss", ID: "switch"}:                 {do: gitBack},
 	} {
 		if got := view.deed(event); got != want {
 			t.Errorf("%+v does %+v", event, got)
@@ -1054,11 +1359,13 @@ func ran(t *testing.T, view *gitView) {
 	view.finish(work(), time.Now())
 }
 
-// In a real repository: d on a changed file says what is lost and does
-// nothing; a second d discards it; another key or a move between the two
-// drops the asking. On a line of the diff it is the hunk that line is in,
-// on an untracked file the file, and a staged file is refused.
-func TestDAsksTwiceAndThenDiscards(t *testing.T) {
+// In a real repository: d on a changed file puts up a modal that says
+// what is lost and does nothing; d again, or its button, discards it, and
+// esc leaves the file as it is. Where the file changed again between the
+// two the modal is said again in the new words. On a line of the diff it
+// is the hunk that line is in, on an untracked file the file, and a
+// staged file is refused.
+func TestDAsksInAModalAndThenDiscards(t *testing.T) {
 	gittest.Isolate(t)
 	repo := gittest.New(t)
 	repo.Write("talk.txt", lineNumbered(1, 30, nil))
@@ -1069,28 +1376,32 @@ func TestDAsksTwiceAndThenDiscards(t *testing.T) {
 
 	view := &gitView{dir: repo.Root}
 	view.read(time.Now())
-	const ask = "discard what is changed in talk.txt and not staged (+2 -2); d again to discard"
+	const ask = "Discard what is changed in talk.txt and not staged (+2 -2)?"
 	press(t, view, "discard", "c:talk.txt")
-	if view.status == nil || *view.status != (muiStatus{ask, "warn"}) || repo.Git("diff", "--name-only") != "talk.txt" {
-		t.Fatalf("d once: %+v", view.status)
+	if got := asks(t, view); len(got) != 4 || got[0] != ask || got[2] != "yes=Discard d" || view.status != nil || repo.Git("diff", "--name-only") != "talk.txt" {
+		t.Fatalf("d once: %q, %+v", got, view.status)
 	}
-	if got := heard(t, view.messages(false)[0]); got.Status == nil || *got.Status != (muiStatus{ask, "warn"}) {
-		t.Errorf("the status said = %+v", got.Status)
+	view.act(view.deed(gitEvent{E: "dismiss", ID: "sure"}), time.Now())
+	if asks(t, view) != nil || repo.Git("diff", "--name-only") != "talk.txt" {
+		t.Fatalf("esc: %q", asks(t, view))
 	}
-	press(t, view, "again", "")
-	if view.status != nil {
-		t.Fatalf("another key: %+v", view.status)
-	}
+	// the file changed again while the modal was up: asked again, in the new words
 	press(t, view, "discard", "c:talk.txt")
-	view.act(view.deed(gitEvent{E: "move", List: "files", ID: "u:notes.txt"}), time.Now())
-	view.act(view.deed(gitEvent{E: "move", List: "files", ID: "c:talk.txt"}), time.Now())
-	press(t, view, "discard", "c:talk.txt")
-	if view.status == nil || view.status.Tone != "warn" || repo.Git("diff", "--name-only") != "talk.txt" {
-		t.Fatalf("d, a move, d: %+v", view.status)
+	repo.Write("talk.txt", lineNumbered(1, 30, map[int]string{3: "three", 15: "fifteen", 28: "twenty-eight"}))
+	view.read(time.Now())
+	press(t, view, "yes", "")
+	if got := asks(t, view); len(got) != 4 || got[0] != "Discard what is changed in talk.txt and not staged (+3 -3)?" || repo.Git("diff", "--name-only") != "talk.txt" {
+		t.Fatalf("its button after the file changed: %q", got)
 	}
+	repo.Write("talk.txt", changed)
+	view.read(time.Now())
 	press(t, view, "discard", "c:talk.txt")
-	if view.status == nil || *view.status != (muiStatus{"discarded what was changed in talk.txt", "ok"}) || repo.Git("status", "--porcelain") != "?? notes.txt" {
-		t.Fatalf("d twice: %+v, git says %q", view.status, repo.Git("status", "--porcelain"))
+	if got := asks(t, view); len(got) != 4 || got[0] != ask {
+		t.Fatalf("d after it changed back: %q", got)
+	}
+	press(t, view, "yes", "")
+	if toasted(view) != (muiStatus{"discarded what was changed in talk.txt", "ok"}) || view.status != nil || asks(t, view) != nil || repo.Git("status", "--porcelain") != "?? notes.txt" {
+		t.Fatalf("its button: %+v, git says %q", toasted(view), repo.Git("status", "--porcelain"))
 	}
 
 	// one hunk of two
@@ -1099,12 +1410,12 @@ func TestDAsksTwiceAndThenDiscards(t *testing.T) {
 	view.act(view.deed(gitEvent{E: "move", List: "files", ID: "c:talk.txt"}), time.Now())
 	in := slices.IndexFunc(view.lines, func(line gitLine) bool { return line.Text == "twenty-eight" })
 	press(t, view, "discard", fmt.Sprint(in))
-	if view.status == nil || *view.status != (muiStatus{"discard hunk 2 of 2 of talk.txt (+1 -1); d again to discard", "warn"}) {
-		t.Fatalf("d on a line: %+v", view.status)
+	if got := asks(t, view); len(got) != 4 || got[0] != "Discard hunk 2 of 2 of talk.txt (+1 -1)?" {
+		t.Fatalf("d on a line: %q", got)
 	}
-	press(t, view, "discard", fmt.Sprint(in-1)) // another line of the same hunk
-	if got := repo.Git("diff", "--unified=0"); !strings.Contains(got, "+three") || strings.Contains(got, "twenty-eight") || view.status == nil || view.status.Tone != "ok" {
-		t.Fatalf("the hunk discarded: %+v\n%s", view.status, got)
+	press(t, view, "discard", fmt.Sprint(in-1)) // d again, on another line of the same hunk
+	if got := repo.Git("diff", "--unified=0"); !strings.Contains(got, "+three") || strings.Contains(got, "twenty-eight") || toasted(view) != (muiStatus{"discarded a hunk of talk.txt", "ok"}) {
+		t.Fatalf("the hunk discarded: %+v\n%s", toasted(view), got)
 	}
 
 	// a staged file is unstaged first; an untracked one is deleted
@@ -1115,10 +1426,10 @@ func TestDAsksTwiceAndThenDiscards(t *testing.T) {
 		t.Errorf("d on a staged file: %+v", view.status)
 	}
 	press(t, view, "discard", "u:notes.txt")
-	if view.status == nil || *view.status != (muiStatus{"delete notes.txt, untracked and in no commit; d again to discard", "warn"}) {
-		t.Fatalf("d on an untracked file: %+v", view.status)
+	if want := []string{"Delete notes.txt, untracked and in no commit?", "Git cannot bring it back.", "yes=Delete d", "no=Keep things as they are esc"}; !slices.Equal(asks(t, view), want) {
+		t.Fatalf("d on an untracked file: %q", asks(t, view))
 	}
-	press(t, view, "discard", "u:notes.txt")
+	press(t, view, "yes", "")
 	if _, err := os.Stat(filepath.Join(repo.Root, "notes.txt")); !os.IsNotExist(err) || !slices.Equal(ids(view), []string{"s:talk.txt"}) {
 		t.Errorf("the untracked file is still there: %v, rows %v", err, ids(view))
 	}
@@ -1215,8 +1526,8 @@ func TestTheLastCommitIsAmendedUnlessARemoteHasIt(t *testing.T) {
 	press(t, view, "commit", "")
 	press(t, view, "amend", "") // with no message: under the one it had
 	hash := repo.Git("rev-parse", "--short", "HEAD")
-	if view.status == nil || *view.status != (muiStatus{"amended: the last commit is " + hash, "ok"}) || view.writing {
-		t.Fatalf("amended: %+v", view.status)
+	if toasted(view) != (muiStatus{"amended: the last commit is " + hash, "ok"}) || view.status != nil || view.writing {
+		t.Fatalf("amended: %+v", toasted(view))
 	}
 	if repo.Git("log", "--format=%s", "origin/main..HEAD") != "A file says one" || repo.Git("show", "HEAD:talk.txt") != "one\ntwo" || repo.Git("status", "--porcelain") != "" {
 		t.Errorf("the last commit = %q holding %q", repo.Git("log", "--format=%s", "origin/main..HEAD"), repo.Git("show", "HEAD:talk.txt"))
@@ -1254,15 +1565,15 @@ func TestUUndoesTheLastCommitAndKeepsItsChangesStaged(t *testing.T) {
 		t.Fatalf("u on an older commit: %+v", view.status)
 	}
 	press(t, view, "undo", "k:"+second)
-	if want := fmt.Sprintf("undo %s %q: what it changed stays staged; u again to undo", second, "The second"); view.status == nil || *view.status != (muiStatus{want, "warn"}) || repo.Git("rev-parse", "--short", "HEAD") != second {
-		t.Fatalf("u once: %+v", view.status)
+	if want := []string{fmt.Sprintf("Undo %s %q?", second, "The second"), "It is taken off the branch, and what it changed stays staged.", "yes=Undo u", "no=Keep things as they are esc"}; !slices.Equal(asks(t, view), want) || repo.Git("rev-parse", "--short", "HEAD") != second {
+		t.Fatalf("u once: %q", asks(t, view))
 	}
 	press(t, view, "undo", "k:"+second)
 	if repo.Git("rev-parse", "--short", "HEAD") != first || repo.Git("diff", "--cached", "--name-only") != "b.txt" || !slices.Equal(ids(view), []string{"s:b.txt", "k:" + first}) {
 		t.Fatalf("u twice: at %s, staged %q, rows %v", repo.Git("rev-parse", "--short", "HEAD"), repo.Git("diff", "--cached", "--name-only"), ids(view))
 	}
-	if view.status == nil || *view.status != (muiStatus{"undone: what " + second + " changed is staged", "ok"}) {
-		t.Errorf("status = %+v", view.status)
+	if toasted(view) != (muiStatus{"undone: what " + second + " changed is staged", "ok"}) || view.status != nil {
+		t.Errorf("toast = %+v, status = %+v", toasted(view), view.status)
 	}
 
 	remote(t, repo)
@@ -1334,14 +1645,14 @@ func TestSStashesAndAStashIsAppliedPoppedAndDropped(t *testing.T) {
 		t.Fatal("s says nothing")
 	}
 	const message = "mia git: main 2026-11-20 10:04"
-	if view.status == nil || *view.status != (muiStatus{"stashed as " + message, "ok"}) || repo.Git("status", "--porcelain") != "" {
-		t.Fatalf("stashed: %+v, git says %q", view.status, repo.Git("status", "--porcelain"))
+	if toasted(view) != (muiStatus{"stashed as " + message, "ok"}) || view.status != nil || repo.Git("status", "--porcelain") != "" {
+		t.Fatalf("stashed: %+v, git says %q", toasted(view), repo.Git("status", "--porcelain"))
 	}
 	stash := "t:" + repo.Git("rev-parse", "stash@{0}")[:10]
 	if !slices.Equal(ids(view), []string{stash}) || view.at != stash {
 		t.Fatalf("rows = %v, on %q", ids(view), view.at)
 	}
-	if want := []gitEntry{{Head: "Stashes", Note: "1"}, {ID: stash, Title: "On main: " + message, Right: view.entries[1].Right}}; !reflect.DeepEqual(view.entries, want) {
+	if want := []gitEntry{{Head: "Stashes", Note: "1"}, {ID: stash, Title: "On main: " + message, Right: view.entries[1].Right, Menu: view.entries[1].Menu}}; !reflect.DeepEqual(view.entries, want) || len(view.entries[1].Menu) != 3 {
 		t.Errorf("entries = %+v", view.entries)
 	}
 	got := heard(t, view.messages(true)[0])
@@ -1360,8 +1671,8 @@ func TestSStashesAndAStashIsAppliedPoppedAndDropped(t *testing.T) {
 	}
 
 	press(t, view, "stage", stash) // space: applied, and kept
-	if repo.Git("status", "--porcelain") != "M talk.txt\n?? notes.txt" || repo.Git("stash", "list", "--format=%gs") != "On main: "+message || view.status == nil || view.status.Tone != "ok" {
-		t.Fatalf("applied: %+v, git says %q", view.status, repo.Git("status", "--porcelain"))
+	if repo.Git("status", "--porcelain") != "M talk.txt\n?? notes.txt" || repo.Git("stash", "list", "--format=%gs") != "On main: "+message || toasted(view) != (muiStatus{"applied, and kept: On main: " + message, "ok"}) {
+		t.Fatalf("applied: %+v, git says %q", toasted(view), repo.Git("status", "--porcelain"))
 	}
 	// what is in the way is said in git's words, and the stash is kept
 	press(t, view, "push", stash)
@@ -1381,21 +1692,23 @@ func TestSStashesAndAStashIsAppliedPoppedAndDropped(t *testing.T) {
 	press(t, view, "stash", "")
 	stash = "t:" + repo.Git("rev-parse", "stash@{0}")[:10]
 	press(t, view, "discard", stash)
-	if view.status == nil || view.status.Tone != "warn" || !strings.HasSuffix(view.status.Text, "d again to drop") || repo.Git("stash", "list") == "" {
-		t.Fatalf("d once on a stash: %+v", view.status)
+	held := repo.Git("stash", "list", "--format=%gs")
+	if want := []string{`Drop the stash "` + held + `" and what it holds?`, "Git keeps no other copy of it.", "yes=Drop d", "no=Keep things as they are esc"}; !slices.Equal(asks(t, view), want) || held == "" {
+		t.Fatalf("d once on a stash: %q", asks(t, view))
 	}
 	mark := view.stashMark()
 	press(t, view, "discard", stash)
-	if repo.Git("stash", "list") != "" || len(view.rows) != 0 || view.status == nil || view.status.Tone != "ok" || view.stashMark() == mark {
-		t.Errorf("dropped: %+v, rows %v", view.status, ids(view))
+	if repo.Git("stash", "list") != "" || len(view.rows) != 0 || toasted(view) != (muiStatus{"dropped: " + held, "ok"}) || view.stashMark() == mark {
+		t.Errorf("dropped: %+v, rows %v", toasted(view), ids(view))
 	}
 }
 
-// In a real repository with a remote: b brings the branches up in place
-// of the files, a field over their list; ⏎ switches to one, makes the
-// branch that follows a remote's, or makes the one named from where the
-// worktree is; what git refuses is the status, in its first line, and the
-// branches stay up; esc goes back to the files.
+// In a real repository with a remote: b brings the branches up in a
+// modal over the files, a field over their list; ⏎ switches to one, makes
+// the branch that follows a remote's, or makes the one named from where
+// the worktree is; what git refuses is the status, in its first line,
+// said in the modal too, and the branches stay up; esc goes back to the
+// files.
 func TestBBringsTheBranchesUpAndEnterSwitches(t *testing.T) {
 	gittest.Isolate(t)
 	repo := gittest.New(t)
@@ -1424,18 +1737,18 @@ func TestBBringsTheBranchesUpAndEnterSwitches(t *testing.T) {
 		{Head: "Remote", Note: "1"},
 		{ID: "r:origin/far", Title: "origin/far", Does: "follow it here"},
 	}
-	if list == nil || list.T != "list" || list.Selected != "l:main" || !reflect.DeepEqual(list.Items, want) || piece(got.View, "files") != nil || piece(got.View, "diff") == nil {
+	if list == nil || list.T != "list" || list.Selected != "l:main" || list.Max != 12 || !reflect.DeepEqual(list.Items, want) || piece(got.View, "files") == nil || piece(got.View, "diff") == nil {
 		t.Fatalf("the list = %+v", list)
 	}
-	if !slices.Equal(got.Keys, []gitKey{{"esc", "back to the files", "back"}}) {
-		t.Errorf("keys = %+v", got.Keys)
+	if modal := piece(got.View, "switch"); modal == nil || modal.T != "modal" || modal.Title != "Switch branch" || piece(modal, "q") == nil || piece(modal, "branches") == nil || piece(modal, "files") != nil {
+		t.Errorf("the modal = %+v", modal)
 	}
 
 	if say, placed := view.act(view.deed(gitEvent{E: "change", ID: "q", Text: "flags"}), time.Now()); !say || !placed {
 		t.Fatal("words typed narrow nothing")
 	}
 	got = heard(t, view.messages(true)[0])
-	if list := piece(got.View, "branches"); len(list.Items) != 1 || list.Items[0] != (gitEntry{ID: "n:flags", Title: "Create flags from main", Does: "create"}) || list.Selected != "n:flags" || piece(got.View, "q").Value != nil {
+	if list := piece(got.View, "branches"); len(list.Items) != 1 || !reflect.DeepEqual(list.Items[0], gitEntry{ID: "n:flags", Title: "Create flags from main", Does: "create"}) || list.Selected != "n:flags" || piece(got.View, "q").Value != nil {
 		t.Fatalf("a name no branch has: %+v", list)
 	}
 	pick := func(id string) {
@@ -1445,8 +1758,8 @@ func TestBBringsTheBranchesUpAndEnterSwitches(t *testing.T) {
 		}
 	}
 	pick("n:flags")
-	if repo.Git("symbolic-ref", "--short", "HEAD") != "flags" || view.picking || view.status == nil || *view.status != (muiStatus{"on flags", "ok"}) || view.standing.Branch != "flags" {
-		t.Fatalf("a branch made: on %q, %+v", repo.Git("symbolic-ref", "--short", "HEAD"), view.status)
+	if repo.Git("symbolic-ref", "--short", "HEAD") != "flags" || view.picking || toasted(view) != (muiStatus{"on flags", "ok"}) || view.status != nil || view.standing.Branch != "flags" {
+		t.Fatalf("a branch made: on %q, %+v", repo.Git("symbolic-ref", "--short", "HEAD"), toasted(view))
 	}
 	if got := heard(t, view.messages(true)[0]); got.Focus != "files" || piece(got.View, "files") == nil || piece(got.View, "branches") != nil {
 		t.Errorf("back at the files: focus %q", got.Focus)
@@ -1465,7 +1778,10 @@ func TestBBringsTheBranchesUpAndEnterSwitches(t *testing.T) {
 	if repo.Git("symbolic-ref", "--short", "HEAD") != "far" || !view.picking || view.status == nil || view.status.Tone != "bad" || !strings.HasPrefix(view.status.Text, "error: Your local changes to the following files would be overwritten") {
 		t.Fatalf("a switch git refuses: %+v", view.status)
 	}
-	press(t, view, "back", "")
+	if said := texts(*piece(heard(t, view.messages(false)[0]).View, "switch")); len(said) != 1 || said[0] != view.status.Text {
+		t.Errorf("the modal says %q of it", said)
+	}
+	view.act(view.deed(gitEvent{E: "dismiss", ID: "switch"}), time.Now())
 	if view.picking {
 		t.Error("esc leaves the branches up")
 	}
@@ -1482,10 +1798,11 @@ func TestBBringsTheBranchesUpAndEnterSwitches(t *testing.T) {
 
 // In a real repository with a bare one as its remote: the head says what
 // is to push and to pull; f fetches, P pulls only where the branch can be
-// moved on and says why where it cannot, and p, asked twice, pushes to
-// what the branch follows, or to origin under its own name where it
-// follows nothing, and never by force. While one runs the status says so
-// and another is refused; how it went is the status after.
+// moved on and says why where it cannot, and p, asked in a modal first,
+// pushes to what the branch follows, or to origin under its own name
+// where it follows nothing, and never by force. While one runs a bar at
+// the head's end says so in place of the status, and another is refused
+// in a toast; how it went is a toast after, and the status where it failed.
 func TestFetchPullAndPushAgainstABareRemote(t *testing.T) {
 	gittest.Isolate(t)
 	repo := gittest.New(t)
@@ -1504,23 +1821,30 @@ func TestFetchPullAndPushAgainstABareRemote(t *testing.T) {
 	if say, placed := view.act(view.deed(gitEvent{E: "press", ID: "fetch"}), time.Now()); !say || placed || view.work == nil {
 		t.Fatal("f leaves nothing to be done")
 	}
-	if view.status == nil || *view.status != (muiStatus{Text: "fetching origin…"}) {
-		t.Fatalf("while it fetches: %+v", view.status)
+	bar := func() string {
+		got := heard(t, view.messages(false)[0])
+		if at := piece(got.View, "remote"); at != nil && at.T == "progress" && got.Status == nil {
+			return at.Text
+		}
+		return ""
+	}
+	if bar() != "fetching origin…" || view.status != nil {
+		t.Fatalf("while it fetches: %q, %+v", bar(), view.status)
 	}
 	// the keys are taken meanwhile; another deed with the remote waits
 	press(t, view, "again", "")
-	if view.status == nil || *view.status != (muiStatus{Text: "fetching origin…"}) {
-		t.Errorf("after another key: %+v", view.status)
+	if bar() != "fetching origin…" {
+		t.Errorf("after another key: %q", bar())
 	}
 	work := view.work
 	press(t, view, "pull", "")
-	if view.status == nil || *view.status != (muiStatus{"fetching origin: wait for it to end", "bad"}) {
-		t.Errorf("a pull while it fetches: %+v", view.status)
+	if toasted(view) != (muiStatus{"fetching origin: wait for it to end", "bad"}) || bar() != "fetching origin…" {
+		t.Errorf("a pull while it fetches: %+v", toasted(view))
 	}
 	view.work = work
 	ran(t, view)
-	if view.status == nil || view.status.Tone != "ok" || !strings.Contains(view.status.Text, "main") || !strings.Contains(view.status.Text, "origin/main") || view.busy != "" {
-		t.Fatalf("fetched: %+v", view.status)
+	if got := toasted(view); got.Tone != "ok" || !strings.Contains(got.Text, "main") || !strings.Contains(got.Text, "origin/main") || view.busy != "" || bar() != "" || view.status != nil {
+		t.Fatalf("fetched: %+v", got)
 	}
 	if got := texts(*heard(t, view.messages(true)[0]).View); got[2] != "2 to push, 1 to pull" {
 		t.Errorf("texts = %q", got)
@@ -1529,20 +1853,20 @@ func TestFetchPullAndPushAgainstABareRemote(t *testing.T) {
 	// neither side is only ahead: nothing is merged, rebased or forced
 	head, theirs := repo.Git("rev-parse", "HEAD"), repo.GitIn(bare, "rev-parse", "main")
 	press(t, view, "pull", "")
-	if view.status == nil || *view.status != (muiStatus{Text: "pulling from origin/main…"}) {
-		t.Errorf("while it pulls: %+v", view.status)
+	if bar() != "pulling from origin/main…" {
+		t.Errorf("while it pulls: %q", bar())
 	}
 	ran(t, view)
 	if view.status == nil || view.status.Tone != "bad" || !strings.Contains(view.status.Text, "fast-forward") || repo.Git("rev-parse", "HEAD") != head {
 		t.Fatalf("a pull that cannot fast-forward: %+v", view.status)
 	}
 	press(t, view, "push", "")
-	if view.status == nil || *view.status != (muiStatus{"push 2 commits to origin/main; p again to push", "warn"}) || view.work != nil {
-		t.Fatalf("p once: %+v", view.status)
+	if want := []string{"Push 2 commits to origin/main?", "Nothing is forced: a remote that has moved on refuses it.", "yes=Push p", "no=Keep things as they are esc"}; !slices.Equal(asks(t, view), want) || view.work != nil {
+		t.Fatalf("p once: %q", asks(t, view))
 	}
 	press(t, view, "push", "")
-	if view.status == nil || *view.status != (muiStatus{Text: "pushing to origin/main…"}) {
-		t.Errorf("while it pushes: %+v", view.status)
+	if bar() != "pushing to origin/main…" || asks(t, view) != nil {
+		t.Errorf("while it pushes: %q", bar())
 	}
 	ran(t, view)
 	if view.status == nil || view.status.Tone != "bad" || !strings.Contains(view.status.Text, "rejected") || repo.GitIn(bare, "rev-parse", "main") != theirs {
@@ -1557,13 +1881,22 @@ func TestFetchPullAndPushAgainstABareRemote(t *testing.T) {
 		t.Errorf("a pull of a branch that follows nothing: %+v", view.status)
 	}
 	press(t, view, "push", "")
-	if view.status == nil || *view.status != (muiStatus{"push 2 commits to origin/talk; p again to push", "warn"}) {
-		t.Fatalf("p once: %+v", view.status)
+	if got := asks(t, view); len(got) != 4 || got[0] != "Push 2 commits to origin/talk?" {
+		t.Fatalf("p once: %q", got)
 	}
-	press(t, view, "push", "")
+	// a commit made while the modal was up: asked again, with the count as it now is
+	repo.Write("c.txt", "c\n")
+	repo.Commit("mine: c")
+	head = repo.Git("rev-parse", "HEAD")
+	view.read(time.Now())
+	press(t, view, "yes", "")
+	if got := asks(t, view); len(got) != 4 || got[0] != "Push 3 commits to origin/talk?" || view.work != nil {
+		t.Fatalf("its button after another commit: %q", got)
+	}
+	press(t, view, "yes", "")
 	ran(t, view)
-	if view.status == nil || view.status.Tone != "ok" || repo.GitIn(bare, "rev-parse", "talk") != head || view.standing.Upstream != "origin/talk" || view.standing.ToPush != 0 {
-		t.Fatalf("pushed: %+v, follows %q", view.status, view.standing.Upstream)
+	if toasted(view).Tone != "ok" || view.status != nil || repo.GitIn(bare, "rev-parse", "talk") != head || view.standing.Upstream != "origin/talk" || view.standing.ToPush != 0 {
+		t.Fatalf("pushed: %+v, follows %q", toasted(view), view.standing.Upstream)
 	}
 	press(t, view, "push", "")
 	if view.status == nil || *view.status != (muiStatus{"nothing to push: origin/talk has every commit", "bad"}) {
@@ -1579,13 +1912,13 @@ func TestFetchPullAndPushAgainstABareRemote(t *testing.T) {
 	}
 	press(t, view, "pull", "")
 	ran(t, view)
-	if view.status == nil || view.status.Tone != "ok" || repo.Git("rev-parse", "HEAD") != repo.GitIn(bare, "rev-parse", "talk") || view.standing.ToPull != 0 {
-		t.Errorf("pulled: %+v", view.status)
+	if toasted(view).Tone != "ok" || repo.Git("rev-parse", "HEAD") != repo.GitIn(bare, "rev-parse", "talk") || view.standing.ToPull != 0 {
+		t.Errorf("pulled: %+v", toasted(view))
 	}
 	press(t, view, "fetch", "")
 	ran(t, view)
-	if view.status == nil || *view.status != (muiStatus{"fetched origin: nothing new", "ok"}) {
-		t.Errorf("a fetch of nothing new: %+v", view.status)
+	if toasted(view) != (muiStatus{"fetched origin: nothing new", "ok"}) {
+		t.Errorf("a fetch of nothing new: %+v", toasted(view))
 	}
 
 	// with no remote at all there is nothing to fetch from
@@ -1674,5 +2007,38 @@ func TestAViewWithNoFolderRunsGitNowhere(t *testing.T) {
 	// a row come under the keys reads no diff of it
 	if view.act(gitDeed{do: gitMove, row: gitRow{id: "c:talk.txt", group: 'c', change: change}}, now); len(view.lines) != 0 || view.failed != "" {
 		t.Errorf("a move with no folder read %+v, %q", view.lines, view.failed)
+	}
+	// what a modal asks, confirmed by its button and by its key, is not
+	// done either; nor is it by esc
+	view.standing = git.Standing{Branch: "main", Head: "0123456789", Upstream: "origin/main", ToPush: 1, Changed: []git.Change{change}}
+	view.rows = []gitRow{
+		{id: "c:talk.txt", group: 'c', change: change},
+		{id: "u:notes.txt", group: 'u', change: git.Change{Path: "notes.txt"}},
+		{id: "k:0123456", group: 'k', commit: git.Commit{SHA: "0123456", Subject: "A file says one"}},
+		{id: "t:held", group: 't', stash: stash},
+	}
+	view.at, view.files = "c:talk.txt", files
+	view.lines, view.hunks = gitCode(files)
+	for _, asked := range []gitEvent{
+		{E: "press", ID: "discard", Item: "c:talk.txt"},
+		{E: "press", ID: "discard", Item: "u:notes.txt"},
+		{E: "press", ID: "discard", Item: "1"},
+		{E: "press", ID: "discard", Item: "t:held"},
+		{E: "press", ID: "undo", Item: "k:0123456"},
+		{E: "press", ID: "push", Item: "c:talk.txt"},
+	} {
+		for _, answer := range []gitEvent{{E: "press", ID: "yes"}, asked, {E: "dismiss", ID: "sure"}, {E: "press", ID: "no"}} {
+			view.status = nil
+			if view.act(view.deed(asked), now); asks(t, view) == nil || view.status != nil {
+				t.Fatalf("%+v with no folder puts up no modal: %+v", asked, view.status)
+			}
+			view.act(view.deed(answer), now)
+			if done := answer.ID == "yes" || answer == asked; asks(t, view) != nil || view.work != nil || view.busy != "" || done != (view.status != nil && *view.status == muiStatus{"mia git has no folder to run git in: nothing is done", "bad"}) {
+				t.Errorf("%+v answered by %+v with no folder: %+v", asked, answer, view.status)
+			}
+			if after := stands(); after != before {
+				t.Fatalf("%+v answered by %+v with no folder changed the repository mia is in:\n%s\nwas\n%s", asked, answer, after, before)
+			}
+		}
 	}
 }

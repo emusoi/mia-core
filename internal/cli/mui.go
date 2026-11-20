@@ -242,3 +242,132 @@ func muiLent(signals <-chan os.Signal) bool {
 		}
 	}
 }
+
+// muiChoice is a choice of the menu an item of a list carries, opened
+// beside it with → and under the pointer's other button: what it does,
+// and at its right the key that does the same; or a rule between two.
+// Picked, it is said with its item, as the pick's sub.
+type muiChoice struct {
+	ID    string `json:"id,omitempty"`
+	Title string `json:"title,omitempty"`
+	Right string `json:"right,omitempty"`
+	Rule  bool   `json:"rule,omitempty"`
+}
+
+// muiPassing is what a view says once and the window does not keep: the
+// words of what was just done, shown over the foot for a moment (a
+// toast, with its tone), and words put on the person's clipboard.
+type muiPassing struct {
+	toast *muiStatus
+	copy  string
+}
+
+// done is what was just done, in a toast: in tone ok, or bad for what
+// failed and is no state of things.
+func (p *muiPassing) done(text, tone string) {
+	p.toast = &muiStatus{Text: cutTo(text, gitWordsMost), Tone: tone}
+}
+
+// changes is what is passing as the changes of a patch, and none of it
+// is left: it is said once.
+func (p *muiPassing) changes() []json.RawMessage {
+	var changes []json.RawMessage
+	if p.copy != "" {
+		changes = append(changes, encode(struct {
+			Op   string `json:"op"`
+			Text string `json:"text"`
+		}{"copy", p.copy}))
+	}
+	if p.toast != nil {
+		changes = append(changes, encode(struct {
+			Op   string `json:"op"`
+			Text string `json:"text"`
+			Tone string `json:"tone,omitempty"`
+		}{"toast", p.toast.Text, p.toast.Tone}))
+	}
+	*p = muiPassing{}
+	return changes
+}
+
+// muiTold is what a view last said whole: all of it but its status and
+// its keys, and those two as they were written.
+type muiTold struct {
+	body   []byte
+	status string
+	keys   string
+}
+
+// muiApart is a view's messages apart: all of them but the first's
+// status and keys, and those two as they are written.
+func muiApart(messages [][]byte) muiTold {
+	if len(messages) == 0 {
+		return muiTold{}
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(messages[0], &fields); err != nil {
+		return muiTold{body: bytes.Join(messages, nil)}
+	}
+	now := muiTold{status: string(fields["status"]), keys: string(fields["keys"])}
+	delete(fields, "status")
+	delete(fields, "keys")
+	first, _ := json.Marshal(fields) // of what was just read, none fails
+	now.body = bytes.Join(append([][]byte{first}, messages[1:]...), nil)
+	return now
+}
+
+// news is what is to be said of a view whose messages, but for where the
+// person is, are these, after what was told last: whole, where anything
+// but its status and its keys is another; else those of the two that
+// are, as the changes of a patch, which does not say the view again.
+// Nothing is said of a view that is as it was told.
+func (t *muiTold) news(messages [][]byte) (changes []json.RawMessage, whole bool) {
+	was, now := *t, muiApart(messages)
+	*t = now
+	if !bytes.Equal(was.body, now.body) {
+		return nil, true
+	}
+	if was.status != now.status {
+		change := json.RawMessage(`{"op":"status"}`) // with no words they are taken away
+		if now.status != "" {
+			var status muiStatus
+			_ = json.Unmarshal([]byte(now.status), &status)
+			change = encode(struct {
+				Op   string `json:"op"`
+				Text string `json:"text"`
+				Tone string `json:"tone,omitempty"`
+			}{"status", status.Text, status.Tone})
+		}
+		changes = append(changes, change)
+	}
+	if was.keys != now.keys {
+		keys := json.RawMessage(now.keys)
+		if now.keys == "" {
+			keys = json.RawMessage("[]")
+		}
+		changes = append(changes, encode(struct {
+			Op   string          `json:"op"`
+			Keys json.RawMessage `json:"keys"`
+		}{"keys", keys}))
+	}
+	return changes, false
+}
+
+// says is what is written of a view: its messages whole where news says
+// so and where the person is placed — placed is then the messages that
+// say where, else nil — and otherwise the changes of its status and its
+// keys alone; and after either, what is passing. plain is the view's
+// messages but for where the person is.
+func (t *muiTold) says(pane string, plain, placed [][]byte, passing *muiPassing) [][]byte {
+	changes, whole := t.news(plain)
+	var all [][]byte
+	switch {
+	case placed != nil:
+		all, changes = placed, nil
+	case whole:
+		all = plain
+	}
+	if changes = append(changes, passing.changes()...); len(changes) > 0 {
+		all = append(all, encode(muiMessage{V: 1, Pane: pane, Patch: changes}))
+	}
+	return all
+}
