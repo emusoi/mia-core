@@ -1526,18 +1526,23 @@ func (r *chatRun) act(deed chatDeed) {
 		r.aim(head, strconv.Itoa(done.Window.Index))
 		r.shows(head.Agent+" goes on with it in window "+done.Window.Name, "ok")
 	case chatContinue:
-		done, err := r.a.ContinueConversation(app.Continue{ID: deed.id, Worktree: r.record.Name, With: v.agent()})
-		if err != nil {
+		// As a switch of agents is: this window's agent started on it and told
+		// nothing, the conversation carried in front of the first thing sent.
+		head, _ := v.headOf(deed.id)
+		went := handTo(r.a, r.record, deed.id, "", head.Agent, v.agent(), "", "")
+		if !went.went {
 			v.armed = ""
-			r.tell(err)
+			r.note(went.text, went.tone)
 			return
 		}
-		r.aim(app.Head{Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, strconv.Itoa(done.To.Window.Index))
-		if !done.Sent {
-			r.shows(done.To.Agent+" was not told to read the handoff: "+done.Problem, "bad")
-			return
+		done := went.done
+		to := strconv.Itoa(done.To.Window.Index)
+		kept := r.a.CarryInWindow(r.record, to, app.Carried{From: head.Agent, ID: deed.id, File: done.Handoff, Full: done.Full})
+		r.aim(app.Head{Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
+		if kept != nil {
+			went.text, went.tone = went.text+" · "+kept.Error(), "warn"
 		}
-		r.shows(fmt.Sprintf("%s goes on from %s's conversation in window %s, told to read %s", done.To.Agent, done.From.Agent, done.To.Window.Name, filepath.Base(done.Handoff)), "ok")
+		r.shows(went.text, went.tone)
 	}
 }
 
