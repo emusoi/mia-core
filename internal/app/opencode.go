@@ -380,6 +380,12 @@ func (o opencodeTalks) turns(in folders, id, cwd string, after int) ([]Turn, boo
 	return turns, true, nil
 }
 
+// One is exported whole each time, for there is no file of it to read on
+// from: a reply opencode is still writing grows under its n.
+func (o opencodeTalks) follow(in folders, id, cwd string, after int) (func() ([]Turn, bool, error), time.Duration) {
+	return polling(func() ([]Turn, bool, error) { return o.turns(in, id, cwd, after) }), time.Second
+}
+
 // ponytail: a search exports every conversation of the folders, each time;
 // opencode's own search is of titles only. Keeping what was said beside
 // what a list keeps is the upgrade when a repository has hundreds.

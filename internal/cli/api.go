@@ -1,11 +1,16 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/config"
@@ -87,16 +92,21 @@ func cmdAPI(a *app.App, args []string) int {
 
 	case "conversation":
 		rest := args[1:]
-		after, worktree := 0, takeValue(&rest, "--worktree")
+		after, worktree, follow := 0, takeValue(&rest, "--worktree"), take(&rest, "--follow")
 		if value := takeValue(&rest, "--after"); value != "" {
 			n, err := strconv.Atoi(value)
 			if err != nil || n < 0 {
-				return usageErr(conversationUsage)
+				return usageErr(conversationUsage + followNote)
 			}
 			after = n
 		}
 		if len(rest) != 1 {
-			return usageErr(conversationUsage)
+			return usageErr(conversationUsage + followNote)
+		}
+		if follow {
+			return followTurns(func(stop <-chan struct{}, say func([]app.Turn) error) error {
+				return a.FollowConversation(rest[0], worktree, after, stop, say)
+			})
 		}
 		turns, err := a.ConversationIn(rest[0], worktree, after)
 		if err != nil {
@@ -123,8 +133,50 @@ var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "re
 const (
 	setupsUsage        = "mia api setups [--repository <name> | --all]"
 	conversationsUsage = "mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]"
-	conversationUsage  = "mia api conversation <id> [--worktree <name>] [--after <n>]"
+	conversationUsage  = "mia api conversation <id> [--worktree <name>] [--after <n>] [--follow]"
+	// followNote is what --follow does, said under a usage that takes it.
+	followNote = "\n--follow: the turns in one line of JSON, then a line of only the new ones each time there are" +
+		"\n  more; a turn that grew, a reply still being written, comes again under the same n: replace by n." +
+		"\n  Ends, exit 0, when stdin ends, the reader goes, or on SIGINT or SIGTERM."
 )
+
+// followTurns is a query's --follow: what follow hands say, each as a line
+// of compact JSON, until stdin ends, the line cannot be written, or mia is
+// told to stop. Each ends it with exit 0.
+func followTurns(follow func(stop <-chan struct{}, say func([]app.Turn) error) error) int {
+	stop := make(chan struct{})
+	var once sync.Once
+	end := func() { once.Do(func() { close(stop) }) }
+	// SIGPIPE too: a line written to a reader that has gone then fails, and
+	// does not kill mia
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGPIPE)
+	defer signal.Stop(signals)
+	go func() {
+		select {
+		case <-signals:
+			end()
+		case <-stop:
+		}
+	}()
+	go func() {
+		_, _ = io.Copy(io.Discard, os.Stdin)
+		end()
+	}()
+	err := follow(stop, func(turns []app.Turn) error {
+		data, err := json.Marshal(turns)
+		if err != nil {
+			return err
+		}
+		_, err = os.Stdout.Write(append(data, '\n'))
+		return err
+	})
+	end()
+	if err != nil {
+		return fail(err)
+	}
+	return exitOK
+}
 
 var apiQueries = strings.Join(apiQueryList, "|")
 
@@ -144,7 +196,7 @@ func apiCapabilities() capabilities {
 		Queries: apiQueryList,
 		Features: []string{
 			"direct-http", "project-config", "doctor", "environment-readiness", "environment-drift",
-			"local-sessions", "conversations", "main-agent", "standing", "remote-sync-preview", "sync-conflicts", "safe-cleanup", "stack-sync", "merged-gc", "compose-environments", "agent-models", "setups", "resume-model", "main-start-agent", "accounts", "main-asks", "main-start-new", "main-conversations", "machine-reach", "roles", "account-login", "account-user-default", "account-signals", "conversation-continue", "conversation-thread", "apps",
+			"local-sessions", "conversations", "main-agent", "standing", "remote-sync-preview", "sync-conflicts", "safe-cleanup", "stack-sync", "merged-gc", "compose-environments", "agent-models", "setups", "resume-model", "main-start-agent", "accounts", "main-asks", "main-start-new", "main-conversations", "machine-reach", "roles", "account-login", "account-user-default", "account-signals", "conversation-continue", "conversation-thread", "apps", "conversation-follow",
 		},
 	}
 }

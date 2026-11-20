@@ -1,6 +1,6 @@
 {
   "query": "conversation",
-  "usage": "mia api conversation \u003cid\u003e [--worktree \u003cname\u003e] [--after \u003cn\u003e]",
+  "usage": "mia api conversation \u003cid\u003e [--worktree \u003cname\u003e] [--after \u003cn\u003e] [--follow]",
   "inputs": [
     {
       "name": "\u003cid\u003e",
@@ -13,6 +13,9 @@
     {
       "name": "--after",
       "value": "\u003cn\u003e"
+    },
+    {
+      "name": "--follow"
     }
   ],
   "output": {

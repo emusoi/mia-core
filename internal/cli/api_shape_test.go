@@ -42,7 +42,7 @@ var apiShapes = []struct {
 	{"conversation", conversationUsage, reflect.TypeFor[[]app.Turn]()},
 	{"main", mainTurnsUsage, reflect.TypeFor[app.MainState]()},
 	{"main conversations", "mia api main conversations", reflect.TypeFor[[]app.Head]()},
-	{"main turns", "mia api main turns [--conversation <id>] [--after <n>]", reflect.TypeFor[[]app.Turn]()},
+	{"main turns", "mia api main turns [--conversation <id>] [--after <n>] [--follow]", reflect.TypeFor[[]app.Turn]()},
 	{"standing", standingUsage, reflect.TypeFor[app.Standing]()},
 	{"agents", "mia api agents", reflect.TypeFor[[]app.AgentModels]()},
 	{"setups", setupsUsage, reflect.TypeFor[[]app.Setup]()},
@@ -447,7 +447,7 @@ func TestWhatBreaksAnAppAndWhatDoesNot(t *testing.T) {
 	if want := []input{{Name: "<id>", Required: true}, {Name: "--worktree", Value: "<name>"}, {Name: "--after", Value: "<n>"}}; !slices.Equal(had, want) {
 		t.Fatalf("inputs = %+v", had)
 	}
-	if got := inputsOf("main", mainTurnsUsage); !slices.Equal(got, []input{{Name: "conversations"}, {Name: "turns"}, {Name: "--conversation", Value: "<id>"}, {Name: "--after", Value: "<n>"}}) {
+	if got := inputsOf("main", mainTurnsUsage); !slices.Equal(got, []input{{Name: "conversations"}, {Name: "turns"}, {Name: "--conversation", Value: "<id>"}, {Name: "--after", Value: "<n>"}, {Name: "--follow"}}) {
 		t.Errorf("of %q, inputs = %+v", mainTurnsUsage, got)
 	}
 	if got := inputsOf("standing", standingUsage); !slices.Equal(got, []input{{Name: "--here"}, {Name: "--seen", Value: "<repository>/<worktree>[@<machine>]"}}) {

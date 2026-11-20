@@ -146,13 +146,25 @@ is listed all the same, `running` with its `window`, nothing in `asked`
 and `said` and no `turns`; `mia api conversation` reads it as no
 turns, `[]`, and it is the same of the main agent's.
 
-`mia api conversation <id> [--worktree <name>] [--after <n>]` is one
+`mia api conversation <id> [--worktree <name>] [--after <n>] [--follow]` is one
 conversation as turns, in order, each with a number `n` that only grows.
 `--after` gives the turns with a greater `n`: a view that polls asks for
 what came after the last it has, and mia reads only what was written
 since. Of a conversation that is in several worktrees, `--worktree` reads
 the copy in the one named, as the list names it; with none it is the last
 written to, the first of them in the list.
+
+`--follow` is for a view that shows it live, in place of polling. The
+turns come in one line of JSON, the same list without the indent, and
+mia keeps running: each time the conversation gains turns, one more line
+gives only those. Nothing is printed while nothing changes. A turn that
+grew — a reply opencode is still writing — comes again under the same
+`n`, so a view replaces the turn it has by `n`. A transcript is looked
+at every 150 ms and read on from where it stopped once it changed;
+opencode's conversations are exported again every second. It ends with
+exit 0 when stdin ends, when a line cannot be written because its reader
+has gone, or on SIGINT or SIGTERM: a view keeps stdin open as long as it
+reads. `mia api capabilities` lists `conversation-follow`.
 
 ```json
 [{"n":1,"kind":"asked","at":"2026-11-02T10:00:00Z","text":"make the list faster"},
@@ -224,9 +236,12 @@ When `[main] machine` names another machine, `mia api main`,
 `session` and `window` are its own. One that does not answer is an error
 in a line that names it, exit 1, and is not asked again for 30 seconds.
 
-`mia api main turns [--after <n>]` is that conversation as
+`mia api main turns [--after <n>] [--follow]` is that conversation as
 [`mia api conversation`](#conversations) gives one, an empty list when
-there is none, with one kind more:
+there is none, and `--follow` follows it as it does there — the one
+open when it starts; with none open, `[]` and nothing more. `--follow`
+reads a main agent on this machine only, and is refused, exit 1, when
+`[main] machine` names another. It has one kind more:
 
 ```json
 [{"n":7,"kind":"asked","at":"2026-11-02T10:00:00Z","text":"start goba on the login bug"},

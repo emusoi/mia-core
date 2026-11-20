@@ -1,6 +1,6 @@
 {
   "query": "main",
-  "usage": "mia api main [conversations|turns [--conversation \u003cid\u003e] [--after \u003cn\u003e]]",
+  "usage": "mia api main [conversations|turns [--conversation \u003cid\u003e] [--after \u003cn\u003e] [--follow]]",
   "inputs": [
     {
       "name": "conversations"
@@ -15,6 +15,9 @@
     {
       "name": "--after",
       "value": "\u003cn\u003e"
+    },
+    {
+      "name": "--follow"
     }
   ],
   "output": {

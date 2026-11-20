@@ -265,6 +265,67 @@ func (t transcripts) heads(in folders) ([]Head, error) {
 }
 
 func (t transcripts) turns(in folders, id, cwd string, after int) ([]Turn, bool, error) {
+	return t.locate(in, id, cwd, after, nil)
+}
+
+// placed is how far a transcript that is followed has been read: the file,
+// where reading stopped, and its size and time when it was.
+type placed struct {
+	file     string
+	end      mark
+	size     int64
+	modified time.Time
+}
+
+// follow finds the transcript as turns does, then reads it on from where
+// it stopped each time its size or time changes. A turn of a transcript
+// is a whole line, written once: none grows under its n.
+func (t transcripts) follow(in folders, id, cwd string, after int) (func() ([]Turn, bool, error), time.Duration) {
+	var at placed
+	return func() ([]Turn, bool, error) {
+		if at.file == "" {
+			return t.locate(in, id, cwd, after, &at)
+		}
+		info, err := os.Stat(at.file)
+		if err != nil {
+			return nil, true, err
+		}
+		if info.Size() == at.size && info.ModTime().Equal(at.modified) {
+			return nil, true, nil
+		}
+		from := at.end
+		if info.Size() < from.Offset {
+			from = mark{} // written again from its start: each turn is given again, under its n
+		}
+		at.size, at.modified = info.Size(), info.ModTime()
+		var turns []Turn
+		if at.end, err = t.read(at.file, from, &about{}, collecting(after, &turns), nil); err != nil {
+			return nil, true, err
+		}
+		return turns, true, nil
+	}, 150 * time.Millisecond
+}
+
+// collecting gathers the turns after after into turns, an answer given to
+// the question it answers when that is among them.
+func collecting(after int, turns *[]Turn) func(Turn) {
+	return func(turn Turn) {
+		if turn.Kind == turnAnswer {
+			for i := range *turns {
+				if (*turns)[i].N == turn.Question {
+					(*turns)[i].Answer = turn.Text
+				}
+			}
+		}
+		if turn.N > after {
+			*turns = append(*turns, turn)
+		}
+	}
+}
+
+// locate is turns, and which transcript was read and how far, into at when
+// it is given.
+func (t transcripts) locate(in folders, id, cwd string, after int, at *placed) ([]Turn, bool, error) {
 	if strings.ContainsAny(id, `/\*?[`) {
 		return nil, false, nil
 	}
@@ -295,18 +356,7 @@ func (t transcripts) turns(in folders, id, cwd string, after int) ([]Turn, bool,
 			all[file] = s
 		}
 		var turns []Turn
-		collect := func(turn Turn) {
-			if turn.Kind == turnAnswer {
-				for i := range turns {
-					if turns[i].N == turn.Question {
-						turns[i].Answer = turn.Text
-					}
-				}
-			}
-			if turn.N > after {
-				turns = append(turns, turn)
-			}
-		}
+		collect := collecting(after, &turns)
 		// what is new is read once, for the list as well; a view that has kept
 		// up needs nothing older
 		from := s.end()
@@ -328,6 +378,9 @@ func (t transcripts) turns(in folders, id, cwd string, after int) ([]Turn, bool,
 			if _, err := t.read(file, start, &about{}, collect, nil); err != nil {
 				return nil, true, err
 			}
+		}
+		if at != nil {
+			*at = placed{file: file, end: s.end(), size: s.Size, modified: s.Modified}
 		}
 		return turns, true, nil
 	}

@@ -274,27 +274,54 @@ func (a *App) ConversationTurns(id string, after int) ([]Turn, error) {
 // a list of conversations names it; with no worktree, the last written to.
 func (a *App) ConversationIn(id, worktree string, after int) ([]Turn, error) {
 	in, _ := a.where()
-	cwd, whose := "", ""
+	cwd, whose, unwritten, err := a.conversationOf(id, worktree)
+	if err != nil {
+		return nil, err
+	}
+	turns, found, err := a.turnsIn(in, id, cwd, whose, after)
+	if err == nil && !found {
+		if err = unwritten(); err == nil {
+			return []Turn{}, nil
+		}
+	}
+	return turns, err
+}
+
+// FollowConversation is ConversationIn as the conversation is written to:
+// say is handed what ConversationIn gives, then each time it gains turns
+// or one grows, those turns, until stop is closed or say fails.
+func (a *App) FollowConversation(id, worktree string, after int, stop <-chan struct{}, say func([]Turn) error) error {
+	in, _ := a.where()
+	cwd, whose, unwritten, err := a.conversationOf(id, worktree)
+	if err != nil {
+		return err
+	}
+	return a.follow(in, id, cwd, whose, after, unwritten, func(turns []Turn) []Turn { return turns }, stop, say)
+}
+
+// conversationOf is where ConversationIn reads a conversation: of the copy
+// in a worktree, its folder and agent, and with none, any. unwritten is
+// what it is that no agent has it: nothing, when a window has it open and
+// nothing of it is written yet.
+func (a *App) conversationOf(id, worktree string) (cwd, whose string, unwritten func() error, err error) {
 	var heads []Head
 	if worktree != "" {
 		heads, _ = a.Conversations(Wanted{Worktree: worktree})
 		at := slices.IndexFunc(heads, func(h Head) bool { return h.ID == id })
 		if at < 0 {
-			return nil, fmt.Errorf("no conversation %s in %s — `mia api conversations --worktree %s` lists what is", id, worktree, worktree)
+			return "", "", nil, fmt.Errorf("no conversation %s in %s — `mia api conversations --worktree %s` lists what is", id, worktree, worktree)
 		}
 		cwd, whose = heads[at].Cwd, heads[at].Agent
 	}
-	turns, found, err := a.turnsIn(in, id, cwd, whose, after)
-	if err == nil && !found {
+	return cwd, whose, func() error {
 		if worktree == "" {
 			heads, _ = a.Conversations(Wanted{})
 		}
 		if slices.ContainsFunc(heads, func(h Head) bool { return h.ID == id && h.Running }) {
-			return []Turn{}, nil // a window has it open, and nothing is written of it yet
+			return nil
 		}
-		err = fmt.Errorf("no conversation %s here — `mia api conversations` lists them", id)
-	}
-	return turns, err
+		return fmt.Errorf("no conversation %s here — `mia api conversations` lists them", id)
+	}, nil
 }
 
 // turnsIn is a conversation made in the folders as turns, of the first

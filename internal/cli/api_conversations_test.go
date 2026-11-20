@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"bufio"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/gittest"
@@ -161,5 +163,91 @@ func TestConversationContinueDryRunSaysWhatItWouldDo(t *testing.T) {
 	}
 	if _, err := os.Stat(handoffs); err == nil {
 		t.Error("a refusal wrote a handoff")
+	}
+}
+
+// mia api conversation --follow prints the turns in a line, then a line of
+// only the new ones each time the transcript is written to, and ends with
+// exit 0 when its stdin does.
+func TestConversationFollowSaysEachTurnAsItIsWritten(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	t.Chdir(repo.Root)
+	claude := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", claude)
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("PI_CODING_AGENT_DIR", "")
+	project := filepath.Join(claude, "projects", regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(repo.Root, "-"))
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	root, _ := json.Marshal(repo.Root)
+	transcript := filepath.Join(project, "c1.jsonl")
+	if err := os.WriteFile(transcript, []byte(`{"type":"user","cwd":`+string(root)+`,"timestamp":"2026-11-02T10:00:00Z","message":{"content":"make the list faster"}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	in, typed, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	read, out, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdin, stdout := os.Stdin, os.Stdout
+	os.Stdin, os.Stdout = in, out
+	t.Cleanup(func() { os.Stdin, os.Stdout = stdin, stdout })
+	exited := make(chan int, 1)
+	go func() { exited <- Run([]string{"api", "conversation", "c1", "--follow"}) }()
+	lines := make(chan string)
+	go func() {
+		scanner := bufio.NewScanner(read)
+		for scanner.Scan() {
+			lines <- scanner.Text()
+		}
+		close(lines)
+	}()
+	next := func() []app.Turn {
+		t.Helper()
+		select {
+		case line := <-lines:
+			var turns []app.Turn
+			if err := json.Unmarshal([]byte(line), &turns); err != nil {
+				t.Fatalf("%q is not a line of turns: %v", line, err)
+			}
+			return turns
+		case <-time.After(5 * time.Second):
+			t.Fatal("no line came")
+			return nil
+		}
+	}
+
+	if turns := next(); len(turns) != 1 || turns[0].N != 1 || turns[0].Text != "make the list faster" {
+		t.Fatalf("first line = %+v", turns)
+	}
+	f, err := os.OpenFile(transcript, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(`{"type":"assistant","cwd":` + string(root) + `,"timestamp":"2026-11-02T10:00:05Z","message":{"content":[{"type":"text","text":"It is faster."}]}}` + "\n"); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	if turns := next(); len(turns) != 1 || turns[0].N != 2 || turns[0].Kind != "said" || turns[0].Text != "It is faster." {
+		t.Fatalf("second line = %+v: only the new turn", turns)
+	}
+	typed.Close()
+	select {
+	case code := <-exited:
+		if code != exitOK {
+			t.Errorf("stdin ended and it exited %d", code)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("stdin ended and it went on")
+	}
+	out.Close()
+	if line, more := <-lines; more {
+		t.Errorf("a line came after the turns: %q", line)
 	}
 }

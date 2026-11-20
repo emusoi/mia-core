@@ -597,17 +597,51 @@ func (a *App) MainTurns(id string, after int) ([]Turn, error) {
 	in, _ := a.where()
 	turns, found, err := a.turnsIn(in, id, "", "", after)
 	if err == nil && !found {
-		if state, said := a.mainNow(); state.Running && said.ID == id {
-			return []Turn{}, nil // it has it open, and nothing is written of it yet
+		if err = a.mainUnwritten(id)(); err == nil {
+			return []Turn{}, nil
 		}
-		err = fmt.Errorf(noMainConversation, id)
 	}
 	if err != nil {
 		return nil, err
 	}
+	return a.didAll(turns), nil
+}
+
+// FollowMain is MainTurns as the conversation is written to: say is handed
+// what MainTurns gives, then each time it gains turns or one grows, those
+// turns, until stop is closed or say fails. With no id it is the one the
+// main agent has open now; with none open, no turns, and nothing more.
+func (a *App) FollowMain(id string, after int, stop <-chan struct{}, say func([]Turn) error) error {
+	if id == "" {
+		if id = a.Main().Conversation; id == "" {
+			if say([]Turn{}) == nil {
+				<-stop
+			}
+			return nil
+		}
+	}
+	in, _ := a.where()
+	return a.follow(in, id, "", "", after, a.mainUnwritten(id), a.didAll, stop, say)
+}
+
+// mainUnwritten is what it is that no agent has one of the main agent's
+// conversations: nothing, when it has it open and nothing of it is
+// written yet.
+func (a *App) mainUnwritten(id string) func() error {
+	return func() error {
+		if state, said := a.mainNow(); state.Running && said.ID == id {
+			return nil
+		}
+		return fmt.Errorf(noMainConversation, id)
+	}
+}
+
+// didAll says each of mia's verbs among turns that changed something as
+// what it did.
+func (a *App) didAll(turns []Turn) []Turn {
 	places := a.places()
 	for i := range turns {
 		turns[i] = a.did(turns[i], places)
 	}
-	return turns, nil
+	return turns
 }

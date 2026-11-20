@@ -9,6 +9,15 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **A view follows a conversation as it is written.**
+  `mia api conversation <id> --follow` and `mia api main turns --follow`
+  print the turns in one line of JSON and keep running, a line more of
+  only the new turns each time there are some, so a view no longer asks
+  once a second. A turn that grew comes again under its `n`, to replace
+  the one it has. A transcript is read on from where it stopped once its
+  size or time changes; opencode's are exported every second. It ends,
+  exit 0, when stdin ends, its reader goes, or on SIGINT or SIGTERM.
+
 - **opencode's conversations are read as claude's, codex's and pi's
   are.** opencode keeps them in a database of its own, so mia asks
   opencode for them as JSON — `opencode api GET /api/session` for the

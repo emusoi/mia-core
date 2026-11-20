@@ -142,6 +142,12 @@ func (p pluginTalks) turns(in folders, id, _ string, after int) ([]Turn, bool, e
 	return turns, true, nil
 }
 
+// A plugin is asked for all of it again each time: what it says of a turn
+// may grow under its n.
+func (p pluginTalks) follow(in folders, id, cwd string, after int) (func() ([]Turn, bool, error), time.Duration) {
+	return polling(func() ([]Turn, bool, error) { return p.turns(in, id, cwd, after) }), time.Second
+}
+
 func (p pluginTalks) search(in folders, text string, limit int) ([]Recalled, error) {
 	out, err := p.ask(append([]string{"search", text, in.Root}, in.Paths...)...)
 	if err != nil {

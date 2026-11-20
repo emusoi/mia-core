@@ -119,6 +119,12 @@ type talks interface {
 	// to another folder is the copy made in cwd, or with no cwd the one
 	// last written to.
 	turns(in folders, id, cwd string, after int) (turns []Turn, found bool, err error)
+	// follow is turns as the conversation is written: each call of next
+	// gives what was written since the call before — the first, what turns
+	// gives — and a turn that grew again under its n; found is false while
+	// the conversation is not this agent's, or nothing of it is written
+	// yet. every is how often next is worth calling.
+	follow(in folders, id, cwd string, after int) (next func() (turns []Turn, found bool, err error), every time.Duration)
 	// search is the conversations in the folders that mention text, each at
 	// the place it comes up.
 	search(in folders, text string, limit int) ([]Recalled, error)

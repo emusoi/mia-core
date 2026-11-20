@@ -14,7 +14,7 @@ import (
 
 const (
 	mainUsage      = "mia main [status|start [--new|--resume <conversation>] [--restart] [--role <role>] [--agent <agent>] [--model <model>] [--effort <effort>] [--account <account>]|stop|say <text…>|press <keys…>|interrupt|model <model> [--effort <effort>]]"
-	mainTurnsUsage = "mia api main [conversations|turns [--conversation <id>] [--after <n>]]"
+	mainTurnsUsage = "mia api main [conversations|turns [--conversation <id>] [--after <n>] [--follow]]"
 	standingUsage  = "mia api standing [--here] [--seen <repository>/<worktree>[@<machine>]]"
 )
 
@@ -274,17 +274,25 @@ func cmdAPIMain(args []string) int {
 		}
 		return emit(append([]app.Head{}, heads...))
 	}
-	conversation := takeValue(&rest, "--conversation")
+	conversation, follow := takeValue(&rest, "--conversation"), take(&rest, "--follow")
 	after := 0
 	if value := takeValue(&rest, "--after"); value != "" {
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
-			return usageErr(mainTurnsUsage)
+			return usageErr(mainTurnsUsage + followNote)
 		}
 		after = n
 	}
 	if len(rest) != 1 || rest[0] != "turns" {
-		return usageErr(mainTurnsUsage)
+		return usageErr(mainTurnsUsage + followNote)
+	}
+	if elsewhere && follow {
+		return fail(fmt.Errorf("--follow reads a main agent on this machine, and it lives on %s — follow it with mia there", machine.Name))
+	}
+	if follow {
+		return followTurns(func(stop <-chan struct{}, say func([]app.Turn) error) error {
+			return a.FollowMain(conversation, after, stop, say)
+		})
 	}
 	if elsewhere {
 		ask := []string{"api", "main", "turns", "--after", strconv.Itoa(after)}
