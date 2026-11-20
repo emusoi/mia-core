@@ -542,6 +542,65 @@ terminal is refused, exit 1.
 
 Not yet: editing in place, creating, renaming and deleting files, colour
 by syntax, searching by a pattern, and blame.
+### mia review
+`mia review [<range> | pr <number> | w]` is an app of mia's own: run in a
+pane of a worktree, it has mia desk draw a code review of that worktree
+over the pane, by desk's UI protocol. The review itself is
+sawa's — `sw`, the local code-review tool, keeps the files, what was
+read, the findings and the verdict — and `mia review` is a face on it:
+everything it shows it asks `sw` for as JSON, and everything it does
+it has `sw` do, as you. `mia api capabilities` lists `review-app`.
+With no argument it shows the review sawa already has for this worktree:
+the one of the branch against its base (`<base>..HEAD`), else the one of
+this worktree last written to — never a pull request's, which is every
+worktree's. With none it opens one, `sw open -r <base>..HEAD`; the base
+is found as [`mia git`](#mia-git) finds it. An argument is opened as `sw
+nvim` takes one: `pr 14`, `w` for the working tree, anything else a
+range.
+Over the view is the change's title — a pull request's own, a branch's
+one commit's subject, else the branch — with, at its right, how many
+findings stand and the verdict. Under it are what the review is of
+(`words → main · 3 files · +5 -3 · sawa read it 4 min ago`, the age that
+of the finding filed last) and sawa's summary, cut to 400 characters.
+Under those, side by side:
+- A list, `files`, by folder: each folder open over its files, a file
+  with its lines added and deleted, how many findings stand on it, and
+  checked once read. `o` puts them in reading order instead — the files
+  on sawa's path first, in its order, each with the path's one line of
+  why — and says so where sawa has no path. At most 400 files are listed.
+- The diff of the file under the keys, a code `diff`, from `sw rows
+  --changed`: runs of lines under heads, with a gap for the lines left
+  out between two, and each finding as a note directly under the line it
+  is about: `issue · major` in its tone (bad for a blocker and a major
+  one, a warning below that), its first line, who filed it and how it
+  stands. A finding on no line shown is over them all. Findings resolved
+  or closed are left out until `u`. Past 1500 lines the code ends in a
+  gap that says how many more there are.
+| `n` `N` | the keys on the next finding that stands, or the one before, across files and round again (the code's `selected`, and the message's `focus`) |
+| `⏎` | on a note: opens it — all its words, the replies with who and when, a text area and **Reply** (`⌘⏎` in the area: `sw reply <id> -m`) and **Reply and resolve** (then `sw resolve <id>`; with no words, only that). On a file: the keys on its diff |
+| `esc` | shuts what is open and keeps the words typed |
+| `c` | on a line of the diff: a comment under it, filed by **Comment** as a finding on that line (`sw add -f <file> -l <line> --side new\|old -m`); `issue:` or `suggestion:` before the words says its type, as in sawa |
+| `space` | marks the file under the keys read (`sw read -f`) and shows the next unread one |
+| `v` | the verdicts in place of the summary — approve, request changes, comment only, and none once one is given; `⏎` gives it (`sw verdict`), `esc` leaves it |
+| `o` `u` | reading order or by folder; resolved findings shown or not |
+| `r` | has sawa look at the change again (`sw open` of the same target) |
+Every `sw` is run with `-t <review>` and without `SAWA_AGENT`,
+`SAWA_AUTHOR` and `SAWA_SNAPSHOT`, so what is written is the person's
+whatever the pane's environment says. After each the review is read
+again, and it is read again by itself when sawa's record of it changes —
+the file `sw state` names as its `store` is looked at every 2 s — so a
+finding an agent files or answers comes in while you read; the view is
+said again only when it would say something else, and the keys stay on
+the line they were on.
+What sawa refuses — approving over a blocker, a line the file does not
+have — is the view's status, cut to 200 characters, and the app stays
+up; so it does with no `sw` on `PATH` and with nothing to review, which
+the view says, and `r` asks again. `q` or `⌃C` in the plain terminal
+leaves, as closing the view does; stdin that is no terminal is refused,
+exit 1.
+Not yet: sawa's map and its patterns, gates, applying a suggested edit,
+findings on the review as a whole, colour by syntax, and a pull
+request's comments on GitHub.
 
 ## Setups
 

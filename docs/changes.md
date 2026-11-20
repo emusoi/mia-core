@@ -39,6 +39,23 @@ on GitHub; a tag without its section is not released.
   Not yet: editing in place, creating, renaming and deleting files,
   colour by syntax, searching by a pattern, blame. `mia api
   capabilities` lists `files-app`. See [mia files](api.md#mia-files).
+- **A code review is an app mia desk draws.** `mia review`, run in a
+  pane of a worktree, draws the review sawa keeps of it — the one of the
+  branch against its base, opened when there is none; `mia review
+  <range>`, `pr <number>` or `w` another — by desk's UI protocol: the
+  change's title, the findings that stand and the verdict over its
+  files, by folder or (`o`) in sawa's reading order with why, and beside
+  them the diff of the file under the keys with each finding as a note
+  under the line it is about. `n` and `N` go through the findings across
+  files; `⏎` opens one, to reply or reply and resolve; `c` comments on a
+  line; `space` marks a file read and shows the next unread; `v` gives
+  the verdict; `u` shows the resolved; `r` looks again. Each is done by
+  `sw` as you, never as an agent, and what sawa refuses is the view's
+  status. The review is read again when sawa's record changes, so an
+  agent's findings and answers come in as you read. Not yet: sawa's map
+  and patterns, gates, applying a suggested edit, colour by syntax, a
+  pull request's GitHub comments. `mia api capabilities` lists
+  `review-app`. See [mia review](api.md#mia-review).
 
 - **A conversation is a chat mia desk draws.** `mia chat`, run in a pane
   of a worktree's session, follows the conversation a window of the

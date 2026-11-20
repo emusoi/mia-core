@@ -14,7 +14,7 @@ var Groups = []string{"Worktrees", "Working", "Environments", "Records"}
 
 var groupOf = map[string]string{
 	"new": "Worktrees", "ls": "Worktrees", "path": "Worktrees", "adopt": "Worktrees", "rm": "Worktrees", "gc": "Worktrees",
-	"star": "Worktrees", "open": "Worktrees", "shell": "Worktrees", "window": "Worktrees", "chat": "Worktrees", "git": "Worktrees", "files": "Worktrees", "rename": "Worktrees", "run": "Worktrees", "setup": "Worktrees", "switch": "Worktrees", "shell-init": "Worktrees", "shell-integration": "Working",
+	"star": "Worktrees", "open": "Worktrees", "shell": "Worktrees", "window": "Worktrees", "chat": "Worktrees", "git": "Worktrees", "files": "Worktrees", "review": "Worktrees", "rename": "Worktrees", "run": "Worktrees", "setup": "Worktrees", "switch": "Worktrees", "shell-init": "Worktrees", "shell-integration": "Working",
 	"dash": "Working", "stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working",
 	"env":    "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
@@ -36,6 +36,7 @@ var verbs = []Verb{
 	{"chat", chatUsage, "a worktree's conversation with its agent as a chat drawn by mia desk over the pane it is run in, followed as it is written: what is sent, chosen and stopped there is typed into the window that has the conversation open, the one of --window or the one that has --conversation; with no window that has one open, the last written to, only shown", false, ""},
 	{"git", gitUsage, "how the worktree it is run in stands in git, drawn by mia desk over the pane: its files staged, changed and untracked and its commits ahead of its base in a list, the diff of the one under the keys beside it; space stages a file or unstages a staged one, and in the diff the hunk under the keys, a stages all, c writes a commit, r asks again; it reads the standing again when the repository changes", false, ""},
 	{"files", filesUsage, "the files of the worktree it is run in, drawn by mia desk over the pane: the tree, a folder opened and shut with ⏎ and a file changed against the base marked A, M or D, beside the file under the keys with its lines numbered; e hands it to $EDITOR at the line under the keys, f finds a file by its name, / finds lines in the files, r asks again; it writes nothing, and reads the files again when the repository changes", false, ""},
+	{"review", reviewUsage, "the review sawa keeps of the worktree it is run in, drawn by mia desk over the pane: the change's title, its findings that stand and its verdict over its files, by folder or in sawa's reading order, and the diff of the one under the keys beside them with each finding under the line it is about; n and N go through the findings, ⏎ opens one to reply or resolve, c comments on a line, space marks a file read, v gives the verdict, r looks again; each is done by sw as you, and the review is read again when sawa's record changes", false, ""},
 	{"shell", "mia shell [--popup | --view <name>] [worktree]", "attach to a worktree's session; --view at this terminal's own size and window", false, ""},
 	{"run", "mia run <worktree>[@machine] <cmd…>", "run a command once in a worktree, here or on a machine", false, ""},
 	{"dev", "mia dev [<worktree> [--follow]|off]", "lend the main checkout's running dev server a worktree's files; the one time mia writes into a working tree", false, ""},
