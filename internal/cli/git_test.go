@@ -21,6 +21,7 @@ type gitHeard struct {
 	V      int        `json:"v"`
 	Pane   string     `json:"pane"`
 	Fill   bool       `json:"fill"`
+	Focus  string     `json:"focus"`
 	Status *muiStatus `json:"status"`
 	View   *gitPiece  `json:"view"`
 	Keys   []gitKey   `json:"keys"`
@@ -609,6 +610,9 @@ func TestACommitIsMadeOfWhatIsStagedWithTheMessageAsTyped(t *testing.T) {
 	got := heard(t, view.messages(true)[0])
 	if want := []string{"words", "level with main", "1 staged · 1 untracked", "Commit to words", "1 file staged", "+1", "1 untracked stay out", "talk.txt", "staged, new file · what goes in", "+1"}; !slices.Equal(texts(*got.View), want) {
 		t.Errorf("texts = %q", texts(*got.View))
+	}
+	if got.Focus != "message" { // the keys are in what is being written
+		t.Errorf("focus = %q", got.Focus)
 	}
 	area, button := piece(got.View, "message"), piece(got.View, "send")
 	if area == nil || area.T != "field" || string(area.Lines) != "6" || !area.Live || area.Value == nil || *area.Value != "A file says one" {

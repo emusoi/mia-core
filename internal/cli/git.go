@@ -40,9 +40,12 @@ const (
 // gitMessage is the whole view said to the window: a UI that fills its
 // pane, and the keys the program takes.
 type gitMessage struct {
-	V      int        `json:"v"`
-	Pane   string     `json:"pane,omitempty"`
-	Fill   bool       `json:"fill"`
+	V    int    `json:"v"`
+	Pane string `json:"pane,omitempty"`
+	Fill bool   `json:"fill"`
+	// Focus is the piece the keys are put on: the window does it once each
+	// time another piece is named, so a view said again leaves them be.
+	Focus  string     `json:"focus,omitempty"`
 	Status *muiStatus `json:"status,omitempty"`
 	View   gitPiece   `json:"view"`
 	Keys   []gitKey   `json:"keys"`
@@ -653,7 +656,12 @@ func (v *gitView) whole(lines json.RawMessage, placed bool) []byte {
 	if placed {
 		list.Selected = v.at
 	}
-	message := gitMessage{V: 1, Pane: v.pane, Fill: true, Keys: keys, Status: v.status, View: gitPiece{T: "col", Children: []gitPiece{
+	// Writing a commit, the keys are in its message; back at the files, on them.
+	focus := "files"
+	if v.writing {
+		focus = "message"
+	}
+	message := gitMessage{V: 1, Pane: v.pane, Fill: true, Focus: focus, Keys: keys, Status: v.status, View: gitPiece{T: "col", Children: []gitPiece{
 		head,
 		{T: "divider"},
 		{T: "row", Split: true, Grow: 1, Children: []gitPiece{
