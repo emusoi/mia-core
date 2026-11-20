@@ -240,6 +240,56 @@ func chatOf(heads []app.Head, worktree, window, id string) (app.Head, error) {
 // drawn by mia desk over its pane, and follows it as it is written. What
 // the person sends, chooses and stops there is typed into the window that
 // has the conversation open; one no window has open is only shown.
+// chatWaits is what the window is told while a window has no conversation
+// mia can read: one quiet line, which the chat takes the place of.
+func chatWaits(pane, window string) []byte {
+	return encode(struct {
+		V     int    `json:"v"`
+		Pane  string `json:"pane,omitempty"`
+		Title string `json:"title"`
+		View  any    `json:"view"`
+	}{1, pane, "chat", map[string]string{"t": "text", "style": "dim", "text": "No conversation in window " + window + " that mia can read yet. It is shown here as soon as its agent has one; q or esc leaves."}})
+}
+
+// chatAwaited waits for a window of a worktree to have a conversation open,
+// asking each second, with a line saying so drawn over the pane: the
+// conversation once there is one, or left when the person went first.
+func chatAwaited(a *app.App, worktree, window string) (head app.Head, left bool, err error) {
+	pane := os.Getenv("TMUX_PANE")
+	say, shut, err := muiOpen(pane, "mia chat: waiting for window "+window+" to have a conversation; q or ⌃C leaves.")
+	if err != nil {
+		return app.Head{}, false, err
+	}
+	defer shut()
+	stop := make(chan struct{})
+	defer close(stop)
+	// ponytail: what is typed in the instant the conversation opens goes to this
+	// reader and is lost; one reader handed on to the chat if that is ever felt.
+	keys, buffer := muiKeys(stop), ""
+	say(chatWaits(pane, window))
+	for {
+		select {
+		case data, open := <-keys:
+			if !open {
+				return app.Head{}, true, nil
+			}
+			events, rest, sight, leave := typed(buffer, data)
+			buffer = rest
+			if leave || slices.ContainsFunc(events, func(e chatEvent) bool { return e.E == "close" }) {
+				return app.Head{}, true, nil
+			}
+			if sight {
+				say(chatWaits(pane, window))
+			}
+		case <-time.After(time.Second):
+			heads, _ := a.Conversations(app.Wanted{Worktree: worktree})
+			if head, err := chatOf(heads, worktree, window, ""); err == nil {
+				return head, false, nil
+			}
+		}
+	}
+}
+
 func cmdChat(a *app.App, args []string) int {
 	window, id := takeValue(&args, "--window"), takeValue(&args, "--conversation")
 	if index, err := strconv.Atoi(window); len(args) > 0 || window != "" && (err != nil || index < 0) {
@@ -254,6 +304,14 @@ func cmdChat(a *app.App, args []string) int {
 	}
 	heads, problems := a.Conversations(app.Wanted{Worktree: record.Name})
 	head, err := chatOf(heads, record.Name, window, id)
+	if err != nil && window != "" && id == "" {
+		// A window whose agent has said nothing mia can read yet: waited for,
+		// where a tab opened for it would only have shut again.
+		var left bool
+		if head, left, err = chatAwaited(a, record.Name, window); left {
+			return exitOK
+		}
+	}
 	if err != nil {
 		for _, problem := range problems {
 			fmt.Fprintln(os.Stderr, "mia:", problem)

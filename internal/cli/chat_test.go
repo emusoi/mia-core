@@ -339,3 +339,18 @@ func TestChatRefusesWhatIsNotATerminal(t *testing.T) {
 		t.Error("capabilities do not list chat")
 	}
 }
+
+// A window with no conversation yet is said as one quiet line, not a chat.
+func TestAWindowWithNoConversationYetIsSaidAsALineThatWaits(t *testing.T) {
+	var said struct {
+		V    int               `json:"v"`
+		Pane string            `json:"pane"`
+		View map[string]string `json:"view"`
+	}
+	if err := json.Unmarshal(chatWaits("%4", "2"), &said); err != nil {
+		t.Fatal(err)
+	}
+	if said.V != 1 || said.Pane != "%4" || said.View["t"] != "text" || !strings.Contains(said.View["text"], "window 2") {
+		t.Errorf("said = %+v", said)
+	}
+}
