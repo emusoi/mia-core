@@ -710,15 +710,26 @@ Side by side:
 | `e` | hands the file to the editor, at the line under the keys where they are in the file, else at its first: the view is closed, `$EDITOR` (else `nvim`) is run in the worktree's top folder with `+<line> <path>` and this terminal as its own, and when it leaves the files are read again and the view said again |
 | `f` | finds a file |
 | `/` | finds in files |
-| `a` | asks a name, in a one-line field `name` in place of the tree's head (the message's `focus` puts the keys in it), for a new file in the folder under the keys, or the folder of the file under them: `⏎` makes it with the folders on the way to it, puts the keys on it in the tree and hands it to the editor at once; a name that ends in `/` makes a folder, listed while nothing is in it. A path that is there already, one outside the worktree and one in `.git` are refused in the status, and the field stays; `esc` asks no more |
-| `R` | asks where the path under the keys goes, the field holding it as it is: `⏎` renames or moves the file or the folder, with `git mv` where git tracks it and on disk alone where it does not, and refuses a path that is there already |
-| `D` | deletes the path under the keys, asked twice: pressed once it says in the status, as a warning, what goes — `delete src/x.rs, 120 lines, not in git · D again to delete`, `…, tracked: git can bring it back`, `…, tracked: git can bring back only what is committed`, and of a folder `delete src/new and its 3 files, 1 not in git` — and deletes nothing; `D` again on the same path deletes it from disk (not from git's index), and any other thing done first drops it |
-| `y` | copies the path under the keys, by its steps from the top: mia desk's protocol has no clipboard, so an OSC 52 string (`ESC ] 52 ; c ; <base64> BEL`) is written to the terminal, in tmux's passthrough inside tmux as the messages are, and the status says `copied <path>` |
+| `a` | asks a name, in a one-line field `name` in a modal, `ask`, over the view (the message's `focus` puts the keys in it), for a new file in the folder under the keys, or the folder of the file under them: `⏎` makes it with the folders on the way to it, puts the keys on it in the tree and hands it to the editor at once; a name that ends in `/` makes a folder, listed while nothing is in it. A path that is there already, one outside the worktree and one in `.git` are refused in the status, said under the field too, and the modal stays; `esc` asks no more |
+| `R` | asks where the path under the keys goes, in the same modal, the field holding it as it is: `⏎` renames or moves the file or the folder, with `git mv` where git tracks it and on disk alone where it does not, and refuses a path that is there already |
+| `D` | deletes the path under the keys, asked first: pressed once it puts up a modal, `sure`, whose title says what goes — `Delete src/x.rs, 120 lines?`, and of a folder `Delete src/new and its 3 files?` — over whether git can bring it back (`It is not in git: nothing can bring it back.`, `Tracked: git can bring it back.`, `Tracked: git can bring back only what is committed.`, `1 of them not in git, which nothing can bring back.`), and deletes nothing. Its button **Delete** (`yes`, whose key is `D`, so `D` twice does it) deletes the path from disk (not from git's index); **Keep it** (`no`) and `esc` take the modal away. What goes is counted again as it is confirmed, and where it is another the modal says it anew and nothing is deleted |
+| `y` | copies the path under the keys, by its steps from the top, to the clipboard (a patch's `copy`), and a toast says `copied <path>` |
 | `c` | the tree of the changed files alone, and of all again |
 | `d` | on a changed file: its diff against the base in place of its lines — `git diff <base's commit> -- <path>`, hunks under heads with the lines added and deleted, a file git does not track all added — with `diff against main · +15 -3` over it; `d` again shows the file. It stays as the keys go to other changed files |
 | `B` | blame: each line of the file says at its `right` its commit by a short name and how long ago it was written (`3f9a2c1 3d`, from `git blame --porcelain`, asked once for a file as it stands), a line not committed `not committed`; `B` again takes them off. `⏎` on a line while they are there shows that commit in place of the file — its name, its date and its subject over what it changed of this file — and `esc` is back in the file on that line |
-| `:` | asks a line's number in a one-line field `line` in place of the file's path: `⏎` says the file from around that line with the keys on it |
+| `:` | asks a line's number in a one-line field `line` in the modal: `⏎` says the file from around that line with the keys on it |
 | `r` | reads the files again |
+
+Each row of the tree carries a menu, opened beside it with `→` and under
+the pointer's other button, each choice with the key that does the same
+at its right: Open in editor, New file here…, Rename…, Delete…, Copy
+path, Diff against the base, Blame; a folder's has the four in the
+middle. What was just done — `made <path>`, `now <path>`, `deleted
+<path>`, `copied <path>` — is a toast, said once; the status is for a
+search and for what was refused, and it and the keys are said by a
+patch's `status` and `keys` where nothing else of the view is another.
+The foot's keys are those of the piece the window says the keys are on
+(`focus`): on a line of the file, those that are about the file.
 
 **Finding a file**, the left side is a field, `q`, over a list, `found`:
 the files whose path has the letters typed, in order and whatever their

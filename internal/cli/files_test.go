@@ -137,7 +137,7 @@ func filesDeskView() *filesView {
 	return view
 }
 
-const filesDeskSaid = `{"v":1,"pane":"%1","fill":true,"view":{"t":"row","split":true,"children":[{"t":"col","w":300,"scroll":true,"pad":6,"children":[{"t":"list","id":"tree","live":true,"selected":"src/mui/patch.rs","items":[{"head":"mia-desk","note":"3 changed against main"},{"id":"docs","title":"docs","depth":0,"open":false},{"id":"examples","title":"examples","depth":0,"open":false},{"id":"src","title":"src","depth":0,"open":true},{"id":"src/mui","title":"mui","depth":1,"open":true},{"id":"src/mui/patch.rs","title":"patch.rs","depth":2,"right":"A","tone":"ok"},{"id":"src/chatlook.rs","title":"chatlook.rs","depth":1},{"id":"src/mui.rs","title":"mui.rs","depth":1,"right":"M","tone":"warn"},{"id":"src/talk.rs","title":"talk.rs","depth":1,"right":"M","tone":"warn"},{"id":"src/term.rs","title":"term.rs","depth":1},{"id":"tests","title":"tests","depth":0,"open":false},{"id":"Cargo.toml","title":"Cargo.toml","depth":0},{"id":"README.md","title":"README.md","depth":0}]}]},{"t":"divider"},{"t":"col","children":[{"t":"row","pad":10,"gap":10,"children":[{"t":"text","text":"src/mui/patch.rs","style":"mono"},{"t":"text","text":"new against main · 3 lines","style":"dim"}]},{"t":"code","id":"file","live":true,"lines":[{"new":1,"text":"//! A patch: changes to the UI shown, made in turn, all or none."},{"new":2,"text":"use crate::mui::{Change, Missing, Piece};"},{"new":3,"text":""}]}]}]},"keys":[{"key":"e","label":"edit in nvim","id":"edit"},{"key":"f","label":"find a file","id":"find"},{"key":"/","label":"find in files","id":"grep"},{"key":"a","label":"new file or folder","id":"new"},{"key":"R","label":"rename or move","id":"move"},{"key":"D","label":"delete","id":"delete"},{"key":"y","label":"copy the path","id":"copy"},{"key":"c","label":"changed only","id":"only"},{"key":"d","label":"diff against the base","id":"diff"},{"key":"B","label":"blame","id":"blame"},{"key":":","label":"go to line","id":"line"},{"key":"r","label":"ask again","id":"again"}]}`
+const filesDeskSaid = `{"v":1,"pane":"%1","fill":true,"view":{"t":"row","split":true,"children":[{"t":"col","pad":6,"w":300,"scroll":true,"children":[{"t":"list","id":"tree","menu":"what to do","live":true,"selected":"src/mui/patch.rs","items":[{"note":"3 changed against main","head":"mia-desk"},{"id":"docs","title":"docs","depth":0,"open":false,"menu":[{"id":"new","title":"New file here\u2026","right":"a"},{"id":"move","title":"Rename\u2026","right":"R"},{"id":"delete","title":"Delete\u2026","right":"D"},{"id":"copy","title":"Copy path","right":"y"}]},{"id":"examples","title":"examples","depth":0,"open":false,"menu":[{"id":"new","title":"New file here\u2026","right":"a"},{"id":"move","title":"Rename\u2026","right":"R"},{"id":"delete","title":"Delete\u2026","right":"D"},{"id":"copy","title":"Copy path","right":"y"}]},{"id":"src","title":"src","depth":0,"open":true,"menu":[{"id":"new","title":"New file here\u2026","right":"a"},{"id":"move","title":"Rename\u2026","right":"R"},{"id":"delete","title":"Delete\u2026","right":"D"},{"id":"copy","title":"Copy path","right":"y"}]},{"id":"src/mui","title":"mui","depth":1,"open":true,"menu":[{"id":"new","title":"New file here\u2026","right":"a"},{"id":"move","title":"Rename\u2026","right":"R"},{"id":"delete","title":"Delete\u2026","right":"D"},{"id":"copy","title":"Copy path","right":"y"}]},{"id":"src/mui/patch.rs","title":"patch.rs","depth":2,"right":"A","tone":"ok","menu":[{"id":"edit","title":"Open in editor","right":"e"},{"id":"new","title":"New file here\u2026","right":"a"},{"id":"move","title":"Rename\u2026","right":"R"},{"id":"delete","title":"Delete\u2026","right":"D"},{"id":"copy","title":"Copy path","right":"y"},{"id":"diff","title":"Diff against the base","right":"d"},{"id":"blame","title":"Blame","right":"B"}]},{"id":"src/chatlook.rs","title":"chatlook.rs","depth":1,"menu":[{"id":"edit","title":"Open in editor","right":"e"},{"id":"new","title":"New file here\u2026","right":"a"},{"id":"move","title":"Rename\u2026","right":"R"},{"id":"delete","title":"Delete\u2026","right":"D"},{"id":"copy","title":"Copy path","right":"y"},{"id":"diff","title":"Diff against the base","right":"d"},{"id":"blame","title":"Blame","right":"B"}]},{"id":"src/mui.rs","title":"mui.rs","depth":1,"right":"M","tone":"warn","menu":[{"id":"edit","title":"Open in editor","right":"e"},{"id":"new","title":"New file here\u2026","right":"a"},{"id":"move","title":"Rename\u2026","right":"R"},{"id":"delete","title":"Delete\u2026","right":"D"},{"id":"copy","title":"Copy path","right":"y"},{"id":"diff","title":"Diff against the base","right":"d"},{"id":"blame","title":"Blame","right":"B"}]},{"id":"src/talk.rs","title":"talk.rs","depth":1,"right":"M","tone":"warn","menu":[{"id":"edit","title":"Open in editor","right":"e"},{"id":"new","title":"New file here\u2026","right":"a"},{"id":"move","title":"Rename\u2026","right":"R"},{"id":"delete","title":"Delete\u2026","right":"D"},{"id":"copy","title":"Copy path","right":"y"},{"id":"diff","title":"Diff against the base","right":"d"},{"id":"blame","title":"Blame","right":"B"}]},{"id":"src/term.rs","title":"term.rs","depth":1,"menu":[{"id":"edit","title":"Open in editor","right":"e"},{"id":"new","title":"New file here\u2026","right":"a"},{"id":"move","title":"Rename\u2026","right":"R"},{"id":"delete","title":"Delete\u2026","right":"D"},{"id":"copy","title":"Copy path","right":"y"},{"id":"diff","title":"Diff against the base","right":"d"},{"id":"blame","title":"Blame","right":"B"}]},{"id":"tests","title":"tests","depth":0,"open":false,"menu":[{"id":"new","title":"New file here\u2026","right":"a"},{"id":"move","title":"Rename\u2026","right":"R"},{"id":"delete","title":"Delete\u2026","right":"D"},{"id":"copy","title":"Copy path","right":"y"}]},{"id":"Cargo.toml","title":"Cargo.toml","depth":0,"menu":[{"id":"edit","title":"Open in editor","right":"e"},{"id":"new","title":"New file here\u2026","right":"a"},{"id":"move","title":"Rename\u2026","right":"R"},{"id":"delete","title":"Delete\u2026","right":"D"},{"id":"copy","title":"Copy path","right":"y"},{"id":"diff","title":"Diff against the base","right":"d"},{"id":"blame","title":"Blame","right":"B"}]},{"id":"README.md","title":"README.md","depth":0,"menu":[{"id":"edit","title":"Open in editor","right":"e"},{"id":"new","title":"New file here\u2026","right":"a"},{"id":"move","title":"Rename\u2026","right":"R"},{"id":"delete","title":"Delete\u2026","right":"D"},{"id":"copy","title":"Copy path","right":"y"},{"id":"diff","title":"Diff against the base","right":"d"},{"id":"blame","title":"Blame","right":"B"}]}]}]},{"t":"divider"},{"t":"col","id":"side","motion":"none","children":[{"t":"row","pad":10,"gap":10,"children":[{"t":"text","text":"src/mui/patch.rs","style":"mono"},{"t":"text","text":"new against main \u00b7 3 lines","style":"dim"}]},{"t":"code","id":"file","live":true,"lines":[{"new":1,"text":"//! A patch: changes to the UI shown, made in turn, all or none."},{"new":2,"text":"use crate::mui::{Change, Missing, Piece};"},{"new":3,"text":""}]}]}]},"keys":[{"key":"e","label":"edit in nvim","id":"edit"},{"key":"f","label":"find a file","id":"find"},{"key":"/","label":"find in files","id":"grep"},{"key":"a","label":"new file or folder","id":"new"},{"key":"R","label":"rename or move","id":"move"},{"key":"D","label":"delete","id":"delete"},{"key":"y","label":"copy the path","id":"copy"},{"key":"c","label":"changed only","id":"only"},{"key":"d","label":"diff against the base","id":"diff"},{"key":"B","label":"blame","id":"blame"},{"key":":","label":"go to line","id":"line"},{"key":"r","label":"ask again","id":"again"}]}`
 
 // The tree lists in each folder its folders and then its files, by name
 // whatever its case, and under a folder what is in it only where the
@@ -192,7 +192,7 @@ func TestChangedFilesCarryTheirMarkInTheList(t *testing.T) {
 		t.Errorf("entries = %s", encode(got))
 	}
 	cut := filesEntries(rows, marks, "app", "", 2)
-	if len(cut) != 4 || cut[3] != (filesEntry{Head: "3 more rows", Note: "shut a folder to see them"}) {
+	if len(cut) != 4 || !reflect.DeepEqual(cut[3], filesEntry{Head: "3 more rows", Note: "shut a folder to see them"}) {
 		t.Errorf("cut to 2 rows: %s", encode(cut))
 	}
 	if got := filesEntries(filesTree([]string{"docs/a.md"}, nil), nil, "app", "", 9); string(encode(got[1])) != `{"id":"docs","title":"docs","depth":0,"open":false}` || *got[1].Open != shut {
@@ -418,7 +418,7 @@ func TestTheLeftSideIsAFieldOverWhatWasFound(t *testing.T) {
 	if field := left.Children[0]; left.W != 440 || field.List != "hits" || field.Placeholder != "Find in files: /pattern, =whole words" || !field.Bare || field.Value == nil || *field.Value != "apply(" {
 		t.Errorf("the left side = %s", encode(left))
 	}
-	if list := filesPieceOf(got.View, "hits"); list == nil || !list.Live || list.Selected != "h:1" || len(list.Items) != 4 || list.Items[2] != (filesEntry{Head: "src/talk.rs", Note: "1"}) {
+	if list := filesPieceOf(got.View, "hits"); list == nil || !list.Live || list.Selected != "h:1" || len(list.Items) != 4 || !reflect.DeepEqual(list.Items[2], filesEntry{Head: "src/talk.rs", Note: "1"}) {
 		t.Errorf("the list = %s", encode(list))
 	}
 	if want := []string{"src/talk.rs", "changed against main · lines 4–30 of 30"}; !slices.Equal(filesTexts(*got.View), want) {
@@ -718,7 +718,7 @@ func TestTheTreeIsTheFilesGitDoesNotIgnoreMarkedAgainstTheBase(t *testing.T) {
 	}
 	got := filesSaid(t, view.messages(filesAllPut)[0])
 	list := filesPieceOf(got.View, "tree")
-	if list.Items[0] != (filesEntry{Head: "app", Note: "4 changed against main"}) || list.Selected != "src/new/added.txt" {
+	if !reflect.DeepEqual(list.Items[0], filesEntry{Head: "app", Note: "4 changed against main"}) || list.Selected != "src/new/added.txt" {
 		t.Errorf("the list = %s", encode(list))
 	}
 	if want := []string{"src/new/added.txt", "new against main · 1 line"}; !slices.Equal(filesTexts(*got.View), want) {
@@ -952,7 +952,7 @@ func TestAFolderInNoRepositoryIsItsOwnTree(t *testing.T) {
 		t.Fatalf("paths = %q, %q", view.paths, view.failed)
 	}
 	got := filesSaid(t, view.messages(filesAllPut)[0])
-	if list := filesPieceOf(got.View, "tree"); got.Status != nil || list.Items[0] != (filesEntry{Head: "sub", Note: "in no repository"}) || list.Selected != "deep.txt" {
+	if list := filesPieceOf(got.View, "tree"); got.Status != nil || !reflect.DeepEqual(list.Items[0], filesEntry{Head: "sub", Note: "in no repository"}) || list.Selected != "deep.txt" {
 		t.Errorf("status %+v, the list = %s", got.Status, encode(list))
 	}
 	if want := []string{"deep.txt", "2 lines"}; !slices.Equal(filesTexts(*got.View), want) {
@@ -997,12 +997,44 @@ func TestFilesRefusesWhatIsNotATerminal(t *testing.T) {
 
 // filesRead is a view of a throwaway repository, read once, that keeps what
 // it writes to the terminal.
-func filesRead(t *testing.T, repo *gittest.Repo) (*filesView, *[]byte) {
+func filesRead(t *testing.T, repo *gittest.Repo) *filesView {
 	t.Helper()
-	var wrote []byte
-	view := &filesView{pane: "%4", dir: repo.Root, hitAt: -1, write: func(data []byte) { wrote = append(wrote, data...) }}
+	view := &filesView{pane: "%4", dir: repo.Root, hitAt: -1}
 	view.read()
-	return view, &wrote
+	return view
+}
+
+// filesAsks is the modal a view says, by its id: its title, the texts in
+// it and its buttons each as its label and its key; nil where it says
+// none of that id.
+func filesAsks(t *testing.T, view *filesView, id string) []string {
+	t.Helper()
+	got := filesSaid(t, view.messages(0)[0])
+	modal := filesPieceOf(got.View, id)
+	if modal == nil {
+		return nil
+	}
+	if modal.T != "modal" {
+		t.Fatalf("the modal = %+v", modal)
+	}
+	said := append([]string{modal.Title}, filesTexts(*modal)...)
+	for _, child := range modal.Children {
+		for _, button := range child.Children {
+			said = append(said, button.ID+"="+button.Label+" "+button.Key)
+			if button.T != "button" || button.Primary != (button.ID == "yes") {
+				t.Fatalf("the button = %+v", button)
+			}
+		}
+	}
+	return said
+}
+
+// filesToasted is what a view just did, as its toast says it; none is no words.
+func filesToasted(view *filesView) muiStatus {
+	if view.passing.toast == nil {
+		return muiStatus{}
+	}
+	return *view.passing.toast
 }
 
 // filesPress is a key of the program's pressed on an item, done.
@@ -1033,15 +1065,15 @@ func TestANameTypedIsAPathInTheFolderAskedAbout(t *testing.T) {
 	}
 }
 
-// a asks a name in a field in place of the tree's head, of a file in the
+// a asks a name in a field in a modal over the view, of a file in the
 // folder under the keys or in the folder of the file under them; ⏎ makes
 // it, with the folders on the way, and the keys are on it in the tree: a
 // file is handed to the editor at once, a name that ends in a slash is a
 // folder listed while nothing is in it. What is there already is
-// refused, and esc asks no more.
+// refused, said under the field, and esc asks no more.
 func TestANewFileOrFolderIsMadeWhereTheKeysAre(t *testing.T) {
 	repo := filesWork(t)
-	view, _ := filesRead(t, repo)
+	view := filesRead(t, repo)
 	if got, want := view.deed(gitEvent{E: "press", ID: "new", Item: "src/keep.txt"}), (filesDeed{do: filesAsked, ask: filesAskNew, path: "src", id: "tree"}); got != want {
 		t.Fatalf("a on a file does %+v", got)
 	}
@@ -1055,11 +1087,14 @@ func TestANewFileOrFolderIsMadeWhereTheKeysAre(t *testing.T) {
 		t.Fatalf("a: said %v at %d", say, place)
 	}
 	got := filesSaid(t, view.messages(filesWordsPut)[0])
-	left := got.View.Children[0]
-	if field := left.Children[0]; got.Focus != "name" || field.T != "field" || field.ID != "name" || field.Right != "in src/" || field.Value == nil || *field.Value != "" || left.Children[2].Items[0].Head != "" {
-		t.Errorf("focus %q, the left side = %s", got.Focus, encode(left))
+	modal := filesPieceOf(got.View, "ask")
+	if modal == nil || modal.T != "modal" || modal.Title != "New file or folder" || len(modal.Children) != 1 || filesPieceOf(got.View, "tree").Items[0].Head != "app" {
+		t.Fatalf("the modal = %s", encode(modal))
 	}
-	if want := []gitKey{{"esc", "never mind", "back"}}; !slices.Equal(got.Keys, want) {
+	if field := modal.Children[0]; got.Focus != "name" || field.T != "field" || field.ID != "name" || field.Right != "in src/" || field.Value == nil || *field.Value != "" {
+		t.Errorf("focus %q, the field = %s", got.Focus, encode(field))
+	}
+	if len(got.Keys) != 0 {
 		t.Errorf("keys = %+v", got.Keys)
 	}
 	// while it asks, no other key does anything
@@ -1073,8 +1108,8 @@ func TestANewFileOrFolderIsMadeWhereTheKeysAre(t *testing.T) {
 	if info, err := os.Stat(filepath.Join(repo.Root, "src/deep/made.txt")); err != nil || info.Size() != 0 {
 		t.Fatalf("the file made: %v", err)
 	}
-	if view.at != "src/deep/made.txt" || view.file != "src/deep/made.txt" || view.focus != "tree" || *view.status != (muiStatus{Text: "made src/deep/made.txt", Tone: "ok"}) {
-		t.Errorf("the keys on %q beside %q, focus %q, status %+v", view.at, view.file, view.focus, view.status)
+	if view.at != "src/deep/made.txt" || view.file != "src/deep/made.txt" || view.focus != "tree" || filesToasted(view) != (muiStatus{Text: "made src/deep/made.txt", Tone: "ok"}) || view.status != nil || filesAsks(t, view, "ask") != nil {
+		t.Errorf("the keys on %q beside %q, focus %q, toast %+v", view.at, view.file, view.focus, filesToasted(view))
 	}
 	if view.handing == nil || *view.handing != (filesDeed{do: filesEdit, path: "src/deep/made.txt", line: 1}) {
 		t.Errorf("handed to the editor: %+v", view.handing)
@@ -1102,11 +1137,14 @@ func TestANewFileOrFolderIsMadeWhereTheKeysAre(t *testing.T) {
 		if view.act(view.deed(gitEvent{E: "submit", ID: "name", Text: typed})); view.asking != filesAskNew || *view.status != (muiStatus{Text: why, Tone: "bad"}) {
 			t.Errorf("%q: asking %d, status %+v", typed, view.asking, view.status)
 		}
+		if said := filesAsks(t, view, "ask"); !slices.Equal(said, []string{"New file or folder", why}) {
+			t.Errorf("%q: the modal says %q", typed, said)
+		}
 	}
 	if _, err := os.Stat(filepath.Join(filepath.Dir(repo.Root), "out.txt")); err == nil {
 		t.Error("a file was made outside the worktree")
 	}
-	if say, _ := filesPress(view, "back", ""); !say || view.asking != filesAskNothing || view.focus != "tree" {
+	if say, _ := view.act(view.deed(gitEvent{E: "dismiss", ID: "ask"})); !say || view.asking != filesAskNothing || view.focus != "tree" || filesAsks(t, view, "ask") != nil {
 		t.Errorf("esc: said %v, asking %d, focus %q", say, view.asking, view.focus)
 	}
 	// one git ignores is made, and said not to be listed
@@ -1122,12 +1160,13 @@ func TestANewFileOrFolderIsMadeWhereTheKeysAre(t *testing.T) {
 // refused.
 func TestAPathIsRenamedWithGitWhereGitTracksIt(t *testing.T) {
 	repo := filesWork(t)
-	view, _ := filesRead(t, repo)
+	view := filesRead(t, repo)
 	if say, place := filesPress(view, "move", "src/same.txt"); !say || place != filesWordsPut || view.asking != filesAskMove || view.answer != "src/same.txt" {
 		t.Fatalf("R: said %v at %d, the field holds %q", say, place, view.answer)
 	}
-	if field := filesSaid(t, view.messages(filesWordsPut)[0]).View.Children[0].Children[0]; field.ID != "name" || field.Value == nil || *field.Value != "src/same.txt" {
-		t.Errorf("the field = %s", encode(field))
+	got := filesSaid(t, view.messages(filesWordsPut)[0])
+	if field, modal := filesPieceOf(got.View, "name"), filesPieceOf(got.View, "ask"); modal == nil || modal.Title != "Rename or move src/same.txt" || field == nil || field.Value == nil || *field.Value != "src/same.txt" {
+		t.Errorf("the modal = %s", encode(modal))
 	}
 	if view.act(view.deed(gitEvent{E: "submit", ID: "name", Text: "src/keep.txt"})); view.asking != filesAskMove || *view.status != (muiStatus{Text: "src/keep.txt is there already", Tone: "bad"}) {
 		t.Errorf("over a file that is there: status %+v", view.status)
@@ -1136,8 +1175,8 @@ func TestAPathIsRenamedWithGitWhereGitTracksIt(t *testing.T) {
 		t.Errorf("to its own name: status %+v", view.status)
 	}
 	view.act(view.deed(gitEvent{E: "submit", ID: "name", Text: "lib/kept.txt"}))
-	if view.asking != filesAskNothing || view.at != "lib/kept.txt" || view.file != "lib/kept.txt" || *view.status != (muiStatus{Text: "now lib/kept.txt", Tone: "ok"}) || view.handing != nil {
-		t.Fatalf("renamed: the keys on %q, status %+v", view.at, view.status)
+	if view.asking != filesAskNothing || view.at != "lib/kept.txt" || view.file != "lib/kept.txt" || filesToasted(view) != (muiStatus{Text: "now lib/kept.txt", Tone: "ok"}) || view.status != nil || view.handing != nil {
+		t.Fatalf("renamed: the keys on %q, toast %+v", view.at, filesToasted(view))
 	}
 	if got := repo.Git("status", "--porcelain", "--", "lib", "src/same.txt"); got != "R  src/same.txt -> lib/kept.txt" {
 		t.Errorf("git status says %q", got)
@@ -1160,120 +1199,206 @@ func TestAPathIsRenamedWithGitWhereGitTracksIt(t *testing.T) {
 	}
 }
 
-// What D says before it deletes is what goes and whether git can bring
-// it back.
+// What the modal says before a path is deleted is what goes, as its
+// title, and under it whether git can bring it back.
 func TestWhatADeleteSaysBeforeItIsDone(t *testing.T) {
 	for _, c := range []struct {
 		named  string
 		gone   filesGone
 		inside bool
-		want   string
+		ask    string
+		told   string
 	}{
-		{"src/x.rs", filesGone{lines: 120}, true, "delete src/x.rs, 120 lines, not in git · D again to delete"},
-		{"src/x.rs", filesGone{lines: 1, tracked: 1}, true, "delete src/x.rs, 1 line, tracked: git can bring it back · D again to delete"},
-		{"src/x.rs", filesGone{lines: 9, tracked: 1, unsaved: true}, true, "delete src/x.rs, 9 lines, tracked: git can bring back only what is committed · D again to delete"},
-		{"blob.bin", filesGone{}, true, "delete blob.bin, not in git · D again to delete"},
-		{"src", filesGone{folder: true, files: 5, tracked: 3}, true, "delete src and its 5 files, 2 not in git · D again to delete"},
-		{"src", filesGone{folder: true, files: 1, tracked: 1}, true, "delete src and its 1 file, tracked: git can bring it back · D again to delete"},
-		{"notes.md", filesGone{lines: 2}, false, "delete notes.md, 2 lines, in no repository · D again to delete"},
+		{"src/x.rs", filesGone{lines: 120}, true, "Delete src/x.rs, 120 lines?", "It is not in git: nothing can bring it back."},
+		{"src/x.rs", filesGone{lines: 1, tracked: 1}, true, "Delete src/x.rs, 1 line?", "Tracked: git can bring it back."},
+		{"src/x.rs", filesGone{lines: 9, tracked: 1, unsaved: true}, true, "Delete src/x.rs, 9 lines?", "Tracked: git can bring back only what is committed."},
+		{"blob.bin", filesGone{}, true, "Delete blob.bin?", "It is not in git: nothing can bring it back."},
+		{"src", filesGone{folder: true, files: 5, tracked: 3}, true, "Delete src and its 5 files?", "2 of them not in git, which nothing can bring back."},
+		{"src", filesGone{folder: true, files: 1, tracked: 1}, true, "Delete src and its 1 file?", "Tracked: git can bring it back."},
+		{"notes.md", filesGone{lines: 2}, false, "Delete notes.md, 2 lines?", "It is in no repository: nothing can bring it back."},
 	} {
-		if got := filesGoing(c.named, c.gone, c.inside); got != c.want {
-			t.Errorf("says %q, want %q", got, c.want)
+		if ask, told := filesGoing(c.named, c.gone, c.inside); ask != c.ask || told != c.told {
+			t.Errorf("says %q, %q, want %q, %q", ask, told, c.ask, c.told)
 		}
 	}
-	if got := filesGoing(strings.Repeat("é", 300), filesGone{lines: 1}, true); len([]rune(got)) > gitWordsMost || !strings.HasSuffix(got, "D again to delete") {
-		t.Errorf("of a long path: %q", got)
+	if ask, _ := filesGoing(strings.Repeat("é", 300), filesGone{lines: 1}, true); len([]rune(ask)) > gitWordsMost || !strings.HasSuffix(ask, ", 1 line?") {
+		t.Errorf("of a long path: %q", ask)
 	}
 }
 
-// D asks twice: pressed once it says in the status what goes and deletes
-// nothing, any other thing done drops that, and pressed again on the
-// same path it deletes it — a file, or a folder with all that is in it.
-func TestDeleteAsksTwice(t *testing.T) {
+// D asks in a modal: pressed once it says what goes and deletes nothing;
+// the modal's button, which D again presses, deletes the path — a file,
+// or a folder with all that is in it — and esc and its other button keep
+// it. What goes is counted again as it is confirmed, and where it is
+// another the modal says it anew and nothing is deleted.
+func TestDeleteAsksInAModal(t *testing.T) {
 	repo := filesWork(t)
-	view, _ := filesRead(t, repo)
+	view := filesRead(t, repo)
 	there := func(path string) bool {
 		_, err := os.Stat(filepath.Join(repo.Root, path))
 		return err == nil
 	}
-	if say, _ := filesPress(view, "delete", "top.txt"); !say || !there("top.txt") || view.arming != "top.txt" ||
-		*view.status != (muiStatus{Text: "delete top.txt, 1 line, not in git · D again to delete", Tone: "warn"}) {
+	if say, _ := filesPress(view, "delete", "top.txt"); !say || !there("top.txt") || view.arming != "top.txt" || view.status != nil {
 		t.Fatalf("D once: said %v, status %+v", say, view.status)
 	}
-	// another key, or the keys moved: nothing is asked any more
-	if say, _ := view.act(view.deed(gitEvent{E: "move", List: "tree", ID: "src"})); !say || view.arming != "" || view.status != nil {
-		t.Errorf("a move after D: said %v, arming %q, status %+v", say, view.arming, view.status)
+	if want := []string{"Delete top.txt, 1 line?", "It is not in git: nothing can bring it back.", "yes=Delete D", "no=Keep it esc"}; !slices.Equal(filesAsks(t, view, "sure"), want) {
+		t.Fatalf("the modal says %q", filesAsks(t, view, "sure"))
 	}
+	if got := filesSaid(t, view.messages(0)[0]); got.Focus != "yes" || len(got.Keys) != 0 {
+		t.Errorf("focus %q, keys %+v", got.Focus, got.Keys)
+	}
+	// under the modal only its buttons and esc do anything, and the keys
+	// passed between its buttons leave it up
+	for _, event := range []gitEvent{{E: "press", ID: "copy", Item: "top.txt"}, {E: "move", List: "tree", ID: "src"}, {E: "focus", ID: "no"}} {
+		if deed := view.deed(event); deed != (filesDeed{}) {
+			t.Errorf("%+v under the modal does %+v", event, deed)
+		}
+	}
+	// esc and its other button keep the file, and the keys go back to the tree
+	for _, never := range []gitEvent{{E: "dismiss", ID: "sure"}, {E: "press", ID: "no"}} {
+		filesPress(view, "delete", "top.txt")
+		if say, _ := view.act(view.deed(never)); !say || view.arming != "" || !there("top.txt") || filesAsks(t, view, "sure") != nil || view.focus != "tree" {
+			t.Errorf("%+v: said %v, arming %q, focus %q", never, say, view.arming, view.focus)
+		}
+	}
+	// the file grew while the modal was up: said anew, and nothing deleted
 	filesPress(view, "delete", "top.txt")
-	if filesPress(view, "delete", "README.md"); !there("top.txt") || !there("README.md") || view.arming != "README.md" {
-		t.Errorf("D on another path: arming %q", view.arming)
+	repo.Write("top.txt", "one\ntwo\n")
+	if say, _ := filesPress(view, "yes", ""); !say || !there("top.txt") || filesAsks(t, view, "sure")[0] != "Delete top.txt, 2 lines?" {
+		t.Fatalf("its button after the file grew: %q", filesAsks(t, view, "sure"))
 	}
-	if want := "delete README.md, 1 line, tracked: git can bring it back · D again to delete"; view.status.Text != want {
-		t.Errorf("of a tracked file: %q", view.status.Text)
+	if say, _ := filesPress(view, "yes", ""); !say || there("top.txt") || view.arming != "" || filesToasted(view) != (muiStatus{Text: "deleted top.txt", Tone: "ok"}) || view.status != nil || slices.Contains(view.paths, "top.txt") || view.focus != "tree" {
+		t.Errorf("its button: said %v, toast %+v, paths %q", say, filesToasted(view), view.paths)
 	}
-	filesPress(view, "copy", "top.txt")
-	if filesPress(view, "delete", "top.txt"); !there("top.txt") {
-		t.Fatal("D after another key deleted at once")
+	// a choice of a row's menu asks as D does
+	if view.act(view.deed(gitEvent{E: "pick", List: "tree", ID: "README.md", Sub: "delete"})); view.arming != "README.md" || !there("README.md") {
+		t.Errorf("Delete… of a row's menu: arming %q", view.arming)
 	}
-	if say, _ := filesPress(view, "delete", "top.txt"); !say || there("top.txt") || view.arming != "" || *view.status != (muiStatus{Text: "deleted top.txt", Tone: "ok"}) || slices.Contains(view.paths, "top.txt") {
-		t.Errorf("D again: said %v, status %+v, paths %q", say, view.status, view.paths)
+	if want := []string{"Delete README.md, 1 line?", "Tracked: git can bring it back.", "yes=Delete D", "no=Keep it esc"}; !slices.Equal(filesAsks(t, view, "sure"), want) {
+		t.Errorf("of a tracked file: %q", filesAsks(t, view, "sure"))
 	}
+	view.act(view.deed(gitEvent{E: "dismiss", ID: "sure"}))
 
 	// a folder says how many files go, those git does not track among them
 	repo.Write("src/new/loose.txt", "loose\n")
 	view.read()
-	if filesPress(view, "delete", "src/new"); view.status.Text != "delete src/new and its 2 files, 1 not in git · D again to delete" || !there("src/new/added.txt") {
-		t.Errorf("of a folder: %q", view.status.Text)
+	view.act(view.deed(gitEvent{E: "move", List: "tree", ID: "src"}))
+	if filesPress(view, "delete", "src/new"); !slices.Equal(filesAsks(t, view, "sure")[:2], []string{"Delete src/new and its 2 files?", "1 of them not in git, which nothing can bring back."}) || !there("src/new/added.txt") {
+		t.Errorf("of a folder: %q", filesAsks(t, view, "sure"))
 	}
-	if filesPress(view, "delete", "src/new"); there("src/new") || slices.Contains(view.paths, "src/new/added.txt") {
+	if filesPress(view, "yes", ""); there("src/new") || slices.Contains(view.paths, "src/new/added.txt") {
 		t.Errorf("a folder deleted: there %v, paths %q", there("src/new"), view.paths)
 	}
 	if view.at != "src" || !slices.Equal(view.lines, []filesLine{{Kind: "gap", Text: "no longer there"}}) {
 		t.Errorf("the keys on %q beside %+v", view.at, view.lines)
 	}
 	// one changed since its commit says git brings back only what is committed
-	if filesPress(view, "delete", "src/keep.txt"); !strings.Contains(view.status.Text, "git can bring it back") {
-		t.Errorf("of a committed file: %q", view.status.Text)
+	if filesPress(view, "delete", "src/keep.txt"); view.told != "Tracked: git can bring it back." {
+		t.Errorf("of a committed file: %q", view.told)
 	}
+	view.act(view.deed(gitEvent{E: "dismiss", ID: "sure"}))
 	repo.Write("src/keep.txt", "other\n")
 	filesPress(view, "again", "")
-	if filesPress(view, "delete", "src/keep.txt"); !strings.Contains(view.status.Text, "only what is committed") {
-		t.Errorf("of a file changed since: %q", view.status.Text)
+	if filesPress(view, "delete", "src/keep.txt"); view.told != "Tracked: git can bring back only what is committed." {
+		t.Errorf("of a file changed since: %q", view.told)
 	}
-	// what is not there is not deleted
-	if filesPress(view, "delete", "src/old.txt"); *view.status != (muiStatus{Text: "src/old.txt is not there to delete", Tone: "bad"}) {
-		t.Errorf("of a deleted file: %+v", view.status)
+	view.act(view.deed(gitEvent{E: "dismiss", ID: "sure"}))
+	// what is not there is not deleted, and no modal asks
+	if filesPress(view, "delete", "src/old.txt"); filesToasted(view) != (muiStatus{Text: "src/old.txt is not there to delete", Tone: "bad"}) || view.arming != "" {
+		t.Errorf("of a deleted file: %+v", filesToasted(view))
 	}
 }
 
-// y puts the path under the keys on the clipboard by an OSC 52 string
-// written to the terminal — in tmux's passthrough inside tmux, each ESC
-// of it doubled — and says so in the status.
-func TestThePathIsCopiedByAnOSC52String(t *testing.T) {
-	if got, want := string(filesCopied("src/x.rs", false)), "\x1b]52;c;c3JjL3gucnM=\a"; got != want {
-		t.Errorf("wrote %q, want %q", got, want)
-	}
-	if got, want := string(filesCopied("src/x.rs", true)), "\x1bPtmux;\x1b\x1b]52;c;c3JjL3gucnM=\a\x1b\\"; got != want {
-		t.Errorf("in tmux wrote %q, want %q", got, want)
-	}
-	if got, want := string(filesCopied("né/é.rs", false)), "\x1b]52;c;bsOpL8OpLnJz\a"; got != want {
-		t.Errorf("past ASCII wrote %q, want %q", got, want)
-	}
+// y puts the path under the keys on the clipboard, by the window's own
+// copy, and says so in a toast.
+func TestThePathIsCopiedByTheWindow(t *testing.T) {
 	repo := filesWork(t)
-	view, wrote := filesRead(t, repo)
-	view.tmux = true
-	if say, place := filesPress(view, "copy", "src/keep.txt"); !say || place != 0 || *view.status != (muiStatus{Text: "copied src/keep.txt"}) {
-		t.Errorf("y: said %v at %d, status %+v", say, place, view.status)
+	view := filesRead(t, repo)
+	if say, place := filesPress(view, "copy", "src/keep.txt"); !say || place != 0 || view.passing.copy != "src/keep.txt" || filesToasted(view) != (muiStatus{Text: "copied src/keep.txt"}) || view.status != nil {
+		t.Errorf("y: said %v at %d, copied %q, toast %+v", say, place, view.passing.copy, filesToasted(view))
 	}
-	if want := "\x1bPtmux;\x1b\x1b]52;c;c3JjL2tlZXAudHh0\a\x1b\\"; string(*wrote) != want {
-		t.Errorf("wrote %q, want %q", *wrote, want)
+	var told muiTold
+	told.says(view.pane, view.messages(0), nil, &muiPassing{})
+	said := told.says(view.pane, view.messages(0), nil, &view.passing)
+	if want := `{"v":1,"pane":"%4","patch":[{"op":"copy","text":"src/keep.txt"},{"op":"toast","text":"copied src/keep.txt"}]}`; len(said) != 1 || string(said[0]) != want {
+		t.Errorf("said %s", said)
+	}
+	if again := told.says(view.pane, view.messages(0), nil, &view.passing); again != nil {
+		t.Errorf("said twice: %s", again)
 	}
 	// on a line of the code it is the file shown, and on a folder the folder
-	*wrote = nil
-	filesPress(view, "copy", "0")
-	filesPress(view, "copy", "src")
-	if want := string(filesCopied("src/new/added.txt", true)) + string(filesCopied("src", true)); string(*wrote) != want {
-		t.Errorf("wrote %q", *wrote)
+	for item, want := range map[string]string{"0": "src/new/added.txt", "src": "src"} {
+		if filesPress(view, "copy", item); view.passing.copy != want {
+			t.Errorf("y on %s copied %q", item, view.passing.copy)
+		}
+	}
+}
+
+// Each row of the tree carries the menu of what can be done to it, each
+// choice by the id of the key that does the same with that key at its
+// right, and picked it does what that key does on the row: a file is
+// handed to the editor, shown as its diff and blamed, and a file and a
+// folder have a file made by them, are renamed, deleted and their path
+// copied. The keys of the foot are those of the piece the window says
+// the keys are on, and ⏎ on a blamed line is said to show its commit.
+func TestEachRowOfTheTreeCarriesItsMenu(t *testing.T) {
+	t.Setenv("EDITOR", "ed")
+	view := filesDeskView()
+	menus := map[string]string{}
+	entries, _ := view.items()
+	for _, entry := range entries {
+		var choices []string
+		for _, choice := range entry.Menu {
+			choices = append(choices, choice.ID+"="+choice.Title+" "+choice.Right)
+		}
+		menus[entry.ID] = strings.Join(choices, ", ")
+	}
+	const folder = "new=New file here… a, move=Rename… R, delete=Delete… D, copy=Copy path y"
+	if menus[""] != "" || menus["src"] != folder || menus["src/mui.rs"] != "edit=Open in editor e, "+folder+", diff=Diff against the base d, blame=Blame B" {
+		t.Errorf("the menus = %q", menus)
+	}
+	if list := filesPieceOf(filesSaid(t, view.messages(0)[0]).View, "tree"); list.Menu == "" {
+		t.Errorf("the list names no menu: %+v", list)
+	}
+	for sub, want := range map[string]filesDeed{
+		"edit":   {do: filesEdit, path: "src/mui.rs", line: 1},
+		"new":    {do: filesAsked, ask: filesAskNew, path: "src", id: "tree"},
+		"move":   {do: filesAsked, ask: filesAskMove, path: "src/mui.rs", id: "tree"},
+		"delete": {do: filesDelete, path: "src/mui.rs", id: "tree"},
+		"copy":   {do: filesCopy, path: "src/mui.rs"},
+		"diff":   {do: filesDiff},
+		"blame":  {do: filesBlamed},
+	} {
+		if got := view.deed(gitEvent{E: "pick", List: "tree", ID: "src/mui.rs", Sub: sub}); got != want {
+			t.Errorf("%s of the menu does %+v", sub, got)
+		}
+	}
+	if got := view.deed(gitEvent{E: "pick", List: "tree", ID: "src"}); got.do != filesToggle {
+		t.Errorf("⏎ on a folder does %+v", got)
+	}
+
+	label := func() string {
+		var all []string
+		for _, key := range view.keys() {
+			all = append(all, key.Key)
+		}
+		return strings.Join(all, " ")
+	}
+	if say, _ := view.act(view.deed(gitEvent{E: "focus", ID: "file"})); !say || !view.inFile || label() != "e : d B y f / R D r" {
+		t.Errorf("on the file the keys are %q", label())
+	}
+	if say, _ := view.act(view.deed(gitEvent{E: "focus", ID: "tree"})); !say || view.inFile || label() != "e f / a R D y c d B : r" {
+		t.Errorf("on the tree the keys are %q", label())
+	}
+	if deed := view.deed(gitEvent{E: "focus", ID: "name"}); deed != (filesDeed{}) {
+		t.Errorf("the keys in a modal's field do %+v", deed)
+	}
+	code := func() string { return filesPieceOf(filesSaid(t, view.messages(0)[0]).View, "file").Does }
+	if code() != "" {
+		t.Errorf("⏎ on a line does %q", code())
+	}
+	if view.blaming = true; code() != "show its commit" {
+		t.Errorf("⏎ on a blamed line does %q", code())
 	}
 }
 
@@ -1294,7 +1419,7 @@ func TestBlameSaysEachLinesCommitAndShowsIt(t *testing.T) {
 	repo := filesWork(t)
 	base, work := repo.Git("rev-parse", "--short=7", "main"), repo.Git("rev-parse", "--short=7", "work")
 	repo.Write("src/keep.txt", "one\n\ttwo, Changed\nthree\nfour\n")
-	view, _ := filesRead(t, repo)
+	view := filesRead(t, repo)
 	view.act(view.deed(gitEvent{E: "move", List: "tree", ID: "src/keep.txt"}))
 	if deed := view.deed(gitEvent{E: "pick", List: "file", ID: "1"}); deed != (filesDeed{}) {
 		t.Errorf("⏎ on a line with no blame does %+v", deed)
@@ -1357,7 +1482,7 @@ func TestBlameSaysEachLinesCommitAndShowsIt(t *testing.T) {
 // folders on the way to them, and the head says so; c again lists all.
 func TestTheTreeListsOnlyWhatChanged(t *testing.T) {
 	repo := filesWork(t)
-	view, _ := filesRead(t, repo)
+	view := filesRead(t, repo)
 	view.act(view.deed(gitEvent{E: "pick", List: "tree", ID: "src/new"})) // shut, and opened again by c
 	if say, _ := filesPress(view, "only", ""); !say || !view.only {
 		t.Fatalf("c: said %v, status %+v", say, view.status)
@@ -1366,7 +1491,7 @@ func TestTheTreeListsOnlyWhatChanged(t *testing.T) {
 		t.Errorf("rows = %q", filesIDs(view.rows))
 	}
 	got := filesSaid(t, view.messages(filesAllPut)[0])
-	if head := filesPieceOf(got.View, "tree").Items[0]; head != (filesEntry{Head: "app", Note: "only the 4 changed against main"}) || got.Keys[7] != (gitKey{"c", "all files", "only"}) {
+	if head := filesPieceOf(got.View, "tree").Items[0]; !reflect.DeepEqual(head, filesEntry{Head: "app", Note: "only the 4 changed against main"}) || got.Keys[7] != (gitKey{"c", "all files", "only"}) {
 		t.Errorf("the head = %+v, the key %+v", head, got.Keys[7])
 	}
 	// the keys on a file that is not changed go to one that is
@@ -1379,7 +1504,7 @@ func TestTheTreeListsOnlyWhatChanged(t *testing.T) {
 		t.Errorf("c again: rows %q", filesIDs(view.rows))
 	}
 	// with nothing changed there is nothing to list alone
-	other, _ := filesRead(t, gittest.New(t))
+	other := filesRead(t, gittest.New(t))
 	if filesPress(other, "only", ""); other.only || *other.status != (muiStatus{Text: "nothing changed against the last commit"}) {
 		t.Errorf("with nothing changed: only %v, status %+v", other.only, other.status)
 	}
@@ -1400,7 +1525,7 @@ func TestAChangedFileIsShownAsItsDiffAgainstTheBase(t *testing.T) {
 	}
 
 	repo := filesWork(t)
-	view, _ := filesRead(t, repo)
+	view := filesRead(t, repo)
 	view.act(view.deed(gitEvent{E: "move", List: "tree", ID: "src/keep.txt"}))
 	if say, _ := filesPress(view, "diff", "src/keep.txt"); !say || !view.diffing || !view.diffed {
 		t.Fatalf("d: said %v, status %+v", say, view.status)
@@ -1481,7 +1606,7 @@ func TestTheLinesSaidOfALongFileFollowTheKeys(t *testing.T) {
 func TestAnyFileIsReadToItsEnd(t *testing.T) {
 	repo := filesWork(t)
 	repo.Write("long.txt", lineNumbered(1, 5000, nil))
-	view, _ := filesRead(t, repo)
+	view := filesRead(t, repo)
 	view.act(view.deed(gitEvent{E: "move", List: "tree", ID: "long.txt"}))
 	texts := func() []string { return filesTexts(*filesSaid(t, view.messages(0)[0]).View) }
 	if want := []string{"long.txt", "new against main · lines 1–1500 of 5000"}; !slices.Equal(texts(), want) || len(view.lines) != filesLinesMost+1 {
@@ -1526,10 +1651,10 @@ func TestAnyFileIsReadToItsEnd(t *testing.T) {
 		t.Fatalf(": said %v at %d", say, place)
 	}
 	got := filesSaid(t, view.messages(filesWordsPut)[0])
-	if field := filesPieceOf(got.View, "line"); got.Focus != "line" || field == nil || field.T != "field" || field.Placeholder != "Go to line, 1–5000" || len(filesTexts(*got.View)) != 0 {
-		t.Errorf("focus %q, the field = %s, texts %q", got.Focus, encode(field), filesTexts(*got.View))
+	if field, modal := filesPieceOf(got.View, "line"), filesPieceOf(got.View, "ask"); got.Focus != "line" || modal == nil || modal.Title != "Go to line" || filesPieceOf(modal, "line") == nil || field.T != "field" || field.Placeholder != "Go to line, 1–5000" {
+		t.Errorf("focus %q, the modal = %s", got.Focus, encode(modal))
 	}
-	if view.act(view.deed(gitEvent{E: "submit", ID: "line", Text: "twelve"})); view.asking != filesAskLine || *view.status != (muiStatus{Text: "a line's number, 1 to 5000", Tone: "bad"}) {
+	if view.act(view.deed(gitEvent{E: "submit", ID: "line", Text: "twelve"})); view.asking != filesAskLine || *view.status != (muiStatus{Text: "a line's number, 1 to 5000", Tone: "bad"}) || !slices.Equal(filesAsks(t, view, "ask"), []string{"Go to line", "a line's number, 1 to 5000"}) {
 		t.Errorf("no number: asking %d, status %+v", view.asking, view.status)
 	}
 	if say, place := view.act(view.deed(gitEvent{E: "submit", ID: "line", Text: " 1234 "})); !say || place != filesLinePut || view.asking != filesAskNothing || view.on != 1234 || view.window != 484 || view.focus != "file" {
@@ -1570,7 +1695,7 @@ func TestFindingInFilesByPatternAndByWholeWords(t *testing.T) {
 
 	repo := filesWork(t)
 	repo.Write("src/words.txt", "a change\nchanged\nt.o\n")
-	view, _ := filesRead(t, repo)
+	view := filesRead(t, repo)
 	filesPress(view, "grep", "")
 	sought := func(typed string) []filesHit {
 		t.Helper()

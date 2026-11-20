@@ -121,6 +121,19 @@ on GitHub; a tag without its section is not released.
   of no repository the tree is the folder's. Not yet: editing in place.
   `mia api capabilities` lists `files-app`. See [mia
   files](api.md#mia-files).
+- **`mia files` asks in a modal, says what it did in a toast, and has a
+  menu on every row.** The name of a new file or folder, where a path is
+  renamed to and the line to go to are asked in a field in a modal over
+  the view, with why a name is refused under it. `D` puts up a modal
+  that says what goes and whether git can bring it back, with **Delete**
+  — its key `D`, so `D` twice still deletes — and **Keep it**, as `esc`
+  does; what goes is counted again as it is confirmed. `made`, `now`,
+  `deleted` and `copied` are toasts, and a path is copied by the
+  window's own `copy`, no longer by an OSC 52 string. Each row of the
+  tree has a menu, under `→` and the pointer's other button: open in
+  the editor, new file here, rename, delete, copy path, diff against the
+  base, blame. The foot's keys follow the piece the window says the keys
+  are on. See [mia files](api.md#mia-files).
 - **A code review is an app mia desk draws.** `mia review`, run in a
   pane of a worktree, draws the review sawa keeps of it — the one of the
   branch against its base, opened when there is none; `mia review

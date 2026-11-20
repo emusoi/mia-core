@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"cmp"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -73,10 +72,20 @@ type filesMessage struct {
 // filesPiece is a piece of the UI, of the kind T says, with what that
 // kind takes. List is the list a field walks, Right the word at a field's
 // end, and Selected the row of a list, or the line of a code, the keys
-// are put on.
+// are put on. Title is a modal's, Label, Key and Primary a button's, Menu
+// the word for what → opens on a list's items, Does what ⏎ does on a
+// line of a code, and Motion how a column comes in.
 type filesPiece struct {
 	T           string          `json:"t"`
 	ID          string          `json:"id,omitempty"`
+	Title       string          `json:"title,omitempty"`
+	Menu        string          `json:"menu,omitempty"`
+	Does        string          `json:"does,omitempty"`
+	Motion      string          `json:"motion,omitempty"`
+	Label       string          `json:"label,omitempty"`
+	Key         string          `json:"key,omitempty"`
+	Primary     bool            `json:"primary,omitempty"`
+	Tone        string          `json:"tone,omitempty"`
 	Text        string          `json:"text,omitempty"`
 	Style       string          `json:"style,omitempty"`
 	Pad         int             `json:"pad,omitempty"`
@@ -97,17 +106,19 @@ type filesPiece struct {
 	Children    []filesPiece    `json:"children,omitempty"`
 }
 
-// filesEntry is what a list holds: a row of the tree (a depth, and for a
-// folder whether it is open), a file found, a line found, or a head.
+// filesEntry is what a list holds: a row of the tree (a depth, for a
+// folder whether it is open, and the menu of what can be done to it), a
+// file found, a line found, or a head.
 type filesEntry struct {
-	ID    string `json:"id,omitempty"`
-	Title string `json:"title,omitempty"`
-	Depth *int   `json:"depth,omitempty"`
-	Open  *bool  `json:"open,omitempty"`
-	Note  string `json:"note,omitempty"`
-	Right string `json:"right,omitempty"`
-	Tone  string `json:"tone,omitempty"`
-	Head  string `json:"head,omitempty"`
+	ID    string      `json:"id,omitempty"`
+	Title string      `json:"title,omitempty"`
+	Depth *int        `json:"depth,omitempty"`
+	Open  *bool       `json:"open,omitempty"`
+	Note  string      `json:"note,omitempty"`
+	Right string      `json:"right,omitempty"`
+	Tone  string      `json:"tone,omitempty"`
+	Head  string      `json:"head,omitempty"`
+	Menu  []muiChoice `json:"menu,omitempty"`
 }
 
 // filesLine is a line of the code: a line of the file with its number
@@ -266,6 +277,32 @@ func filesEntries(rows []filesRow, marks map[string]byte, name, note string, mos
 	return entries
 }
 
+// filesMenus is the tree's entries with, on each row, the menu of what
+// can be done to it: each choice by the id of the key that does the
+// same, with that key at its right. A file is handed to the editor,
+// shown as its diff against the base and blamed; a file and a folder
+// have a new file made beside or in them, are renamed, deleted, and
+// their path copied. Three dots end the choices that ask first.
+func filesMenus(entries []filesEntry, rows []filesRow) []filesEntry {
+	folder := []muiChoice{
+		{ID: "new", Title: "New file here…", Right: "a"}, {ID: "move", Title: "Rename…", Right: "R"},
+		{ID: "delete", Title: "Delete…", Right: "D"}, {ID: "copy", Title: "Copy path", Right: "y"},
+	}
+	file := slices.Concat([]muiChoice{{ID: "edit", Title: "Open in editor", Right: "e"}}, folder,
+		[]muiChoice{{ID: "diff", Title: "Diff against the base", Right: "d"}, {ID: "blame", Title: "Blame", Right: "B"}})
+	at := 0 // the rows are the entries that have an id, in order
+	for i := range entries {
+		if entries[i].ID == "" || at >= len(rows) {
+			continue
+		}
+		if entries[i].Menu = file; rows[at].folder {
+			entries[i].Menu = folder
+		}
+		at++
+	}
+	return entries
+}
+
 // filesHas reports whether typed's letters are all in words, in order.
 func filesHas(words, typed string) bool {
 	for _, letter := range typed {
@@ -392,10 +429,11 @@ func filesGrouped(hits []filesHit, first int) []filesEntry {
 
 // filesFitted is the entries build makes of most things that a message
 // has room for beside a file's lines: of fewer and fewer of them until
-// they are under half of what a message may be.
-func filesFitted(most int, build func(most int) []filesEntry) []filesEntry {
+// they are under room bytes, half of what a message may be and, of the
+// tree with its menus, three quarters.
+func filesFitted(most, room int, build func(most int) []filesEntry) []filesEntry {
 	for ; ; most /= 2 {
-		if entries := build(most); most <= 1 || len(encode(entries)) < muiLimit/2 {
+		if entries := build(most); most <= 1 || len(encode(entries)) < room {
 			return entries
 		}
 	}
@@ -514,40 +552,30 @@ type filesGone struct {
 	unsaved bool
 }
 
-// filesGoing is what D says before it deletes: what goes, whether git
-// can bring it back, and that D pressed again does it.
-func filesGoing(named string, gone filesGone, inside bool) string {
-	what := "delete " + cutTo(named, gitWordsMost/2)
+// filesGoing is what the modal D puts up says before anything is
+// deleted: what goes, as its title, and under it whether git can bring
+// it back.
+func filesGoing(named string, gone filesGone, inside bool) (ask, told string) {
+	ask = "Delete " + cutTo(named, gitWordsMost/2)
 	switch {
 	case gone.folder:
-		what += " and its " + counted(gone.files, "file")
+		ask += " and its " + counted(gone.files, "file")
 	case gone.lines > 0:
-		what += ", " + counted(gone.lines, "line")
+		ask += ", " + counted(gone.lines, "line")
 	}
 	switch {
 	case !inside:
-		what += ", in no repository"
+		told = "It is in no repository: nothing can bring it back."
 	case gone.tracked == 0:
-		what += ", not in git"
+		told = "It is not in git: nothing can bring it back."
 	case gone.folder && gone.tracked < gone.files:
-		what += fmt.Sprintf(", %d not in git", gone.files-gone.tracked)
+		told = fmt.Sprintf("%d of them not in git, which nothing can bring back.", gone.files-gone.tracked)
 	case gone.unsaved:
-		what += ", tracked: git can bring back only what is committed"
+		told = "Tracked: git can bring back only what is committed."
 	default:
-		what += ", tracked: git can bring it back"
+		told = "Tracked: git can bring it back."
 	}
-	return what + " · D again to delete"
-}
-
-// filesCopied is what puts a path on the clipboard, written to the
-// terminal: an OSC 52 string, and inside tmux in tmux's passthrough, each
-// ESC of it doubled, as a message to the window is.
-func filesCopied(named string, tmux bool) []byte {
-	osc := "\033]52;c;" + base64.StdEncoding.EncodeToString([]byte(named)) + "\a"
-	if tmux {
-		osc = "\033Ptmux;" + strings.ReplaceAll(osc, "\033", "\033\033") + "\033\\"
-	}
-	return []byte(osc)
+	return ask + "?", told
 }
 
 // filesSeeking is what is searched for, of the words typed, and how they
@@ -794,8 +822,12 @@ type filesView struct {
 	asked     string          // what it asks about: the folder a new name is in, the path renamed
 	answer    string          // what the field holds as it comes up
 	focus     string          // the piece the keys were last put on
-	back      string          // the piece they go back to when nothing is answered
-	arming    string          // the path D was pressed on once
+	back      string          // the piece they go back to when a modal goes
+	arming    string          // the path a modal asks to delete, "" for none
+	ask       string          // what that modal asks, in words
+	told      string          // and the line under them
+	inFile    bool            // the keys are on a line of the file, as the window said
+	passing   muiPassing      // what was just done, said once
 	window    int             // the first line said of the file, 0 until it is read
 	on        int             // the line of the file under the keys, 0 for none
 	diffing   bool            // a changed file is shown as its diff against the base
@@ -804,11 +836,9 @@ type filesView struct {
 	deleted   int             // and deletes
 	blaming   bool            // each line says its commit
 	blames    map[string]filesBlame
-	commit    *filesCommit      // the commit shown in place of the file, nil for none
-	how       string            // how the words searched for are read, "" as written
-	handing   *filesDeed        // the file to hand to the editor next, nil for none
-	tmux      bool              // the terminal is tmux's
-	write     func(data []byte) // writes to the terminal
+	commit    *filesCommit // the commit shown in place of the file, nil for none
+	how       string       // how the words searched for are read, "" as written
+	handing   *filesDeed   // the file to hand to the editor next, nil for none
 }
 
 // shows puts a file at the right, from the line a search found, or from
@@ -1124,12 +1154,12 @@ func (v *filesView) lineAt(place int) int {
 func (v *filesView) items() (entries []filesEntry, at string) {
 	switch v.mode {
 	case filesInFind:
-		return filesFitted(len(v.found), func(most int) []filesEntry { return filesFoundEntries(v.found[:min(len(v.found), most)], v.marks) }), cutTo(v.foundAt, gitWordsMost)
+		return filesFitted(len(v.found), muiLimit/2, func(most int) []filesEntry { return filesFoundEntries(v.found[:min(len(v.found), most)], v.marks) }), cutTo(v.foundAt, gitWordsMost)
 	case filesInGrep:
 		if v.hitAt >= 0 {
 			at = filesHitID(v.hitAt)
 		}
-		return filesFitted(len(v.hits), func(most int) []filesEntry { return filesGrouped(v.hits[:min(len(v.hits), most)], 0) }), at
+		return filesFitted(len(v.hits), muiLimit/2, func(most int) []filesEntry { return filesGrouped(v.hits[:min(len(v.hits), most)], 0) }), at
 	}
 	note := "in no repository"
 	switch {
@@ -1140,17 +1170,21 @@ func (v *filesView) items() (entries []filesEntry, at string) {
 	case v.against != "":
 		note = fmt.Sprintf("%d changed against %s", len(v.marks), v.against)
 	}
-	return filesFitted(filesRowsMost, func(most int) []filesEntry { return filesEntries(v.rows, v.marks, v.name, note, most) }), v.at
+	return filesFitted(filesRowsMost, muiLimit/4*3, func(most int) []filesEntry {
+		return filesMenus(filesEntries(v.rows, v.marks, v.name, note, most), v.rows)
+	}), v.at
 }
 
 // keys is the keys the program takes: in the tree all of them, each
-// that turns something on saying what it now turns off; over what a
-// search found, and while something is asked or a commit shown, e and esc.
+// that turns something on saying what it now turns off, and on a line
+// of the file those that are about the file; over what a search found
+// and while a commit is shown, e and esc. Under a modal the window takes
+// none of them.
 func (v *filesView) keys() []gitKey {
 	edit := gitKey{"e", "edit in " + filepath.Base(editorWords()[0]), "edit"}
 	switch {
-	case v.asking != filesAskNothing:
-		return []gitKey{{"esc", "never mind", "back"}}
+	case v.asking != filesAskNothing || v.arming != "":
+		return []gitKey{}
 	case v.commit != nil:
 		return []gitKey{edit, {"esc", "back to the file", "back"}}
 	case v.mode != filesInTree:
@@ -1166,6 +1200,10 @@ func (v *filesView) keys() []gitKey {
 	if v.blaming {
 		blame = "no blame"
 	}
+	if v.inFile {
+		return []gitKey{edit, {":", "go to line", "line"}, {"d", diff, "diff"}, {"B", blame, "blame"}, {"y", "copy the path", "copy"},
+			{"f", "find a file", "find"}, {"/", "find in files", "grep"}, {"R", "rename or move", "move"}, {"D", "delete", "delete"}, {"r", "ask again", "again"}}
+	}
 	return []gitKey{edit, {"f", "find a file", "find"}, {"/", "find in files", "grep"},
 		{"a", "new file or folder", "new"}, {"R", "rename or move", "move"}, {"D", "delete", "delete"}, {"y", "copy the path", "copy"},
 		{"c", only, "only"}, {"d", diff, "diff"}, {"B", blame, "blame"}, {":", "go to line", "line"}, {"r", "ask again", "again"}}
@@ -1174,18 +1212,19 @@ func (v *filesView) keys() []gitKey {
 // whole is the message that says the whole view with these lines of the
 // file in it: the list of the left side — the tree, or a field over what
 // a search found — and beside it the file under the keys, its path and
-// how it stands over its lines. A name asked for is a field in place of
-// the tree's head, and a line asked for one in place of the file's path.
+// how it stands over its lines. A name or a line asked for is a field in
+// a modal over the view, and so is what is asked before a path is
+// deleted, with the button that deletes it and the one that keeps it.
 func (v *filesView) whole(lines json.RawMessage, place filesPlace) []byte {
 	entries, at := v.items()
-	list := filesPiece{T: "list", ID: "tree", Live: true, Items: entries}
+	list := filesPiece{T: "list", ID: "tree", Live: true, Menu: "what to do", Items: entries}
 	left := filesPiece{T: "col", W: 300, Scroll: true, Pad: 6}
 	field := filesPiece{T: "field", ID: "q", Bare: true, Icon: "search", Live: true}
 	switch v.mode {
 	case filesInFind:
-		list.ID, field.Placeholder, field.Right = "found", "Find a file", counted(v.matched, "file")
+		list.ID, list.Menu, field.Placeholder, field.Right = "found", "", "Find a file", counted(v.matched, "file")
 	case filesInGrep:
-		list.ID, field.Placeholder, left.W = "hits", "Find in files: /pattern, =whole words", 440
+		list.ID, list.Menu, field.Placeholder, left.W = "hits", "", "Find in files: /pattern, =whole words", 440
 	}
 	if v.mode != filesInTree {
 		field.List = list.ID
@@ -1198,21 +1237,40 @@ func (v *filesView) whole(lines json.RawMessage, place filesPlace) []byte {
 	if place&filesWordsPut != 0 {
 		asked.Value = &v.answer
 	}
+	title := ""
 	switch v.asking {
 	case filesAskNew:
-		asked.Placeholder, asked.Right = "New file, or folder/", "in "+cutTo(filesUnder(v.asked, ""), gitWordsMost-3)
+		title, asked.Placeholder, asked.Right = "New file or folder", "New file, or folder/", "in "+cutTo(filesUnder(v.asked, ""), gitWordsMost-3)
 		if v.asked == "" {
 			asked.Right = "in " + cutTo(v.name, gitWordsMost-3)
 		}
 	case filesAskMove:
-		asked.Placeholder = "Rename or move to"
+		title, asked.Placeholder = "Rename or move "+cutTo(v.asked, gitWordsMost-20), "Rename or move to"
 	case filesAskLine:
-		asked.ID, asked.Placeholder = "line", fmt.Sprintf("Go to line, 1–%d", max(v.total, 1))
+		title, asked.ID, asked.Placeholder = "Go to line", "line", fmt.Sprintf("Go to line, 1–%d", max(v.total, 1))
 	}
-	if v.asking == filesAskNew || v.asking == filesAskMove {
-		left.Children, list.Items = []filesPiece{asked, {T: "divider"}}, entries[1:]
+	var over []filesPiece
+	switch {
+	case v.asking != filesAskNothing:
+		// (Why what was typed is refused is said under the field, where it is read.)
+		modal := filesPiece{T: "modal", ID: "ask", Title: title, Children: []filesPiece{asked}}
+		if v.status != nil && v.status.Tone == "bad" {
+			modal.Children = append(modal.Children, filesPiece{T: "text", Text: v.status.Text, Tone: "bad"})
+		}
+		over = []filesPiece{modal}
+	case v.arming != "":
+		over = []filesPiece{{T: "modal", ID: "sure", Title: cutTo(v.ask, gitWordsMost), W: 520, Children: []filesPiece{
+			{T: "text", Text: v.told, Style: "dim"},
+			{T: "row", Children: []filesPiece{
+				{T: "button", ID: "yes", Label: "Delete", Key: "D", Primary: true},
+				{T: "button", ID: "no", Label: "Keep it", Key: "esc"},
+			}},
+		}}}
 	}
 	code := filesPiece{T: "code", ID: "file", Live: true, Lines: lines}
+	if v.blaming && !v.diffed && v.commit == nil {
+		code.Does = "show its commit"
+	}
 	if place&filesKeysPut != 0 {
 		list.Selected = at
 	}
@@ -1230,13 +1288,12 @@ func (v *filesView) whole(lines json.RawMessage, place filesPlace) []byte {
 	if state := v.state(); state != "" {
 		about = append(about, filesPiece{T: "text", Text: cutTo(state, gitWordsMost), Style: "dim"})
 	}
-	if v.asking == filesAskLine {
-		about = []filesPiece{asked}
-	}
+	// (The right side is said again whole on every move: it comes in at
+	// once, and no file fades. A modal is said last in it, over all.)
 	message := filesMessage{V: 1, Pane: v.pane, Fill: true, Focus: v.focus, Keys: v.keys(), Status: v.status, View: filesPiece{T: "row", Split: true, Children: []filesPiece{
 		left,
 		{T: "divider"},
-		{T: "col", Children: []filesPiece{{T: "row", Pad: 10, Gap: 10, Children: about}, code}},
+		{T: "col", ID: "side", Motion: "none", Children: append([]filesPiece{{T: "row", Pad: 10, Gap: 10, Children: about}, code}, over...)},
 	}}}
 	if v.failed != "" {
 		message.Status = &muiStatus{Text: v.failed, Tone: "bad"}
@@ -1304,7 +1361,9 @@ const (
 	filesNever     // what is asked dropped, or the commit shown left
 	filesNamed     // a file or a folder made, or a path renamed, as the field says
 	filesToLine    // the file said from the line the field says
-	filesDelete    // a path deleted: asked for once, and done the second time
+	filesDelete    // a path deleted: asked in a modal first, and done when asked again
+	filesKeep      // the path a modal asks about kept, and the modal taken away
+	filesFocus     // the keys on another piece: the tree, or the file
 	filesCopy      // a path put on the clipboard
 	filesBlamed    // each line with its commit, or without again
 	filesCommitted // the commit of a blamed line in place of the file
@@ -1409,7 +1468,7 @@ func (v *filesView) pressed(key, item string) filesDeed {
 	case "move":
 		return filesDeed{do: filesAsked, ask: filesAskMove, path: named, id: piece}
 	case "delete":
-		return filesDeed{do: filesDelete, path: named}
+		return filesDeed{do: filesDelete, path: named, id: piece}
 	case "copy":
 		return filesDeed{do: filesCopy, path: named}
 	case "line":
@@ -1430,12 +1489,32 @@ func (v *filesView) pressed(key, item string) filesDeed {
 // that finds in files searches for its words, and so does ⏎ on a line
 // found for other words than the field now holds. A line of the file
 // come under the keys is where they are, and ⏎ on one that is blamed
-// shows its commit. While a name or a line is asked for, only what the
-// field sends and esc do anything.
+// shows its commit. While a modal asks a name or a line, only what its
+// field sends and esc do anything; while one asks before a delete, only
+// its buttons and esc. A choice of a row's menu does what the key of its
+// id does on that row.
 func (v *filesView) deed(event gitEvent) filesDeed {
+	if event.E == "pick" && event.List == "tree" && event.Sub != "" {
+		event = gitEvent{E: "press", ID: event.Sub, Item: event.ID}
+	}
 	switch {
 	case event.E == "close":
 		return filesDeed{do: filesLeave}
+	case event.E == "focus":
+		if event.ID == "tree" || event.ID == "file" {
+			return filesDeed{do: filesFocus, id: event.ID}
+		}
+		return filesDeed{}
+	case v.arming != "":
+		switch {
+		case event.E == "press" && event.ID == "yes":
+			return filesDeed{do: filesDelete, path: v.arming, id: v.back}
+		case event.E == "dismiss", event.E == "press" && event.ID == "no":
+			return filesDeed{do: filesKeep}
+		}
+		return filesDeed{}
+	case event.E == "dismiss" && v.asking != filesAskNothing:
+		return filesDeed{do: filesNever}
 	case event.E == "press" && event.ID == "back" && (v.asking != filesAskNothing || v.commit != nil):
 		return filesDeed{do: filesNever}
 	case v.asking != filesAskNothing:
@@ -1549,21 +1628,24 @@ func (v *filesView) forget() {
 // what of where the person is it says: after a move not the row of the
 // list, so the keys are not put back where they were a moment ago, only
 // the line of the code a search found; the row when the list is another.
-// What the tree said of the last thing done goes with the next, and with
-// it a delete asked for once, unless the next is D again.
+// What the tree's status said of the last thing refused goes with the
+// next thing done. Where the keys are, as the window says it, changes
+// the keys alone.
 func (v *filesView) act(deed filesDeed) (say bool, place filesPlace) {
+	if deed.do == filesFocus {
+		v.inFile = deed.id == "file"
+		return true, 0
+	}
 	stale := false
-	if deed.do != filesNothing && deed.do != filesLeave && deed.do != filesEdit && v.mode == filesInTree && (v.status != nil || v.arming != "") {
-		if deed.do != filesDelete {
-			v.arming = ""
-		}
+	if deed.do != filesNothing && deed.do != filesLeave && deed.do != filesEdit && v.mode == filesInTree && v.status != nil {
 		v.status, stale = nil, true
 	}
 	say, place = v.did(deed)
 	return say || stale, place
 }
 
-// said is how the last thing done went, as the view's status.
+// said is what was refused, or failed, as the view's status: it stays
+// until the next thing is done.
 func (v *filesView) said(text, tone string) {
 	v.status = &muiStatus{Text: cutTo(text, gitWordsMost), Tone: tone}
 }
@@ -1728,9 +1810,9 @@ func (v *filesView) did(deed filesDeed) (say bool, place filesPlace) {
 		case !listed:
 			v.said(named+" is made, and not listed: git ignores it", "warn")
 		case made:
-			v.said("made "+named, "ok")
+			v.passing.done("made "+named, "ok")
 		default:
-			v.said("now "+named, "ok")
+			v.passing.done("now "+named, "ok")
 		}
 		if made && !folder {
 			v.handing = &filesDeed{do: filesEdit, path: named, line: 1}
@@ -1747,19 +1829,26 @@ func (v *filesView) did(deed filesDeed) (say bool, place filesPlace) {
 		v.load()
 		v.on = min(line, max(v.total, 1))
 		return true, filesLinePut
+	case filesKeep:
+		v.arming, v.focus = "", v.back
+		return true, 0
 	case filesDelete:
+		// What goes is counted again as the modal is answered: where it is
+		// another by then, nothing is deleted and the modal says it anew.
 		info, err := os.Lstat(v.full(deed.path))
-		switch {
-		case err != nil:
-			v.arming = ""
-			v.said(deed.path+" is not there to delete", "bad")
-			return true, 0
-		case v.arming != deed.path:
-			v.arming = deed.path
-			v.said(filesGoing(deed.path, v.gone(deed.path, info.IsDir()), v.inside), "warn")
+		if err != nil {
+			if v.arming != "" {
+				v.arming, v.focus = "", v.back
+			}
+			v.passing.done(deed.path+" is not there to delete", "bad")
 			return true, 0
 		}
-		v.arming = ""
+		ask, told := filesGoing(deed.path, v.gone(deed.path, info.IsDir()), v.inside)
+		if v.arming != deed.path || v.ask != ask || v.told != told {
+			v.arming, v.ask, v.told, v.back, v.focus = deed.path, ask, told, deed.id, "yes"
+			return true, 0
+		}
+		v.arming, v.focus = "", v.back
 		if _, _, err = filesNamedIn("", deed.path); err == nil {
 			err = os.RemoveAll(v.full(deed.path))
 		}
@@ -1768,13 +1857,11 @@ func (v *filesView) did(deed filesDeed) (say bool, place filesPlace) {
 			return true, 0
 		}
 		place = v.again()
-		v.said("deleted "+deed.path, "ok")
+		v.passing.done("deleted "+deed.path, "ok")
 		return true, place
 	case filesCopy:
-		if v.write != nil {
-			v.write(filesCopied(deed.path, v.tmux))
-		}
-		v.said("copied "+deed.path, "")
+		v.passing.copy = deed.path
+		v.passing.done("copied "+deed.path, "")
 		return true, 0
 	case filesBlamed:
 		if v.blaming = !v.blaming; !v.blaming {
@@ -2014,8 +2101,8 @@ func (v *filesView) changed() string {
 // and e, which hands the file to the editor and takes the pane again when
 // it leaves; and the keys that make a file or a folder, rename one,
 // delete one, copy its path, show only what changed, a file's diff
-// against the base and each line's commit, and go to a line. It reads
-// the files again when the repository changes.
+// against the base and each line's commit, and go to a line, each on a
+// row's menu too. It reads the files again when the repository changes.
 func cmdFiles(args []string) int {
 	if len(args) > 0 {
 		return usageErr(filesUsage)
@@ -2027,8 +2114,7 @@ func cmdFiles(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	view := &filesView{pane: os.Getenv("TMUX_PANE"), dir: dir, hitAt: -1, tmux: os.Getenv("TMUX") != "",
-		write: func(data []byte) { _, _ = os.Stdout.Write(data) }}
+	view := &filesView{pane: os.Getenv("TMUX_PANE"), dir: dir, hitAt: -1}
 	view.read()
 	defer view.quiet()
 
@@ -2045,10 +2131,15 @@ func cmdFiles(args []string) int {
 	}
 	defer func() { shut() }()
 
-	var shown []byte // what the view said last, but for where the person is
+	// What was told last: the view is said whole when more than its status
+	// and its keys is another, and when it says where the person is.
+	var told muiTold
 	show := func(place filesPlace) {
-		shown = bytes.Join(view.messages(0), nil)
-		say(view.messages(place)...)
+		var where [][]byte
+		if place != 0 {
+			where = view.messages(place)
+		}
+		say(told.says(view.pane, view.messages(0), where, &view.passing)...)
 	}
 	show(filesAllPut)
 	mark := view.changed()
@@ -2065,9 +2156,7 @@ func cmdFiles(args []string) int {
 				continue
 			}
 			mark = now
-			if place := view.again(); !bytes.Equal(bytes.Join(view.messages(0), nil), shown) {
-				show(place)
-			}
+			show(view.again())
 		case batch := <-view.results():
 			from := len(view.hits)
 			if whole, place := view.take(batch); whole {
