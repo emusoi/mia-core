@@ -1,12 +1,94 @@
 package app
 
 import (
+	"encoding/json"
+	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/emusoi/mia-core/internal/model"
+	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/session"
+	"github.com/emusoi/mia-core/internal/store"
 )
+
+// Carried is a conversation a window's agent goes on from and was not told
+// of yet: whose it was and which, the file mia wrote it out to, and the
+// file that has every turn when that one leaves some out. It is kept on
+// the window itself, as tmux's window option @mia_context, so that any
+// chat of the window says it in front of the first thing sent, whichever
+// process that is, and it goes with the window.
+type Carried struct {
+	From string `json:"from"`
+	ID   string `json:"id"`
+	File string `json:"file"`
+	Full string `json:"full,omitempty"`
+}
+
+const carriedOption = "@mia_context"
+
+// option is what is kept on the window, and carriedIn reads it back:
+// nothing kept, or what does not read, is nothing carried.
+func (c Carried) option() string {
+	data, _ := json.Marshal(c) // of strings: it does not fail
+	return string(data)
+}
+
+func carriedIn(option string) (Carried, bool) {
+	var c Carried
+	if json.Unmarshal([]byte(strings.TrimSpace(option)), &c) != nil || c.File == "" {
+		return Carried{}, false
+	}
+	return c, true
+}
+
+// CarryInWindow keeps on a window what its agent goes on from.
+func (a *App) CarryInWindow(record model.Record, window string, carried Carried) error {
+	host, window, err := a.windowNamed(record, window)
+	if err != nil {
+		return err
+	}
+	tmux := run.Tool{Binary: "tmux", SSH: host.SSH}
+	if out, err := tmux.Combined("set-option", "-w", "-t", session.Target(record.Name, window), carriedOption, carried.option()); err != nil {
+		return fmt.Errorf("keep what window %s of %s goes on from: %s", window, record.Name, strings.TrimSpace(out))
+	}
+	return nil
+}
+
+// CarriedInWindow is what a window's agent goes on from and was not told
+// of yet, when there is any.
+func (a *App) CarriedInWindow(record model.Record, window string) (Carried, bool) {
+	host, window, err := a.windowNamed(record, window)
+	if err != nil {
+		return Carried{}, false
+	}
+	out, err := run.Tool{Binary: "tmux", SSH: host.SSH}.Combined("show-options", "-w", "-q", "-v", "-t", session.Target(record.Name, window), carriedOption)
+	if err != nil {
+		return Carried{}, false
+	}
+	return carriedIn(out)
+}
+
+// TakeCarried is CarriedInWindow, taken off the window: of two chats of
+// one window that send at once, one has it. Whoever takes it and does not
+// send it keeps it again with CarryInWindow.
+func (a *App) TakeCarried(record model.Record, window string) (Carried, bool) {
+	if a.MiaDir != "" {
+		if unlock, err := store.Lock(a.MiaDir, "context.lock"); err == nil {
+			defer unlock()
+		}
+	}
+	carried, on := a.CarriedInWindow(record, window)
+	if !on {
+		return Carried{}, false
+	}
+	host, window, _ := a.windowNamed(record, window)
+	if _, err := (run.Tool{Binary: "tmux", SSH: host.SSH}).Combined("set-option", "-w", "-u", "-t", session.Target(record.Name, window), carriedOption); err != nil {
+		return Carried{}, false // still on the window: said by the send that takes it off
+	}
+	return carried, true
+}
 
 // Runs is what a worktree's window runs, as a chat of it says it: the
 // agent, what mia started it with or last switched it to, and what mia can

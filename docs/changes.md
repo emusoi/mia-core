@@ -88,7 +88,8 @@ on GitHub; a tag without its section is not released.
   the conversation over — written out as a handoff, that agent started
   on the model and told nothing, the old window closed once the new one
   runs, the chat gone on there, and the handoff said in front of the
-  first thing sent. `earlier` (e) lists the worktree's conversations
+  first thing sent, by whichever `mia chat` of that window sends it: it
+  is kept on the window (`@mia_context`) until then. `earlier` (e) lists the worktree's conversations
   beside the one under the keys read back: `⏎` goes on with one, `c`
   continues another agent's in this chat's agent, asked twice. A window
   of an agent mia reads no conversations of still sends, and says so.

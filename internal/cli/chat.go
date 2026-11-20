@@ -595,9 +595,6 @@ type chatView struct {
 	// id is the conversation followed, "" while the window has none mia
 	// can read.
 	id string
-	// carry is the conversation this chat's agent goes on from, until the
-	// first thing is sent to it: said in front of that.
-	carry *chatCarried
 
 	// The models: every agent's, the setups used in this repository, and
 	// what is typed to find one by.
@@ -614,18 +611,30 @@ type chatView struct {
 	now   time.Time
 }
 
-// chatCarried is a conversation handed to another agent: whose it was, the
-// file mia wrote it out to, and what the file says.
-type chatCarried struct{ from, file, text string }
+// carrying is where what a window's agent goes on from is kept until it
+// is said: on the window, so that it is whoever chats with it that has it.
+type carrying interface {
+	TakeCarried(record model.Record, window string) (app.Carried, bool)
+	CarryInWindow(record model.Record, window string, carried app.Carried) error
+}
 
-// toType is what is typed into the agent's window for words the person
-// sent: the words, and in front of the first after a conversation was
-// handed to this agent, that conversation.
-func (v *chatView) toType(words string) string {
-	if v.carry == nil {
-		return words
+// typedFor is what is typed into a window for words the person sent: the
+// words, and in front of the first after a conversation was handed to its
+// agent, that conversation, read from the file mia wrote it out to. It is
+// taken off the window as it is typed, so it is said once whichever chat
+// of the window sends first; back keeps it there again, for a send that
+// did not go.
+func typedFor(kept carrying, record model.Record, window, words string, read func(file string) ([]byte, error)) (text string, back func()) {
+	was, on := kept.TakeCarried(record, window)
+	if !on {
+		return words, func() {}
 	}
-	return carried(v.carry.from, v.carry.text, v.carry.file, words, chatCarry)
+	back = func() { _ = kept.CarryInWindow(record, window, was) } // not kept: the next send is the words alone
+	transcript, err := read(was.File)
+	if err != nil {
+		return "Read " + was.File + ": the conversation so far, with " + was.From + ".\n\n" + chatRule + "\n\n" + words, back
+	}
+	return carried(was.From, string(transcript), cmp.Or(was.Full, was.File), words, chatCarry), back
 }
 
 // agent is the agent that answers in this chat.
@@ -1152,6 +1161,13 @@ func (r *chatRun) aim(head app.Head, window string) {
 			r.note(v.runs.Agent+"'s replies are in its terminal: mia reads none of its conversations. What is sent here is typed to it", "warn")
 		}
 	}
+	if carried, on := r.a.CarriedInWindow(r.record, window); window != "" && on {
+		// its agent goes on from another's conversation: that one's turns stay over what it says
+		before := &talk{}
+		turns, _ := r.a.ConversationIn(carried.ID, r.record.Name, 0)
+		before.heard(turns)
+		v.talk.goesOn(before)
+	}
 	if head.ID != "" {
 		r.follow(head.ID)
 	}
@@ -1224,15 +1240,16 @@ func (r *chatRun) act(deed chatDeed) (again, placed bool) {
 	case chatSend:
 		v.talk.status = nil
 		r.out(v.talk.sends(deed.text))
-		send, words := r.a.SendToWindow, v.toType(deed.text)
+		send := r.a.SendToWindow
+		words, back := typedFor(r.a, r.record, v.window, deed.text, os.ReadFile)
 		if strings.Contains(words, "\n") {
 			send = r.a.SayToWindow // pasted: a line break in it is not an Enter
 		}
 		if err := send(r.record, v.window, words); err != nil {
+			back()
 			r.out(v.talk.refused(err))
 			return false, false
 		}
-		v.carry = nil
 		return was != nil, false
 	case chatChoose:
 		v.talk.status = nil
@@ -1292,11 +1309,14 @@ func (r *chatRun) act(deed chatDeed) (again, placed bool) {
 		r.say(v.whole(false))
 		went := handTo(r.a, r.record, v.id, window, from, deed.agent, deed.model, deed.effort)
 		if went.went {
-			before, done := v.talk, went.done
-			r.aim(app.Head{Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, strconv.Itoa(done.To.Window.Index))
-			v.talk.goesOn(before)
-			text, _ := os.ReadFile(done.Handoff) // mia's own file of it, written a moment ago
-			v.carry = &chatCarried{from: from, file: cmp.Or(done.Full, done.Handoff), text: string(text)}
+			done := went.done
+			to := strconv.Itoa(done.To.Window.Index)
+			// kept on its window: whichever chat of it sends first says it, this one or one started after
+			kept := r.a.CarryInWindow(r.record, to, app.Carried{From: from, ID: v.id, File: done.Handoff, Full: done.Full})
+			r.aim(app.Head{Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
+			if kept != nil {
+				went.text, went.tone = cutTo(went.text+" · "+kept.Error(), chatSaid), "warn"
+			}
 		}
 		v.mode = chatting
 		r.note(went.text, went.tone)

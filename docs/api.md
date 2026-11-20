@@ -218,7 +218,13 @@ that its replies are in its terminal.
   its last turns, with where the whole file is. The chat shows the
   person's own words alone, of the transcript's turn too. No agent's own
   files, session or sign-in is read, copied or converted. `esc` goes
-  back.
+  back. That the new window's agent was not told yet is kept on the
+  window itself, as its tmux window option `@mia_context` — whose
+  conversation, its id and the handoff's file — so a `mia chat` started
+  for that window after, in place of the one that handed it over, shows
+  the turns so far over the same line and says the handoff with the
+  first thing sent; whichever chat sends first takes it off the window,
+  so it is said once, and a send that did not go keeps it there.
 - **Earlier** (`e`), in place of the chat: the worktree's conversations,
   what was first asked with the agent and how long ago, the one a window
   has open marked, and beside the list the one under the keys read back.

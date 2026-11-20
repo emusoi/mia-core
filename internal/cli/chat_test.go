@@ -6,15 +6,21 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/config"
 	"github.com/emusoi/mia-core/internal/gittest"
 	"github.com/emusoi/mia-core/internal/model"
 	"github.com/emusoi/mia-core/internal/plugin"
+	"github.com/emusoi/mia-core/internal/session"
 )
 
 // shownPiece is a piece of a view as the window reads it.
@@ -815,18 +821,13 @@ func TestAnotherAgentsModelHandsTheConversationOverAndClosesTheOldWindowLast(t *
 // the conversation in front, only what follows the rule.
 func TestTheFirstThingSentAfterAHandingCarriesTheConversation(t *testing.T) {
 	handoff := "# Handoff: a conversation with claude, to go on from\n\n## The conversation\n\n### 1 · user\n\nmake it faster\n\n### 2 · claude\n\nIt is faster.\n"
-	view := &chatView{talk: &talk{agent: "codex", reply: true}, window: "5", carry: &chatCarried{from: "claude", file: "/repo/.git/mia/handoffs/monduli/claude-c1.md", text: handoff}}
-	first := view.toType("and the tests")
+	first := carried("claude", handoff, "/repo/.git/mia/handoffs/monduli/claude-c1.md", "and the tests", chatCarry)
 	want := "The conversation so far, with claude:\n\n" + strings.TrimSpace(handoff) + "\n\n" + chatRule + "\n\nand the tests"
 	if first != want {
 		t.Errorf("the first thing sent is %q", first)
 	}
 	if got := ownWords(first); got != "and the tests" {
 		t.Errorf("the person's own words of it: %q", got)
-	}
-	view.carry = nil // as when it went
-	if got := view.toType("and the docs"); got != "and the docs" {
-		t.Errorf("the second thing sent is %q", got)
 	}
 	if got := ownWords("a --- rule of the person's own"); got != "a --- rule of the person's own" {
 		t.Errorf("words with no conversation in front: %q", got)
@@ -858,5 +859,148 @@ func TestTheFirstThingSentAfterAHandingCarriesTheConversation(t *testing.T) {
 	heard := only(t, chat.heard([]app.Turn{{N: 1, Kind: "asked", Text: first}, {N: 2, Kind: "question", Text: "Which?", Options: []string{"A", "B"}}, {N: 3, Kind: "answer", Text: "A", Question: 2}}))
 	if len(heard.Patch) != 3 || heard.Patch[0].Turn.N != 4 || heard.Patch[0].Turn.Text != "and the tests" || heard.Patch[2].Turn.N != 6 || heard.Patch[2].Turn.Question != 5 || chat.anew != 1 || len(chat.sent) != 0 {
 		t.Errorf("its transcript's turns: %+v, anew %d, sent %q", heard.Patch, chat.anew, chat.sent)
+	}
+}
+
+// fakeWindows is what is kept on windows until it is said: what every chat
+// of a window shares, as tmux keeps it.
+type fakeWindows map[string]app.Carried
+
+func (f fakeWindows) TakeCarried(record model.Record, window string) (app.Carried, bool) {
+	was, on := f[window]
+	delete(f, window)
+	return was, on
+}
+
+func (f fakeWindows) CarryInWindow(record model.Record, window string, carried app.Carried) error {
+	f[window] = carried
+	return nil
+}
+
+// What a window's agent goes on from is kept on the window, not in a chat:
+// of two chats of it — the one that handed the conversation over, and one
+// started after — whichever sends first says it, and it is said once. A
+// send that did not go keeps it there again; another window has none.
+func TestWhatAWindowGoesOnFromIsSaidOnceWhicheverChatSendsFirst(t *testing.T) {
+	record := model.Record{Name: "monduli"}
+	handoff := "## The conversation\n\n### 1 · user\n\nmake it faster\n"
+	read := func(file string) ([]byte, error) {
+		if file != "/repo/claude-c1.md" {
+			return nil, os.ErrNotExist
+		}
+		return []byte(handoff), nil
+	}
+	kept := fakeWindows{"5": {From: "claude", ID: "c1", File: "/repo/claude-c1.md"}}
+	// the chat that handed it over is ended before it sends, and another is started for the window
+	if text, _ := typedFor(kept, record, "2", "to another window", read); text != "to another window" || len(kept) != 1 {
+		t.Errorf("another window is typed %q", text)
+	}
+	later, back := typedFor(kept, record, "5", "and the tests", read)
+	if later != "The conversation so far, with claude:\n\n"+strings.TrimSpace(handoff)+"\n\n"+chatRule+"\n\nand the tests" || len(kept) != 0 {
+		t.Fatalf("the first thing sent, from the chat started after: %q, kept %v", later, kept)
+	}
+	if first, _ := typedFor(kept, record, "5", "and the docs", read); first != "and the docs" {
+		t.Errorf("the chat that handed it over then sends %q", first)
+	}
+	back() // it did not go
+	if again, _ := typedFor(kept, record, "5", "and the tests", read); again != later || len(kept) != 0 {
+		t.Errorf("sent again after it did not go: %q", again)
+	}
+
+	// a handoff that is not there any more is named, to be read
+	kept["5"] = app.Carried{From: "claude", ID: "c1", File: "/repo/gone.md"}
+	if text, _ := typedFor(kept, record, "5", "go on", read); text != "Read /repo/gone.md: the conversation so far, with claude.\n\n"+chatRule+"\n\ngo on" || ownWords(text) != "go on" {
+		t.Errorf("with its file gone: %q", text)
+	}
+	kept["5"] = app.Carried{From: "claude", ID: "c1", File: "/repo/claude-c1.md", Full: "/repo/claude-c1-full.md"}
+	handoff = "## The conversation\n" + strings.Repeat("\n### 1 · user\n\n"+strings.Repeat("word ", 400)+"\n", 60)
+	if text, _ := typedFor(kept, record, "5", "go on", read); !strings.Contains(text, "the whole of it is in /repo/claude-c1-full.md]") {
+		t.Errorf("a long one does not say where every turn is: %.200q", text)
+	}
+}
+
+// A conversation handed to another agent in a chat is kept on the new
+// window, where a chat started after finds it: the turns so far over the
+// line that says who goes on, and the handoff said with the first thing
+// sent, after which the window keeps nothing. The old agent's window is
+// closed.
+func TestAHandingIsKeptOnTheNewWindowUntilTheFirstSend(t *testing.T) {
+	roleLab(t)
+	claude := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", claude)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	repo := gittest.New(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Plugins = pluginHost(config.Config{})
+	record, err := a.New("handed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := filepath.Join(claude, "projects", regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(record.Path, "-"))
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cwd, _ := json.Marshal(record.Path)
+	lines := `{"type":"user","cwd":` + string(cwd) + `,"timestamp":"2026-11-02T10:00:00Z","message":{"content":"make the list faster"}}` + "\n" +
+		`{"type":"assistant","cwd":` + string(cwd) + `,"timestamp":"2026-11-02T10:00:05Z","message":{"content":[{"type":"text","text":"It is faster."}]}}` + "\n"
+	if err := os.WriteFile(filepath.Join(project, "c1.jsonl"), []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.NewWindow(record, "old", session.What{}, []string{"cat"}); err != nil {
+		t.Fatal(err)
+	}
+	old := ""
+	for _, w := range a.Windows(record) {
+		if w.Name == "old" {
+			old = strconv.Itoa(w.Index)
+		}
+	}
+	chat := func(window string) *chatRun {
+		run := &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, say: func(...[]byte) {}, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
+		run.aim(app.Head{}, window)
+		t.Cleanup(func() { close(run.quit) })
+		return run
+	}
+	first := chat(old)
+	first.view.id, first.view.runs.Agent = "c1", "claude"
+	first.act(chatDeed{do: chatHand, agent: "echo", model: "loud"})
+	if status := first.view.talk.status; status == nil || status.Text != "claude stopped · echo goes on with this conversation" {
+		t.Fatalf("status = %+v", status)
+	}
+	if session.Here().HasWindow(record.Name, "old") {
+		t.Error("the old agent's window is still there")
+	}
+	window := first.view.window
+	screenShows(t, record.Name, window, "echo-agent --model loud")
+	carried, on := a.CarriedInWindow(record, window)
+	if !on || carried.From != "claude" || carried.ID != "c1" || filepath.Base(carried.File) != "claude-c1.md" {
+		t.Fatalf("on the new window: %+v, %v", carried, on)
+	}
+	if out, _ := exec.Command("tmux", "show-options", "-w", "-v", "-t", session.Target(record.Name, window), "@mia_context").Output(); !strings.Contains(string(out), `"id":"c1"`) {
+		t.Errorf("tmux keeps %q", out)
+	}
+
+	// a chat started after, for the new window: the turns so far, and the first send carries the conversation
+	second := chat(window)
+	got := read(t, second.view.talk.whole())
+	if !slices.Equal(numbers(got.View.Turns), []int{1, 2, 3}) || got.View.Turns[1].Text != "It is faster." || got.View.Turns[2].Text != "continued by echo" {
+		t.Fatalf("a chat started after shows %+v", got.View.Turns)
+	}
+	second.act(chatDeed{do: chatSend, text: "and the tests"})
+	screenShows(t, record.Name, window, "The conversation so far, with claude:", "It is faster.", chatRule, "and the tests")
+	if _, on := a.CarriedInWindow(record, window); on {
+		t.Error("said, and the window still keeps it")
+	}
+	before, _ := session.Here().CaptureBack(record.Name, window, false, 500)
+	first.act(chatDeed{do: chatSend, text: "and the docs"})
+	screenShows(t, record.Name, window, "and the docs")
+	if after, _ := session.Here().CaptureBack(record.Name, window, false, 500); strings.Count(after, "The conversation so far") != strings.Count(before, "The conversation so far") {
+		t.Errorf("the conversation is said again by the second send:\n%s", after)
+	}
+	if _, on := a.TakeCarried(record, window); on {
+		t.Error("taken twice")
 	}
 }
