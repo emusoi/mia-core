@@ -241,6 +241,18 @@ echo ready; exec cat >> "$HOME/heard"`})
 	if out, err := exec.Command("git", "-C", record.Path, "status", "--porcelain").Output(); err != nil || len(out) != 0 {
 		t.Errorf("the worktree is not as it was: %q %v", out, err)
 	}
+
+	// started quiet, the agent runs and is told nothing: a chat says the handoff with the first thing sent
+	quiet, err := a.ContinueConversation(app.Continue{ID: "c1", With: "echo", Model: "soft", Quiet: true})
+	if err != nil || !quiet.Sent || quiet.Problem != "" || quiet.Handoff != file || quiet.Model != "soft" {
+		t.Fatalf("quiet = %+v %v", quiet, err)
+	}
+	if screen, _ := a.ReadWindow(record, quiet.To.Window.Name); !strings.Contains(screen, "ready") {
+		t.Errorf("one started quiet does not run:\n%s", screen)
+	}
+	if told, _ := os.ReadFile(filepath.Join(os.Getenv("HOME"), "heard")); strings.Count(string(told), "Read ") != 3 {
+		t.Errorf("one started quiet was told to read the handoff:\n%s", told)
+	}
 }
 
 // A handoff's record says which conversation went on with which agent; the

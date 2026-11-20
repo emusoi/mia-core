@@ -76,6 +76,24 @@ on GitHub; a tag without its section is not released.
   pull request's GitHub comments. `mia api capabilities` lists
   `review-app`. See [mia review](api.md#mia-review).
 
+- **The chat does what desk's own chat did.** `mia chat` fills its pane
+  under a line that says the agent, its model, effort and account. What
+  is sent shows at once and is not said twice when the transcript has
+  it; one the window refuses is taken back, with why and the words as
+  the status. What the agent's screen asks — a permission — is a question
+  in the chat, and an answer is pressed in its window for every agent.
+  `models` (m, by `tab` from the field) is a palette of the setups used
+  here and each installed agent's models with their efforts: a model of
+  the chat's own agent switches the window, one of another agent hands
+  the conversation over — written out as a handoff, that agent started
+  on the model and told nothing, the old window closed once the new one
+  runs, the chat gone on there, and the handoff said in front of the
+  first thing sent. `earlier` (e) lists the worktree's conversations
+  beside the one under the keys read back: `⏎` goes on with one, `c`
+  continues another agent's in this chat's agent, asked twice. A window
+  of an agent mia reads no conversations of still sends, and says so.
+  See [conversations](api.md#conversations).
+
 - **A conversation is a chat mia desk draws.** `mia chat`, run in a pane
   of a worktree's session, follows the conversation a window of the
   worktree has open — `--window` says which, `--conversation` another —

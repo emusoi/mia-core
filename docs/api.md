@@ -179,6 +179,59 @@ agent has written it. Whether the agent is at work is looked at once a
 second. `q` or `⌃C` in the plain terminal leaves, and stdin that is no
 terminal is refused, exit 1. `mia api capabilities` lists `chat`.
 
+The view fills its pane: one quiet line over the chat says the agent, the
+model and effort mia started it with or last switched it to, and the
+account it is on, with two buttons at its right, `models` and `earlier`.
+The chat's field types every letter, so `tab` goes from it to the
+buttons, where `m` and `e` (or `⏎`) press them. A window named by
+`--window` that has no conversation mia can read yet is a chat all the
+same, and its conversation is looked for each second; of an agent mia
+reads no conversations of (gemini, cursor-agent) the status says once
+that its replies are in its terminal.
+
+- **What is sent** is said at once as an `asked` turn after the last, and
+  the transcript's own turn of the same words takes its place. When the
+  agent was at work and another turn comes first, the turn is taken back
+  and the status says it waits. A send the window refuses — it asks
+  something first — takes the turn back and says why with the words in
+  the status: desk's chat cannot be handed them back into its field.
+- **Questions.** An answer chosen is pressed in the window as
+  `mia window press` presses it, for every agent: its digit where the
+  options are numbered, the cursor moved to it and Enter where they are
+  not. A press refused is said as the status, the question open again.
+  What the window's screen asks that the transcript does not — a
+  permission, a folder to trust — is a question of the chat's own after
+  the last turn, looked for each second and taken out once answered.
+- **Models** (`m`), in place of the chat: a search line over one list —
+  the setups used in this repository, then the models of each agent
+  installed under its head, the one that runs checked, an item's menu
+  (`→`) its efforts. `⏎` on a model of the chat's own agent switches the
+  window as `mia window model` does. On another agent's it hands the
+  conversation over, in one step: its turns written out as
+  `mia conversation continue` writes a handoff, that agent started on
+  the model in a window of its own and told nothing, the old agent's
+  window closed once the new one runs — never before, and not when it is
+  the chat's own window — and the chat goes on in the new window, the
+  turns so far over a line `continued by <agent>`. The first thing then
+  sent has the handoff in front of it in the same message, under `The
+  conversation so far, with <agent>:` and over a rule; past 48 KB only
+  its last turns, with where the whole file is. The chat shows the
+  person's own words alone, of the transcript's turn too. No agent's own
+  files, session or sign-in is read, copied or converted. `esc` goes
+  back.
+- **Earlier** (`e`), in place of the chat: the worktree's conversations,
+  what was first asked with the agent and how long ago, the one a window
+  has open marked, and beside the list the one under the keys read back.
+  `⏎` on one a window has open shows it, on another takes it up again as
+  `mia conversation resume` does and follows it. `c` on a conversation
+  of another agent hands it to this chat's agent as
+  `mia conversation continue` does, told to read it: the first press
+  says what that carries over, the second does it. `esc` goes back.
+
+A turn desk was told stays as it was told, so a turn taken back, or a
+question opened again, is said in a chat piece of another id (`chat`,
+`chat-1`, …): what is typed in its field and not yet sent is lost then.
+
 ```json
 [{"n":1,"kind":"asked","at":"2026-11-02T10:00:00Z","text":"make the list faster"},
  {"n":2,"kind":"said","at":"2026-11-02T10:00:04Z","text":"I will **look** at where the time goes."},

@@ -34,6 +34,9 @@ type Continue struct {
 	With, Model, Effort, Account string
 	// DryRun writes nothing and starts nothing.
 	DryRun bool
+	// Quiet starts the agent and tells it nothing: whoever asked says the
+	// handoff to it themselves, with the first thing the person sends.
+	Quiet bool
 }
 
 // Talk names one conversation: whose it is, and its id.
@@ -76,7 +79,8 @@ type Continued struct {
 	Command string `json:"command"`
 	// Instruction is the agent's first message, and Sent whether mia typed
 	// it: an agent that asked something first, or ended, was not typed
-	// into, and Problem says which.
+	// into, and Problem says which. Of one started quiet, Sent is that it
+	// runs, with nothing typed.
 	Instruction string `json:"instruction"`
 	Sent        bool   `json:"sent"`
 	Problem     string `json:"problem,omitempty"`
@@ -216,6 +220,8 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 		done.Problem = fmt.Sprintf("%s ended as soon as it started, saying:\n%s", agent.Name, said)
 	} else if runsNothing(host, record.Name, done.To.Window.Name) {
 		done.Problem = fmt.Sprintf("%s ended as soon as it started, and its window is a shell now: nothing is typed into a shell", agent.Name)
+	} else if want.Quiet {
+		// it runs, and is told nothing
 	} else if err := say(host, record.Name, done.To.Window.Name, agent.Name, "mia window press "+record.Name+" "+done.To.Window.Name+" --", done.Instruction); err != nil {
 		done.Problem = err.Error()
 	}
