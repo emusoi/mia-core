@@ -9,6 +9,20 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **The chat's models and Earlier are modals.** In `mia chat`, `models`
+  and `earlier` no longer take the chat's place: each is a card over it,
+  the conversation in sight behind, and `esc` takes it away with nothing
+  changed. Models is the search line over the list, as it was; Earlier
+  the list beside the conversation under the keys. Each conversation in
+  Earlier has a menu, under the pointer's other button too — Resume,
+  Continue with this chat's agent, Copy its id — as each model has its
+  efforts. A send the window refuses gives the words back to the chat's
+  field; a turn taken back is taken out of the same chat, so what is
+  being typed stays; the status changes alone; and what went well — a
+  model switched, a conversation handed over or taken up — is a toast
+  that goes by itself, not a status that stays. See
+  [conversations](api.md#conversations).
+
 - **opencode has models, and gemini a word for one.** opencode's models
   are those of the providers it is signed in to, so mia asks it —
   `opencode models`, a `provider/model` a line — and keeps what it said

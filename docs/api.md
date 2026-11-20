@@ -170,8 +170,9 @@ reads. `mia api capabilities` lists `conversation-follow`.
 in a pane of a worktree's session, it follows a conversation of the
 worktree and has mia desk draw it as a chat over the pane, by desk's UI
 protocol — the whole view once, the last turns that fit a message, then
-each line of new turns as a patch, and the view again when the pane comes
-into sight. With no flag it is the conversation a window has open, else
+every change as a patch (a turn put in or taken out, the status, a modal
+put over the chat or taken away, a toast), and the view again when the
+pane comes into sight. With no flag it is the conversation a window has open, else
 the last written to, which is only shown. What is sent, chosen and
 stopped in the chat is typed into that window as `mia window send`,
 `press` and `key` type; what was sent comes back as a turn once the
@@ -194,11 +195,12 @@ reads no conversations of (gemini, cursor-agent) the status says once
 that its replies are in its terminal.
 
 - **What is sent** is said at once as an `asked` turn after the last, and
-  the transcript's own turn of the same words takes its place. When the
-  agent was at work and another turn comes first, the turn is taken back
-  and the status says it waits. A send the window refuses — it asks
-  something first — takes the turn back and says why with the words in
-  the status: desk's chat cannot be handed them back into its field.
+  taken out (`unturn`) in the patch that puts in the transcript's own
+  turn of the same words. When the agent was at work and another turn
+  comes first, the turn is taken out and the status says it waits. A
+  send the window refuses — it asks something first — takes the turn
+  out, gives the words back to the chat's field (`draft`) and says why
+  as the status.
 - **Questions.** An answer chosen is pressed in the window as
   `mia window press` presses it, for every agent: its digit where the
   options are numbered, the cursor moved to it and Enter where they are
@@ -206,10 +208,16 @@ that its replies are in its terminal.
   What the window's screen asks that the transcript does not — a
   permission, a folder to trust — is a question of the chat's own after
   the last turn, looked for each second and taken out once answered.
-- **Models** (`m`), in place of the chat: a search line over one list —
+- **How a thing went.** The status is said alone, as a change. What went
+  well — a model switched, a conversation taken up or handed over, an id
+  copied — is a toast, which goes by itself; what did not is the status,
+  or, of something asked in a modal, a line at the modal's foot.
+- **Models** (`m`), a modal over the chat, which stays in sight behind
+  it: a search line with the keys over one list in a room of its own —
   the setups used in this repository, then the models of each agent
   installed under its head, the one that runs checked, an item's menu
-  (`→`) its efforts. opencode's are those it lists, each with its
+  (`→`, or the pointer's other button) its efforts. A pick takes the
+  modal away. opencode's are those it lists, each with its
   provider beside it, and none when it lists none: one row then, its
   model chosen inside it. `⏎` on a model of the chat's own agent switches
   the window as `mia window model` does — opencode by starting it again
@@ -224,26 +232,32 @@ that its replies are in its terminal.
   conversation so far, with <agent>:` and over a rule; past 48 KB only
   its last turns, with where the whole file is. The chat shows the
   person's own words alone, of the transcript's turn too. No agent's own
-  files, session or sign-in is read, copied or converted. `esc` goes
-  back. That the new window's agent was not told yet is kept on the
+  files, session or sign-in is read, copied or converted. `esc` takes
+  the modal away and leaves the chat, its status and what runs as they
+  were. That the new window's agent was not told yet is kept on the
   window itself, as its tmux window option `@mia_context` — whose
   conversation, its id and the handoff's file — so a `mia chat` started
   for that window after, in place of the one that handed it over, shows
   the turns so far over the same line and says the handoff with the
   first thing sent; whichever chat sends first takes it off the window,
   so it is said once, and a send that did not go keeps it there.
-- **Earlier** (`e`), in place of the chat: the worktree's conversations,
+- **Earlier** (`e`), a modal over the chat: the worktree's conversations,
   what was first asked with the agent and how long ago, the one a window
   has open marked, and beside the list the one under the keys read back.
   `⏎` on one a window has open shows it, on another takes it up again as
   `mia conversation resume` does and follows it. `c` on a conversation
   of another agent hands it to this chat's agent as
   `mia conversation continue` does, told to read it: the first press
-  says what that carries over, the second does it. `esc` goes back.
+  says at the modal's foot what that carries over, the second does it.
+  Each has a menu (`→`, or the pointer's other button): **Resume** (or
+  **Go to it**) as `⏎`, **Continue with** this chat's agent on another
+  agent's, at once, and **Copy its id**. `esc` takes the modal away.
 
-A turn desk was told stays as it was told, so a turn taken back, or a
-question opened again, is said in a chat piece of another id (`chat`,
-`chat-1`, …): what is typed in its field and not yet sent is lost then.
+A turn desk was told stays as it was told, so a turn of the chat's own —
+what was sent, what the screen asks — has a place after any the
+transcript has (past 2^30) and is taken out by it, never said again
+otherwise; what is typed in the chat's field stays. A chat of another
+window or conversation is another piece (`chat`, `chat-1`, …).
 
 ```json
 [{"n":1,"kind":"asked","at":"2026-11-02T10:00:00Z","text":"make the list faster"},

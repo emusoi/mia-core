@@ -25,12 +25,12 @@ import (
 
 // shownPiece is a piece of a view as the window reads it.
 type shownPiece struct {
-	T, ID, Text, Style, Label, Key, Agent, Placeholder, Icon, Right, List, Menu, Selected string
-	Reply, Working, Bare, Live, Flat, Scroll, Split                                       bool
-	Grow, W                                                                               int
-	Children                                                                              []shownPiece
-	Items                                                                                 []chatItem
-	Turns                                                                                 []app.Turn
+	T, ID, Title, Text, Style, Tone, Label, Key, Agent, Placeholder, Icon, Right, List, Menu, Selected string
+	Reply, Working, Bare, Live, Flat, Split                                                            bool
+	Grow, W, H, Max                                                                                    int
+	Children                                                                                           []shownPiece
+	Items                                                                                              []chatItem
+	Turns                                                                                              []app.Turn
 }
 
 // find is the first piece of a kind in a piece, itself too, and nil for none.
@@ -58,11 +58,32 @@ type heardByWindow struct {
 	View   *shownPiece `json:"-"`
 	Keys   []chatKey   `json:"keys"`
 	Patch  []struct {
-		Op, ID string
-		Turn   *app.Turn
-		On     *bool
+		Op, ID, Text, Tone string
+		N                  int
+		Turn               *app.Turn
+		On                 *bool
+		Node               *shownPiece
 	} `json:"patch"`
 	Close bool `json:"close"`
+}
+
+// pieceOf is a piece read back as the window reads it.
+func pieceOf(t *testing.T, said json.RawMessage) *shownPiece {
+	t.Helper()
+	var got shownPiece
+	if err := json.Unmarshal(said, &got); err != nil {
+		t.Fatalf("%v in %.200s", err, said)
+	}
+	return &got
+}
+
+// ops is the changes of a patch, each by its name.
+func ops(got heardByWindow) []string {
+	var names []string
+	for _, op := range got.Patch {
+		names = append(names, op.Op)
+	}
+	return names
 }
 
 // read is a message read back, which no message the window takes fails:
@@ -388,9 +409,10 @@ func TestChatRefusesWhatIsNotATerminal(t *testing.T) {
 }
 
 // The view fills its pane: one quiet line over the chat that says who
-// answers, with the buttons that show the models and the earlier
-// conversations at its right, and the keys on the chat's field. A
-// conversation no window has open has no field, and no models to switch.
+// answers, a piece said again alone, with the buttons that show the
+// models and the earlier conversations at its right, and the keys on the
+// chat's field. A conversation no window has open has no field, and no
+// models to switch.
 func TestTheChatFillsItsPaneUnderALineThatSaysWhoAnswers(t *testing.T) {
 	if got := chatAbout(app.Runs{Agent: "claude", Model: "opus", Effort: "high", Account: "work"}); got != "claude · opus · high · on work" {
 		t.Errorf("about = %q", got)
@@ -400,40 +422,41 @@ func TestTheChatFillsItsPaneUnderALineThatSaysWhoAnswers(t *testing.T) {
 	}
 	view := &talk{pane: "%2", agent: "claude", about: "claude · opus · high · on work", reply: true}
 	got := only(t, view.heard([]app.Turn{{N: 1, Kind: "asked", Text: "hello"}}))
-	if !got.Fill || got.Focus != "chat" || got.Whole.T != "col" || len(got.Whole.Children) != 2 || got.Whole.Children[1].T != "chat" {
+	if !got.Fill || got.Focus != "chat" || got.Whole.T != "col" || got.Whole.ID != "view" || len(got.Whole.Children) != 2 || got.Whole.Children[1].T != "chat" || len(got.Keys) != 0 {
 		t.Fatalf("view = %+v", got.Whole)
 	}
 	line := got.Whole.Children[0]
-	if line.T != "row" || len(line.Children) != 4 || line.Children[0].Text != "claude · opus · high · on work" || line.Children[0].Style != "dim" || line.Children[1].Grow != 1 {
+	if line.T != "row" || len(line.Children) != 4 || line.Children[0].Text != "claude · opus · high · on work" || line.Children[0].ID != "about" || line.Children[0].Style != "dim" || line.Children[1].Grow != 1 {
 		t.Errorf("line = %+v", line)
 	}
-	if m, e := line.Children[2], line.Children[3]; m.T != "button" || m.ID != "models" || m.Key != "m" || e.T != "button" || e.ID != "earlier" || e.Key != "e" {
+	if m, e := line.Children[2], line.Children[3]; m.T != "button" || m.ID != "open-models" || m.Label != "models" || m.Key != "m" || e.T != "button" || e.ID != "open-earlier" || e.Label != "earlier" || e.Key != "e" {
 		t.Errorf("buttons = %+v", line.Children[2:])
 	}
 
 	shown := &talk{agent: "codex", about: "codex"}
 	got = only(t, shown.heard(nil))
-	if line := got.Whole.Children[0]; got.Focus != "" || got.View.Reply || len(line.Children) != 3 || line.Children[2].ID != "earlier" {
+	if line := got.Whole.Children[0]; got.Focus != "" || got.View.Reply || len(line.Children) != 3 || line.Children[2].ID != "open-earlier" {
 		t.Errorf("one no window has open: focus %q, line %+v", got.Focus, line)
 	}
 }
 
-// What is sent is said at once as an asked turn after the last, and the
-// transcript's own turn of the same words takes its place: nothing is
-// said twice, and the chat is not begun anew.
+// What is sent is said at once as an asked turn after the last, at a place
+// of the app's own, and when the transcript says the same words that turn
+// is taken out as the transcript's is put in, in one patch to the same
+// chat: nothing is said twice.
 func TestWhatWasSentShowsAtOnceAndTheTranscriptsTurnTakesItsPlace(t *testing.T) {
 	view := &talk{pane: "%3", agent: "claude", reply: true}
 	view.heard([]app.Turn{{N: 1, Kind: "asked", Text: "hello"}, {N: 2, Kind: "said", Text: "Hello."}})
 	got := only(t, view.sends("make it faster"))
-	if len(got.Patch) != 1 || got.Patch[0].Op != "turn" || got.Patch[0].ID != "chat" || got.Patch[0].Turn.N != 3 || got.Patch[0].Turn.Kind != "asked" || got.Patch[0].Turn.Text != "make it faster" {
+	if len(got.Patch) != 1 || got.Patch[0].Op != "turn" || got.Patch[0].ID != "chat" || got.Patch[0].Turn.N != chatOwn+1 || got.Patch[0].Turn.Kind != "asked" || got.Patch[0].Turn.Text != "make it faster" {
 		t.Fatalf("sent is said as %+v", got.Patch)
 	}
 	got = only(t, view.heard([]app.Turn{{N: 3, Kind: "asked", Text: "make it faster\n"}, {N: 4, Kind: "said", Text: "I will"}}))
-	if len(got.Patch) != 2 || got.Patch[0].ID != "chat" || view.anew != 0 || len(view.sent) != 0 || len(view.own) != 0 {
-		t.Errorf("the transcript's turn: %+v, begun anew %d times, %d still its own", got.Patch, view.anew, len(view.own))
+	if !slices.Equal(ops(got), []string{"unturn", "turn", "turn"}) || got.Patch[0].ID != "chat" || got.Patch[0].N != chatOwn+1 || got.Patch[1].Turn.N != 3 || len(view.sent) != 0 || len(view.own) != 0 {
+		t.Errorf("the transcript's turn: %+v, %d still its own", got.Patch, len(view.own))
 	}
-	if ns := numbers(read(t, view.whole()).View.Turns); !slices.Equal(ns, []int{1, 2, 3, 4}) {
-		t.Errorf("turns %v", ns)
+	if whole := read(t, view.whole()); whole.View.ID != "chat" || !slices.Equal(numbers(whole.View.Turns), []int{1, 2, 3, 4}) {
+		t.Errorf("view = %+v", whole.View)
 	}
 }
 
@@ -448,80 +471,124 @@ func TestAWindowWithNoConversationYetIsAChatThatCanSayTheFirstThing(t *testing.T
 	}
 	view.sends("what is in here?")
 	got = only(t, view.sends("and why?"))
-	if len(got.Patch) != 1 || got.Patch[0].Turn.N != 2 || got.Patch[0].Turn.Text != "and why?" {
+	if len(got.Patch) != 1 || got.Patch[0].Turn.N != chatOwn+2 || got.Patch[0].Turn.Text != "and why?" {
 		t.Errorf("the second thing sent: %+v", got.Patch)
 	}
 	got = only(t, view.heard([]app.Turn{{N: 1, Kind: "asked", Text: "what is in here?"}, {N: 2, Kind: "asked", Text: "and why?"}, {N: 3, Kind: "said", Text: "Files."}}))
-	if got.Patch == nil || view.anew != 0 || len(view.sent) != 0 {
-		t.Errorf("its conversation begun: %+v, anew %d, sent %q", got, view.anew, view.sent)
+	if !slices.Equal(ops(got), []string{"unturn", "unturn", "turn", "turn", "turn"}) || got.Patch[1].N != chatOwn+2 || got.Patch[4].Turn.N != 3 || len(view.sent) != 0 {
+		t.Errorf("its conversation begun: %+v, sent %+v", got.Patch, view.sent)
 	}
 }
 
 // An agent at work takes up what was sent later: when another turn comes
-// first, the turn said for it is taken back — in a chat of another id,
-// as the window keeps a turn it was told — and the status says it waits.
-// It is said once the transcript has it.
+// first, the turn said for it is taken out of the same chat, and the
+// status, a change of the same patch, says it waits. It is said once the
+// transcript has it.
 func TestWhatAnAgentAtWorkTakesUpLaterIsNotSaidTwice(t *testing.T) {
 	view := &talk{pane: "%3", agent: "claude", reply: true}
 	view.heard([]app.Turn{{N: 1, Kind: "asked", Text: "hello"}})
 	view.sends("and the tests")
 	got := only(t, view.heard([]app.Turn{{N: 2, Kind: "tool", Text: "Read a file"}}))
-	if got.View == nil || got.View.ID != "chat-1" || got.Focus != "chat-1" || !slices.Equal(numbers(got.View.Turns), []int{1, 2}) || got.View.Turns[1].Kind != "tool" {
-		t.Fatalf("view = %+v", got.View)
+	if got.View != nil || !slices.Equal(ops(got), []string{"unturn", "turn", "status"}) || got.Patch[0].ID != "chat" || got.Patch[0].N != chatOwn+1 || got.Patch[1].Turn.N != 2 || got.Patch[1].Turn.Kind != "tool" {
+		t.Fatalf("said %+v", got)
 	}
-	if got.Status == nil || got.Status.Text != "claude takes it up when it can — sent: and the tests" || got.Status.Tone != "" {
-		t.Errorf("status = %+v", got.Status)
+	if status := got.Patch[2]; status.Text != "claude takes it up when it can — sent: and the tests" || status.Tone != "" || view.status == nil || view.status.Text != status.Text {
+		t.Errorf("status = %+v, kept %+v", status, view.status)
 	}
 	got = only(t, view.heard([]app.Turn{{N: 3, Kind: "asked", Text: "and the tests"}}))
-	if len(got.Patch) != 1 || got.Patch[0].ID != "chat-1" || got.Patch[0].Turn.N != 3 {
+	if len(got.Patch) != 1 || got.Patch[0].ID != "chat" || got.Patch[0].Turn.N != 3 {
 		t.Errorf("the transcript's turn: %+v", got)
+	}
+	// the view said whole, as when its pane comes into sight, carries the status
+	if whole := read(t, view.whole()); whole.Status == nil || !strings.HasPrefix(whole.Status.Text, "claude takes it up") || !slices.Equal(numbers(whole.View.Turns), []int{1, 2, 3}) {
+		t.Errorf("said whole: %+v, %+v", whole.Status, whole.View)
 	}
 }
 
-// A send the window refuses takes its turn back, and the status says why
-// with the words, which the chat's field cannot be handed: both cut to
-// fit what the window keeps of a status.
-func TestASendRefusedTakesItsTurnBackAndSaysTheWords(t *testing.T) {
+// A send the window refuses takes its turn out, gives the words back to
+// the chat's field as they were typed, and says why as the status: one
+// patch, and the view is not said again.
+func TestASendRefusedTakesItsTurnOutAndGivesTheWordsBack(t *testing.T) {
 	view := &talk{pane: "%3", agent: "claude", reply: true}
 	view.heard([]app.Turn{{N: 1, Kind: "asked", Text: "hello"}})
 	view.sends("go on\nwith it")
 	got := only(t, view.refused(errors.New("claude asks first: Trust this folder?")))
-	if got.View == nil || got.View.ID != "chat-1" || !slices.Equal(numbers(got.View.Turns), []int{1}) || len(view.sent) != 0 {
-		t.Fatalf("view = %+v, sent %q", got.View, view.sent)
+	if got.View != nil || !slices.Equal(ops(got), []string{"unturn", "draft", "status"}) || len(view.sent) != 0 || len(view.own) != 0 {
+		t.Fatalf("said %+v, sent %+v", got, view.sent)
 	}
-	if got.Status == nil || got.Status.Tone != "bad" || got.Status.Text != "claude asks first: Trust this folder? — not sent: go on with it" {
-		t.Errorf("status = %+v", got.Status)
+	if out, draft, status := got.Patch[0], got.Patch[1], got.Patch[2]; out.ID != "chat" || out.N != chatOwn+1 || draft.ID != "chat" || draft.Text != "go on\nwith it" ||
+		status.Tone != "bad" || status.Text != "claude asks first: Trust this folder?" {
+		t.Errorf("patch = %+v", got.Patch)
 	}
-	long := unsent(errors.New(strings.Repeat("why ", 100)), strings.Repeat("words ", 100))
-	if len([]rune(long)) != chatSaid || !strings.Contains(long, " — not sent: words words") || !strings.HasPrefix(long, "why why") {
-		t.Errorf("%d characters: %q", len([]rune(long)), long)
+	view.sends(strings.Repeat("é", 2*chatDraft))
+	if got = only(t, view.refused(errors.New(strings.Repeat("why ", 100)))); len([]rune(got.Patch[1].Text)) != chatDraft || len([]rune(got.Patch[2].Text)) != chatSaid {
+		t.Errorf("long ones: %d characters given back, %d said", len([]rune(got.Patch[1].Text)), len([]rune(got.Patch[2].Text)))
 	}
 	if messages := view.refused(errors.New("nothing was sent")); messages != nil {
 		t.Errorf("with nothing sent: %s", messages)
 	}
 }
 
+// The status is said alone, as a change, and taken away by one with no
+// words. How a thing done went is a toast when it went well, which goes
+// by itself and is not kept; otherwise the status, which the view said
+// whole carries.
+func TestTheStatusIsAChangeAndWhatWentWellAToast(t *testing.T) {
+	view := &talk{pane: "%3", agent: "claude", reply: true}
+	if messages := view.patch(view.stands(&muiStatus{Text: "said before the view"})); messages != nil || view.status == nil {
+		t.Errorf("before the view is said: %s", messages)
+	}
+	view.heard(nil)
+	messages := view.patch(view.stands(&muiStatus{Text: "claude's replies are in its terminal", Tone: "warn"}))
+	if len(messages) != 1 || string(messages[0]) != `{"v":1,"pane":"%3","patch":[{"op":"status","text":"claude's replies are in its terminal","tone":"warn"}]}` {
+		t.Errorf("status = %s", messages)
+	}
+	if messages = view.patch(view.stands(nil)); len(messages) != 1 || string(messages[0]) != `{"v":1,"pane":"%3","patch":[{"op":"status"}]}` || view.status != nil {
+		t.Errorf("taken away = %s", messages)
+	}
+	toast := only(t, view.patch(view.went("claude stopped · codex goes on with this conversation", "ok")))
+	if len(toast.Patch) != 1 || toast.Patch[0].Op != "toast" || toast.Patch[0].Text != "claude stopped · codex goes on with this conversation" || toast.Patch[0].Tone != "ok" || view.status != nil {
+		t.Errorf("went well = %+v, status %+v", toast.Patch, view.status)
+	}
+	got := only(t, view.patch(view.went("codex goes on with this conversation · claude's window is still open: no window 2", "warn")))
+	if len(got.Patch) != 1 || got.Patch[0].Op != "status" || got.Patch[0].Tone != "warn" || view.status == nil || read(t, view.whole()).Status == nil {
+		t.Errorf("went otherwise = %+v", got.Patch)
+	}
+}
+
 // What the window's screen asks that the transcript does not — a
-// permission — is said as a question of the app's own after the last
-// turn, and taken out once answered. A transcript that ends on a question
-// nobody answered is the asking itself. An answer the window refused is
-// said as the status, the questions open again.
+// permission — is a question of the app's own after the last turn, and
+// taken out once answered; asked otherwise, it is another question at
+// another place. A transcript that ends on a question nobody answered is
+// the asking itself. An answer the window refused is said as the status,
+// and the question is open again: the app's own at another place, the
+// transcript's taken out and said again with what is said next.
 func TestWhatTheScreenAsksIsAQuestionOfTheChatsOwn(t *testing.T) {
 	view := &talk{pane: "%3", agent: "claude", reply: true}
 	view.heard([]app.Turn{{N: 1, Kind: "asked", Text: "hello"}, {N: 2, Kind: "tool", Text: "Run make"}})
 	asks := &app.Asks{Text: "Run make?", Options: []string{"Yes", "No"}, Selected: 1}
 	got := only(t, view.asked(asks))
-	if len(got.Patch) != 1 || got.Patch[0].Turn.N != 3 || got.Patch[0].Turn.Kind != "question" || got.Patch[0].Turn.Text != "Run make?" || !slices.Equal(got.Patch[0].Turn.Options, []string{"Yes", "No"}) {
+	if len(got.Patch) != 1 || got.Patch[0].Turn.N != chatOwn+1 || got.Patch[0].Turn.Kind != "question" || got.Patch[0].Turn.Text != "Run make?" || !slices.Equal(got.Patch[0].Turn.Options, []string{"Yes", "No"}) {
 		t.Fatalf("asked is said as %+v", got.Patch)
 	}
 	if messages := view.asked(&app.Asks{Text: "Run make?", Options: []string{"Yes", "No"}, Selected: 2}); messages != nil {
 		t.Errorf("the cursor moved, and it is said again: %s", messages)
 	}
-	got = only(t, view.asked(nil))
-	if got.View == nil || got.View.ID != "chat-1" || !slices.Equal(numbers(got.View.Turns), []int{1, 2}) {
-		t.Errorf("answered: %+v", got.View)
+	// sent while it asks: the question stands after what was sent
+	got = only(t, view.sends("yes, run it"))
+	if !slices.Equal(ops(got), []string{"unturn", "turn", "turn"}) || got.Patch[0].N != chatOwn+1 || got.Patch[1].Turn.N != chatOwn+2 || got.Patch[1].Turn.Kind != "asked" || got.Patch[2].Turn.N != chatOwn+3 || got.Patch[2].Turn.Kind != "question" {
+		t.Errorf("sent while it asks: %+v", got.Patch)
 	}
-	if got = only(t, view.asked(&app.Asks{Options: []string{"Yes", "No"}})); got.Patch[0].Turn.Text != "claude asks" {
+	view.refused(errors.New("claude asks first"))
+	got = only(t, view.reopened(chatOwn+3, errors.New("the cursor did not move to option 2, and nothing was answered")))
+	if !slices.Equal(ops(got), []string{"unturn", "turn", "status"}) || got.Patch[0].N != chatOwn+3 || got.Patch[1].Turn.N != chatOwn+4 || got.Patch[1].Turn.Text != "Run make?" || got.Patch[2].Tone != "bad" || !strings.HasPrefix(got.Patch[2].Text, "the cursor did not move") {
+		t.Errorf("its own question refused: %+v", got.Patch)
+	}
+	got = only(t, view.asked(nil))
+	if got.View != nil || len(got.Patch) != 1 || got.Patch[0].Op != "unturn" || got.Patch[0].ID != "chat" || got.Patch[0].N != chatOwn+4 {
+		t.Errorf("answered: %+v", got)
+	}
+	if got = only(t, view.asked(&app.Asks{Options: []string{"Yes", "No"}})); got.Patch[0].Turn.Text != "claude asks" || got.Patch[0].Turn.N != chatOwn+5 {
 		t.Errorf("one with no words: %+v", got.Patch[0].Turn)
 	}
 	view.asked(nil)
@@ -530,13 +597,19 @@ func TestWhatTheScreenAsksIsAQuestionOfTheChatsOwn(t *testing.T) {
 	if messages := view.asked(asks); len(messages) != 0 {
 		t.Errorf("the transcript's own question, said twice: %s", messages)
 	}
-	got = only(t, view.reopened(errors.New("the cursor did not move to option 2, and nothing was answered")))
-	if got.View.ID != "chat-3" || got.Status == nil || got.Status.Tone != "bad" || !strings.HasPrefix(got.Status.Text, "the cursor did not move") || got.View.Turns[2].Answer != "" {
-		t.Errorf("refused: %+v, %+v", got.View, got.Status)
+	got = only(t, view.reopened(3, errors.New("the cursor did not move to option 2, and nothing was answered")))
+	if got.View != nil || !slices.Equal(ops(got), []string{"unturn", "status"}) || got.Patch[0].ID != "chat" || got.Patch[0].N != 3 || got.Patch[1].Tone != "bad" || !strings.HasPrefix(got.Patch[1].Text, "the cursor did not move") {
+		t.Errorf("refused: %+v", got)
+	}
+	if got = only(t, view.asked(asks)); len(got.Patch) != 1 || got.Patch[0].Op != "turn" || got.Patch[0].Turn.N != 3 || got.Patch[0].Turn.Kind != "question" || got.Patch[0].Turn.Answer != "" {
+		t.Errorf("said again, open: %+v", got.Patch)
+	}
+	if messages := view.asked(asks); len(messages) != 0 {
+		t.Errorf("said again twice: %s", messages)
 	}
 	// answered, and the screen asks on: its question comes after what came since
 	got = only(t, view.heard([]app.Turn{{N: 4, Kind: "answer", Text: "A", Question: 3}, {N: 5, Kind: "tool", Text: "Run make"}}))
-	if len(got.Patch) != 3 || got.Patch[2].Turn.N != 6 || got.Patch[2].Turn.Kind != "question" || got.Patch[2].Turn.Text != "Run make?" {
+	if len(got.Patch) != 3 || got.Patch[2].Turn.N <= chatOwn || got.Patch[2].Turn.Kind != "question" || got.Patch[2].Turn.Text != "Run make?" {
 		t.Errorf("after an answered question: %+v", got)
 	}
 }
@@ -550,25 +623,32 @@ func chatAgents() []app.AgentModels {
 	}
 }
 
-// The models are the setups used here first, then each installed agent's
-// under its head — the chat's own agent's installed or not, an agent with
-// none once — the one that runs checked and under the keys, an item's
-// menu its efforts with the one it runs at checked; what is typed narrows
-// them.
-func TestTheModelsAreAPaletteInPlaceOfTheChat(t *testing.T) {
-	view := &chatView{talk: &talk{pane: "%5", agent: "claude"}, mode: picking, worktree: "monduli", window: "2",
+// The models are a modal over the chat: a bare search line over one list
+// in a room of its own — the setups used here first, then each installed
+// agent's under its head, the chat's own agent's installed or not, an
+// agent with none once — the one that runs checked and under the keys, an
+// item's menu its efforts with the one it runs at checked; what is typed
+// narrows them. It is put over the chat by a patch, and the chat is not
+// said again.
+func TestTheModelsAreAModalOverTheChat(t *testing.T) {
+	view := &chatView{talk: &talk{pane: "%5", agent: "claude", reply: true}, worktree: "monduli", window: "2",
 		runs:   app.Runs{Agent: "claude", Model: "opus", Effort: "high", Account: "work", Live: true},
 		agents: chatAgents(),
 		setups: []app.Setup{{Agent: "codex", Model: "gpt-6-luna", Effort: "high"}, {Agent: "claude", Role: "reviewer"}, {Agent: "gone", Model: "x"}}}
-	got := read(t, view.whole(true))
-	if !got.Fill || got.Focus != "q" || len(got.Keys) != 1 || got.Keys[0] != (chatKey{Key: "esc", Label: "back to the chat", ID: "back"}) || got.View != nil {
-		t.Fatalf("message = %+v", got)
+	view.talk.heard([]app.Turn{{N: 1, Kind: "asked", Text: "hello"}})
+	got := only(t, view.up(picking))
+	if got.View != nil || len(got.Patch) != 1 || got.Patch[0].Op != "add" || got.Patch[0].ID != "view" || view.mode != picking || view.talk.keys != "q" {
+		t.Fatalf("put up as %+v", got)
 	}
-	field, list := got.Whole.find("field"), got.Whole.find("list")
-	if field == nil || field.ID != "q" || !field.Bare || !field.Live || field.List != "models" || field.Right != "5 models" || field.Icon != "search" {
+	modal := got.Patch[0].Node
+	if modal.T != "modal" || modal.ID != "over" || modal.Title != "Model" || modal.W != 520 || len(modal.Children) != 3 || modal.Children[1].T != "divider" || modal.find("chat") != nil {
+		t.Fatalf("modal = %+v", modal)
+	}
+	field, list := modal.Children[0], modal.Children[2]
+	if field.T != "field" || field.ID != "q" || !field.Bare || !field.Live || field.List != "models" || field.Right != "5 models" || field.Icon != "search" {
 		t.Errorf("field = %+v", field)
 	}
-	if list == nil || list.ID != "models" || list.Menu != "effort" || list.Selected != "a|claude|opus" {
+	if list.T != "list" || list.ID != "models" || list.Menu != "effort" || list.Max != 11 || list.Selected != "a|claude|opus" {
 		t.Fatalf("list = %+v", list)
 	}
 	var said []string
@@ -592,16 +672,93 @@ func TestTheModelsAreAPaletteInPlaceOfTheChat(t *testing.T) {
 		t.Errorf("an agent with no models = %+v", none)
 	}
 
+	// what is typed says the modal again, narrowed: the keys and the field's words stay the person's
 	view.query = " LUNA"
-	list = read(t, view.whole(false)).Whole.find("list")
-	if len(list.Items) != 4 || list.Items[1].ID != "u|codex|high|gpt-6-luna" || list.Items[3].ID != "a|codex|gpt-6-luna" || list.Selected != "" {
+	got = only(t, view.again())
+	if len(got.Patch) != 1 || got.Patch[0].Op != "set" || got.Patch[0].ID != "over" || got.Patch[0].Node.T != "modal" {
+		t.Fatalf("said again as %+v", got.Patch)
+	}
+	if list := got.Patch[0].Node.find("list"); len(list.Items) != 4 || list.Items[1].ID != "u|codex|high|gpt-6-luna" || list.Items[3].ID != "a|codex|gpt-6-luna" || list.Selected != "" {
 		t.Errorf("narrowed to %+v", list.Items)
 	}
+	if right := got.Patch[0].Node.find("field").Right; right != "2 models" {
+		t.Errorf("the field counts %q", right)
+	}
+	// why a pick was not done is said at the modal's foot, in it
+	view.told = &muiStatus{Text: "claude cannot be switched to another model while it runs", Tone: "bad"}
+	if foot := pieceOf(t, view.models(false)).Children; len(foot) != 4 || foot[3].T != "text" || foot[3].Tone != "bad" || !strings.HasPrefix(foot[3].Text, "claude cannot be switched") {
+		t.Errorf("foot = %+v", foot)
+	}
+
+	// more models than a modal holds are cut to those that fit, and counted all the same
+	var many []plugin.Model
+	for n := range 2 * muiPieces {
+		many = append(many, plugin.Model{ID: "p/m" + strconv.Itoa(n), Label: "m" + strconv.Itoa(n)})
+	}
+	crowd := &chatView{talk: &talk{agent: "opencode"}, mode: picking, runs: app.Runs{Agent: "opencode"}, agents: []app.AgentModels{{Name: "opencode", Models: many, Installed: true}}}
+	cut := pieceOf(t, crowd.models(false))
+	if rows := len(cut.find("list").Items); rows > chatFrame-16 || rows < chatHeads || cut.find("field").Right != counted(len(many), "model") || len(crowd.models(false)) > muiLimit-2*patchEnvelope {
+		t.Errorf("%d models are said in %d rows, %d bytes", len(many), rows, len(crowd.models(false)))
+	}
+
 	if rows := chatModels(chatAgents(), nil, "pi", ""); !slices.ContainsFunc(rows, func(m chatModel) bool { return m.agent == "pi" && m.model == "anthropic/claude-opus-5" }) {
 		t.Errorf("the chat's own agent, not installed, is not listed: %+v", rows)
 	}
 	if row, ok := chatModelOf(chatModel{agent: "pi", model: "a|b/c"}.id()); !ok || row.agent != "pi" || row.model != "a|b/c" {
 		t.Errorf("a model's id read back: %+v", row)
+	}
+}
+
+// A modal is taken away by a patch that changes nothing else: esc leaves
+// the chat, its turns, its status and what runs as they were. A pick that
+// switched takes it away in the patch that says the line over the chat
+// again and what was done as a toast. While it is up the chat's own
+// changes go on being said, and the view said whole — its pane come into
+// sight — is the chat with the keys on the modal's piece, then the modal
+// put back.
+func TestAModalIsPutOverTheChatAndTakenAwayByPatches(t *testing.T) {
+	for mode, keys := range map[chatMode]string{picking: "q", looking: "earlier"} {
+		view := &chatView{talk: &talk{pane: "%5", agent: "claude", about: "claude · opus", reply: true, status: &muiStatus{Text: "as it was"}}, worktree: "monduli", window: "2", id: "c2",
+			runs: app.Runs{Agent: "claude", Model: "opus", Live: true}, agents: chatAgents()}
+		view.listed([]app.Head{{ID: "c2", Agent: "claude"}, {ID: "c1", Agent: "codex"}}, time.Now())
+		view.talk.heard([]app.Turn{{N: 1, Kind: "asked", Text: "hello"}})
+		view.up(mode)
+		if got := view.deed(chatEvent{E: "dismiss", ID: "over"}); got != (chatDeed{do: chatBack}) {
+			t.Fatalf("esc in mode %d asks %+v", mode, got)
+		}
+		// a turn comes while it is up: a patch to the chat behind it
+		if got := only(t, view.talk.heard([]app.Turn{{N: 2, Kind: "said", Text: "Hello."}})); len(got.Patch) != 1 || got.Patch[0].Op != "turn" || got.Patch[0].ID != "chat" {
+			t.Errorf("in mode %d a turn is said as %+v", mode, got)
+		}
+		again := view.talk.said()
+		if len(again) != 2 {
+			t.Fatalf("in mode %d said whole in %d messages", mode, len(again))
+		}
+		whole, back := read(t, again[0]), read(t, again[1])
+		if whole.Focus != keys || whole.Whole.find("modal") != nil || !slices.Equal(numbers(whole.View.Turns), []int{1, 2}) ||
+			len(back.Patch) != 1 || back.Patch[0].Op != "add" || back.Patch[0].ID != "view" || back.Patch[0].Node.T != "modal" || back.Patch[0].Node.find("list").Selected != "" {
+			t.Errorf("in mode %d said whole as focus %q, then %+v", mode, whole.Focus, back.Patch)
+		}
+		messages := view.shut()
+		if len(messages) != 1 || string(messages[0]) != `{"v":1,"pane":"%5","patch":[{"op":"remove","id":"over"}]}` {
+			t.Errorf("in mode %d taken away as %s", mode, messages)
+		}
+		if view.mode != chatting || view.talk.over != nil || view.talk.status == nil || view.runs.Model != "opus" || view.id != "c2" || len(view.talk.said()) != 1 {
+			t.Errorf("in mode %d, after esc: %+v", mode, view)
+		}
+		if whole = read(t, view.talk.whole()); whole.Focus != "chat" || whole.Status == nil || whole.Status.Text != "as it was" {
+			t.Errorf("in mode %d, the chat after esc: focus %q, status %+v", mode, whole.Focus, whole.Status)
+		}
+	}
+
+	view := &chatView{talk: &talk{pane: "%5", agent: "claude", about: "claude · opus", reply: true}, window: "2", runs: app.Runs{Agent: "claude", Model: "opus", Live: true}, agents: chatAgents()}
+	view.talk.heard(nil)
+	view.up(picking)
+	view.talk.about = "claude · sonnet · low"
+	got := only(t, view.shut(encode(chatOp{Op: "set", ID: "about", Node: chatHead(view.talk.about)}), view.talk.went("claude switched to sonnet low", "ok")))
+	if !slices.Equal(ops(got), []string{"remove", "set", "toast"}) || got.Patch[1].ID != "about" || got.Patch[1].Node.ID != "about" || got.Patch[1].Node.Text != "claude · sonnet · low" ||
+		got.Patch[2].Text != "claude switched to sonnet low" || got.Patch[2].Tone != "ok" || view.talk.status != nil {
+		t.Errorf("a switch is said as %+v", got.Patch)
 	}
 }
 
@@ -627,7 +784,7 @@ func TestOpencodesModelsAreInThePaletteAndAPickStartsItAgain(t *testing.T) {
 		t.Errorf("another agent's conversation says nothing of this one: %+v", other)
 	}
 	view := &chatView{talk: &talk{pane: "%5", agent: "opencode"}, mode: picking, worktree: "monduli", window: "3", id: "ses_1", runs: runs, agents: agents}
-	list := read(t, view.whole(true)).Whole.find("list")
+	list := pieceOf(t, view.models(true)).find("list")
 	var said []string
 	for _, item := range list.Items {
 		said = append(said, cmp.Or(item.ID, "# "+item.Head))
@@ -656,7 +813,7 @@ func TestOpencodesModelsAreInThePaletteAndAPickStartsItAgain(t *testing.T) {
 		t.Errorf("a pick of another agent's asks %+v", got)
 	}
 	view.query = "OLLAMA"
-	if list := read(t, view.whole(false)).Whole.find("list"); len(list.Items) != 2 || list.Items[1].ID != "a|opencode|ollama/qwen3:4b" {
+	if list := pieceOf(t, view.models(false)).find("list"); len(list.Items) != 2 || list.Items[1].ID != "a|opencode|ollama/qwen3:4b" {
 		t.Errorf("narrowed by a provider to %+v", list.Items)
 	}
 
@@ -668,7 +825,7 @@ func TestOpencodesModelsAreInThePaletteAndAPickStartsItAgain(t *testing.T) {
 	// with none listed it is as it was: one row, its model chosen inside it
 	agents[2].Models = []plugin.Model{}
 	view.agents, view.query = agents, ""
-	list = read(t, view.whole(false)).Whole.find("list")
+	list = pieceOf(t, view.models(false)).find("list")
 	if none := list.Items[len(list.Items)-1]; none.ID != "a|opencode|" || none.Note != "its model is chosen inside it" {
 		t.Errorf("with no models listed = %+v", none)
 	}
@@ -693,11 +850,12 @@ func TestWhatAnEventAsksOfTheChat(t *testing.T) {
 		{chatting, chatEvent{E: "send", Text: "  "}, chatDeed{}},
 		{chatting, chatEvent{E: "choose", Question: 4, Option: 1}, chatDeed{do: chatChoose, question: 4, option: 1}},
 		{chatting, chatEvent{E: "stop"}, chatDeed{do: chatStop}},
-		{chatting, chatEvent{E: "press", ID: "models"}, chatDeed{do: chatModelsUp}},
-		{chatting, chatEvent{E: "press", ID: "earlier"}, chatDeed{do: chatEarlier}},
-		{chatting, chatEvent{E: "press", ID: "back"}, chatDeed{}},
+		{chatting, chatEvent{E: "press", ID: "open-models"}, chatDeed{do: chatModelsUp}},
+		{chatting, chatEvent{E: "press", ID: "open-earlier"}, chatDeed{do: chatEarlier}},
+		{chatting, chatEvent{E: "dismiss", ID: "over"}, chatDeed{}},
 		{picking, chatEvent{E: "send", Text: "typed into the chat before"}, chatDeed{}},
-		{picking, chatEvent{E: "press", ID: "back"}, chatDeed{do: chatBack}},
+		{picking, chatEvent{E: "press", ID: "open-earlier"}, chatDeed{}},
+		{picking, chatEvent{E: "dismiss", ID: "over"}, chatDeed{do: chatBack}},
 		{picking, chatEvent{E: "change", ID: "q", Text: "lu"}, chatDeed{do: chatNarrow, text: "lu"}},
 		{picking, chatEvent{E: "pick", List: "models", ID: "a|claude|sonnet"}, chatDeed{do: chatSwitch, model: "sonnet"}},
 		{picking, chatEvent{E: "pick", List: "models", ID: "a|claude|sonnet", Sub: "low"}, chatDeed{do: chatSwitch, model: "sonnet", effort: "low"}},
@@ -706,12 +864,19 @@ func TestWhatAnEventAsksOfTheChat(t *testing.T) {
 		{picking, chatEvent{E: "pick", List: "models", ID: "u|codex|high|gpt-6-luna"}, chatDeed{do: chatHand, agent: "codex", model: "gpt-6-luna", effort: "high"}},
 		{picking, chatEvent{E: "pick", List: "models", ID: "a|opencode|"}, chatDeed{do: chatHand, agent: "opencode"}},
 		{picking, chatEvent{E: "pick", List: "models", ID: "nonsense"}, chatDeed{}},
-		{looking, chatEvent{E: "press", ID: "back"}, chatDeed{do: chatBack}},
+		{looking, chatEvent{E: "dismiss", ID: "over"}, chatDeed{do: chatBack}},
+		{looking, chatEvent{E: "dismiss", ID: "another"}, chatDeed{}},
 		{looking, chatEvent{E: "move", List: "earlier", ID: "c1"}, chatDeed{do: chatRead, id: "c1"}},
 		{looking, chatEvent{E: "move", List: "earlier", ID: "c2"}, chatDeed{}},
 		{looking, chatEvent{E: "pick", List: "earlier", ID: "c2"}, chatDeed{do: chatShow, id: "c2"}},
 		{looking, chatEvent{E: "pick", List: "earlier", ID: "c0"}, chatDeed{do: chatGoOn, id: "c0"}},
 		{looking, chatEvent{E: "pick", List: "earlier", ID: "c9"}, chatDeed{}},
+		{looking, chatEvent{E: "pick", List: "earlier", ID: "c2", Sub: "resume"}, chatDeed{do: chatShow, id: "c2"}},
+		{looking, chatEvent{E: "pick", List: "earlier", ID: "c0", Sub: "resume"}, chatDeed{do: chatGoOn, id: "c0"}},
+		{looking, chatEvent{E: "pick", List: "earlier", ID: "c1", Sub: "continue"}, chatDeed{do: chatContinue, id: "c1"}},
+		{looking, chatEvent{E: "pick", List: "earlier", ID: "c0", Sub: "continue"}, chatDeed{}},
+		{looking, chatEvent{E: "pick", List: "earlier", ID: "c1", Sub: "copy"}, chatDeed{do: chatCopy, id: "c1"}},
+		{looking, chatEvent{E: "pick", List: "earlier", ID: "c9", Sub: "copy"}, chatDeed{}},
 		{looking, chatEvent{E: "press", ID: "continue", Item: "c0"}, chatDeed{}},
 		{looking, chatEvent{E: "press", ID: "continue", Item: "c1"}, chatDeed{do: chatSay, id: "c1",
 			text: "c again hands this to claude in a new window: what was said and each thing done carry over, what codex thought and its tools' output do not"}},
@@ -733,21 +898,23 @@ func TestWhatAnEventAsksOfTheChat(t *testing.T) {
 
 	// a conversation no window has open is only shown: its earlier ones too
 	view.mode, view.window = chatting, ""
-	for _, event := range []chatEvent{{E: "send", Text: "go on"}, {E: "choose"}, {E: "stop"}, {E: "press", ID: "models"}} {
+	for _, event := range []chatEvent{{E: "send", Text: "go on"}, {E: "choose"}, {E: "stop"}, {E: "press", ID: "open-models"}} {
 		if got := view.deed(event); got != (chatDeed{}) {
 			t.Errorf("with no window, %+v asks %+v", event, got)
 		}
 	}
-	if got := view.deed(chatEvent{E: "press", ID: "earlier"}); got.do != chatEarlier {
+	if got := view.deed(chatEvent{E: "press", ID: "open-earlier"}); got.do != chatEarlier {
 		t.Errorf("with no window, earlier asks %+v", got)
 	}
 }
 
-// Earlier is the worktree's conversations as a list beside the one under
-// the keys read back: what was first asked, the agent and when at the
-// right, the one a window has open running, c on one of another agent,
-// and the chat beside it with no field.
-func TestEarlierIsAListBesideTheConversationUnderTheKeys(t *testing.T) {
+// Earlier is a modal over the chat: the worktree's conversations as a
+// list in a room of its own beside the one under the keys read back, a
+// chat with no field in a column of a height of its own. A row says what
+// was first asked, the agent and when at the right, the one a window has
+// open running, c on one of another agent; its menu, which the pointer's
+// other button opens too, is what can be done to it.
+func TestEarlierIsAModalOfAListBesideTheConversationUnderTheKeys(t *testing.T) {
 	now := time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)
 	view := &chatView{talk: &talk{pane: "%5", agent: "claude"}, worktree: "monduli", window: "2", id: "c2", runs: app.Runs{Agent: "claude"}}
 	view.listed([]app.Head{
@@ -755,47 +922,112 @@ func TestEarlierIsAListBesideTheConversationUnderTheKeys(t *testing.T) {
 		{ID: "c1", Agent: "codex", Asked: "why is the tab a pill", Active: now.Add(-4 * 24 * time.Hour)},
 		{ID: "c0", Agent: "claude", Active: now.Add(-3 * time.Hour)},
 	}, now)
-	view.mode = looking
 	view.reads("c1", []app.Turn{{N: 1, Kind: "asked", Text: "why is the tab a pill"}, {N: 2, Kind: "did", Text: "mia ls"}, {N: 3, Kind: "said", Text: "The hover style won."}})
-	got := read(t, view.whole(true))
-	if !got.Fill || got.Focus != "earlier" || len(got.Keys) != 1 || got.Keys[0].Key != "esc" || got.Keys[0].ID != "back" {
-		t.Fatalf("message = %+v", got)
+	view.talk.heard(nil)
+	got := only(t, view.up(looking))
+	if got.View != nil || len(got.Patch) != 1 || got.Patch[0].Op != "add" || got.Patch[0].ID != "view" || view.mode != looking || view.talk.keys != "earlier" {
+		t.Fatalf("put up as %+v", got)
 	}
-	if line := got.Whole.Children[0].Children[0]; line.Text != "Earlier in monduli · 3 conversations" {
+	modal := got.Patch[0].Node
+	if modal.T != "modal" || modal.ID != "over" || modal.Title != "Earlier" || modal.W != 720 || len(modal.Children) != 2 {
+		t.Fatalf("modal = %+v", modal)
+	}
+	if line := modal.Children[0]; line.T != "text" || line.Text != "in monduli · 3 conversations" || line.Style != "dim" {
 		t.Errorf("line = %+v", line)
 	}
-	split := got.Whole.Children[1]
-	if split.T != "row" || !split.Split || split.Grow != 1 || len(split.Children) != 3 || split.Children[0].W != 360 || !split.Children[0].Scroll || split.Children[1].T != "divider" {
+	split := modal.Children[1]
+	if split.T != "row" || !split.Split || len(split.Children) != 2 || split.Children[0].T != "col" || split.Children[0].W != 300 || split.Children[1].T != "col" || split.Children[1].H != 420 {
 		t.Fatalf("split = %+v", split)
 	}
 	list := split.Children[0].find("list")
-	if list == nil || list.ID != "earlier" || !list.Live || !list.Flat || list.Selected != "c1" || len(list.Items) != 3 {
+	if list == nil || list.ID != "earlier" || !list.Live || !list.Flat || list.Max != 12 || list.Menu != "more" || list.Selected != "c1" || len(list.Items) != 13 {
 		t.Fatalf("list = %+v", list)
+	}
+	// (a short list is made as tall as the chat beside it by heads with no words, which the keys pass over)
+	if slices.ContainsFunc(list.Items[3:], func(gap chatItem) bool { return gap.ID != "" || gap.Head != " " || gap.Title != "" }) {
+		t.Errorf("under its rows = %+v", list.Items[3:])
 	}
 	first, second, third := list.Items[0], list.Items[1], list.Items[2]
 	if first.Title != "make the list faster" || first.Right != "claude · now" || first.Running == nil || !*first.Running || first.Icon != "claude" || len(first.Keys) != 0 || first.Does != "back to it" {
 		t.Errorf("the running one = %+v", first)
 	}
-	if second.Right != "codex · 4d" || *second.Running || len(second.Keys) != 1 || second.Keys[0] != (chatKey{Key: "c", Label: "continue in claude", ID: "continue"}) || second.Does != "go on with it" {
+	if second.Right != "codex · 4d" || *second.Running || len(second.Keys) != 1 || second.Keys[0] != (chatKey{Key: "c", Label: "continue", ID: "continue"}) || second.Does != "go on with it" {
 		t.Errorf("another agent's = %+v", second)
 	}
 	if third.Title != "nothing asked yet" || third.Right != "claude · 3h" || len(third.Keys) != 0 {
 		t.Errorf("one with nothing asked = %+v", third)
 	}
-	if beside := split.Children[2]; beside.T != "chat" || beside.ID != "read-c1" || beside.Agent != "codex" || beside.Reply || !slices.Equal(numbers(beside.Turns), []int{1, 3}) {
+	menu := func(item chatItem) []string {
+		var said []string
+		for _, one := range item.Menu {
+			said = append(said, one.ID+": "+one.Title)
+		}
+		return said
+	}
+	if got := menu(first); !slices.Equal(got, []string{"resume: Go to it", "copy: Copy its id"}) {
+		t.Errorf("the running one's menu = %q", got)
+	}
+	if got := menu(second); !slices.Equal(got, []string{"resume: Resume", "continue: Continue with claude", "copy: Copy its id"}) {
+		t.Errorf("another agent's menu = %q", got)
+	}
+	if got := menu(third); !slices.Equal(got, []string{"resume: Resume", "copy: Copy its id"}) {
+		t.Errorf("the same agent's menu = %q", got)
+	}
+	if beside := split.Children[1].Children[0]; beside.T != "chat" || beside.ID != "read-c1" || beside.Agent != "codex" || beside.Reply || !slices.Equal(numbers(beside.Turns), []int{1, 3}) {
 		t.Errorf("read back = %+v", beside)
 	}
-	if list = read(t, view.whole(false)).Whole.find("list"); list.Selected != "" {
-		t.Errorf("said again, the keys are put on %q", list.Selected)
+
+	// the keys moved: the modal is said again with that one read back, and the keys are not put anywhere
+	view.reads("c0", nil)
+	got = only(t, view.again())
+	if len(got.Patch) != 1 || got.Patch[0].Op != "set" || got.Patch[0].ID != "over" || got.Patch[0].Node.find("list").Selected != "" || got.Patch[0].Node.find("chat").ID != "read-c0" {
+		t.Errorf("said again as %+v", got.Patch)
 	}
+	// what c does, said the first time it is pressed, is at the modal's foot
+	view.told = &muiStatus{Text: "c again hands this to claude in a new window", Tone: "warn"}
+	if foot := pieceOf(t, view.earlier(false)).Children; len(foot) != 3 || foot[2].T != "text" || foot[2].Tone != "warn" || foot[2].Text != "c again hands this to claude in a new window" {
+		t.Errorf("foot = %+v", foot)
+	}
+	view.told = nil
 
 	var long []app.Turn
 	for n := 1; n <= 3*chatReadMost; n++ {
 		long = append(long, app.Turn{N: n, Kind: "tool", Text: "Read a file"})
 	}
 	view.reads("c0", long)
-	if beside := read(t, view.whole(false)).Whole.find("chat"); len(beside.Turns) != chatReadMost || beside.Turns[chatReadMost-1].N != 3*chatReadMost {
+	if beside := pieceOf(t, view.earlier(false)).find("chat"); len(beside.Turns) != chatReadMost || beside.Turns[chatReadMost-1].N != 3*chatReadMost {
 		t.Errorf("a long one is read back by %d turns", len(beside.Turns))
+	}
+	// as many conversations as it lists, each read back by as many turns: a modal the window takes over a chat grown full
+	var heads []app.Head
+	for n := range 2 * chatHeads {
+		heads = append(heads, app.Head{ID: "c" + strconv.Itoa(n), Agent: "codex", Asked: strings.Repeat("w", chatSaid)})
+	}
+	view.listed(heads, now)
+	view.reads("c0", long)
+	full := pieceOf(t, view.earlier(true))
+	if rows, turns := len(full.find("list").Items), len(full.find("chat").Turns); rows != chatHeads || turns != chatReadMost || rows+turns+16 > chatFrame || len(view.earlier(true)) > muiLimit-2*patchEnvelope {
+		t.Errorf("%d rows beside %d turns, in %d bytes", rows, turns, len(view.earlier(true)))
+	}
+	// and of rows whose words are long in a message's bytes, those that fit it
+	for n := range heads {
+		heads[n].Asked = strings.Repeat("é", chatSaid)
+	}
+	view.listed(heads, now)
+	full = pieceOf(t, view.earlier(true))
+	if rows := len(full.find("list").Items); rows == 0 || rows >= chatHeads || len(full.find("chat").Turns) != chatReadMost || len(view.earlier(true)) > muiLimit-2*patchEnvelope {
+		t.Errorf("%d long rows, in %d bytes", rows, len(view.earlier(true)))
+	}
+}
+
+// The id of a conversation is put on the clipboard by a change, and a
+// toast says so.
+func TestAConversationsIdIsCopiedByAChange(t *testing.T) {
+	view := &talk{pane: "%5", agent: "claude"}
+	view.heard(nil)
+	messages := view.patch(encode(chatOp{Op: "copy", Text: "c1"}), view.went("copied c1", "ok"))
+	if len(messages) != 1 || string(messages[0]) != `{"v":1,"pane":"%5","patch":[{"op":"copy","text":"c1"},{"op":"toast","text":"copied c1","tone":"ok"}]}` {
+		t.Errorf("copied as %s", messages)
 	}
 }
 
@@ -822,7 +1054,7 @@ func (f *fakeMia) CloseWindow(record model.Record, window string) error {
 // for every pair of the agents mia knows: it is started quiet on the
 // model in a window of its own, and only once it runs is the window of
 // the agent it was with closed. Refused, ended as it started, or this
-// chat's own window: nothing is closed, and the status says why.
+// chat's own window: nothing is closed, and what is said says why.
 func TestAnotherAgentsModelHandsTheConversationOverAndClosesTheOldWindowLast(t *testing.T) {
 	record := model.Record{Name: "monduli"}
 	agents := []app.AgentModels{
@@ -915,19 +1147,20 @@ func TestTheFirstThingSentAfterAHandingCarriesTheConversation(t *testing.T) {
 	// the chat goes on from the one before: its turns stay over a quiet line, and what is heard comes after
 	before := &talk{agent: "claude"}
 	before.heard([]app.Turn{{N: 1, Kind: "asked", Text: "make it faster"}, {N: 2, Kind: "said", Text: "It is faster."}})
-	chat := &talk{pane: "%3", agent: "codex", reply: true, anew: 1}
+	chat := &talk{pane: "%3", agent: "codex", reply: true, nth: 1}
 	chat.goesOn(before)
 	got := read(t, chat.whole())
 	if !slices.Equal(numbers(got.View.Turns), []int{1, 2, 3}) || got.View.Turns[2].Kind != "tool" || got.View.Turns[2].Text != "continued by codex" || got.View.ID != "chat-1" {
 		t.Fatalf("gone on: %+v", got.View)
 	}
 	sent := only(t, chat.sends("and the tests"))
-	if sent.Patch[0].Turn.N != 4 || sent.Patch[0].Turn.Text != "and the tests" {
+	if sent.Patch[0].Turn.N != chatOwn+1 || sent.Patch[0].Turn.Text != "and the tests" {
 		t.Errorf("sent is said as %+v", sent.Patch[0].Turn)
 	}
 	heard := only(t, chat.heard([]app.Turn{{N: 1, Kind: "asked", Text: first}, {N: 2, Kind: "question", Text: "Which?", Options: []string{"A", "B"}}, {N: 3, Kind: "answer", Text: "A", Question: 2}}))
-	if len(heard.Patch) != 3 || heard.Patch[0].Turn.N != 4 || heard.Patch[0].Turn.Text != "and the tests" || heard.Patch[2].Turn.N != 6 || heard.Patch[2].Turn.Question != 5 || chat.anew != 1 || len(chat.sent) != 0 {
-		t.Errorf("its transcript's turns: %+v, anew %d, sent %q", heard.Patch, chat.anew, chat.sent)
+	if !slices.Equal(ops(heard), []string{"unturn", "turn", "turn", "turn"}) || heard.Patch[0].N != chatOwn+1 || heard.Patch[1].ID != "chat-1" || heard.Patch[1].Turn.N != 4 || heard.Patch[1].Turn.Text != "and the tests" ||
+		heard.Patch[3].Turn.N != 6 || heard.Patch[3].Turn.Question != 5 || len(chat.sent) != 0 {
+		t.Errorf("its transcript's turns: %+v, sent %+v", heard.Patch, chat.sent)
 	}
 }
 
@@ -992,7 +1225,8 @@ func TestWhatAWindowGoesOnFromIsSaidOnceWhicheverChatSendsFirst(t *testing.T) {
 // window, where a chat started after finds it: the turns so far over the
 // line that says who goes on, and the handoff said with the first thing
 // sent, after which the window keeps nothing. The old agent's window is
-// closed.
+// closed, and the chat of the new one is said whole with a toast that
+// says so, not a status that stays.
 func TestAHandingIsKeptOnTheNewWindowUntilTheFirstSend(t *testing.T) {
 	roleLab(t)
 	claude := t.TempDir()
@@ -1027,8 +1261,9 @@ func TestAHandingIsKeptOnTheNewWindowUntilTheFirstSend(t *testing.T) {
 			old = strconv.Itoa(w.Index)
 		}
 	}
+	var said [][]byte
 	chat := func(window string) *chatRun {
-		run := &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, say: func(...[]byte) {}, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
+		run := &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, say: func(messages ...[]byte) { said = append(said, messages...) }, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
 		run.aim(app.Head{}, window)
 		t.Cleanup(func() { close(run.quit) })
 		return run
@@ -1036,8 +1271,12 @@ func TestAHandingIsKeptOnTheNewWindowUntilTheFirstSend(t *testing.T) {
 	first := chat(old)
 	first.view.id, first.view.runs.Agent = "c1", "claude"
 	first.act(chatDeed{do: chatHand, agent: "echo", model: "loud"})
-	if status := first.view.talk.status; status == nil || status.Text != "claude stopped · echo goes on with this conversation" {
-		t.Fatalf("status = %+v", status)
+	if len(said) != 2 || first.view.mode != chatting {
+		t.Fatalf("%d messages: %s", len(said), said)
+	}
+	if whole, toast := read(t, said[0]), read(t, said[1]); whole.View == nil || whole.View.ID != "chat-1" || whole.View.Agent != "echo" ||
+		len(toast.Patch) != 1 || toast.Patch[0].Op != "toast" || toast.Patch[0].Tone != "ok" || toast.Patch[0].Text != "claude stopped · echo goes on with this conversation" {
+		t.Fatalf("said %s", said)
 	}
 	if session.Here().HasWindow(record.Name, "old") {
 		t.Error("the old agent's window is still there")

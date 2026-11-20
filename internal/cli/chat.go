@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -25,18 +26,22 @@ const chatUsage = "mia chat [--window <index>] [--conversation <id>]"
 // chatTurns is how many turns the view said whole has at most: under what
 // the window takes, so that turns can be added to it by patches before it
 // must be said again.
-const chatTurns = 1500
+const chatTurns = 1000
 
 // patchEnvelope is more than a patch's message is around its changes: its
 // version and its pane.
 const patchEnvelope = 64
 
 // What the window takes besides a chat's turns: chatFrame is more than the
-// pieces a view has around them, chatSaid the characters it keeps of a
-// status and of a list's words, chatHeads how many conversations Earlier
-// lists, and chatReadMost how many turns of one it reads back.
+// pieces a view has around them — its own few, and those of a modal over
+// it, a list of chatHeads beside chatReadMost turns — chatSaid the
+// characters it keeps of a status, a toast and a list's words, chatDraft
+// those it keeps of what a chat's field holds, chatHeads how many
+// conversations Earlier lists, and chatReadMost how many turns of one it
+// reads back.
 const (
-	chatFrame = 16
+	chatFrame = 720
+	chatDraft = 4000
 	// chatCarry is how many bytes of a conversation gone on from are said
 	// in front of the first thing sent to the agent that goes on with it:
 	// what is pasted into a window in one go.
@@ -44,12 +49,22 @@ const (
 	chatSaid     = 200
 	chatHeads    = 300
 	chatReadMost = 400
+	// chatOwn is the place before the first turn of the app's own: after
+	// any a transcript has. The window keeps a turn it was told and takes
+	// another at its place only as a reply grown longer, so a turn of the
+	// app's own has a place no other turn ever has, and is taken out by it.
+	chatOwn = 1 << 30
+	// chatRoom is how tall the conversation read back in Earlier is, in
+	// points: what the window gives a chat among other pieces.
+	chatRoom = 420
+	// chatOver is the id of the modal over the chat: the models, or the
+	// earlier conversations.
+	chatOver = "over"
 )
 
 // chatMessage is a view said whole: a UI that fills its pane, the piece
-// the keys are put on (once each time another is named), how things stand
-// at the right of its top line, and the keys it takes whatever piece has
-// them.
+// the keys are put on (once each time another is named), and how things
+// stand at the right of its top line.
 type chatMessage struct {
 	V      int             `json:"v"`
 	Pane   string          `json:"pane,omitempty"`
@@ -57,11 +72,10 @@ type chatMessage struct {
 	Focus  string          `json:"focus,omitempty"`
 	Status *muiStatus      `json:"status,omitempty"`
 	View   json.RawMessage `json:"view"`
-	Keys   []chatKey       `json:"keys,omitempty"`
 }
 
-// chatKey is a key the view takes, or an item of a list while the keys are
-// on it: what it is called along the foot, and the id it is said by.
+// chatKey is a key an item of a list takes while the keys are on it: what
+// it is called along the foot, and the id it is said by.
 type chatKey struct {
 	Key   string `json:"key"`
 	Label string `json:"label"`
@@ -71,21 +85,34 @@ type chatKey struct {
 // chatBox is a col or a row of pieces.
 type chatBox struct {
 	T        string            `json:"t"`
+	ID       string            `json:"id,omitempty"`
 	Children []json.RawMessage `json:"children,omitempty"`
 	Gap      int               `json:"gap,omitempty"`
 	Pad      int               `json:"pad,omitempty"`
 	Grow     int               `json:"grow,omitempty"`
 	W        int               `json:"w,omitempty"`
-	Scroll   bool              `json:"scroll,omitempty"`
+	H        int               `json:"h,omitempty"`
 	Split    bool              `json:"split,omitempty"`
+}
+
+// chatModal is pieces in a card over the chat, the rest dimmed behind it:
+// the keys are its pieces' alone, and esc says dismiss.
+type chatModal struct {
+	T        string            `json:"t"`
+	ID       string            `json:"id"`
+	Title    string            `json:"title"`
+	W        int               `json:"w"`
+	Children []json.RawMessage `json:"children"`
 }
 
 // chatWords is a text; chatButton a button its key presses from anywhere
 // but a field; chatField the search line that walks a list.
 type chatWords struct {
 	T     string `json:"t"`
+	ID    string `json:"id,omitempty"`
 	Text  string `json:"text"`
 	Style string `json:"style,omitempty"`
+	Tone  string `json:"tone,omitempty"`
 }
 
 type chatButton struct {
@@ -106,13 +133,16 @@ type chatField struct {
 	List        string `json:"list"`
 }
 
-// chatList is a list: the models, each with its efforts as its menu, or
-// the worktree's conversations, the row under the keys said as it changes.
+// chatList is a list in a room of its own, max rows tall: the models, each
+// with its efforts as its menu, or the worktree's conversations, the row
+// under the keys said as it changes and each with what can be done to it
+// as its menu.
 type chatList struct {
 	T        string     `json:"t"`
 	ID       string     `json:"id"`
 	Live     bool       `json:"live,omitempty"`
 	Flat     bool       `json:"flat,omitempty"`
+	Max      int        `json:"max,omitempty"`
 	Menu     string     `json:"menu,omitempty"`
 	Selected string     `json:"selected,omitempty"`
 	Items    []chatItem `json:"items"`
@@ -148,13 +178,20 @@ type chatPiece struct {
 	Turns   []json.RawMessage `json:"turns"`
 }
 
-// chatOp is one change of a patch to the chat: a turn put in it, or
-// whether its agent is at work.
+// chatOp is one change of a patch: a turn put in the chat, or taken out
+// of it by its place n; whether its agent is at work; words put in its
+// field, on the clipboard, by the title as the status — none takes it
+// away — or over the foot a few seconds as a toast; a piece put last in
+// another, said again whole, or taken out.
 type chatOp struct {
 	Op   string          `json:"op"`
-	ID   string          `json:"id"`
+	ID   string          `json:"id,omitempty"`
 	Turn json.RawMessage `json:"turn,omitempty"`
 	On   *bool           `json:"on,omitempty"`
+	N    int             `json:"n,omitempty"`
+	Text string          `json:"text,omitempty"`
+	Tone string          `json:"tone,omitempty"`
+	Node json.RawMessage `json:"node,omitempty"`
 }
 
 // chatTurn is a turn as the window is told it, its place, and what it
@@ -211,10 +248,9 @@ func lastThatFit(turns []chatTurn, room, most int) []chatTurn {
 	return turns[from:]
 }
 
-// patches is turns as patches of turn changes to the chat of an id, in
-// order: each patch no more changes and no more bytes than the window
-// takes.
-func patches(pane, id string, turns []chatTurn) [][]byte {
+// patches is changes as patches, in order: each patch no more changes and
+// no more bytes than the window takes.
+func patches(pane string, changes []json.RawMessage) [][]byte {
 	var all [][]byte
 	var ops []json.RawMessage
 	size := patchEnvelope
@@ -224,8 +260,7 @@ func patches(pane, id string, turns []chatTurn) [][]byte {
 		}
 		ops, size = nil, patchEnvelope
 	}
-	for _, turn := range turns {
-		op := encode(chatOp{Op: "turn", ID: id, Turn: turn.json})
+	for _, op := range changes {
 		if len(ops) == muiOps || size+len(op)+1 > muiLimit {
 			flush()
 		}
@@ -235,11 +270,15 @@ func patches(pane, id string, turns []chatTurn) [][]byte {
 	return all
 }
 
-// chatLine is a quiet line of a view: words, and at its right end what
-// follows them.
+// chatLine is the quiet line over a chat: its words, a piece said again
+// alone when they change, and at its right end what follows them.
 func chatLine(words string, right ...json.RawMessage) json.RawMessage {
-	left := []json.RawMessage{encode(chatWords{T: "text", Text: words, Style: "dim"}), encode(chatBox{T: "col", Grow: 1})}
+	left := []json.RawMessage{chatHead(words), encode(chatBox{T: "col", Grow: 1})}
 	return encode(chatBox{T: "row", Pad: 8, Gap: 8, Children: append(left, right...)})
+}
+
+func chatHead(words string) json.RawMessage {
+	return encode(chatWords{T: "text", ID: "about", Text: words, Style: "dim"})
 }
 
 // chatAbout is the line over a chat: the agent, the model and the effort
@@ -278,31 +317,49 @@ type talk struct {
 	turns  []chatTurn   // every turn of the transcript the window can read, in order
 	shown  map[int]bool // the turns the window was told; nil until the view was said
 	// sent is what was sent from here that the transcript has not said yet,
-	// the first sent first: each is said as an asked turn after its last.
-	sent []string
+	// the first sent first: each is said as an asked turn after the last.
+	sent []chatSent
 	// asks is what the window's screen asks that the transcript does not: a
-	// permission, a folder to trust. It is said as a question after those.
-	asks *app.Asks
+	// permission, a folder to trust. It is said as a question after those,
+	// at the place asksAt, 0 until it has one.
+	asks   *app.Asks
+	asksAt int
+	// placed is how many places turns of the app's own took.
+	placed int
 	// own is those turns of the app's own that the window was told, by
-	// their place: what each said.
-	own      map[int]string
+	// their place.
+	own      map[int]bool
 	answered map[int]bool // the transcript's questions that were answered
-	// anew is how many times the chat was begun anew, which its id says:
-	// the window keeps a turn it was told, and takes another at its place
-	// only as a reply grown longer, so a turn taken back or said otherwise
-	// is said in a chat of another id.
-	anew int
+	// again is the transcript's turns taken out of the window's chat to be
+	// said again: a question whose answer was refused is open once it is.
+	again []int
+	// nth is which chat of its run this one is, which its id says: the chat
+	// of another conversation is another piece, as the window keeps the
+	// turns a chat was told.
+	nth int
 	// offset is added to the place of each turn heard: the turns of the
 	// conversation this one goes on from stand before them.
 	offset int
+	// over is the modal that stands over the chat, nil for none, and keys
+	// the piece of it the keys are put on. A view said whole is said
+	// without it and it is put back by a patch: the chat's turns are those
+	// that fit a message whatever stands over them.
+	over json.RawMessage
+	keys string
+}
+
+// chatSent is words sent from here, and the place their turn was said at.
+type chatSent struct {
+	n    int
+	text string
 }
 
 // id is the chat piece's id.
 func (t *talk) id() string {
-	if t.anew == 0 {
+	if t.nth == 0 {
 		return "chat"
 	}
-	return "chat-" + strconv.Itoa(t.anew)
+	return "chat-" + strconv.Itoa(t.nth)
 }
 
 // find is where the transcript's turn n is among the turns, or would be.
@@ -310,23 +367,31 @@ func (t *talk) find(n int) (int, bool) {
 	return slices.BinarySearchFunc(t.turns, n, func(have chatTurn, n int) int { return cmp.Compare(have.n, n) })
 }
 
-// extras is the app's own turns, placed after the transcript's last: what
-// was sent and is not in it yet, then what the window's screen asks,
-// unless the transcript ends on a question nobody answered — that one is
-// the asking.
+// place is the next place for a turn of the app's own.
+func (t *talk) place() int {
+	t.placed++
+	return chatOwn + t.placed
+}
+
+// extras is the app's own turns, each at a place of its own after the
+// transcript's last: what was sent and is not in it yet, then what the
+// window's screen asks, unless the transcript ends on a question nobody
+// answered — that one is the asking.
 func (t *talk) extras() []chatTurn {
-	n, open := 0, false
+	open := false
 	if len(t.turns) > 0 {
 		last := t.turns[len(t.turns)-1]
-		n, open = last.n, last.kind == "question" && !t.answered[last.n]
+		open = last.kind == "question" && !t.answered[last.n]
 	}
 	var own []chatTurn
-	for _, text := range t.sent {
-		n++
-		own = append(own, worded(app.Turn{N: n, Kind: "asked", Text: text}))
+	for _, sent := range t.sent {
+		own = append(own, worded(app.Turn{N: sent.n, Kind: "asked", Text: sent.text}))
 	}
 	if t.asks != nil && !open {
-		own = append(own, worded(app.Turn{N: n + 1, Kind: "question", Text: cmp.Or(t.asks.Text, t.agent+" asks"), Options: t.asks.Options}))
+		if t.asksAt == 0 || len(t.sent) > 0 && t.asksAt < t.sent[len(t.sent)-1].n {
+			t.asksAt = t.place() // after what was sent since it was first said
+		}
+		own = append(own, worded(app.Turn{N: t.asksAt, Kind: "question", Text: cmp.Or(t.asks.Text, t.agent+" asks"), Options: t.asks.Options}))
 	}
 	return own
 }
@@ -335,68 +400,103 @@ func (t *talk) extras() []chatTurn {
 // who answers, and at its right the keys that show the models and the
 // earlier conversations, buttons that tab reaches from the chat's field,
 // which types every letter — and the chat with the last turns that fit.
+// The keys are put on the chat's field, or on the modal's piece while one
+// stands over it.
 func (t *talk) whole() []byte {
 	own := t.extras()
 	chat := chatPiece{T: "chat", ID: t.id(), Agent: t.agent, Reply: t.reply, Working: t.working, Turns: []json.RawMessage{}}
 	var buttons []json.RawMessage
 	if t.reply {
-		buttons = append(buttons, encode(chatButton{T: "button", ID: "models", Label: "models", Key: "m"}))
+		buttons = append(buttons, encode(chatButton{T: "button", ID: "open-models", Label: "models", Key: "m"}))
 	}
-	buttons = append(buttons, encode(chatButton{T: "button", ID: "earlier", Label: "earlier", Key: "e"}))
+	buttons = append(buttons, encode(chatButton{T: "button", ID: "open-earlier", Label: "earlier", Key: "e"}))
 	view := func() json.RawMessage {
-		return encode(chatBox{T: "col", Children: []json.RawMessage{chatLine(t.about, buttons...), encode(chat)}})
+		return encode(chatBox{T: "col", ID: "view", Children: []json.RawMessage{chatLine(t.about, buttons...), encode(chat)}})
 	}
 	message := chatMessage{V: 1, Pane: t.pane, Fill: true, Status: t.status}
-	if t.reply {
+	switch {
+	case t.over != nil:
+		message.Focus = t.keys
+	case t.reply:
 		message.Focus = chat.ID
 	}
 	room := muiLimit - len(encode(message)) - len(view())
 	for _, turn := range own {
 		room -= len(turn.json) + 1
 	}
-	t.shown, t.own = map[int]bool{}, map[int]string{}
+	t.shown, t.own, t.again = map[int]bool{}, map[int]bool{}, nil
 	for _, turn := range lastThatFit(t.turns, room, chatTurns) {
 		chat.Turns = append(chat.Turns, turn.json)
 		t.shown[turn.n] = true
 	}
 	for _, turn := range own {
 		chat.Turns = append(chat.Turns, turn.json)
-		t.shown[turn.n], t.own[turn.n] = true, turn.words
+		t.shown[turn.n], t.own[turn.n] = true, true
 	}
 	message.View = view()
 	return encode(message)
 }
 
-// says is the messages that make the window's chat what it now is, once
-// the view was said: changed are the transcript's turns that came or grew.
-// What is new is a patch of turn changes; the whole view is said when it
-// would hold more turns than the window takes, and in a chat begun anew
-// when a turn of the app's own that the window was told is no longer what
-// stands at its place.
-func (t *talk) says(changed []chatTurn) [][]byte {
+// said is the messages that say the view whole: the view, and after it
+// the modal that stands over it, put back.
+func (t *talk) said() [][]byte {
+	all := [][]byte{t.whole()}
+	if t.over != nil {
+		all = append(all, t.patch(encode(chatOp{Op: "add", ID: "view", Node: t.over}))...)
+	}
+	return all
+}
+
+// patch is changes as the messages that make them, once the view was
+// said: a patch to no view is dropped.
+func (t *talk) patch(changes ...json.RawMessage) [][]byte {
 	if t.shown == nil {
 		return nil
 	}
-	own := t.extras()
-	wanted := map[int]string{}
-	for _, turn := range own {
-		wanted[turn.n] = turn.words
+	return patches(t.pane, changes)
+}
+
+// stands takes how things stand, nil when there is nothing to say, and is
+// the change that says it alone: a view said whole carries it too.
+func (t *talk) stands(status *muiStatus) json.RawMessage {
+	if t.status = status; status == nil {
+		return encode(chatOp{Op: "status"})
 	}
-	for n, was := range t.own {
-		now, stands := wanted[n]
-		if at, found := t.find(n); !stands && found {
-			now, stands = t.turns[at].words, true // the transcript's own turn came where it was said
-		}
-		if !stands || now != was {
-			t.anew++
-			return [][]byte{t.whole()}
-		}
+	return encode(chatOp{Op: "status", Text: status.Text, Tone: status.Tone})
+}
+
+// went is the change that says how a thing done went: well, a toast, which
+// goes by itself; otherwise the status, which stays until the next thing
+// done.
+func (t *talk) went(text, tone string) json.RawMessage {
+	if tone == "ok" {
+		return encode(chatOp{Op: "toast", Text: cutTo(text, chatSaid), Tone: tone})
 	}
-	for _, turn := range own {
-		if _, told := t.own[turn.n]; !told {
+	return t.stands(&muiStatus{Text: cutTo(text, chatSaid), Tone: tone})
+}
+
+// says is the messages that make the window's chat what it now is, once
+// the view was said: changed are the transcript's turns that came or grew,
+// and after is what else changes with them. It is one patch: the turns of
+// the app's own that no longer stand taken out by their places, then the
+// turns put in. The whole view is said when it would hold more turns than
+// the window takes.
+func (t *talk) says(changed []chatTurn, after ...json.RawMessage) [][]byte {
+	if t.shown == nil {
+		return nil
+	}
+	stands := map[int]bool{}
+	for _, turn := range t.extras() {
+		if stands[turn.n] = true; !t.own[turn.n] {
 			changed = append(changed, turn)
 		}
 	}
+	for _, n := range t.again {
+		if at, found := t.find(n); found {
+			changed = append(changed, t.turns[at])
+		}
+	}
+	t.again = nil
 	more := 0
 	for _, turn := range changed {
 		if !t.shown[turn.n] {
@@ -404,24 +504,29 @@ func (t *talk) says(changed []chatTurn) [][]byte {
 		}
 	}
 	if len(t.shown)+more > muiPieces-chatFrame {
-		return [][]byte{t.whole()}
+		return append(t.said(), t.patch(after...)...)
+	}
+	var ops []json.RawMessage
+	for _, n := range slices.Sorted(maps.Keys(t.own)) {
+		if !stands[n] {
+			ops = append(ops, encode(chatOp{Op: "unturn", ID: t.id(), N: n}))
+			delete(t.shown, n)
+		}
 	}
 	for _, turn := range changed {
 		t.shown[turn.n] = true
+		ops = append(ops, encode(chatOp{Op: "turn", ID: t.id(), Turn: turn.json}))
 	}
-	clear(t.own)
-	for _, turn := range own {
-		t.own[turn.n] = turn.words
-	}
-	return patches(t.pane, t.id(), changed)
+	t.own = stands
+	return patches(t.pane, append(ops, after...))
 }
 
 // heard takes the turns a followed conversation gained or that grew, and
 // is the messages that say them: the whole view when it was not said yet.
-// A turn that says what was sent from here takes the place of the one said
-// for it at once; when another comes first — the agent was at work, and
-// takes up what was sent later — that one is taken back, and the status
-// says it waits.
+// A turn that says what was sent from here is put in as the one said for
+// it at once is taken out; when another comes first — the agent was at
+// work, and takes up what was sent later — that one is taken out too, and
+// the status says it waits.
 func (t *talk) heard(turns []app.Turn) [][]byte {
 	var changed []chatTurn
 	passed := false // a turn came that is none of what was sent from here
@@ -449,7 +554,8 @@ func (t *talk) heard(turns []app.Turn) [][]byte {
 			t.turns[at] = one
 		} else {
 			t.turns = slices.Insert(t.turns, at, one)
-			if echo := slices.Index(t.sent, strings.TrimSpace(turn.Text)); turn.Kind == "asked" && echo >= 0 {
+			echo := slices.IndexFunc(t.sent, func(sent chatSent) bool { return sent.text == strings.TrimSpace(turn.Text) })
+			if turn.Kind == "asked" && echo >= 0 {
 				t.sent = slices.Delete(t.sent, echo, echo+1)
 			} else {
 				passed = true
@@ -457,18 +563,19 @@ func (t *talk) heard(turns []app.Turn) [][]byte {
 		}
 		changed = append(changed, one)
 	}
+	var after []json.RawMessage
 	if passed && len(t.sent) > 0 {
-		t.status = &muiStatus{Text: cutTo(t.agent+" takes it up when it can — sent: "+strings.Join(t.sent, " · "), chatSaid)}
-		t.sent = nil
-		if t.shown != nil {
-			t.anew++ // with the status, which only a view said whole carries
+		waits := ""
+		for _, sent := range t.sent {
+			waits += " · " + sent.text
 		}
-		return [][]byte{t.whole()}
+		after = append(after, t.stands(&muiStatus{Text: cutTo(t.agent+" takes it up when it can — sent: "+strings.TrimPrefix(waits, " · "), chatSaid)}))
+		t.sent = nil
 	}
 	if t.shown == nil {
-		return [][]byte{t.whole()}
+		return t.said()
 	}
-	return t.says(changed)
+	return t.says(changed, after...)
 }
 
 // goesOn makes the chat go on from another: that one's turns stay, over a
@@ -524,67 +631,68 @@ func (t *talk) atWork(on bool) [][]byte {
 		return nil
 	}
 	t.working = on
-	if t.shown == nil {
-		return nil
-	}
-	return [][]byte{encode(muiMessage{V: 1, Pane: t.pane, Patch: []json.RawMessage{encode(chatOp{Op: "working", ID: t.id(), On: &on})}})}
+	return t.patch(encode(chatOp{Op: "working", ID: t.id(), On: &on}))
 }
 
 // sends takes what the person sent, and is the patch that says it at once
-// as an asked turn after the last: the transcript's own turn takes its
-// place when the agent writes it.
+// as an asked turn after the last: it is taken out as the transcript's own
+// turn is put in, when the agent writes it.
 func (t *talk) sends(text string) [][]byte {
-	t.sent = append(t.sent, text)
+	t.sent = append(t.sent, chatSent{t.place(), text})
 	return t.says(nil)
 }
 
-// unsent is what is said of words that did not go: why, and the words —
-// the chat's field cannot be handed them back — each cut so that both fit
-// what the window keeps of a status.
-func unsent(why error, words string) string {
-	words = cutTo(strings.Join(strings.Fields(words), " "), chatSaid/2)
-	const between = " — not sent: "
-	return cutTo(why.Error(), chatSaid-len([]rune(words))-len([]rune(between))) + between + words
-}
-
-// refused takes that the last thing sent did not go, and is the message
-// that takes its turn back and says why with the words.
+// refused takes that the last thing sent did not go, and is the patch
+// that takes its turn out, gives its words back to the chat's field, and
+// says why as the status.
 func (t *talk) refused(why error) [][]byte {
 	if len(t.sent) == 0 {
 		return nil
 	}
-	words := t.sent[len(t.sent)-1]
+	words := []rune(t.sent[len(t.sent)-1].text)
 	t.sent = t.sent[:len(t.sent)-1]
-	t.status = &muiStatus{Text: unsent(why, words), Tone: "bad"}
-	t.anew++
-	return [][]byte{t.whole()}
+	return t.says(nil, encode(chatOp{Op: "draft", ID: t.id(), Text: string(words[:min(len(words), chatDraft)])}),
+		t.stands(&muiStatus{Text: cutTo(why.Error(), chatSaid), Tone: "bad"}))
 }
 
 // asked takes what the window's screen asks now, nil when nothing, and is
-// the messages that say it as a question of the app's own after the last
-// turn, or take that question out once it is answered.
+// the patch that says it as a question of the app's own after the last
+// turn, or takes that question out once it is answered. One asked
+// otherwise is another question, at another place.
 func (t *talk) asked(asks *app.Asks) [][]byte {
 	same := func(a, b *app.Asks) bool {
 		return a == nil && b == nil || a != nil && b != nil && a.Text == b.Text && slices.Equal(a.Options, b.Options)
 	}
-	if same(t.asks, asks) {
+	if !same(t.asks, asks) {
+		t.asks, t.asksAt = asks, 0
+	} else if len(t.again) == 0 {
 		return nil
 	}
-	t.asks = asks
 	return t.says(nil)
 }
 
-// reopened is the message that says the chat again with each question
-// open: the window writes an answer under a question as it is chosen, and
-// one the agent's window refused was not given.
-func (t *talk) reopened(why error) [][]byte {
-	t.status = &muiStatus{Text: cutTo(why.Error(), chatSaid), Tone: "bad"}
-	t.anew++
-	return [][]byte{t.whole()}
+// reopened takes that the answer chosen to a question was refused by the
+// agent's window, and is the patch that says why as the status and opens
+// the question again: the window writes an answer under a question as it
+// is chosen, and keeps it while it keeps the turn. One of the app's own
+// is said at another place; the transcript's is taken out, and said again
+// with what is said next.
+func (t *talk) reopened(question int, why error) [][]byte {
+	status := t.stands(&muiStatus{Text: cutTo(why.Error(), chatSaid), Tone: "bad"})
+	if question == t.asksAt {
+		t.asksAt = 0
+		return t.says(nil, status)
+	}
+	if !t.shown[question] {
+		return t.patch(status)
+	}
+	delete(t.shown, question)
+	t.again = append(t.again, question)
+	return t.patch(encode(chatOp{Op: "unturn", ID: t.id(), N: question}), status)
 }
 
-// chatMode is what stands in the pane: the chat, the models to pick from,
-// or the worktree's earlier conversations.
+// chatMode is what stands over the chat, in a modal: nothing, the models
+// to pick from, or the worktree's earlier conversations.
 type chatMode int
 
 const (
@@ -619,6 +727,10 @@ type chatView struct {
 	read  []chatTurn
 	armed string
 	now   time.Time
+
+	// told is what the modal says at its foot of the last thing asked in
+	// it: what c does, why a pick was not done.
+	told *muiStatus
 }
 
 // carrying is where what a window's agent goes on from is kept until it
@@ -731,20 +843,23 @@ func chatModels(agents []app.AgentModels, setups []app.Setup, here, query string
 	})
 }
 
-// models is the message that says the models in place of the chat: a bare
-// search line over one list, "Used here" first and then each agent's
-// under its head, the one that runs checked, an item's menu its agent's
-// efforts. placed puts the keys' row on the one that runs.
-func (v *chatView) models(placed bool) []byte {
+// models is the modal that says the models over the chat: a bare search
+// line over one list in a room of its own, "Used here" first and then each
+// agent's under its head, the one that runs checked, an item's menu its
+// agent's efforts. placed puts the keys' row on the one that runs.
+func (v *chatView) models(placed bool) json.RawMessage {
 	rows := chatModels(v.agents, v.setups, v.agent(), v.query)
-	list := chatList{T: "list", ID: "models", Menu: "effort", Items: []chatItem{}}
-	group := ""
+	list := chatList{T: "list", ID: "models", Max: 11, Menu: "effort", Items: []chatItem{}}
+	group, held := "", 0
 	for _, row := range rows {
 		var agent app.AgentModels
 		for _, one := range v.agents {
 			if one.Name == row.agent {
 				agent = one
 			}
+		}
+		if held += 2 + len(agent.Efforts); held > chatHeads+chatReadMost {
+			break // no more than a modal holds: what is typed finds the rest
 		}
 		mine := row.agent == v.agent()
 		// what it would run at: the setup's, what this chat runs at, or what the config starts it with
@@ -807,12 +922,17 @@ func (v *chatView) models(placed bool) []byte {
 		list.Items = append(list.Items, item)
 	}
 	field := chatField{T: "field", ID: "q", Placeholder: "Search models", Icon: "search", Right: counted(len(rows), "model"), Bare: true, Live: true, List: "models"}
-	return encode(chatMessage{V: 1, Pane: v.talk.pane, Fill: true, Focus: "q", Status: v.talk.status,
-		Keys: []chatKey{{Key: "esc", Label: "back to the chat", ID: "back"}},
-		View: encode(chatBox{T: "col", Children: []json.RawMessage{
-			encode(field), encode(chatBox{T: "divider"}),
-			encode(chatBox{T: "col", Grow: 1, Scroll: true, Children: []json.RawMessage{encode(list)}}),
-		}})})
+	inside := []json.RawMessage{encode(field), encode(chatBox{T: "divider"}), encode(list)}
+	return encode(chatModal{T: "modal", ID: chatOver, Title: "Model", W: 520, Children: append(inside, v.foot()...)})
+}
+
+// foot is what a modal says at its foot: nothing, until something asked in
+// it was not done at once.
+func (v *chatView) foot() []json.RawMessage {
+	if v.told == nil {
+		return nil
+	}
+	return []json.RawMessage{encode(chatWords{T: "text", Text: v.told.Text, Style: "dim", Tone: v.told.Tone})}
 }
 
 // headOf is the conversation of an id among those Earlier lists.
@@ -824,58 +944,92 @@ func (v *chatView) headOf(id string) (app.Head, bool) {
 	return v.heads[at], true
 }
 
-// earlier is the message that says the worktree's conversations in place
-// of the chat: a list of them — what was first asked, the agent and when
-// at the right, the one a window has open marked as running — and beside
-// it the one under the keys read back, a chat with no field. On one of
-// another agent c hands it to this chat's. placed puts the keys' row on
-// the conversation read back.
-func (v *chatView) earlier(placed bool) []byte {
-	list := chatList{T: "list", ID: "earlier", Live: true, Flat: true, Items: []chatItem{}}
+// earlier is the modal that says the worktree's conversations over the
+// chat: a list of them — what was first asked, the agent and when at the
+// right, the one a window has open marked as running — and beside it the
+// one under the keys read back, a chat with no field in a room of its own
+// height. An item's menu is what can be done to it: taken up again or gone
+// to, handed to this chat's agent when it is another's, as c does, and its
+// id copied. placed puts the keys' row on the conversation read back.
+func (v *chatView) earlier(placed bool) json.RawMessage {
+	list := chatList{T: "list", ID: "earlier", Live: true, Flat: true, Max: 12, Menu: "more", Items: []chatItem{}}
 	if placed {
 		list.Selected = v.on
 	}
+	room := muiLimit * 3 / 4 // the list's, of a message: the rest is the turns read back
 	for _, head := range v.heads {
 		running := head.Running && head.Window != nil
 		item := chatItem{ID: head.ID, Title: cmp.Or(cutTo(head.Asked, chatSaid), "nothing asked yet"), Icon: chatIcon(head.Agent),
-			Right: head.Agent + " · " + gitAge(v.now.Sub(head.Active)), Running: &running, Does: "go on with it"}
+			Right: head.Agent + " · " + gitAge(v.now.Sub(head.Active)), Running: &running, Does: "go on with it",
+			Menu: []chatItem{{ID: "resume", Title: "Resume"}}}
 		if running {
-			item.Does = "back to it"
+			item.Does, item.Menu[0].Title = "back to it", "Go to it"
 		}
 		if head.Agent != v.agent() {
-			item.Keys = []chatKey{{Key: "c", Label: "continue in " + v.agent(), ID: "continue"}}
+			item.Keys = []chatKey{{Key: "c", Label: "continue", ID: "continue"}}
+			item.Menu = append(item.Menu, chatItem{ID: "continue", Title: "Continue with " + v.agent()})
+		}
+		item.Menu = append(item.Menu, chatItem{ID: "copy", Title: "Copy its id"})
+		if room -= len(encode(item)) + 1; room < 0 {
+			break
 		}
 		list.Items = append(list.Items, item)
 	}
+	// A modal's row stands its sides at its middle, and a chat in it is
+	// chatRoom points tall: heads with no words, which the keys pass over,
+	// make a short list as tall, so that it begins at the top.
+	if rows := len(list.Items); rows > 0 {
+		for tall := 30*rows + 40; tall <= chatRoom-12; tall += 30 {
+			list.Items = append(list.Items, chatItem{Head: " "})
+		}
+	}
 	reading, _ := v.headOf(v.on)
 	read := chatPiece{T: "chat", ID: cutTo("read-"+v.on, chatSaid), Agent: reading.Agent, Turns: []json.RawMessage{}}
-	message := chatMessage{V: 1, Pane: v.talk.pane, Fill: true, Focus: "earlier", Status: v.talk.status,
-		Keys: []chatKey{{Key: "esc", Label: "back to the chat", ID: "back"}}}
-	view := func() json.RawMessage {
-		return encode(chatBox{T: "col", Children: []json.RawMessage{
-			chatLine("Earlier in " + v.worktree + " · " + counted(len(v.heads), "conversation")),
-			encode(chatBox{T: "row", Split: true, Grow: 1, Children: []json.RawMessage{
-				encode(chatBox{T: "col", W: 360, Scroll: true, Children: []json.RawMessage{encode(list)}}),
-				encode(chatBox{T: "divider"}), encode(read),
+	modal := func() json.RawMessage {
+		inside := []json.RawMessage{
+			encode(chatWords{T: "text", Text: "in " + v.worktree + " · " + counted(len(v.heads), "conversation"), Style: "dim"}),
+			encode(chatBox{T: "row", Split: true, Gap: 16, Children: []json.RawMessage{
+				encode(chatBox{T: "col", W: 300, Children: []json.RawMessage{encode(list)}}),
+				encode(chatBox{T: "col", H: chatRoom, Children: []json.RawMessage{encode(read)}}),
 			}}),
-		}})
+		}
+		return encode(chatModal{T: "modal", ID: chatOver, Title: "Earlier", W: 720, Children: append(inside, v.foot()...)})
 	}
-	for _, turn := range lastThatFit(v.read, muiLimit-len(encode(message))-len(view()), min(chatReadMost, muiPieces-chatFrame-len(list.Items))) {
+	for _, turn := range lastThatFit(v.read, muiLimit-2*patchEnvelope-len(modal()), chatReadMost) {
 		read.Turns = append(read.Turns, turn.json)
 	}
-	message.View = view()
-	return encode(message)
+	return modal()
 }
 
-// whole is the message that says what stands in the pane now.
-func (v *chatView) whole(placed bool) []byte {
-	switch v.mode {
-	case picking:
+// modal is the modal of the mode.
+func (v *chatView) modal(placed bool) json.RawMessage {
+	if v.mode == picking {
 		return v.models(placed)
-	case looking:
-		return v.earlier(placed)
 	}
-	return v.talk.whole()
+	return v.earlier(placed)
+}
+
+// up is the patch that puts a modal over the chat, the keys' row placed
+// in it. The window puts the keys on the first piece of it that takes
+// them, the search line or the list, which a view said whole names too.
+func (v *chatView) up(mode chatMode) [][]byte {
+	v.mode = mode
+	v.talk.over, v.talk.keys = v.modal(false), map[chatMode]string{picking: "q", looking: "earlier"}[mode]
+	return v.talk.patch(encode(chatOp{Op: "add", ID: "view", Node: v.modal(true)}))
+}
+
+// again is the patch that says the modal again as it now is: the keys
+// stay where they are, and what is typed in its field.
+func (v *chatView) again() [][]byte {
+	v.talk.over = v.modal(false)
+	return v.talk.patch(encode(chatOp{Op: "set", ID: chatOver, Node: v.talk.over}))
+}
+
+// shut is the patch that takes the modal away, and makes with it the
+// changes that say what was done in it; the chat behind is as it was.
+func (v *chatView) shut(with ...json.RawMessage) [][]byte {
+	v.mode, v.told, v.talk.over, v.talk.keys = chatting, nil, nil, ""
+	return v.talk.patch(append([]json.RawMessage{encode(chatOp{Op: "remove", ID: chatOver})}, with...)...)
 }
 
 // listed takes the worktree's conversations for Earlier, the last written
@@ -909,7 +1063,7 @@ func (v *chatView) reads(id string, turns []app.Turn) {
 // typed, choose with the question's turn and its option counted from 0,
 // stop; a button or a key pressed, with the item of a list it was pressed
 // on; an item picked, with the item of its menu; the row under the keys
-// moved; the search line changed; close.
+// moved; the search line changed; a modal dismissed with esc; close.
 type chatEvent struct {
 	E        string `json:"e"`
 	ID       string `json:"id"`
@@ -943,11 +1097,12 @@ const (
 	chatStop            // stop the agent
 	chatModelsUp        // show the models
 	chatEarlier         // show the earlier conversations
-	chatBack            // back to the chat
+	chatBack            // take the modal away
 	chatNarrow          // the models that hold the words
 	chatSwitch          // switch this window's agent to a model and an effort
 	chatHand            // hand this conversation to another agent, and go on with that one
-	chatSay             // only say something as the status
+	chatSay             // only say something at the modal's foot
+	chatCopy            // put a conversation's id on the clipboard
 	chatRead            // read back the conversation under the keys
 	chatGoOn            // take a conversation up again, and show it
 	chatShow            // show the conversation a window has open
@@ -969,14 +1124,15 @@ type chatDeed struct {
 // another agent hands the conversation to that agent, when there is one
 // mia can read. In Earlier ⏎
 // on the conversation a window has open shows it and on another takes it
-// up again, and c says what handing it over does the first time it is
-// pressed on a conversation, and does it the second.
+// up again, as its menu's first item does; c says what handing it over
+// does the first time it is pressed on a conversation, and does it the
+// second, and the menu's item, which names it, does it at once. esc in a
+// modal takes it away, and nothing else is done.
 func (v *chatView) deed(event chatEvent) chatDeed {
-	back := event.E == "press" && event.ID == "back"
 	switch {
 	case event.E == "close":
 		return chatDeed{do: chatLeave}
-	case v.mode == picking && back, v.mode == looking && back:
+	case v.mode != chatting && event.E == "dismiss" && event.ID == chatOver:
 		return chatDeed{do: chatBack}
 	case v.mode == picking && event.E == "change" && event.ID == "q":
 		return chatDeed{do: chatNarrow, text: event.Text}
@@ -1011,6 +1167,12 @@ func (v *chatView) deed(event chatEvent) chatDeed {
 		head, there := v.headOf(event.ID)
 		switch {
 		case !there:
+		case event.Sub == "copy":
+			return chatDeed{do: chatCopy, id: head.ID}
+		case event.Sub == "continue":
+			if head.Agent != v.agent() {
+				return chatDeed{do: chatContinue, id: head.ID}
+			}
 		case head.Running && head.Window != nil:
 			return chatDeed{do: chatShow, id: head.ID}
 		default:
@@ -1027,10 +1189,10 @@ func (v *chatView) deed(event chatEvent) chatDeed {
 				v.agent(), head.Agent)}
 		}
 	case v.mode != chatting:
-	case event.E == "press" && event.ID == "earlier":
+	case event.E == "press" && event.ID == "open-earlier":
 		return chatDeed{do: chatEarlier}
 	case v.window == "":
-	case event.E == "press" && event.ID == "models":
+	case event.E == "press" && event.ID == "open-models":
 		return chatDeed{do: chatModelsUp}
 	case event.E == "send" && strings.TrimSpace(event.Text) != "":
 		return chatDeed{do: chatSend, text: strings.TrimSpace(event.Text)}
@@ -1134,44 +1296,57 @@ type chatRun struct {
 	pressed time.Time
 }
 
-// out says the chat's own messages, while the chat is what stands in the
-// pane: it is said whole when the person comes back to it.
-func (r *chatRun) out(messages [][]byte) {
-	if r.view.mode == chatting {
-		r.say(messages...)
+// note says how things stand as the status, alone: nothing, and it is
+// taken away.
+func (r *chatRun) note(text, tone string) {
+	t := r.view.talk
+	if text == "" && t.status == nil {
+		return
 	}
+	var status *muiStatus
+	if text != "" {
+		status = &muiStatus{Text: cutTo(text, chatSaid), Tone: tone}
+	}
+	r.say(t.patch(t.stands(status))...)
 }
 
-// note says how the last thing done went as the status, with the view.
-func (r *chatRun) note(text, tone string) {
-	r.view.talk.status = nil
-	if text != "" {
-		r.view.talk.status = &muiStatus{Text: cutTo(text, chatSaid), Tone: tone}
-	}
+// tell says at the modal's foot why what was asked in it was not done.
+func (r *chatRun) tell(why error) {
+	r.view.told = &muiStatus{Text: why.Error(), Tone: "bad"}
+	r.say(r.view.again()...)
+}
+
+// shows says whole the chat aim began, and how what began it went.
+func (r *chatRun) shows(text, tone string) {
+	t := r.view.talk
+	went := t.went(text, tone)
+	r.say(t.said()...)
+	r.say(t.patch(went)...)
 }
 
 // aim makes the chat one of a window, of a conversation, or of both: the
 // conversation is followed from its first turn, and a window with none
 // mia can read yet is a chat all the same — what is sent is typed to it
 // and shown, and its conversation is looked for each second. The chat
-// before it is let go of, and this one begun anew.
+// before it is let go of with what stood over it, and this one is another
+// piece to the window.
 func (r *chatRun) aim(head app.Head, window string) {
 	if r.quit != nil {
 		close(r.quit)
 	}
 	r.of, r.quit = r.of+1, make(chan struct{})
-	v, anew := r.view, 0
+	v, nth := r.view, 0
 	if v.talk != nil {
-		anew = v.talk.anew + 1
+		nth = v.talk.nth + 1
 	}
-	v.mode, v.window, v.id = chatting, window, head.ID
+	v.mode, v.told, v.window, v.id = chatting, nil, window, head.ID
 	v.runs = app.Runs{Agent: head.Agent, Model: head.Model, Effort: head.Effort, Account: head.Account, Reads: true}
 	if window != "" {
 		if runs := r.a.WindowRuns(r.record, window); runs.Agent != "" {
 			v.runs = chatRuns(runs, head)
 		}
 	}
-	v.talk = &talk{pane: os.Getenv("TMUX_PANE"), agent: cmp.Or(v.runs.Agent, "window "+window), about: chatAbout(v.runs), reply: window != "", anew: anew}
+	v.talk = &talk{pane: os.Getenv("TMUX_PANE"), agent: cmp.Or(v.runs.Agent, "window "+window), about: chatAbout(v.runs), reply: window != "", nth: nth}
 	if window != "" {
 		v.talk.working = r.a.AtWork(r.record, r.index())
 		if v.runs.Agent != "" && !v.runs.Reads {
@@ -1230,12 +1405,12 @@ func (r *chatRun) looks() {
 			v.id = head.ID
 			if runs := chatRuns(r.a.WindowRuns(r.record, v.window), head); runs.Agent != "" && runs != v.runs {
 				v.runs, v.talk.agent, v.talk.about = runs, runs.Agent, chatAbout(runs)
-				r.out([][]byte{v.talk.whole()})
+				r.say(v.talk.said()...)
 			}
 			r.follow(head.ID)
 		}
 	}
-	r.out(v.talk.atWork(r.a.AtWork(r.record, r.index())))
+	r.say(v.talk.atWork(r.a.AtWork(r.record, r.index()))...)
 	if time.Since(r.pressed) < 2*time.Second {
 		return
 	}
@@ -1243,20 +1418,20 @@ func (r *chatRun) looks() {
 	if now, on := r.a.AsksInWindow(r.record, v.window); on {
 		asks = &now
 	}
-	r.out(v.talk.asked(asks))
+	r.say(v.talk.asked(asks)...)
 }
 
-// act does a deed, and reports whether the view is to be said again
-// whole, and whether with where the keys are.
-func (r *chatRun) act(deed chatDeed) (again, placed bool) {
+// act does a deed, and says what it changes: the chat's own changes, a
+// modal put over it, said again or taken away, and how the thing went — a
+// toast when it went well, the status or the modal's foot when not. A
+// chat of another window or conversation is said whole.
+func (r *chatRun) act(deed chatDeed) {
 	v := r.view
-	was := v.talk.status
 	switch deed.do {
 	case chatNothing, chatLeave:
-		return false, false
 	case chatSend:
-		v.talk.status = nil
-		r.out(v.talk.sends(deed.text))
+		r.note("", "")
+		r.say(v.talk.sends(deed.text)...)
 		send := r.a.SendToWindow
 		words, back := typedFor(r.a, r.record, v.window, deed.text, os.ReadFile)
 		if strings.Contains(words, "\n") {
@@ -1264,127 +1439,117 @@ func (r *chatRun) act(deed chatDeed) (again, placed bool) {
 		}
 		if err := send(r.record, v.window, words); err != nil {
 			back()
-			r.out(v.talk.refused(err))
-			return false, false
+			r.say(v.talk.refused(err)...)
 		}
-		return was != nil, false
 	case chatChoose:
-		v.talk.status = nil
+		r.note("", "")
 		if err := r.a.PressInWindow(r.record, v.window, strconv.Itoa(deed.option+1)); err != nil {
-			r.out(v.talk.reopened(err))
-			return false, false
+			r.say(v.talk.reopened(deed.question, err)...)
+			return
 		}
 		// answered: the question of the app's own goes, until the screen asks again
 		r.pressed = time.Now()
-		r.out(v.talk.asked(nil))
-		return was != nil, false
+		r.say(v.talk.asked(nil)...)
 	case chatStop:
-		r.note("", "")
 		if err := r.a.StopInWindow(r.record, v.window); err != nil {
 			r.note(err.Error(), "bad")
+			return
 		}
-		return was != v.talk.status, false
+		r.note("", "")
 	case chatModelsUp:
 		v.agents, v.setups, v.query = r.a.AgentModels(), r.a.Setups(filepath.Base(r.a.Root)), ""
-		v.mode = picking
-		r.note("", "")
-		return true, true
+		r.say(v.up(picking)...)
 	case chatEarlier:
 		heads, _ := r.a.Conversations(app.Wanted{Worktree: r.record.Name})
 		v.listed(heads, time.Now())
-		v.mode = looking
-		r.note("", "")
 		r.read(v.on)
-		return true, true
+		r.say(v.up(looking)...)
 	case chatBack:
-		v.mode = chatting
-		r.note("", "")
-		return true, true
+		r.say(v.shut()...)
 	case chatNarrow:
-		v.query = deed.text
-		return true, false
+		v.query, v.told = deed.text, nil
+		r.say(v.again()...)
 	case chatSay:
-		v.armed = deed.id
-		r.note(deed.text, "warn")
-		return true, false
+		v.armed, v.told = deed.id, &muiStatus{Text: deed.text, Tone: "warn"}
+		r.say(v.again()...)
+	case chatCopy:
+		r.say(v.talk.patch(encode(chatOp{Op: "copy", Text: deed.id}), v.talk.went("copied "+deed.id, "ok"))...)
 	case chatSwitch:
 		now, err := r.a.SwitchWindow(r.record, v.window, deed.model, deed.effort)
 		if err != nil {
-			r.note(err.Error(), "bad")
-			return true, false
+			r.tell(err)
+			return
 		}
 		v.runs.Model, v.runs.Effort = now.Model, now.Effort
-		v.talk.about, v.mode = chatAbout(v.runs), chatting
-		r.note(v.runs.Agent+" switched to "+strings.TrimSpace(deed.model+" "+deed.effort), "ok")
-		return true, true
+		v.talk.about = chatAbout(v.runs)
+		r.say(v.shut(encode(chatOp{Op: "set", ID: "about", Node: chatHead(v.talk.about)}),
+			v.talk.went(v.runs.Agent+" switched to "+strings.TrimSpace(deed.model+" "+deed.effort), "ok"))...)
 	case chatHand:
 		from, window := v.agent(), v.window
 		if r.a.WindowHasPane(r.record, window, v.talk.pane) {
 			window = "" // this chat's own window: closing it would end the chat
 		}
-		r.note("handing this conversation to "+deed.agent+"…", "")
-		r.say(v.whole(false))
+		r.say(v.shut(v.talk.stands(&muiStatus{Text: cutTo("handing this conversation to "+deed.agent+"…", chatSaid)}))...)
 		went := handTo(r.a, r.record, v.id, window, from, deed.agent, deed.model, deed.effort)
-		if went.went {
-			done := went.done
-			to := strconv.Itoa(done.To.Window.Index)
-			// kept on its window: whichever chat of it sends first says it, this one or one started after
-			kept := r.a.CarryInWindow(r.record, to, app.Carried{From: from, ID: v.id, File: done.Handoff, Full: done.Full})
-			r.aim(app.Head{Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
-			if kept != nil {
-				went.text, went.tone = cutTo(went.text+" · "+kept.Error(), chatSaid), "warn"
-			}
+		if !went.went {
+			r.note(went.text, went.tone)
+			return
 		}
-		v.mode = chatting
-		r.note(went.text, went.tone)
-		return true, true
+		done := went.done
+		to := strconv.Itoa(done.To.Window.Index)
+		// kept on its window: whichever chat of it sends first says it, this one or one started after
+		kept := r.a.CarryInWindow(r.record, to, app.Carried{From: from, ID: v.id, File: done.Handoff, Full: done.Full})
+		r.aim(app.Head{Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
+		if kept != nil {
+			went.text, went.tone = went.text+" · "+kept.Error(), "warn"
+		}
+		r.shows(went.text, went.tone)
 	case chatRead:
 		r.read(deed.id)
-		return true, false
+		r.say(v.again()...)
 	case chatShow:
 		head, _ := v.headOf(deed.id)
-		if head.ID != v.id || strconv.Itoa(head.Window.Index) != v.window {
-			r.aim(head, strconv.Itoa(head.Window.Index))
+		if head.ID == v.id && strconv.Itoa(head.Window.Index) == v.window {
+			r.say(v.shut()...)
+			return
 		}
-		v.mode = chatting
-		r.note("", "")
-		return true, true
+		r.aim(head, strconv.Itoa(head.Window.Index))
+		r.say(v.talk.said()...)
 	case chatGoOn:
 		done, err := r.a.ResumeConversation(deed.id, r.record.Name, r.record.Name, "", "", "")
 		if err != nil {
-			r.note(err.Error(), "bad")
-			return true, false
+			r.tell(err)
+			return
 		}
 		head, _ := v.headOf(deed.id)
 		head.Model, head.Effort, head.Account = done.Model, done.Effort, cmp.Or(done.Account, head.Account)
 		r.aim(head, strconv.Itoa(done.Window.Index))
-		r.note(head.Agent+" goes on with it in window "+done.Window.Name, "ok")
-		return true, true
+		r.shows(head.Agent+" goes on with it in window "+done.Window.Name, "ok")
 	case chatContinue:
 		done, err := r.a.ContinueConversation(app.Continue{ID: deed.id, Worktree: r.record.Name, With: v.agent()})
 		if err != nil {
 			v.armed = ""
-			r.note(err.Error(), "bad")
-			return true, false
+			r.tell(err)
+			return
 		}
 		r.aim(app.Head{Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, strconv.Itoa(done.To.Window.Index))
-		r.note(fmt.Sprintf("%s goes on from %s's conversation in window %s, told to read %s", done.To.Agent, done.From.Agent, done.To.Window.Name, filepath.Base(done.Handoff)), "ok")
 		if !done.Sent {
-			r.note(done.To.Agent+" was not told to read the handoff: "+done.Problem, "bad")
+			r.shows(done.To.Agent+" was not told to read the handoff: "+done.Problem, "bad")
+			return
 		}
-		return true, true
+		r.shows(fmt.Sprintf("%s goes on from %s's conversation in window %s, told to read %s", done.To.Agent, done.From.Agent, done.To.Window.Name, filepath.Base(done.Handoff)), "ok")
 	}
-	return false, false
 }
 
-// read reads back the conversation under the keys in Earlier.
+// read reads back the conversation under the keys in Earlier, and what
+// the modal's foot says is why it could not be.
 func (r *chatRun) read(id string) {
-	if id == "" {
+	if r.view.told = nil; id == "" {
 		return
 	}
 	turns, err := r.a.ConversationIn(id, r.record.Name, 0)
 	if err != nil {
-		r.note(err.Error(), "bad")
+		r.view.told = &muiStatus{Text: err.Error(), Tone: "bad"}
 	}
 	r.view.reads(id, turns)
 }
@@ -1443,7 +1608,7 @@ func cmdChat(a *app.App, args []string) int {
 	defer shut()
 	run.say = say
 	if run.view.id == "" {
-		say(run.view.whole(true)) // else with its turns, as they are first read
+		say(run.view.talk.said()...) // else with its turns, as they are first read
 	}
 
 	second := time.NewTicker(time.Second)
@@ -1463,7 +1628,7 @@ func cmdChat(a *app.App, args []string) int {
 			return exitOK
 		case batch := <-run.batches:
 			if batch.of == run.of {
-				run.out(run.view.talk.heard(batch.turns))
+				say(run.view.talk.heard(batch.turns)...)
 			}
 		case <-second.C:
 			run.looks()
@@ -1476,7 +1641,6 @@ func cmdChat(a *app.App, args []string) int {
 				return exitOK
 			}
 			buffer = rest
-			again, placed := sight, false // the pane came into sight: said again whole
 			for i, event := range events {
 				deed := run.view.deed(event)
 				if deed.do == chatLeave {
@@ -1485,11 +1649,10 @@ func cmdChat(a *app.App, args []string) int {
 				if deed.do == chatRead && i+1 < len(events) && events[i+1].E == "move" {
 					continue // the keys held down: only where they came to rest is read
 				}
-				said, here := run.act(deed)
-				again, placed = again || said, placed || here
+				run.act(deed)
 			}
-			if again {
-				say(run.view.whole(placed))
+			if sight {
+				say(run.view.talk.said()...) // the pane came into sight: said again whole
 			}
 		}
 	}
