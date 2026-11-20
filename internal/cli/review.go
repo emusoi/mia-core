@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -322,10 +321,16 @@ type reviewMessage struct {
 
 // reviewPiece is a piece of the UI, of the kind T says, with what that
 // kind takes. Lines is a code's lines, or the number of lines tall a text
-// area is: the window has the one name for both.
+// area is: the window has the one name for both. Title is a modal's,
+// Menu the word for what → opens on a list's items, Does what ⏎ does on
+// a line of a code, and Motion how a column comes in.
 type reviewPiece struct {
 	T           string          `json:"t"`
 	ID          string          `json:"id,omitempty"`
+	Title       string          `json:"title,omitempty"`
+	Menu        string          `json:"menu,omitempty"`
+	Does        string          `json:"does,omitempty"`
+	Motion      string          `json:"motion,omitempty"`
 	Text        string          `json:"text,omitempty"`
 	Style       string          `json:"style,omitempty"`
 	Tone        string          `json:"tone,omitempty"`
@@ -351,20 +356,22 @@ type reviewPiece struct {
 // reviewEntry is what a list holds: the head over the files, a folder
 // (open, at depth 0), a file, a verdict to pick, a finding on the review
 // as a whole (its label a lead in its tone), or a gate (why it was
-// judged so on a line under it).
+// judged so on a line under it). A file and a finding carry the menu of
+// what can be done to them.
 type reviewEntry struct {
-	ID      string `json:"id,omitempty"`
-	Title   string `json:"title,omitempty"`
-	Note    string `json:"note,omitempty"`
-	Right   string `json:"right,omitempty"`
-	Depth   int    `json:"depth,omitempty"`
-	Open    bool   `json:"open,omitempty"`
-	Checked bool   `json:"checked,omitempty"`
-	Head    string `json:"head,omitempty"`
-	Tag     string `json:"tag,omitempty"`
-	Lead    string `json:"lead,omitempty"`
-	Tone    string `json:"tone,omitempty"`
-	Under   string `json:"under,omitempty"`
+	ID      string      `json:"id,omitempty"`
+	Title   string      `json:"title,omitempty"`
+	Note    string      `json:"note,omitempty"`
+	Right   string      `json:"right,omitempty"`
+	Depth   int         `json:"depth,omitempty"`
+	Open    bool        `json:"open,omitempty"`
+	Checked bool        `json:"checked,omitempty"`
+	Head    string      `json:"head,omitempty"`
+	Tag     string      `json:"tag,omitempty"`
+	Lead    string      `json:"lead,omitempty"`
+	Tone    string      `json:"tone,omitempty"`
+	Under   string      `json:"under,omitempty"`
+	Menu    []muiChoice `json:"menu,omitempty"`
 }
 
 // reviewLine is a line of the code: a hunk's head, a line added, deleted
@@ -584,14 +591,40 @@ func reviewGates(gates []sawaGate, most int, now time.Time) []reviewEntry {
 
 // reviewAbove is the findings on the review as a whole as a list holds
 // them, no more than most: each by its first line, its label a lead in
-// its tone, and who filed it and how it stands at the right.
+// its tone, who filed it and how it stands at the right, and the menu
+// of what its state allows: a reply, and to resolve one that stands or
+// reopen one that does not, and its words copied.
 func reviewAbove(findings []sawaFinding, most int) []reviewEntry {
 	entries := []reviewEntry{{Head: "On the review as a whole", Note: strconv.Itoa(len(findings))}}
 	for _, finding := range findings[:min(len(findings), most)] {
 		label, tone := reviewLabel(finding)
 		said := finding.first()
 		title, _, _ := strings.Cut(said.Body, "\n")
-		entries = append(entries, reviewEntry{ID: finding.ID, Title: cutTo(title, gitWordsMost), Lead: label, Tone: tone, Right: cutTo(said.Author+" · "+finding.State, gitWordsMost)})
+		menu := []muiChoice{{ID: "reply", Title: "Reply", Right: "⏎"}, {ID: "resolve", Title: "Resolve"}}
+		if !finding.stands() {
+			menu[1] = muiChoice{ID: "reopen", Title: "Reopen"}
+		}
+		menu = append(menu, muiChoice{ID: "copy", Title: "Copy its text", Right: "y"})
+		entries = append(entries, reviewEntry{ID: finding.ID, Title: cutTo(title, gitWordsMost), Lead: label, Tone: tone, Right: cutTo(said.Author+" · "+finding.State, gitWordsMost), Menu: menu})
+	}
+	return entries
+}
+
+// reviewMenus is the list's entries with, on each file, the menu of what
+// can be done to it, each choice by the id of the key that does the same
+// with that key at its right: it is marked read where it is not, handed
+// to the editor, and its path copied. (sawa has no word that marks a
+// file unread, so a read one has no such choice.)
+func reviewMenus(entries []reviewEntry, rows []reviewRow) []reviewEntry {
+	for i := range entries {
+		if !slices.ContainsFunc(rows, func(row reviewRow) bool { return row.id == entries[i].ID }) {
+			continue
+		}
+		var menu []muiChoice
+		if !entries[i].Checked {
+			menu = []muiChoice{{ID: "read", Title: "Mark read", Right: "space"}}
+		}
+		entries[i].Menu = append(menu, muiChoice{ID: "edit", Title: "Open in editor", Right: "e"}, muiChoice{ID: "copy", Title: "Copy path", Right: "y"})
 	}
 	return entries
 }
@@ -957,7 +990,9 @@ type reviewView struct {
 	open      string            // the finding that is open, reviewNew while a comment is written
 	writing   *reviewMark       // the line that comment is under
 	typed     map[string]string // what is typed and not sent, by finding
-	status    *muiStatus        // how the last thing done went
+	status    *muiStatus        // what was refused, or failed, or is to be known of how things stand
+	passing   muiPassing        // what was just done, said once
+	on        string            // the piece the keys are on, as the window said: files, diff or general
 }
 
 // find finds the review to show: the one asked for, opened as sw nvim
@@ -1109,10 +1144,11 @@ func (v *reviewView) build(now time.Time) (moved bool) {
 		on = v.marks[v.at]
 	}
 	// (Paths past ASCII are six bytes a character in a message: fewer files
-	// are listed until the list leaves the diff most of the message.)
+	// are listed until the list, with its menus, leaves the diff half of it.)
 	for most := reviewRowsMost; ; most /= 2 {
 		v.entries, v.rows = reviewList(v.state, v.reading, v.filter, most)
-		if most <= 1 || len(encode(v.entries)) < muiLimit/4 {
+		v.entries = reviewMenus(v.entries, v.rows)
+		if most <= 1 || len(encode(v.entries)) < muiLimit/2 {
 			break
 		}
 	}
@@ -1248,10 +1284,16 @@ func (v *reviewView) about(now time.Time) string {
 	return cutTo(strings.Join(words, " · "), gitWordsMost)
 }
 
-// keys is the keys the program takes: esc first while it shuts something.
+// keys is the keys the program takes where the window says the keys
+// are: c, which comments on a line, only off the list of files and the
+// findings on the review as a whole, and y by what it copies there; esc
+// first while it shuts a finding. Under a modal the window takes none.
 func (v *reviewView) keys() []gitKey {
-	if v.failed != "" {
+	switch {
+	case v.failed != "":
 		return []gitKey{{"r", "ask again", "again"}}
+	case v.judging || v.gating:
+		return []gitKey{}
 	}
 	order, resolved, filter := "reading order", "show resolved", "mine to answer"
 	if v.reading {
@@ -1263,31 +1305,46 @@ func (v *reviewView) keys() []gitKey {
 	case reviewAll:
 		resolved, filter = "hide resolved", "all open"
 	}
-	keys := []gitKey{
-		{"n", "next finding", "next"}, {"N", "previous finding", "prev"}, {"c", "comment", "comment"},
-		{"space", "read, next file", "read"}, {"e", "edit in " + filepath.Base(editorWords()[0]), "edit"},
-		{"f", filter, "filter"}, {"g", "gates", "gates"}, {"o", order, "order"}, {"u", resolved, "resolved"},
-		{"v", "verdict", "verdict"},
+	keys := []gitKey{{"n", "next finding", "next"}, {"N", "previous finding", "prev"}}
+	copies := "copy the path"
+	switch v.on {
+	case "files":
+	case "general":
+		copies = "copy the finding"
+	default:
+		keys = append(keys, gitKey{"c", "comment", "comment"})
+		if v.on == "diff" {
+			copies = "copy the finding"
+		}
 	}
+	keys = append(keys,
+		gitKey{"space", "read, next file", "read"}, gitKey{"e", "edit in " + filepath.Base(editorWords()[0]), "edit"}, gitKey{"y", copies, "copy"},
+		gitKey{"f", filter, "filter"}, gitKey{"g", "gates", "gates"}, gitKey{"o", order, "order"}, gitKey{"u", resolved, "resolved"},
+		gitKey{"v", "verdict", "verdict"})
 	if len(v.layers) > 0 {
 		keys = append(keys, gitKey{"[", "layer under", "under"}, gitKey{"]", "layer over", "over"})
 	}
 	keys = append(keys, gitKey{"r", "ask again", "again"})
-	switch {
-	case v.judging:
-		return append([]gitKey{{"esc", "no verdict now", "shut"}}, keys...)
-	case v.gate != "":
-		return append([]gitKey{{"esc", "back to the gates", "shut"}}, keys...)
-	case v.gating:
-		return append([]gitKey{{"esc", "back to the summary", "shut"}}, keys...)
-	case v.open != "":
+	if v.open != "" {
 		return append([]gitKey{{"esc", "shut it, keep the words", "shut"}}, keys...)
 	}
 	return keys
 }
 
-// verdicts is the verdicts sawa offers a person, as a list in place of
-// the summary: the one given is checked, and can be taken back.
+// modals is the modal over the view, where there is one: the verdicts
+// to pick from, or the gates, and of those the one that is shown.
+func (v *reviewView) modals(aim reviewAim, now time.Time) []reviewPiece {
+	switch {
+	case v.judging:
+		return []reviewPiece{{T: "modal", ID: "judge", Title: "Your verdict", Children: []reviewPiece{v.verdicts(aim)}}}
+	case v.gating:
+		return []reviewPiece{{T: "modal", ID: "gated", Title: "Gates", W: 560, Children: v.gates(aim, now)}}
+	}
+	return nil
+}
+
+// verdicts is the verdicts sawa offers a person, as a list in a modal
+// over the view: the one given is checked, and can be taken back.
 func (v *reviewView) verdicts(aim reviewAim) reviewPiece {
 	given := v.state.Verdict.Verdict
 	list := reviewPiece{T: "list", ID: "verdict", Items: []reviewEntry{
@@ -1308,7 +1365,7 @@ func (v *reviewView) verdicts(aim reviewAim) reviewPiece {
 	return list
 }
 
-// gates is the gates in place of the summary: their list, each with how
+// gates is the gates in a modal over the view: their list, each with how
 // it was judged and why; or the one that is shown — what must hold, what
 // was judged of it, and since sawa lets a person record a gate's result
 // as it lets an agent, an area for why and Pass, Warn and Fail.
@@ -1352,7 +1409,7 @@ func (v *reviewView) overall(aim reviewAim, now time.Time) []reviewPiece {
 	if len(findings) == 0 {
 		return nil
 	}
-	list := reviewPiece{T: "list", ID: "general", Live: true, Max: 4, Items: reviewAbove(findings, reviewAboveMost)}
+	list := reviewPiece{T: "list", ID: "general", Live: true, Max: 4, Menu: "what to do", Items: reviewAbove(findings, reviewAboveMost)}
 	if aim.above && v.above != "" {
 		list.Selected = v.above
 	}
@@ -1394,22 +1451,18 @@ func (v *reviewView) whole(lines json.RawMessage, aim reviewAim, now time.Time) 
 	if runes := []rune(summary); len(runes) > reviewSummaryMost {
 		summary = string(runes[:reviewSummaryMost]) + "…"
 	}
-	switch {
-	case v.judging:
-		head.Children = append(head.Children, v.verdicts(aim))
-	case v.gating:
-		head.Children = append(head.Children, v.gates(aim, now)...)
-	default:
-		head.Children = append(append(head.Children, reviewWords(summary, "", "")...), v.overall(aim, now)...)
-	}
+	head.Children = append(append(head.Children, reviewWords(summary, "", "")...), v.overall(aim, now)...)
 	if len(s.Files) == 0 {
 		head.Children = append(head.Children, reviewWords("nothing to review: "+s.Label+" changes no file", "dim", "")...)
-		message.View = reviewPiece{T: "col", Children: []reviewPiece{head}}
+		message.View = reviewPiece{T: "col", Children: append([]reviewPiece{head}, v.modals(aim, now)...)}
 		return encode(message)
 	}
 
-	list := reviewPiece{T: "list", ID: "files", Live: true, Items: v.entries}
+	list := reviewPiece{T: "list", ID: "files", Live: true, Menu: "what to do", Items: v.entries}
 	code := reviewPiece{T: "code", ID: "diff", Live: true, Lines: lines}
+	if slices.ContainsFunc(v.marks, func(mark reviewMark) bool { return mark.kind == "note" && mark.note != reviewNew }) {
+		code.Does = "open finding"
+	}
 	if aim.list {
 		list.Selected = reviewID(v.file)
 	}
@@ -1427,15 +1480,17 @@ func (v *reviewView) whole(lines json.RawMessage, aim reviewAim, now time.Time) 
 		reviewWords(fmt.Sprintf("file %d of %d", nth, len(files)), "dim", "")...),
 		reviewPiece{T: "col", Grow: 1}),
 		reviewWords(findings, "", "warn")...)}
-	message.View = reviewPiece{T: "col", Children: []reviewPiece{
+	// (The right side is said again whole on every move: it comes in at
+	// once, and no diff fades. A modal is said last, over all of it.)
+	message.View = reviewPiece{T: "col", Children: append([]reviewPiece{
 		head,
 		{T: "divider"},
 		{T: "row", Split: true, Grow: 1, Children: []reviewPiece{
 			{T: "col", W: 360, Scroll: true, Pad: 6, Children: []reviewPiece{list}},
 			{T: "divider"},
-			{T: "col", Children: []reviewPiece{over, code}},
+			{T: "col", ID: "side", Motion: "none", Children: []reviewPiece{over, code}},
 		}},
-	}}
+	}, v.modals(aim, now)...)}
 	return encode(message)
 }
 
@@ -1471,6 +1526,7 @@ type reviewEvent struct {
 	List string `json:"list"`
 	Item string `json:"item"`
 	Text string `json:"text"`
+	Sub  string `json:"sub"`
 }
 
 // reviewDo is what an event asks for.
@@ -1506,6 +1562,8 @@ const (
 	reviewReopen   // a finding that stands no more sent back
 	reviewEdit     // a file handed to the editor at a line
 	reviewLayer    // the layer under, or over, shown
+	reviewFocus    // the keys on another piece: the files, the diff or the findings on the whole
+	reviewCopy     // a path, or a finding's words, put on the clipboard
 )
 
 // reviewDeed is what an event does: with a file, a line's place, a
@@ -1527,15 +1585,58 @@ func (v *reviewView) fileOf(id string) (string, bool) {
 	return v.rows[at].path, true
 }
 
+// copying is what y does: on a file of the list its path is put on the
+// clipboard, on a finding — its note in the diff, or its row over the
+// files — what it says. On another line of the diff it is refused.
+func (v *reviewView) copying(item string) reviewDeed {
+	if file, ok := v.fileOf(item); ok {
+		return reviewDeed{do: reviewCopy, file: file, text: file}
+	}
+	id := item
+	if at, err := strconv.Atoi(item); err == nil && at >= 0 && at < len(v.marks) {
+		id = v.marks[at].note
+	}
+	if finding, ok := v.finding(id); ok && id != "" {
+		return reviewDeed{do: reviewCopy, id: id, text: finding.first().Body}
+	}
+	return reviewDeed{do: reviewCopy}
+}
+
 // deed is what an event does to the view as it stands. A key pressed on
 // a row of the list is about that file, and on a line of the code about
-// that line of the file shown.
+// that line of the file shown. A choice of a file's menu does what the
+// key of its id does on that file; one of a finding's replies to it,
+// resolves or reopens it with what is typed under it, or copies it. esc
+// under a modal shuts it.
 func (v *reviewView) deed(event reviewEvent) reviewDeed {
+	switch finding, above := v.finding(event.ID); {
+	case event.E != "pick" || event.Sub == "":
+	case event.List == "files":
+		event = reviewEvent{E: "press", ID: event.Sub, Item: event.ID}
+	case event.List != "general" || !above || !v.isAbove(event.ID):
+		return reviewDeed{}
+	case event.Sub == "reply":
+		return reviewDeed{do: reviewUnfold, id: event.ID}
+	case event.Sub == "resolve" && finding.stands():
+		return reviewDeed{do: reviewSettle, id: event.ID, text: v.typed[event.ID]}
+	case event.Sub == "reopen" && !finding.stands():
+		return reviewDeed{do: reviewReopen, id: event.ID, text: v.typed[event.ID]}
+	case event.Sub == "copy":
+		return v.copying(event.ID)
+	default:
+		return reviewDeed{}
+	}
 	place, err := strconv.Atoi(event.ID)
 	onLine := err == nil && place >= 0 && place < len(v.marks)
 	switch {
 	case event.E == "close":
 		return reviewDeed{do: reviewLeave}
+	case event.E == "dismiss":
+		return reviewDeed{do: reviewShut}
+	case event.E == "focus":
+		if event.ID == "files" || event.ID == "diff" || event.ID == "general" {
+			return reviewDeed{do: reviewFocus, id: event.ID}
+		}
 	case event.E == "move" && event.List == "files":
 		if file, ok := v.fileOf(event.ID); ok && file != v.file {
 			return reviewDeed{do: reviewFile, file: file}
@@ -1587,6 +1688,8 @@ func (v *reviewView) deed(event reviewEvent) reviewDeed {
 		return reviewDeed{}
 	}
 	switch event.ID {
+	case "copy":
+		return v.copying(event.Item)
 	case "next":
 		return reviewDeed{do: reviewNext}
 	case "prev":
@@ -1746,6 +1849,21 @@ func (v *reviewView) act(deed reviewDeed, now time.Time) (say bool, aim reviewAi
 	case reviewOnWhole:
 		v.above = deed.id
 		return false, aim
+	case reviewFocus:
+		v.on = deed.id
+		return true, aim
+	case reviewCopy:
+		switch {
+		case deed.text == "":
+			v.status = &muiStatus{Text: "y copies a file's path, and on a finding what it says: the keys are on neither"}
+		case deed.file != "":
+			v.passing.copy = deed.text
+			v.passing.done("copied "+deed.file, "")
+		default:
+			v.passing.copy = deed.text
+			v.passing.done("copied what "+deed.id+" says", "")
+		}
+		return true, aim
 	}
 	v.status = nil
 	if v.failed != "" {
@@ -1900,25 +2018,25 @@ func (v *reviewView) act(deed reviewDeed, now time.Time) (say bool, aim reviewAi
 	switch deed.do {
 	case reviewReply:
 		delete(v.typed, deed.id)
-		v.status = &muiStatus{Text: "replied", Tone: "ok"}
+		v.passing.done("reply sent", "ok")
 		aim = reviewAim{words: true}
 	case reviewSettle:
 		delete(v.typed, deed.id)
 		v.open = ""
-		v.status = &muiStatus{Text: deed.id + " resolved", Tone: "ok"}
+		v.passing.done(deed.id+" resolved", "ok")
 		aim = reviewAim{focus: "diff"}
 		if v.isAbove(deed.id) {
 			aim = reviewAim{focus: "general"}
 		}
 	case reviewReopen:
 		delete(v.typed, deed.id)
-		v.status = &muiStatus{Text: deed.id + " reopened", Tone: "ok"}
+		v.passing.done(deed.id+" reopened", "ok")
 		aim = reviewAim{words: true}
 	case reviewApply:
-		v.status = &muiStatus{Text: deed.id + " applied to the working tree", Tone: "ok"}
+		v.passing.done(deed.id+" applied to the working tree", "ok")
 	case reviewJudged:
 		delete(v.typed, "g:"+v.gate)
-		v.status = &muiStatus{Text: v.gate + ": " + deed.id, Tone: reviewGateTone(deed.id)}
+		v.passing.done(v.gate+": "+deed.id, reviewGateTone(deed.id))
 		v.gate = ""
 		aim = reviewAim{list: true, focus: "gates"}
 	case reviewComment:
@@ -1926,16 +2044,22 @@ func (v *reviewView) act(deed reviewDeed, now time.Time) (say bool, aim reviewAi
 		_ = json.Unmarshal(answer, &filed) // without its id the keys stay where they are
 		delete(v.typed, reviewNew)
 		v.open, v.writing = "", nil
-		v.status = &muiStatus{Text: "filed " + filed.ID, Tone: "ok"}
+		v.passing.done("filed "+filed.ID, "ok")
 		v.read(now)
 		return true, onto(filed.ID)
 	case reviewVerdict:
 		v.judging = false
 		aim = reviewAim{focus: "files"}
 	case reviewAgain:
-		v.status = &muiStatus{Text: "looked at again", Tone: "ok"}
+		v.passing.done("looked at again", "ok")
 	}
 	moved := v.read(now)
+	switch deed.do {
+	case reviewVerdict:
+		v.passing.done("verdict: "+v.state.Verdict.Label, "ok")
+	case reviewRead:
+		v.passing.done("marked read: "+deed.file, "ok")
+	}
 	if deed.do == reviewRead {
 		files, _ := reviewOrder(v.state, v.reading)
 		if next := reviewUnread(files, deed.file); next == "" { // all read: what is left is the verdict
@@ -2009,11 +2133,16 @@ func cmdReview(args []string) int {
 	}
 	defer func() { shut() }()
 
-	var shown []byte // what the view said last, but for where the person is
+	// What was told last: the view is said whole when more than its status
+	// and its keys is another, and when it says where the person is.
+	var told muiTold
 	show := func(aim reviewAim) {
 		now := time.Now()
-		shown = bytes.Join(view.messages(reviewAim{}, now), nil)
-		say(view.messages(aim, now)...)
+		var where [][]byte
+		if aim != (reviewAim{}) {
+			where = view.messages(aim, now)
+		}
+		say(told.says(view.pane, view.messages(reviewAim{}, now), where, &view.passing)...)
 	}
 	show(reviewAim{list: true, code: true, words: true})
 	stamp := reviewStamp(view.state.Store)
@@ -2031,9 +2160,7 @@ func cmdReview(args []string) int {
 			}
 			stamp = now
 			// (Said again when it reads another way: a finding come in, an age gone on.)
-			if !bytes.Equal(bytes.Join(view.messages(reviewAim{}, time.Now()), nil), shown) {
-				show(aim)
-			}
+			show(aim)
 		case data, open := <-keys:
 			if !open {
 				return exitOK

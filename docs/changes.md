@@ -160,6 +160,18 @@ on GitHub; a tag without its section is not released.
   no verb for it), sawa's map and patterns, a pull request's GitHub
   comments. `mia api capabilities` lists `review-app`. See [mia
   review](api.md#mia-review).
+- **`mia review` asks in a modal, says what it did in a toast, and has
+  a menu on its files and findings.** The verdicts and the gates come up
+  in a modal over the view, which stays as it was under them, and `esc`
+  takes them away. A reply sent, a finding resolved, reopened or filed,
+  an edit applied, a file marked read, a gate's result and the verdict
+  given are toasts; the status is kept for what sawa refused. Each file
+  has a menu, under `→` and the pointer's other button — mark read,
+  open in the editor, copy path — and each finding on the review as a
+  whole one — reply, resolve or reopen, copy its text; `y` copies a
+  path, or what a finding says. The foot's keys follow the piece the
+  window says the keys are on, and the diff says `⏎` opens a finding.
+  See [mia review](api.md#mia-review).
 
 - **The chat does what desk's own chat did.** `mia chat` fills its pane
   under a line that says the agent, its model, effort and account. What

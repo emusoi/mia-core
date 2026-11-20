@@ -831,12 +831,29 @@ Under those, side by side:
 | `space` | marks the file under the keys read (`sw read -f`) and shows the next unread one; when every file is read the status says so and the verdicts come up with the keys on them |
 | `e` | hands the file to the editor as [`mia files`](#mia-files) does — `$EDITOR +<line> <path>`, else `nvim`, run in the worktree's top folder, the view said again when it leaves — at the line of the file the keys are on in the diff (a deleted line's and a note's being the next line the file has), and at its first on its row in the list |
 | `f` | which findings are shown: every open one, then only those an agent says it addressed and that wait on you, then the resolved too, and round again; the header's count, each file's, the notes and `n` follow |
-| `g` | sawa's gates in place of the summary, a list `gates`: each by its name with what must hold (`.sawa/gates.md`), how it was judged, by whom and when at its right, and why on a line under it. `⏎` on one shows what was judged, with a text area for why and **Pass**, **Warn** and **Fail**, which record its result (`sw gate <name> pass\|warn\|fail -m`): sawa lets a person record one as it lets an agent. `esc` goes back to the gates, and again to the summary |
-| `v` | the verdicts in place of the summary — approve, request changes, comment only, and none once one is given; `⏎` gives it (`sw verdict`), `esc` leaves it |
+| `g` | sawa's gates in a modal, `gated`, over the view, a list `gates`: each by its name with what must hold (`.sawa/gates.md`), how it was judged, by whom and when at its right, and why on a line under it. `⏎` on one shows what was judged, with a text area for why and **Pass**, **Warn** and **Fail**, which record its result (`sw gate <name> pass\|warn\|fail -m`): sawa lets a person record one as it lets an agent. `esc` goes back to the gates, and again to the summary |
+| `v` | the verdicts in a modal, `judge`, over the view — approve, request changes, comment only, and none once one is given; `⏎` gives it (`sw verdict`), `esc` leaves it |
+| `y` | copies to the clipboard (a patch's `copy`) the path of the file under the keys in the list, and on a finding — its note in the diff, or its row over the files — what it says |
 | `o` `u` | reading order or by folder; resolved findings shown or not |
 | `[` `]` | where sawa reviews a stack (`sw stack --json` says its layers): the layer under and the one over, each a review of its own (`sw open -r <parent>..<branch>`), this worktree's own being the one found as above; the header says `layer 2 of 3`, and the status says so at the bottom and at the top |
 | `r` | has sawa look at the change again (`sw open` of the same target) |
 
+Each file of the list carries a menu, opened beside it with `→` and
+under the pointer's other button, each choice with the key that does the
+same at its right: Mark read (where it is not; sawa has no word that
+marks one unread), Open in editor, Copy path. A finding on the review
+as a whole has Reply, Resolve while it stands or Reopen once it does
+not — each with what is typed under it — and Copy its text. A finding
+under a line of the diff has no menu: the window's protocol has none on
+a line of code, and `⏎` opens it, as the code's `does` says in the foot.
+
+What was just done — `reply sent`, `t3 resolved`, `t3 reopened`, `filed
+t7`, `marked read: <path>`, the verdict as sawa words it, a gate's result,
+`copied <path>` — is a toast, said once. The status is for what sawa
+refused and for what is to be known of how things stand, and it and the
+keys are said by a patch's `status` and `keys` where nothing else of the
+view is another. The foot's keys are those of the piece the window says
+the keys are on (`focus`): `c` only off the list of files.
 Every `sw` is run with `-t <review>` and without `SAWA_AGENT`,
 `SAWA_AUTHOR` and `SAWA_SNAPSHOT`, so what is written is the person's
 whatever the pane's environment says. After each the review is read
