@@ -405,6 +405,8 @@ func Run(args []string) int {
 		return exitOK
 	case "window", "windows":
 		return cmdWindow(a, rest, asJSON)
+	case "chat":
+		return cmdChat(a, rest)
 	case "setup":
 		target := ""
 		if len(rest) == 1 {

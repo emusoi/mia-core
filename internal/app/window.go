@@ -164,6 +164,18 @@ func (a *App) KeysInWindow(record model.Record, window string, keys []string) er
 	return host.Keys(record.Name, window, keys)
 }
 
+// StopInWindow presses the key that stops the agent a window runs
+// mid-work, as KeysInWindow presses one: Escape, unless the agent has
+// another.
+func (a *App) StopInWindow(record model.Record, window string) error {
+	host, window, err := a.windowNamed(record, window)
+	if err != nil {
+		return err
+	}
+	agent, _ := agentNamed(a.agents(), a.agentOfWindow(host, record.Name, window))
+	return host.Keys(record.Name, window, []string{agent.stopKey()})
+}
+
 func (a *App) ReadWindow(record model.Record, window string) (string, error) {
 	host, window, err := a.windowNamed(record, window)
 	if err != nil {

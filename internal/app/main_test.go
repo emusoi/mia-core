@@ -268,6 +268,16 @@ func TestStandingIsEveryRepositorysAgentsAndEachMachineAskedForItsOwn(t *testing
 	if here.Working[0].Worktree != "themi" || here.Working[0].Agent != "codex" || here.DoneUnread[0].Worktree != "duluti" {
 		t.Errorf("working = %+v, done and unread = %+v", here.Working, here.DoneUnread)
 	}
+	// a chat asks it of one worktree: at work where it stands among the working, and nowhere else
+	for _, name := range []string{"kilwa", "duluti", "themi", "sekei"} {
+		record, err := shop.RecordOrHere(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := shop.AtWork(record, 0); got != (name == "themi") {
+			t.Errorf("%s at work: %v", name, got)
+		}
+	}
 	if _, err := os.Stat(asked); err == nil {
 		t.Error("a machine was asked when only this one was wanted")
 	}

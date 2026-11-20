@@ -9,6 +9,15 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **A conversation is a chat mia desk draws.** `mia chat`, run in a pane
+  of a worktree's session, follows the conversation a window of the
+  worktree has open — `--window` says which, `--conversation` another —
+  and says it to mia desk by its UI protocol: the view whole, then each
+  new or grown turn as a patch, and whether the agent is at work. What is
+  sent, chosen and stopped there is typed into the agent's window. A
+  conversation no window has open is shown with no field to reply in.
+  `mia api capabilities` lists `chat`.
+
 - **A view follows a conversation as it is written.**
   `mia api conversation <id> --follow` and `mia api main turns --follow`
   print the turns in one line of JSON and keep running, a line more of

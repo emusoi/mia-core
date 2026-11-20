@@ -14,7 +14,7 @@ var Groups = []string{"Worktrees", "Working", "Environments", "Records"}
 
 var groupOf = map[string]string{
 	"new": "Worktrees", "ls": "Worktrees", "path": "Worktrees", "adopt": "Worktrees", "rm": "Worktrees", "gc": "Worktrees",
-	"star": "Worktrees", "open": "Worktrees", "shell": "Worktrees", "window": "Worktrees", "rename": "Worktrees", "run": "Worktrees", "setup": "Worktrees", "switch": "Worktrees", "shell-init": "Worktrees", "shell-integration": "Working",
+	"star": "Worktrees", "open": "Worktrees", "shell": "Worktrees", "window": "Worktrees", "chat": "Worktrees", "rename": "Worktrees", "run": "Worktrees", "setup": "Worktrees", "switch": "Worktrees", "shell-init": "Worktrees", "shell-integration": "Working",
 	"dash": "Working", "stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working",
 	"env":    "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
@@ -33,6 +33,7 @@ var verbs = []Verb{
 	{"adopt", "mia adopt <worktree>", "take over a worktree created by hand", false, ""},
 	{"rm", "mia rm [--force] [--stop-running] [--branch] <worktree>", "remove a worktree, its session and its name", false, ""},
 	{"window", windowUsage, "the windows of a worktree's session: land in one, pick one without landing, add a shell or an agent — with a model, an effort and an account — close one, read or type into one, type into one without Enter, press a key by name (C-c, Escape), switch an agent's model while it runs; account says how to put one on another account", false, ""},
+	{"chat", chatUsage, "a worktree's conversation with its agent as a chat drawn by mia desk over the pane it is run in, followed as it is written: what is sent, chosen and stopped there is typed into the window that has the conversation open, the one of --window or the one that has --conversation; with no window that has one open, the last written to, only shown", false, ""},
 	{"shell", "mia shell [--popup | --view <name>] [worktree]", "attach to a worktree's session; --view at this terminal's own size and window", false, ""},
 	{"run", "mia run <worktree>[@machine] <cmd…>", "run a command once in a worktree, here or on a machine", false, ""},
 	{"dev", "mia dev [<worktree> [--follow]|off]", "lend the main checkout's running dev server a worktree's files; the one time mia writes into a working tree", false, ""},

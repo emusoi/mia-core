@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/emusoi/mia-core/internal/model"
 	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/runtime"
 	"github.com/emusoi/mia-core/internal/session"
@@ -199,6 +200,24 @@ func (a *App) standingIn(repo Repository, panes map[string][]session.Pane) []sto
 		found = append(found, stand)
 	}
 	return found
+}
+
+// AtWork reports whether the agent in a worktree's window is at work now:
+// the window says so, as a list of windows does, or the worktree stands
+// among the working, as Standing says it.
+func (a *App) AtWork(record model.Record, window int) bool {
+	panes := session.Here().AllPanes()
+	for _, one := range session.WindowsFrom(panes[session.Name(record.Name)]) {
+		if one.Index == window && one.Working {
+			return true
+		}
+	}
+	for _, one := range a.standingIn(Repository{Name: filepath.Base(a.Root), Path: a.Root}, panes) {
+		if one.Worktree == record.Name {
+			return one.group == groupWorking
+		}
+	}
+	return false
 }
 
 // option is a numbered choice as an agent draws one: "❯ 1. Yes", "  2. No",

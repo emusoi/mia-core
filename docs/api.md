@@ -166,6 +166,19 @@ exit 0 when stdin ends, when a line cannot be written because its reader
 has gone, or on SIGINT or SIGTERM: a view keeps stdin open as long as it
 reads. `mia api capabilities` lists `conversation-follow`.
 
+`mia chat [--window <index>] [--conversation <id>]` is that, shown: run
+in a pane of a worktree's session, it follows a conversation of the
+worktree and has mia desk draw it as a chat over the pane, by desk's UI
+protocol — the whole view once, the last turns that fit a message, then
+each line of new turns as a patch, and the view again when the pane comes
+into sight. With no flag it is the conversation a window has open, else
+the last written to, which is only shown. What is sent, chosen and
+stopped in the chat is typed into that window as `mia window send`,
+`press` and `key` type; what was sent comes back as a turn once the
+agent has written it. Whether the agent is at work is looked at once a
+second. `q` or `⌃C` in the plain terminal leaves, and stdin that is no
+terminal is refused, exit 1. `mia api capabilities` lists `chat`.
+
 ```json
 [{"n":1,"kind":"asked","at":"2026-11-02T10:00:00Z","text":"make the list faster"},
  {"n":2,"kind":"said","at":"2026-11-02T10:00:04Z","text":"I will **look** at where the time goes."},
