@@ -124,6 +124,8 @@ func Run(args []string) int {
 		return cmdRole(rest, asJSON)
 	case "git": // from any folder: one in no repository is shown as that
 		return cmdGit(rest)
+	case "files": // from any folder too: one in no repository is its own tree
+		return cmdFiles(rest)
 	case "api":
 		if len(rest) > 0 && (rest[0] == "main" || rest[0] == "standing") { // the person's, from anywhere
 			return cmdAPIMain(rest)

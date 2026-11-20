@@ -471,6 +471,78 @@ does; stdin that is no terminal is refused, exit 1.
 Not yet: discarding a change, amending the last commit, push, pull and
 fetch, switching branches, the stash, and colour by syntax.
 
+### mia files
+
+`mia files` is an app of mia's own too: run in a pane, in any folder of a
+repository, it has mia desk draw that worktree's files over the pane, by
+desk's UI protocol. It is for looking: it writes nothing, and editing is
+handed to your editor. In a folder of no repository the tree is that
+folder's, with no marks. `mia api capabilities` lists `files-app`.
+
+Side by side:
+
+- A list, `tree`, under a head with the repository's name and `3 changed
+  against main`: the files git tracks and those it does not, ignored ones
+  left out (`git ls-files --cached --others --exclude-standard`), as a
+  tree — in each folder its folders, then its files, by name; an item's
+  id is its path, its `depth` how far in it is, and a folder has `open`.
+  Only a folder you opened is listed under: `⏎` on one opens or shuts
+  it. As the view comes up the folders on the way to each changed file
+  are open, unless that is more than 30 folders. A file changed against
+  the base carries `A` (added, or untracked), `M` (changed) or `D`
+  (deleted; it is still listed). The base is the one `mia git` stands a
+  branch against, and the files are compared, as they are on disk, with
+  the commit the branch left it at; with no base, with the last commit.
+  At most 400 rows are listed, and a head then says how many more there
+  are.
+- The file of the row under the keys: its path, `new against main · 19
+  lines`, and a code `file` with its lines numbered, a tab as the spaces
+  to the next fourth column. `l` passes the keys to it, `h` back. A
+  binary file, one over 2 MB and one that is no file are one gap that
+  says so. Of a longer file the first 1500 lines are said, on in patches
+  of `lines` where they are more than a message, then a gap that says how
+  many more there are: a UI holds 2000 pieces, the tree's rows among
+  them.
+
+| key | does |
+|---|---|
+| `e` | hands the file to the editor, at the line under the keys where they are in the file, else at its first: the view is closed, `$EDITOR` (else `nvim`) is run in the worktree's top folder with `+<line> <path>` and this terminal as its own, and when it leaves the files are read again and the view said again |
+| `f` | finds a file |
+| `/` | finds in files |
+| `r` | reads the files again |
+
+**Finding a file**, the left side is a field, `q`, over a list, `found`:
+the files whose path has the letters typed, in order and whatever their
+case — those with them in the file's name first, then the shorter path,
+50 at most — narrowed with each change of the words. The file under the
+keys is at the right. `⏎` goes back to the tree with every folder on the
+way to it open and the keys on it; `esc` goes back to the tree as it was.
+
+**Finding in files**, the field is over a list, `hits`: `⏎` searches for
+the words as they are written, not as a pattern (`git grep -n -I
+--untracked -F`, and `-i` when they are all in lower case; binary and
+ignored files are passed over). What git finds is said as it finds it,
+the hits of a file under a head with its path and their count, each line
+by its text with its number at the right, in patches of `item` no more
+often than every 100 ms; the status is `searching…` and then `6 in 4
+files`. At 500 hits the search is stopped and the status says there are
+more. The hit under the keys is at the right: its file from 8 lines
+before it, `from line 239` after its path, at most 960 lines of it. `↑`
+`↓` walk the hits from the field and `⏎` goes back to the tree with the
+keys on the hit's file; `e`, on a hit or a line, edits there. Other
+words typed drop what was found, so `⏎` searches for them; a new search
+and `esc` stop one at work.
+
+The files are read again by themselves when the repository changes, as
+`mia git` does it: `git status` is asked every 2 s, and the view is said
+again only when it would say something else. What fails — a command git
+refuses, an editor that cannot be run — is the view's status, and the
+app stays up. `q` or `⌃C` in the plain terminal leaves; stdin that is no
+terminal is refused, exit 1.
+
+Not yet: editing in place, creating, renaming and deleting files, colour
+by syntax, searching by a pattern, and blame.
+
 ## Setups
 
 `mia api setups` is the setups the person has used — an agent, a model

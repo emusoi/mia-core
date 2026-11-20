@@ -25,6 +25,21 @@ on GitHub; a tag without its section is not released.
   the stash, colour by syntax. `mia api capabilities` lists `git-app`.
   See [mia git](api.md#mia-git).
 
+- **A worktree's files are an app mia desk draws.** `mia files`, run in a
+  pane in any folder of a repository, says them to mia desk by its UI
+  protocol: the tree of the files git does not ignore, a folder opened
+  and shut with `⏎`, a file changed against the base marked `A`, `M` or
+  `D`, and beside it the file under the keys with its lines numbered.
+  `e` hands the file to `$EDITOR` (else `nvim`) at the line under the
+  keys and takes the pane again when it leaves; `f` finds a file by the
+  letters of its path; `/` finds lines in the files with `git grep`, said
+  as they are found, 500 at most; `r` asks again. It writes nothing, and
+  reads the files again when `git status`, asked every 2 s, says
+  something else. In a folder of no repository the tree is the folder's.
+  Not yet: editing in place, creating, renaming and deleting files,
+  colour by syntax, searching by a pattern, blame. `mia api
+  capabilities` lists `files-app`. See [mia files](api.md#mia-files).
+
 - **A conversation is a chat mia desk draws.** `mia chat`, run in a pane
   of a worktree's session, follows the conversation a window of the
   worktree has open — `--window` says which, `--conversation` another —
