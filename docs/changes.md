@@ -52,12 +52,21 @@ on GitHub; a tag without its section is not released.
   `e` hands the file to `$EDITOR` (else `nvim`) at the line under the
   keys and takes the pane again when it leaves; `f` finds a file by the
   letters of its path; `/` finds lines in the files with `git grep`, said
-  as they are found, 500 at most; `r` asks again. It writes nothing, and
-  reads the files again when `git status`, asked every 2 s, says
-  something else. In a folder of no repository the tree is the folder's.
-  Not yet: editing in place, creating, renaming and deleting files,
-  colour by syntax, searching by a pattern, blame. `mia api
-  capabilities` lists `files-app`. See [mia files](api.md#mia-files).
+  as they are found, 500 at most — as written, after a `/` by a regular
+  expression, after an `=` whole words alone; `r` asks again. `a` makes
+  a file, handed to the editor at once, or with a `/` at its end a
+  folder, where the keys are; `R` renames or moves the path under them,
+  with `git mv` where git tracks it; `D` deletes it, asked twice, the
+  status saying first what goes and whether git can bring it back; `y`
+  copies its path by an OSC 52 string. `c` lists only what changed; `d`
+  shows a changed file as its diff against the base; `B` puts each
+  line's commit and its age at its right, and `⏎` on one shows that
+  commit; `:` goes to a line. A file of any length is read to its end,
+  1500 lines said at a time around the keys. It reads the files again
+  when `git status`, asked every 2 s, says something else. In a folder
+  of no repository the tree is the folder's. Not yet: editing in place.
+  `mia api capabilities` lists `files-app`. See [mia
+  files](api.md#mia-files).
 - **A code review is an app mia desk draws.** `mia review`, run in a
   pane of a worktree, draws the review sawa keeps of it — the one of the
   branch against its base, opened when there is none; `mia review

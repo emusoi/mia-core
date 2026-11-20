@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"cmp"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -34,9 +36,10 @@ const filesUsage = "mia files"
 // of them, with the pieces around them. Then the folders opened on the
 // way to what changed as the view comes up, the bytes of a file that is
 // read, those of it looked at to tell a binary one, the files listed of a
-// folder in no repository, the lines sent before the one a search found,
-// the characters kept of such a line, and how long after one batch of
-// what a search found the next is said.
+// folder in no repository, how near the ends of the lines said of a long
+// file the keys come before others are said, the characters kept of a
+// line a search found, and how long after one batch of what a search
+// found the next is said.
 const (
 	filesRowsMost     = 400
 	filesFoundMost    = 50
@@ -48,7 +51,7 @@ const (
 	filesFileMost     = 2 << 20
 	filesBinaryLook   = 8000
 	filesWalkMost     = 20000
-	filesBefore       = 8
+	filesEdge         = 100
 	filesHitMost      = 160
 	filesBatch        = 100 * time.Millisecond
 )
@@ -56,9 +59,12 @@ const (
 // filesMessage is the whole view said to the window: a UI that fills its
 // pane, and the keys the program takes.
 type filesMessage struct {
-	V      int        `json:"v"`
-	Pane   string     `json:"pane,omitempty"`
-	Fill   bool       `json:"fill"`
+	V    int    `json:"v"`
+	Pane string `json:"pane,omitempty"`
+	Fill bool   `json:"fill"`
+	// Focus is the piece the keys are put on: the window does it once each
+	// time another piece is named, so a view said again leaves them be.
+	Focus  string     `json:"focus,omitempty"`
 	Status *muiStatus `json:"status,omitempty"`
 	View   filesPiece `json:"view"`
 	Keys   []gitKey   `json:"keys"`
@@ -104,13 +110,17 @@ type filesEntry struct {
 	Head  string `json:"head,omitempty"`
 }
 
-// filesLine is a line of the code: a line of the file with its number, or
-// a gap that stands for lines left out and for a file that has none to
-// show.
+// filesLine is a line of the code: a line of the file with its number
+// and, blamed, its commit and that one's age at the right; a line of a
+// diff, added or deleted or the same, with its numbers in the old file
+// and the new, under a hunk's head; or a gap that stands for lines left
+// out and for a file that has none to show.
 type filesLine struct {
-	New  int    `json:"new,omitempty"`
-	Text string `json:"text"`
-	Kind string `json:"kind,omitempty"`
+	Old   int    `json:"old,omitempty"`
+	New   int    `json:"new,omitempty"`
+	Text  string `json:"text"`
+	Kind  string `json:"kind,omitempty"`
+	Right string `json:"right,omitempty"`
 }
 
 // filesItemOp is the change of a patch that puts an entry last in a list.
@@ -153,7 +163,8 @@ func filesByName(a, b string) int {
 
 // filesTree is the rows of the tree of paths: in each folder its folders
 // and then its files, by name, and under a folder what is in it only
-// where it is open. The top is always open.
+// where it is open. The top is always open. A path that ends in a slash
+// is a folder with nothing in it.
 func filesTree(paths []string, open map[string]bool) []filesRow {
 	type folder struct{ folders, files []string }
 	listed := map[string]*folder{"": {}}
@@ -162,7 +173,9 @@ func filesTree(paths []string, open map[string]bool) []filesRow {
 		for {
 			name, under, deeper := strings.Cut(rest, "/")
 			if !deeper {
-				listed[in].files = append(listed[in].files, name)
+				if name != "" {
+					listed[in].files = append(listed[in].files, name)
+				}
 				break
 			}
 			sub := filesUnder(in, name)
@@ -416,10 +429,42 @@ func filesLines(content []byte, from, most int) ([]filesLine, int) {
 	return lines, len(all)
 }
 
+// filesCount is how many lines a file has: none where it is empty or is
+// not text.
+func filesCount(content []byte) int {
+	switch {
+	case len(content) == 0, bytes.IndexByte(content[:min(len(content), filesBinaryLook)], 0) >= 0:
+		return 0
+	case content[len(content)-1] == '\n':
+		return bytes.Count(content, []byte("\n"))
+	}
+	return bytes.Count(content, []byte("\n")) + 1
+}
+
+// filesWindow is the first line said of a file of total lines, most of
+// them at a time, so that a line is in the middle of them: the first
+// line of the file where all of it is said.
+func filesWindow(line, total, most int) int {
+	return max(min(line-most/2, total-most+1), 1)
+}
+
+// filesTurned is the first line to say of a file once the keys are on a
+// line of it, and whether that is another than from, the first said now:
+// it is when the keys are within edge lines of the last line said and
+// the file goes on after it, or of the first and the file begins before.
+func filesTurned(line, from, total, most, edge int) (int, bool) {
+	to := min(from+most-1, total)
+	if line > to-edge && to < total || line < from+edge && from > 1 {
+		next := filesWindow(line, total, most)
+		return next, next != from
+	}
+	return from, false
+}
+
 // filesState is the words after a file's path: how it stands against
-// what the marks are against, how many lines it has, and the line the
-// code begins at where that is not its first.
-func filesState(mark byte, against string, total, from int) string {
+// what the marks are against, and how many lines it has, or which of
+// them are said where that is not all of them.
+func filesState(mark byte, against string, total, from, to int) string {
 	var words []string
 	switch mark {
 	case 'A':
@@ -429,13 +474,125 @@ func filesState(mark byte, against string, total, from int) string {
 	case 'D':
 		words = append(words, "deleted against "+against)
 	}
-	if total > 0 {
+	switch {
+	case total > 0 && (from > 1 || to < total):
+		words = append(words, fmt.Sprintf("lines %d–%d of %d", from, to, total))
+	case total > 0:
 		words = append(words, counted(total, "line"))
 	}
-	if from > 1 {
-		words = append(words, fmt.Sprintf("from line %d", from))
-	}
 	return strings.Join(words, " · ")
+}
+
+// filesNamedIn is the path a name typed is of, in a folder: by its
+// steps from the worktree's top, and whether it names a folder, which a
+// name that ends in a slash does. A name of nothing, one from the root,
+// one that leaves the worktree and one in git's own folder are refused.
+func filesNamedIn(folder, typed string) (named string, isFolder bool, err error) {
+	typed = strings.TrimSpace(typed)
+	named = path.Clean(path.Join(folder, typed))
+	switch {
+	case typed == "":
+		return "", false, errors.New("no name was typed")
+	case strings.HasPrefix(typed, "/"):
+		return "", false, errors.New("a path from the worktree, not from /")
+	case named == "." || named == ".." || strings.HasPrefix(named, "../"):
+		return "", false, errors.New("that is outside the worktree")
+	case named == ".git" || strings.HasPrefix(named, ".git/"):
+		return "", false, errors.New("that is git's own folder")
+	}
+	return named, strings.HasSuffix(typed, "/"), nil
+}
+
+// filesGone is what goes with a delete: a file's lines, or the files
+// under a folder, how many of them git tracks, and whether what it
+// tracks is other than the last commit has it.
+type filesGone struct {
+	folder  bool
+	lines   int
+	files   int
+	tracked int
+	unsaved bool
+}
+
+// filesGoing is what D says before it deletes: what goes, whether git
+// can bring it back, and that D pressed again does it.
+func filesGoing(named string, gone filesGone, inside bool) string {
+	what := "delete " + cutTo(named, gitWordsMost/2)
+	switch {
+	case gone.folder:
+		what += " and its " + counted(gone.files, "file")
+	case gone.lines > 0:
+		what += ", " + counted(gone.lines, "line")
+	}
+	switch {
+	case !inside:
+		what += ", in no repository"
+	case gone.tracked == 0:
+		what += ", not in git"
+	case gone.folder && gone.tracked < gone.files:
+		what += fmt.Sprintf(", %d not in git", gone.files-gone.tracked)
+	case gone.unsaved:
+		what += ", tracked: git can bring back only what is committed"
+	default:
+		what += ", tracked: git can bring it back"
+	}
+	return what + " · D again to delete"
+}
+
+// filesCopied is what puts a path on the clipboard, written to the
+// terminal: an OSC 52 string, and inside tmux in tmux's passthrough, each
+// ESC of it doubled, as a message to the window is.
+func filesCopied(named string, tmux bool) []byte {
+	osc := "\033]52;c;" + base64.StdEncoding.EncodeToString([]byte(named)) + "\a"
+	if tmux {
+		osc = "\033Ptmux;" + strings.ReplaceAll(osc, "\033", "\033\033") + "\033\\"
+	}
+	return []byte(osc)
+}
+
+// filesSeeking is what is searched for, of the words typed, and how they
+// are read: after a slash as a regular expression, after an equals sign
+// as whole words, else as they are written. With them, how that is said.
+func filesSeeking(typed string) (words string, how git.Match, said string) {
+	if pattern, ok := strings.CutPrefix(typed, "/"); ok {
+		return pattern, git.AsPattern, "as a pattern"
+	}
+	if whole, ok := strings.CutPrefix(typed, "="); ok {
+		return whole, git.WholeWords, "whole words"
+	}
+	return typed, git.AsWritten, ""
+}
+
+// filesBlamedWord is the word at the right of a blamed line: its commit
+// by a short name and how long ago that was written.
+func filesBlamedWord(blamed git.Blamed, now time.Time) string {
+	if blamed.Commit == "" {
+		return "not committed"
+	}
+	return cutTo(blamed.Commit, 7) + " " + gitAge(now.Sub(blamed.When))
+}
+
+// filesDiffed is a diff's lines of code as the file's code holds them,
+// no more than most of them, a gap after them saying how many more there
+// are; with them how many lines are added and deleted in all.
+func filesDiffed(code []gitLine, most int) (lines []filesLine, added, deleted int) {
+	for n, line := range code {
+		switch line.Kind {
+		case "add":
+			added++
+		case "del":
+			deleted++
+		case "same":
+			line.Kind = ""
+		}
+		if n < most {
+			lines = append(lines, filesLine{Old: line.Old, New: line.New, Text: line.Text, Kind: line.Kind, Right: line.Right})
+		}
+	}
+	if more := len(code) - most; more > 0 {
+		lines = append(lines, filesLine{Kind: "gap", Text: counted(more, "more line")})
+	}
+	return lines, added, deleted
 }
 
 // filesWalk is the files under a folder of no repository, by their paths
@@ -518,8 +675,8 @@ func filesReadLine(reader *bufio.Reader) (string, error) {
 // prints is said as it comes: the hits of the files it is done with, no
 // more often than once every filesBatch, so a file's head is said with
 // its count; the last batch says how it ended. At most hits it is stopped.
-func filesSearchFor(dir, words string, repository bool, most int) (*filesSearch, error) {
-	search, err := git.Grep(dir, words, repository)
+func filesSearchFor(dir, words string, how git.Match, repository bool, most int) (*filesSearch, error) {
+	search, err := git.Grep(dir, words, how, repository)
 	if err != nil {
 		return nil, err
 	}
@@ -596,6 +753,33 @@ const (
 	filesAllPut = filesKeysPut | filesLinePut | filesWordsPut
 )
 
+// filesAsk is what the one-line field asks for: the name of a new file
+// or folder, where a path is renamed to, or the line to go to.
+type filesAsk int
+
+const (
+	filesAskNothing filesAsk = iota
+	filesAskNew
+	filesAskMove
+	filesAskLine
+)
+
+// filesBlame is a file blamed: each of its lines with its commit, as it
+// stood when the file was of this size and time.
+type filesBlame struct {
+	stamp string
+	lines []git.Blamed
+}
+
+// filesCommit is a commit shown in place of the file: what is said of
+// it, what it changed of the file as lines of code, and the line the
+// keys were on, where they go back to.
+type filesCommit struct {
+	said  string
+	lines []filesLine
+	back  int
+}
+
 // filesView is a worktree's files as the window is shown them. top is dir
 // itself where dir is in no repository.
 type filesView struct {
@@ -623,8 +807,56 @@ type filesView struct {
 	line      int             // the line of it a search found, 0 for none
 	lines     []filesLine     // its lines of code
 	total     int             // how many lines it has
-	status    *muiStatus      // how a search stands
+	status    *muiStatus      // how a search stands, or how the last thing done went
 	failed    string          // why the files could not be read, or the editor run
+	fork      string          // the commit the marks are against
+	made      []string        // the folders the person made, listed while nothing is in them
+	only      bool            // the tree lists only what changed
+	asking    filesAsk        // what the one-line field asks for
+	asked     string          // what it asks about: the folder a new name is in, the path renamed
+	answer    string          // what the field holds as it comes up
+	focus     string          // the piece the keys were last put on
+	back      string          // the piece they go back to when nothing is answered
+	arming    string          // the path D was pressed on once
+	window    int             // the first line said of the file, 0 until it is read
+	on        int             // the line of the file under the keys, 0 for none
+	diffing   bool            // a changed file is shown as its diff against the base
+	diffed    bool            // the lines are such a diff
+	added     int             // the lines it adds
+	deleted   int             // and deletes
+	blaming   bool            // each line says its commit
+	blames    map[string]filesBlame
+	commit    *filesCommit      // the commit shown in place of the file, nil for none
+	how       string            // how the words searched for are read, "" as written
+	handing   *filesDeed        // the file to hand to the editor next, nil for none
+	tmux      bool              // the terminal is tmux's
+	write     func(data []byte) // writes to the terminal
+}
+
+// shows puts a file at the right, from the line a search found, or from
+// its first.
+func (v *filesView) shows(file string, line int) {
+	v.file, v.line, v.on, v.window, v.commit = file, line, line, 0, nil
+}
+
+// tree makes the rows of the tree: of every file, with the folders the
+// person made, or of those changed alone.
+func (v *filesView) tree() {
+	paths := v.paths
+	if v.only {
+		paths = slices.DeleteFunc(slices.Clone(paths), func(named string) bool { return v.marks[named] == 0 })
+	} else if len(v.made) > 0 {
+		paths = slices.Clone(paths)
+		for _, folder := range v.made {
+			paths = append(paths, folder+"/")
+		}
+	}
+	v.rows = filesTree(paths, v.open)
+}
+
+// full is a path of the worktree as the disk has it.
+func (v *filesView) full(named string) string {
+	return filepath.Join(v.top, filepath.FromSlash(named))
 }
 
 // row is the row of an id.
@@ -639,7 +871,8 @@ func (v *filesView) row(id string) (filesRow, bool) {
 // mark reads which files changed against what: the commit the branch left
 // its base at (the base as mia git finds it), else the last commit, else
 // nothing at all; and the untracked ones as added. A file deleted is
-// listed with the others.
+// listed with the others; one that is gone from disk and was not there
+// at that commit either is not.
 func (v *filesView) mark() error {
 	commit, against := "HEAD", "the last commit"
 	base := gitBase(v.top, git.CurrentBranch(v.top))
@@ -654,7 +887,7 @@ func (v *filesView) mark() error {
 			commit, against = fork, base
 		}
 	}
-	v.against = against
+	v.against, v.fork = against, commit
 	out, err := git.Against(v.top, commit)
 	if err != nil {
 		return err
@@ -667,6 +900,11 @@ func (v *filesView) mark() error {
 	for _, path := range untracked {
 		v.marks[path] = 'A'
 	}
+	missing, err := git.Missing(v.top)
+	if err != nil {
+		return err
+	}
+	v.paths = slices.DeleteFunc(v.paths, func(named string) bool { return v.marks[named] == 0 && slices.Contains(missing, named) })
 	for path, mark := range v.marks {
 		if mark == 'D' {
 			v.paths = append(v.paths, path)
@@ -685,7 +923,7 @@ func (v *filesView) mark() error {
 func (v *filesView) read() (moved bool) {
 	before := v.at
 	was := slices.IndexFunc(v.rows, func(row filesRow) bool { return row.id == v.at })
-	v.top, v.inside, v.name, v.against, v.paths, v.marks, v.failed = v.dir, false, filepath.Base(v.dir), "", nil, map[string]byte{}, ""
+	v.top, v.inside, v.name, v.against, v.fork, v.paths, v.marks, v.failed = v.dir, false, filepath.Base(v.dir), "", "", nil, map[string]byte{}, ""
 	top, err := git.Toplevel(v.dir)
 	if err != nil { // in no repository: the folder itself
 		v.paths, err = filesWalk(v.dir, filesWalkMost)
@@ -709,7 +947,11 @@ func (v *filesView) read() (moved bool) {
 		}
 		v.open = filesOnTheWay(changed, filesOpenMost)
 	}
-	v.rows = filesTree(v.paths, v.open)
+	v.made = slices.DeleteFunc(v.made, func(folder string) bool {
+		in, err := os.ReadDir(v.full(folder))
+		return err != nil || len(in) > 0
+	})
+	v.tree()
 	if _, still := v.row(v.at); !still && len(v.rows) > 0 {
 		v.at = v.rows[min(max(was, 0), len(v.rows)-1)].id
 	} else if !still {
@@ -728,7 +970,7 @@ func (v *filesView) read() (moved bool) {
 	switch v.mode {
 	case filesInTree:
 		if row, ok := v.row(v.at); ok && !row.folder && row.path != v.file {
-			v.file, v.line = row.path, 0
+			v.shows(row.path, 0)
 		}
 	case filesInFind:
 		v.find(v.typed, v.foundAt)
@@ -747,19 +989,26 @@ func (v *filesView) find(typed, at string) {
 		v.foundAt = at
 	case len(v.found) > 0:
 		v.foundAt = v.found[0]
-		v.file, v.line = v.foundAt, 0
+		v.shows(v.foundAt, 0)
 	default:
 		v.foundAt = ""
 	}
 }
 
-// load reads the file at the right: its lines from the first, or from a
-// few before the one a search found, as many as the view has room for
-// beside its list. One that is not there, is no file, or is over
-// filesFileMost is a gap that says so.
+// load reads what is at the right: the commit shown in place of the
+// file; a changed file's diff against the base, where that is asked for;
+// else the file's lines, as many as the view has room for beside its
+// list, with the line under the keys in the middle of them where the
+// file has more, each with its commit where the file is blamed. A file
+// that is not there, is no file, or is over filesFileMost is a gap that
+// says so.
 func (v *filesView) load() {
-	v.lines, v.total = nil, 0
-	if v.file == "" {
+	v.lines, v.total, v.diffed, v.added, v.deleted = nil, 0, false, 0, 0
+	switch {
+	case v.file == "":
+		return
+	case v.commit != nil:
+		v.lines = v.commit.lines
 		return
 	}
 	most := filesLinesMost
@@ -767,7 +1016,17 @@ func (v *filesView) load() {
 		most = filesHitLinesMost
 	}
 	gap := func(text string) { v.lines = []filesLine{{Kind: "gap", Text: text}} }
-	info, err := os.Stat(filepath.Join(v.top, v.file))
+	if v.diffing && v.inside && v.marks[v.file] != 0 {
+		code, err := v.differs()
+		if err != nil {
+			gap(cutTo(err.Error(), gitWordsMost))
+			return
+		}
+		v.lines, v.added, v.deleted = filesDiffed(code, filesLinesMost)
+		v.diffed = true
+		return
+	}
+	info, err := os.Stat(v.full(v.file))
 	switch {
 	case err != nil && v.marks[v.file] == 'D':
 		gap("deleted against " + v.against)
@@ -778,13 +1037,87 @@ func (v *filesView) load() {
 	case info.Size() > filesFileMost:
 		gap(fmt.Sprintf("a file of %d MB", info.Size()>>20))
 	default:
-		content, err := os.ReadFile(filepath.Join(v.top, v.file))
+		content, err := os.ReadFile(v.full(v.file))
 		if err != nil {
 			gap(cutTo(err.Error(), gitWordsMost))
 			return
 		}
-		v.lines, v.total = filesLines(content, v.line-filesBefore, most)
+		total := filesCount(content)
+		if v.window == 0 {
+			v.window = filesWindow(max(v.on, 1), total, most)
+		}
+		v.window = max(min(v.window, total-most+1), 1)
+		v.lines, v.total = filesLines(content, v.window, most)
+		if v.blaming && v.inside {
+			v.blame(fmt.Sprintf("%d %d", info.Size(), info.ModTime().UnixNano()), time.Now())
+		}
 	}
+}
+
+// differs is the diff of the file at the right against the base, as
+// lines of code: of a file git does not track, every line of it added.
+func (v *filesView) differs() ([]gitLine, error) {
+	files, err := git.DiffAgainst(v.top, v.fork, v.file)
+	if err != nil {
+		return nil, err
+	}
+	if len(files) > 0 {
+		code, _ := gitCode(files)
+		return code, nil
+	}
+	info, err := os.Stat(v.full(v.file))
+	switch {
+	case err != nil:
+		return nil, err
+	case info.Size() > filesFileMost:
+		return []gitLine{{Kind: "gap", Text: fmt.Sprintf("a file of %d MB", info.Size()>>20)}}, nil
+	}
+	content, err := os.ReadFile(v.full(v.file))
+	return gitAdded(content), err
+}
+
+// blame puts at the right of each line said its commit and that one's
+// age, as git blame has them: asked once for a file as it stands, by its
+// stamp. A file git blames no line of keeps its lines as they are.
+func (v *filesView) blame(stamp string, now time.Time) {
+	blamed, known := v.blames[v.file]
+	if !known || blamed.stamp != stamp {
+		lines, err := git.Blame(v.top, v.file)
+		if err != nil {
+			lines = nil
+		}
+		blamed = filesBlame{stamp: stamp, lines: lines}
+		if v.blames == nil {
+			v.blames = map[string]filesBlame{}
+		}
+		v.blames[v.file] = blamed
+	}
+	for at, line := range v.lines {
+		if line.New > 0 && line.New <= len(blamed.lines) {
+			v.lines[at].Right = filesBlamedWord(blamed.lines[line.New-1], now)
+		}
+	}
+}
+
+// state is the words after the path of what is at the right.
+func (v *filesView) state() string {
+	switch {
+	case v.file == "":
+		return "nothing to show"
+	case v.commit != nil:
+		return v.commit.said
+	case v.diffed:
+		words := "diff against " + v.against
+		if lines := plusMinus(v.added, v.deleted); lines != "" {
+			words += " · " + lines
+		}
+		return words
+	}
+	to := 0
+	for _, line := range v.lines {
+		to = max(to, line.New)
+	}
+	return filesState(v.marks[v.file], v.against, v.total, v.from(), to)
 }
 
 // from is the number of the first line of the file that is shown.
@@ -824,28 +1157,57 @@ func (v *filesView) items() (entries []filesEntry, at string) {
 	switch {
 	case v.against != "" && len(v.marks) == 0:
 		note = "nothing changed against " + v.against
+	case v.only:
+		note = fmt.Sprintf("only the %d changed against %s", len(v.marks), v.against)
 	case v.against != "":
 		note = fmt.Sprintf("%d changed against %s", len(v.marks), v.against)
 	}
 	return filesFitted(filesRowsMost, func(most int) []filesEntry { return filesEntries(v.rows, v.marks, v.name, note, most) }), v.at
 }
 
+// keys is the keys the program takes: in the tree all of them, each
+// that turns something on saying what it now turns off; over what a
+// search found, and while something is asked or a commit shown, e and esc.
+func (v *filesView) keys() []gitKey {
+	edit := gitKey{"e", "edit in " + filepath.Base(filesEditorWords()[0]), "edit"}
+	switch {
+	case v.asking != filesAskNothing:
+		return []gitKey{{"esc", "never mind", "back"}}
+	case v.commit != nil:
+		return []gitKey{edit, {"esc", "back to the file", "back"}}
+	case v.mode != filesInTree:
+		return []gitKey{edit, {"esc", "back to the tree", "back"}}
+	}
+	only, diff, blame := "changed only", "diff against the base", "blame"
+	if v.only {
+		only = "all files"
+	}
+	if v.diffing {
+		diff = "the whole file"
+	}
+	if v.blaming {
+		blame = "no blame"
+	}
+	return []gitKey{edit, {"f", "find a file", "find"}, {"/", "find in files", "grep"},
+		{"a", "new file or folder", "new"}, {"R", "rename or move", "move"}, {"D", "delete", "delete"}, {"y", "copy the path", "copy"},
+		{"c", only, "only"}, {"d", diff, "diff"}, {"B", blame, "blame"}, {":", "go to line", "line"}, {"r", "ask again", "again"}}
+}
+
 // whole is the message that says the whole view with these lines of the
 // file in it: the list of the left side — the tree, or a field over what
 // a search found — and beside it the file under the keys, its path and
-// how it stands over its lines.
+// how it stands over its lines. A name asked for is a field in place of
+// the tree's head, and a line asked for one in place of the file's path.
 func (v *filesView) whole(lines json.RawMessage, place filesPlace) []byte {
 	entries, at := v.items()
 	list := filesPiece{T: "list", ID: "tree", Live: true, Items: entries}
 	left := filesPiece{T: "col", W: 300, Scroll: true, Pad: 6}
 	field := filesPiece{T: "field", ID: "q", Bare: true, Icon: "search", Live: true}
-	edit := gitKey{"e", "edit in " + filepath.Base(filesEditorWords()[0]), "edit"}
-	keys := []gitKey{edit, {"f", "find a file", "find"}, {"/", "find in files", "grep"}, {"r", "ask again", "again"}}
 	switch v.mode {
 	case filesInFind:
 		list.ID, field.Placeholder, field.Right = "found", "Find a file", counted(v.matched, "file")
 	case filesInGrep:
-		list.ID, field.Placeholder, left.W = "hits", "Find in files", 440
+		list.ID, field.Placeholder, left.W = "hits", "Find in files: /pattern, =whole words", 440
 	}
 	if v.mode != filesInTree {
 		field.List = list.ID
@@ -853,15 +1215,32 @@ func (v *filesView) whole(lines json.RawMessage, place filesPlace) []byte {
 			field.Value = &v.typed
 		}
 		left.Children = []filesPiece{field, {T: "divider"}}
-		keys = []gitKey{edit, {"esc", "back to the tree", "back"}}
+	}
+	asked := filesPiece{T: "field", ID: "name", Bare: true}
+	if place&filesWordsPut != 0 {
+		asked.Value = &v.answer
+	}
+	switch v.asking {
+	case filesAskNew:
+		asked.Placeholder, asked.Right = "New file, or folder/", "in "+cutTo(filesUnder(v.asked, ""), gitWordsMost-3)
+		if v.asked == "" {
+			asked.Right = "in " + cutTo(v.name, gitWordsMost-3)
+		}
+	case filesAskMove:
+		asked.Placeholder = "Rename or move to"
+	case filesAskLine:
+		asked.ID, asked.Placeholder = "line", fmt.Sprintf("Go to line, 1–%d", max(v.total, 1))
+	}
+	if v.asking == filesAskNew || v.asking == filesAskMove {
+		left.Children, list.Items = []filesPiece{asked, {T: "divider"}}, entries[1:]
 	}
 	code := filesPiece{T: "code", ID: "file", Live: true, Lines: lines}
 	if place&filesKeysPut != 0 {
 		list.Selected = at
 	}
-	// (The line a search found, by its place: a window that puts the keys of
+	// (The line the keys are on, by its place: a window that puts the keys of
 	// a code where it is told has them on it.)
-	if at := slices.IndexFunc(v.lines, func(line filesLine) bool { return line.New == v.line }); place&filesLinePut != 0 && v.line > 0 && at >= 0 {
+	if at := slices.IndexFunc(v.lines, func(line filesLine) bool { return line.New == v.on }); place&filesLinePut != 0 && v.on > 0 && at >= 0 {
 		code.Selected = strconv.Itoa(at)
 	}
 	left.Children = append(left.Children, list)
@@ -870,14 +1249,13 @@ func (v *filesView) whole(lines json.RawMessage, place filesPlace) []byte {
 	if v.file != "" {
 		about = append(about, filesPiece{T: "text", Text: cutTo(v.file, gitWordsMost), Style: "mono"})
 	}
-	state := filesState(v.marks[v.file], v.against, v.total, v.from())
-	if v.file == "" {
-		state = "nothing to show"
+	if state := v.state(); state != "" {
+		about = append(about, filesPiece{T: "text", Text: cutTo(state, gitWordsMost), Style: "dim"})
 	}
-	if state != "" {
-		about = append(about, filesPiece{T: "text", Text: state, Style: "dim"})
+	if v.asking == filesAskLine {
+		about = []filesPiece{asked}
 	}
-	message := filesMessage{V: 1, Pane: v.pane, Fill: true, Keys: keys, Status: v.status, View: filesPiece{T: "row", Split: true, Children: []filesPiece{
+	message := filesMessage{V: 1, Pane: v.pane, Fill: true, Focus: v.focus, Keys: v.keys(), Status: v.status, View: filesPiece{T: "row", Split: true, Children: []filesPiece{
 		left,
 		{T: "divider"},
 		{T: "col", Children: []filesPiece{{T: "row", Pad: 10, Gap: 10, Children: about}, code}},
@@ -932,27 +1310,40 @@ type filesDo int
 const (
 	filesNothing filesDo = iota
 	filesLeave
-	filesOn     // the keys on a folder of the tree: nothing is read
-	filesShow   // the file of another row at the right
-	filesToggle // a folder opened or shut
-	filesEdit   // a file handed to the editor at a line
-	filesFind   // the field that finds a file
-	filesGrep   // the field that finds in files
-	filesTyped  // the field's words as they now are
-	filesSeek   // the files searched for words
-	filesGo     // back to the tree with the keys on a file
-	filesBack   // back to the tree as it was
-	filesAgain  // read the files again
+	filesOn        // the keys on a folder of the tree: nothing is read
+	filesShow      // the file of another row at the right
+	filesToggle    // a folder opened or shut
+	filesEdit      // a file handed to the editor at a line
+	filesFind      // the field that finds a file
+	filesGrep      // the field that finds in files
+	filesTyped     // the field's words as they now are
+	filesSeek      // the files searched for words
+	filesGo        // back to the tree with the keys on a file
+	filesBack      // back to the tree as it was
+	filesAgain     // read the files again
+	filesOnLine    // another line of the file under the keys
+	filesAsked     // the field that asks a name, or a line
+	filesNever     // what is asked dropped, or the commit shown left
+	filesNamed     // a file or a folder made, or a path renamed, as the field says
+	filesToLine    // the file said from the line the field says
+	filesDelete    // a path deleted: asked for once, and done the second time
+	filesCopy      // a path put on the clipboard
+	filesBlamed    // each line with its commit, or without again
+	filesCommitted // the commit of a blamed line in place of the file
+	filesOnly      // the tree of what changed alone, or of all again
+	filesDiff      // a changed file as its diff against the base, or whole again
 )
 
 // filesDeed is what an event does: with the file's path and a line of
-// it, the id of its row, or the words typed, as it needs.
+// it, the id of its row or of the piece the keys go back to, the words
+// typed, or what is asked, as it needs.
 type filesDeed struct {
 	do   filesDo
 	id   string
 	path string
 	line int
 	text string
+	ask  filesAsk
 }
 
 // hit is the hit of an id.
@@ -1000,19 +1391,99 @@ func (v *filesView) editing(item string) filesDeed {
 	return filesDeed{}
 }
 
+// under is the path a key pressed on item is about, whether it is a
+// folder, and the piece the keys were on: a row of the tree is its path,
+// and a line of the code, as nothing is, the file shown.
+func (v *filesView) under(item string) (named string, folder bool, piece string, ok bool) {
+	if place, err := strconv.Atoi(item); err == nil && place >= 0 && place < len(v.lines) && v.file != "" {
+		return v.file, false, "file", true
+	}
+	if row, ok := v.row(item); ok {
+		return row.path, row.folder, "tree", true
+	}
+	return v.file, false, "tree", v.file != ""
+}
+
+// pressed is what a key of the tree's own does, pressed on item: a asks
+// the name of a new file in the folder under the keys, or in the folder
+// of the file under them; R asks where the path under them goes; D
+// deletes it and y copies it; : asks a line of the file shown; c, d and
+// B turn the changed files alone, the diff and the blame on and off.
+func (v *filesView) pressed(key, item string) filesDeed {
+	named, folder, piece, ok := v.under(item)
+	switch key {
+	case "new":
+		in := ""
+		switch {
+		case ok && folder:
+			in = named
+		case ok && path.Dir(named) != ".":
+			in = path.Dir(named)
+		}
+		return filesDeed{do: filesAsked, ask: filesAskNew, path: in, id: piece}
+	case "only":
+		return filesDeed{do: filesOnly}
+	}
+	if !ok {
+		return filesDeed{}
+	}
+	switch key {
+	case "move":
+		return filesDeed{do: filesAsked, ask: filesAskMove, path: named, id: piece}
+	case "delete":
+		return filesDeed{do: filesDelete, path: named}
+	case "copy":
+		return filesDeed{do: filesCopy, path: named}
+	case "line":
+		return filesDeed{do: filesAsked, ask: filesAskLine, id: "file"}
+	case "diff":
+		return filesDeed{do: filesDiff}
+	case "blame":
+		return filesDeed{do: filesBlamed}
+	}
+	return filesDeed{}
+}
+
 // deed is what an event does to the view as it stands. The row of a list
 // come under the keys shows its file; ⏎ on a folder opens or shuts it, on
 // a file found or a line found goes back to the tree with the keys on
 // that file, and on a file of the tree does nothing more: its file is at
 // the right already, and the keys cross to it with l. ⏎ in the field
 // that finds in files searches for its words, and so does ⏎ on a line
-// found for other words than the field now holds.
+// found for other words than the field now holds. A line of the file
+// come under the keys is where they are, and ⏎ on one that is blamed
+// shows its commit. While a name or a line is asked for, only what the
+// field sends and esc do anything.
 func (v *filesView) deed(event gitEvent) filesDeed {
-	switch event.E {
-	case "close":
+	switch {
+	case event.E == "close":
 		return filesDeed{do: filesLeave}
+	case event.E == "press" && event.ID == "back" && (v.asking != filesAskNothing || v.commit != nil):
+		return filesDeed{do: filesNever}
+	case v.asking != filesAskNothing:
+		switch {
+		case event.E == "submit" && event.ID == "name" && v.asking != filesAskLine:
+			return filesDeed{do: filesNamed, text: event.Text}
+		case event.E == "submit" && event.ID == "line" && v.asking == filesAskLine:
+			return filesDeed{do: filesToLine, text: event.Text}
+		}
+		return filesDeed{}
+	}
+	switch event.E {
 	case "move", "pick":
 		switch event.List {
+		case "file":
+			place, err := strconv.Atoi(event.ID)
+			if err != nil || place < 0 || place >= len(v.lines) {
+				break
+			}
+			line := v.lineAt(place)
+			switch {
+			case event.E == "pick" && v.blaming && v.commit == nil && !v.diffed && v.lines[place].New > 0:
+				return filesDeed{do: filesCommitted, line: line}
+			case event.E == "move" && line != v.on:
+				return filesDeed{do: filesOnLine, line: line}
+			}
 		case "tree":
 			row, ok := v.row(event.ID)
 			switch {
@@ -1066,6 +1537,8 @@ func (v *filesView) deed(event gitEvent) filesDeed {
 			return filesDeed{do: filesGrep}
 		case event.ID == "again" && v.mode == filesInTree:
 			return filesDeed{do: filesAgain}
+		case v.mode == filesInTree && v.commit == nil:
+			return v.pressed(event.ID, event.Item)
 		}
 	}
 	return filesDeed{}
@@ -1098,13 +1571,307 @@ func (v *filesView) forget() {
 // what of where the person is it says: after a move not the row of the
 // list, so the keys are not put back where they were a moment ago, only
 // the line of the code a search found; the row when the list is another.
+// What the tree said of the last thing done goes with the next, and with
+// it a delete asked for once, unless the next is D again.
 func (v *filesView) act(deed filesDeed) (say bool, place filesPlace) {
+	stale := false
+	if deed.do != filesNothing && deed.do != filesLeave && deed.do != filesEdit && v.mode == filesInTree && (v.status != nil || v.arming != "") {
+		if deed.do != filesDelete {
+			v.arming = ""
+		}
+		v.status, stale = nil, true
+	}
+	say, place = v.did(deed)
+	return say || stale, place
+}
+
+// said is how the last thing done went, as the view's status.
+func (v *filesView) said(text, tone string) {
+	v.status = &muiStatus{Text: cutTo(text, gitWordsMost), Tone: tone}
+}
+
+// goes puts the keys of the tree on a path, the folders on the way to it
+// open, and reports whether it is listed.
+func (v *filesView) goes(named string, folder bool) bool {
+	for on := range filesOnTheWay([]string{named}, math.MaxInt) {
+		v.open[on] = true
+	}
+	v.read()
+	if _, listed := v.row(cutTo(named, gitWordsMost)); !listed {
+		return false
+	}
+	v.at = cutTo(named, gitWordsMost)
+	if !folder {
+		v.shows(named, 0)
+		v.load()
+	}
+	return true
+}
+
+// make makes what a name typed is of, in the folder asked about: a
+// folder, or a file with nothing in it, and the folders on the way to
+// it. What is there already is left as it is.
+func (v *filesView) make(typed string) (named string, folder bool, err error) {
+	if named, folder, err = filesNamedIn(v.asked, typed); err != nil {
+		return "", false, err
+	}
+	if _, err := os.Lstat(v.full(named)); err == nil {
+		return "", false, fmt.Errorf("%s is there already", named)
+	}
+	if folder {
+		return named, true, os.MkdirAll(v.full(named), 0o755)
+	}
+	if err = os.MkdirAll(filepath.Dir(v.full(named)), 0o755); err != nil {
+		return "", false, err
+	}
+	file, err := os.OpenFile(v.full(named), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	if err != nil {
+		return "", false, err
+	}
+	return named, false, file.Close()
+}
+
+// move renames the path asked about to the one typed, by its steps from
+// the top: with git mv where git tracks it, else on disk alone. A path
+// that is there already is refused, but the same one in other capitals.
+func (v *filesView) move(typed string) (to string, err error) {
+	from := v.asked
+	if to, _, err = filesNamedIn("", typed); err != nil {
+		return "", err
+	}
+	was, err := os.Lstat(v.full(from))
+	switch {
+	case to == from:
+		return "", errors.New("that is its name already")
+	case err != nil:
+		return "", fmt.Errorf("%s is not there to rename", from)
+	}
+	if there, err := os.Lstat(v.full(to)); err == nil && !os.SameFile(was, there) {
+		return "", fmt.Errorf("%s is there already", to)
+	}
+	if err = os.MkdirAll(filepath.Dir(v.full(to)), 0o755); err != nil {
+		return "", err
+	}
+	if v.inside {
+		if tracked, _ := git.Tracked(v.top, from); len(tracked) > 0 {
+			return to, git.Move(v.top, from, to)
+		}
+	}
+	return to, os.Rename(v.full(from), v.full(to))
+}
+
+// gone is what would go with a path deleted, as the disk and git have it.
+func (v *filesView) gone(named string, folder bool) filesGone {
+	gone := filesGone{folder: folder}
+	if folder {
+		_ = filepath.WalkDir(v.full(named), func(_ string, entry fs.DirEntry, err error) error {
+			if err == nil && !entry.IsDir() {
+				gone.files++
+			}
+			return nil
+		})
+	} else if content, err := os.ReadFile(v.full(named)); err == nil {
+		gone.lines = filesCount(content)
+	}
+	if v.inside {
+		tracked, _ := git.Tracked(v.top, named)
+		gone.tracked, gone.unsaved = len(tracked), git.Unsaved(v.top, named)
+	}
+	return gone
+}
+
+// did does a deed to the view, and reports what act does of it.
+func (v *filesView) did(deed filesDeed) (say bool, place filesPlace) {
 	switch deed.do {
 	case filesNothing, filesLeave, filesEdit:
 		return false, 0
 	case filesOn:
 		v.at = deed.id
 		return false, 0
+	case filesOnLine:
+		v.on = deed.line
+		if v.commit != nil || v.diffed || v.total == 0 {
+			return false, 0
+		}
+		most := filesLinesMost
+		if v.mode == filesInGrep {
+			most = filesHitLinesMost
+		}
+		next, turned := filesTurned(deed.line, v.window, v.total, most, filesEdge)
+		if !turned {
+			return false, 0
+		}
+		v.window = next
+		v.load()
+		return true, filesLinePut
+	case filesAsked:
+		v.asking, v.asked, v.answer, v.back, v.focus = deed.ask, deed.path, "", deed.id, "name"
+		switch deed.ask {
+		case filesAskMove:
+			v.answer = deed.path
+		case filesAskLine:
+			v.focus = "line"
+		}
+		return true, filesWordsPut
+	case filesNever:
+		if v.asking != filesAskNothing {
+			v.asking, v.focus = filesAskNothing, v.back
+			return true, 0
+		}
+		v.on, v.commit, v.focus = v.commit.back, nil, "file"
+		v.load()
+		return true, filesLinePut
+	case filesNamed:
+		var named string
+		var folder bool
+		var err error
+		if v.asking == filesAskMove {
+			was := v.asked
+			if named, err = v.move(deed.text); err == nil {
+				info, statErr := os.Stat(v.full(named))
+				folder = statErr == nil && info.IsDir()
+				if v.open[was] {
+					v.open[named] = true
+				}
+				if at := slices.Index(v.made, was); at >= 0 {
+					v.made[at] = named
+				}
+			}
+		} else if named, folder, err = v.make(deed.text); err == nil && folder {
+			v.made, v.only = append(v.made, named), false
+		}
+		if err != nil {
+			v.said(err.Error(), "bad")
+			return true, 0
+		}
+		made := v.asking == filesAskNew
+		v.asking, v.focus = filesAskNothing, "tree"
+		switch listed := v.goes(named, folder); {
+		case !listed:
+			v.said(named+" is made, and not listed: git ignores it", "warn")
+		case made:
+			v.said("made "+named, "ok")
+		default:
+			v.said("now "+named, "ok")
+		}
+		if made && !folder {
+			v.handing = &filesDeed{do: filesEdit, path: named, line: 1}
+		}
+		return true, filesKeysPut
+	case filesToLine:
+		line, err := strconv.Atoi(strings.TrimPrefix(strings.TrimSpace(deed.text), ":"))
+		if err != nil || line < 1 {
+			v.said(fmt.Sprintf("a line's number, 1 to %d", max(v.total, 1)), "bad")
+			return true, 0
+		}
+		v.asking, v.focus, v.diffing = filesAskNothing, "file", false
+		v.on, v.window = line, 0
+		v.load()
+		v.on = min(line, max(v.total, 1))
+		return true, filesLinePut
+	case filesDelete:
+		info, err := os.Lstat(v.full(deed.path))
+		switch {
+		case err != nil:
+			v.arming = ""
+			v.said(deed.path+" is not there to delete", "bad")
+			return true, 0
+		case v.arming != deed.path:
+			v.arming = deed.path
+			v.said(filesGoing(deed.path, v.gone(deed.path, info.IsDir()), v.inside), "warn")
+			return true, 0
+		}
+		v.arming = ""
+		if _, _, err = filesNamedIn("", deed.path); err == nil {
+			err = os.RemoveAll(v.full(deed.path))
+		}
+		if err != nil {
+			v.said(err.Error(), "bad")
+			return true, 0
+		}
+		place = v.again()
+		v.said("deleted "+deed.path, "ok")
+		return true, place
+	case filesCopy:
+		if v.write != nil {
+			v.write(filesCopied(deed.path, v.tmux))
+		}
+		v.said("copied "+deed.path, "")
+		return true, 0
+	case filesBlamed:
+		if v.blaming = !v.blaming; !v.blaming {
+			v.load()
+			return true, 0
+		}
+		v.diffing = false
+		v.load()
+		switch {
+		case !v.inside:
+			v.blaming = false
+			v.said("in no repository: no line is of a commit", "warn")
+		case !slices.ContainsFunc(v.lines, func(line filesLine) bool { return line.Right != "" }):
+			v.said("git blames no line of "+v.file, "warn")
+		}
+		return true, 0
+	case filesCommitted:
+		blamed := v.blames[v.file].lines
+		if deed.line < 1 || deed.line > len(blamed) {
+			return false, 0
+		}
+		if blamed[deed.line-1].Commit == "" {
+			v.said(fmt.Sprintf("line %d is not committed yet", deed.line), "")
+			return true, 0
+		}
+		commit, err := git.Described(v.top, blamed[deed.line-1].Commit)
+		var files []git.FileDiff
+		if err == nil {
+			files, err = git.ShownOf(v.top, blamed[deed.line-1].Commit, v.file)
+		}
+		if err != nil {
+			v.said(err.Error(), "bad")
+			return true, 0
+		}
+		code, _ := gitCode(files)
+		if len(files) == 0 {
+			code = []gitLine{{Kind: "gap", Text: "it changed no line of a file of this name"}}
+		}
+		lines, _, _ := filesDiffed(code, filesLinesMost)
+		v.commit = &filesCommit{said: fmt.Sprintf("%s · %s · %s", commit.SHA, commit.When.Format("2006-01-02"), commit.Subject), lines: lines, back: deed.line}
+		v.on, v.focus = deed.line, "file"
+		v.load()
+		return true, filesLinePut
+	case filesOnly:
+		switch {
+		case !v.only && len(v.marks) == 0 && v.against != "":
+			v.said("nothing changed against "+v.against, "")
+			return true, 0
+		case !v.only && len(v.marks) == 0:
+			v.said("in no repository: nothing is changed against anything", "")
+			return true, 0
+		}
+		if v.only = !v.only; v.only {
+			for path := range v.marks {
+				for on := range filesOnTheWay([]string{path}, math.MaxInt) {
+					v.open[on] = true
+				}
+			}
+		}
+		return true, v.again()
+	case filesDiff:
+		switch {
+		case v.diffing:
+			v.diffing, v.window = false, 0
+		case !v.inside:
+			v.said("in no repository: nothing to diff against", "")
+			return true, 0
+		case v.marks[v.file] == 0:
+			v.said(v.file+" is as "+v.against+" has it", "")
+			return true, 0
+		default:
+			v.diffing, v.blaming = true, false
+		}
+		v.load()
+		return true, 0
 	case filesShow:
 		switch v.mode {
 		case filesInTree:
@@ -1114,13 +1881,13 @@ func (v *filesView) act(deed filesDeed) (say bool, place filesPlace) {
 		case filesInGrep:
 			_, v.hitAt, _ = v.hit(deed.id)
 		}
-		v.file, v.line = deed.path, deed.line
+		v.shows(deed.path, deed.line)
 		v.load()
 		return true, filesLinePut
 	case filesToggle:
 		v.at = deed.id
 		v.open[deed.path] = !v.open[deed.path]
-		v.rows = filesTree(v.paths, v.open)
+		v.tree()
 		return true, 0
 	case filesFind:
 		v.mode, v.kept = filesInFind, v.file
@@ -1153,12 +1920,19 @@ func (v *filesView) act(deed filesDeed) (say bool, place filesPlace) {
 			return true, 0
 		}
 		v.words = deed.text
-		search, err := filesSearchFor(v.top, deed.text, v.inside, filesHitsMost)
+		words, how, said := filesSeeking(deed.text)
+		if strings.TrimSpace(words) == "" {
+			return true, 0
+		}
+		search, err := filesSearchFor(v.top, words, how, v.inside, filesHitsMost)
 		if err != nil {
 			v.status = &muiStatus{Text: cutTo(err.Error(), gitWordsMost), Tone: "bad"}
 			return true, 0
 		}
-		v.search, v.status = search, &muiStatus{Text: "searching…"}
+		v.search, v.how, v.status = search, said, &muiStatus{Text: "searching…"}
+		if said != "" {
+			v.status.Text = "searching " + said + "…"
+		}
 		return true, 0
 	case filesGo:
 		v.mode, v.typed = filesInTree, ""
@@ -1166,14 +1940,18 @@ func (v *filesView) act(deed filesDeed) (say bool, place filesPlace) {
 		for folder := range filesOnTheWay([]string{deed.path}, math.MaxInt) {
 			v.open[folder] = true
 		}
-		v.rows = filesTree(v.paths, v.open)
-		v.at, v.file, v.line = cutTo(deed.path, gitWordsMost), deed.path, deed.line
+		if v.only && v.marks[deed.path] == 0 {
+			v.only = false
+		}
+		v.tree()
+		v.at = cutTo(deed.path, gitWordsMost)
+		v.shows(deed.path, deed.line)
 		v.load()
 		return true, filesKeysPut | filesLinePut
 	case filesBack:
 		v.mode, v.typed = filesInTree, ""
 		v.forget()
-		v.file, v.line = v.kept, 0
+		v.shows(v.kept, 0)
 		v.load()
 		return true, filesKeysPut
 	}
@@ -1198,7 +1976,8 @@ func (v *filesView) take(batch filesBatched) (whole bool, place filesPlace) {
 	first := len(v.hits) == 0 && len(batch.hits) > 0
 	v.hits = append(v.hits, batch.hits...)
 	if first {
-		v.hitAt, v.file, v.line = 0, v.hits[0].path, v.hits[0].line
+		v.hitAt = 0
+		v.shows(v.hits[0].path, v.hits[0].line)
 		v.load()
 		place = filesKeysPut | filesLinePut
 	}
@@ -1222,6 +2001,9 @@ func (v *filesView) take(batch filesBatched) (whole bool, place filesPlace) {
 	default:
 		v.status = &muiStatus{Text: fmt.Sprintf("%d in %s", len(v.hits), counted(files, "file"))}
 	}
+	if v.how != "" && batch.failed == "" {
+		v.status.Text += " · " + v.how
+	}
 	return true, place
 }
 
@@ -1242,7 +2024,7 @@ func (v *filesView) run(deed filesDeed) {
 // git looks at, and the size and time of the file shown.
 func (v *filesView) changed() string {
 	mark := gitMark(v.dir, v.top)
-	if info, err := os.Lstat(filepath.Join(v.top, v.file)); err == nil && v.file != "" {
+	if info, err := os.Lstat(v.full(v.file)); err == nil && v.file != "" {
 		mark += fmt.Sprintf("%d %d\n", info.Size(), info.ModTime().UnixNano())
 	}
 	return mark
@@ -1285,8 +2067,10 @@ func filesKeys(stop, next <-chan struct{}) <-chan string {
 // desk over its pane: the tree beside the file under the keys, a field
 // that finds a file by its name and one that finds lines in the files,
 // and e, which hands the file to the editor and takes the pane again when
-// it leaves. It writes nothing; it reads the files again when the
-// repository changes.
+// it leaves; and the keys that make a file or a folder, rename one,
+// delete one, copy its path, show only what changed, a file's diff
+// against the base and each line's commit, and go to a line. It reads
+// the files again when the repository changes.
 func cmdFiles(args []string) int {
 	if len(args) > 0 {
 		return usageErr(filesUsage)
@@ -1298,7 +2082,8 @@ func cmdFiles(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	view := &filesView{pane: os.Getenv("TMUX_PANE"), dir: dir, hitAt: -1}
+	view := &filesView{pane: os.Getenv("TMUX_PANE"), dir: dir, hitAt: -1, tmux: os.Getenv("TMUX") != "",
+		write: func(data []byte) { _, _ = os.Stdout.Write(data) }}
 	view.read()
 	defer view.quiet()
 
@@ -1360,12 +2145,20 @@ func cmdFiles(args []string) int {
 			}
 			for i, event := range events {
 				deed := view.deed(event)
+				if deed.do != filesLeave && deed.do != filesEdit && !((deed.do == filesShow || deed.do == filesOnLine) && i+1 < len(events) && events[i+1].E == "move") {
+					said, here := view.act(deed)
+					again, place = again || said, place|here
+					if view.handing == nil { // a file just made is handed to the editor at once
+						continue
+					}
+					deed, view.handing = *view.handing, nil
+				}
 				switch {
 				case deed.do == filesLeave:
 					return exitOK
-				case deed.do == filesShow && i+1 < len(events) && events[i+1].E == "move":
+				case deed.do != filesEdit:
 					continue // the keys held down: only where they came to rest is read
-				case deed.do == filesEdit:
+				default:
 					shut()
 					shut = func() {}
 					view.run(deed)
@@ -1385,10 +2178,7 @@ func cmdFiles(args []string) int {
 					}
 					mark = view.changed()
 					again, place = true, filesAllPut
-					continue
 				}
-				said, here := view.act(deed)
-				again, place = again || said, place|here
 			}
 			if again {
 				show(place)

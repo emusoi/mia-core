@@ -595,9 +595,10 @@ the base, and colour by syntax.
 
 `mia files` is an app of mia's own too: run in a pane, in any folder of a
 repository, it has mia desk draw that worktree's files over the pane, by
-desk's UI protocol. It is for looking: it writes nothing, and editing is
-handed to your editor. In a folder of no repository the tree is that
-folder's, with no marks. `mia api capabilities` lists `files-app`.
+desk's UI protocol. Editing is handed to your editor; of the worktree it
+writes only what `a`, `R` and `D` are asked to. In a folder of no
+repository the tree is that folder's, with no marks. `mia api
+capabilities` lists `files-app`.
 
 Side by side:
 
@@ -614,21 +615,36 @@ Side by side:
   branch against, and the files are compared, as they are on disk, with
   the commit the branch left it at; with no base, with the last commit.
   At most 400 rows are listed, and a head then says how many more there
-  are.
+  are. `c` lists only the files changed, with the folders on the way to
+  them, and the head says `only the 3 changed against main`; `c` again
+  lists all.
 - The file of the row under the keys: its path, `new against main · 19
   lines`, and a code `file` with its lines numbered, a tab as the spaces
   to the next fourth column. `l` passes the keys to it, `h` back. A
   binary file, one over 2 MB and one that is no file are one gap that
-  says so. Of a longer file the first 1500 lines are said, on in patches
-  of `lines` where they are more than a message, then a gap that says how
-  many more there are: a UI holds 2000 pieces, the tree's rows among
-  them.
+  says so. A UI holds 2000 pieces, the tree's rows among them, so of a
+  file of more than 1500 lines 1500 are said at a time, on in patches of
+  `lines` where they are more than a message, between a gap that says how
+  many lines are above and one that says how many more there are, and
+  the line over the code says which: `lines 701–2200 of 5000`. The code
+  is `live`: when the keys come within 100 lines of the last line said
+  and the file goes on, the view is said again with the lines around the
+  keys' line and the keys on it (the code's `selected`), and so within
+  100 of the first; any file is read to its end this way.
 
 | key | does |
 |---|---|
 | `e` | hands the file to the editor, at the line under the keys where they are in the file, else at its first: the view is closed, `$EDITOR` (else `nvim`) is run in the worktree's top folder with `+<line> <path>` and this terminal as its own, and when it leaves the files are read again and the view said again |
 | `f` | finds a file |
 | `/` | finds in files |
+| `a` | asks a name, in a one-line field `name` in place of the tree's head (the message's `focus` puts the keys in it), for a new file in the folder under the keys, or the folder of the file under them: `⏎` makes it with the folders on the way to it, puts the keys on it in the tree and hands it to the editor at once; a name that ends in `/` makes a folder, listed while nothing is in it. A path that is there already, one outside the worktree and one in `.git` are refused in the status, and the field stays; `esc` asks no more |
+| `R` | asks where the path under the keys goes, the field holding it as it is: `⏎` renames or moves the file or the folder, with `git mv` where git tracks it and on disk alone where it does not, and refuses a path that is there already |
+| `D` | deletes the path under the keys, asked twice: pressed once it says in the status, as a warning, what goes — `delete src/x.rs, 120 lines, not in git · D again to delete`, `…, tracked: git can bring it back`, `…, tracked: git can bring back only what is committed`, and of a folder `delete src/new and its 3 files, 1 not in git` — and deletes nothing; `D` again on the same path deletes it from disk (not from git's index), and any other thing done first drops it |
+| `y` | copies the path under the keys, by its steps from the top: mia desk's protocol has no clipboard, so an OSC 52 string (`ESC ] 52 ; c ; <base64> BEL`) is written to the terminal, in tmux's passthrough inside tmux as the messages are, and the status says `copied <path>` |
+| `c` | the tree of the changed files alone, and of all again |
+| `d` | on a changed file: its diff against the base in place of its lines — `git diff <base's commit> -- <path>`, hunks under heads with the lines added and deleted, a file git does not track all added — with `diff against main · +15 -3` over it; `d` again shows the file. It stays as the keys go to other changed files |
+| `B` | blame: each line of the file says at its `right` its commit by a short name and how long ago it was written (`3f9a2c1 3d`, from `git blame --porcelain`, asked once for a file as it stands), a line not committed `not committed`; `B` again takes them off. `⏎` on a line while they are there shows that commit in place of the file — its name, its date and its subject over what it changed of this file — and `esc` is back in the file on that line |
+| `:` | asks a line's number in a one-line field `line` in place of the file's path: `⏎` says the file from around that line with the keys on it |
 | `r` | reads the files again |
 
 **Finding a file**, the left side is a field, `q`, over a list, `found`:
@@ -641,13 +657,18 @@ way to it open and the keys on it; `esc` goes back to the tree as it was.
 **Finding in files**, the field is over a list, `hits`: `⏎` searches for
 the words as they are written, not as a pattern (`git grep -n -I
 --untracked -F`, and `-i` when they are all in lower case; binary and
-ignored files are passed over). What git finds is said as it finds it,
+ignored files are passed over). Words after a `/` are a regular
+expression (`-E` in place of `-F`), and words after an `=` are found
+only where they are whole words (`-F -w`); the status says which, `6 in
+4 files · as a pattern`, and a pattern git cannot read is the status.
+What git finds is said as it finds it,
 the hits of a file under a head with its path and their count, each line
 by its text with its number at the right, in patches of `item` no more
 often than every 100 ms; the status is `searching…` and then `6 in 4
 files`. At 500 hits the search is stopped and the status says there are
-more. The hit under the keys is at the right: its file from 8 lines
-before it, `from line 239` after its path, at most 960 lines of it. `↑`
+more. The hit under the keys is at the right: its file with the keys of
+the code on the hit's line, 960 lines of it at a time around that line
+where it has more. `↑`
 `↓` walk the hits from the field and `⏎` goes back to the tree with the
 keys on the hit's file; `e`, on a hit or a line, edits there. Other
 words typed drop what was found, so `⏎` searches for them; a new search
@@ -660,8 +681,12 @@ refuses, an editor that cannot be run — is the view's status, and the
 app stays up. `q` or `⌃C` in the plain terminal leaves; stdin that is no
 terminal is refused, exit 1.
 
-Not yet: editing in place, creating, renaming and deleting files, colour
-by syntax, searching by a pattern, and blame.
+A key that is not the program's is not said to it, so a delete asked
+for once is dropped by the next thing done that is: the keys moved, or
+another of these keys.
+
+Not yet: editing in place, and a diff or a commit of more than 1500
+lines read past them.
 ### mia review
 `mia review [<range> | pr <number> | w]` is an app of mia's own: run in a
 pane of a worktree, it has mia desk draw a code review of that worktree
