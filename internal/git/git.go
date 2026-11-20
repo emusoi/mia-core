@@ -587,7 +587,12 @@ func DiffFrom(dir, base string) string {
 
 // Recent is the last n commits on HEAD, newest first.
 func Recent(dir string, n int) []Commit {
-	out, err := run(dir, "log", fmt.Sprintf("-%d", n), "--format=%h%x00%ct%x00%s", "HEAD")
+	return commits(dir, n, "HEAD")
+}
+
+// commits is the last n commits of a revision or a range, newest first.
+func commits(dir string, n int, of string) []Commit {
+	out, err := run(dir, "log", fmt.Sprintf("-%d", n), "--format=%h%x00%ct%x00%s", of, "--")
 	if err != nil {
 		return nil
 	}

@@ -51,6 +51,16 @@ func (s Store) load() (edges, error) {
 	return f.Parents, nil
 }
 
+// ParentOf is the layer under a branch in its stack, "" where the branch
+// is in none.
+func (s Store) ParentOf(branch string) string {
+	parents, err := s.load()
+	if err != nil {
+		return ""
+	}
+	return parents[branch]
+}
+
 func (s Store) save(parents edges) error {
 	f, err := s.read()
 	if err != nil {

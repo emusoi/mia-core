@@ -16,6 +16,7 @@
 | `mia open [worktree]` | open it in your editor |
 | `mia window …` | its session's windows |
 | `mia chat [--window <index>] [--conversation <id>]` | the worktree's conversation with its agent as a [chat](api.md#conversations) mia desk draws over the pane, followed as it is written |
+| `mia git` | how the worktree it is run in stands in git, as an [app](api.md#mia-git) mia desk draws over the pane: its files and commits ahead in a list, the diff of one beside it, and keys that stage, unstage and commit |
 | `mia window new <worktree> <agent> [--model <m>] [--effort <e>] [-- command]` | a window running an agent, started with a model and an effort |
 | `mia window model <worktree> <window> <model> [--effort <e>]` | switch the agent in a window to another model while it runs |
 | `mia window new <worktree> [window] --role <role>` | a window running the agent a role says, with its model, effort and account, sent the role's body once it is ready |

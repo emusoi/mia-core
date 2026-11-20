@@ -407,6 +407,70 @@ and `keys` are always lists, empty when there are none. A manifest that
 does not read, or is named as an agent, is left out and said in a line on
 stderr; the others are listed all the same and the exit status is 0.
 
+### mia git
+
+`mia git` is an app of mia's own: run in a pane, in any folder of a
+repository, it has mia desk draw how that worktree stands in git over the
+pane, by desk's UI protocol, as `mia chat` draws a conversation. It needs
+no mia worktree: it is about the repository of the folder it is run in.
+`mia api capabilities` lists `git-app`.
+
+Over the view is the branch, where it stands against its base — `3 ahead
+of main, none behind`; the base is the layer under it in a
+[stack](stacks.md) mia knows, else the repository's base branch, and for
+the base branch itself what it follows — and how many files are staged,
+changed and untracked. Under it, side by side:
+
+- A list, `files`: the files under **Staged**, **Changed** and
+  **Untracked**, each head with its count and a group with none left out,
+  each file with its lines added and deleted and `new`, `deleted`,
+  `renamed` or `conflict`; then the commits ahead of the base, newest
+  first, 20 at most, each with its age. An item's id says its group:
+  `s:<path>`, `c:<path>`, `u:<path>`, `k:<short hash>`. At most 400 files
+  are listed, and a head then says how many of its group are shown.
+- The diff of the row under the keys, a code `diff`: of a staged file
+  what is staged (`git diff --cached`), of a changed one what is not
+  (`git diff`), of an untracked one its lines as added, of a commit its
+  own (`git show`). Each hunk has a head that says which of how many it
+  is, each line its number in the old file and the new, and the lines
+  git left out between two hunks are a gap. A tab is said as the spaces
+  to the next fourth column. A diff longer than a message is said on in
+  patches of `lines`, and past 1500 lines it ends in a gap that says how
+  many more there are.
+
+| key | does |
+|---|---|
+| `space` | on a file: stages it, or unstages one that is staged. On a line of the diff: stages the hunk that line is in (`git apply --cached`), or unstages it in a staged file's (`--reverse`); in an untracked file's, stages the file |
+| `a` | stages every file (`git add --all`) |
+| `c` | the commit screen |
+| `r` | reads the standing again |
+
+After each of these the standing is read again, and the keys stay on the
+same file where it still is — a file staged is followed into Staged —
+else on the row after it. It is read again by itself when the repository
+changes: `git status` is asked every 2 s, with `--no-optional-locks`, and
+the view is said again only when it would say something else. A file
+already changed that changes again is seen by its size and time; the
+base moving on is not seen until something else changes, or `r`.
+
+The commit screen has, in place of the diff alone, `Commit to <branch>`
+with what is staged, a text area for the message, a **Commit** button
+(`⌘⏎` in the area sends it too) and the diff of the row under the keys
+under them; the list stays, and `space` and `a` work in it. `esc` goes
+back to the files and keeps the words typed. The commit is `git commit
+-m` with the message as typed: nothing is added to it, and hooks run.
+With nothing staged, or no message, nothing is done and the view's status
+says why; a hook that fails is said by its first line. Made, the status
+is `committed <short hash>`, back on the files.
+
+What fails — a folder in no repository, git not installed, a hunk git
+will not apply — is the view's status, cut to 200 characters, and the app
+stays up. `q` or `⌃C` in the plain terminal leaves, as closing the view
+does; stdin that is no terminal is refused, exit 1.
+
+Not yet: discarding a change, amending the last commit, push, pull and
+fetch, switching branches, the stash, and colour by syntax.
+
 ## Setups
 
 `mia api setups` is the setups the person has used — an agent, a model

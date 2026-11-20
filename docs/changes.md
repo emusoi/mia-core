@@ -9,6 +9,22 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **How a worktree stands in git is an app mia desk draws.** `mia git`,
+  run in a pane in any folder of a repository, says it to mia desk by its
+  UI protocol: the branch and where it stands against its base — the
+  layer under it in a stack, else the base branch — over a list of the
+  files staged, changed and untracked and the commits ahead, with the
+  diff of the row under the keys beside it, hunk by hunk with each line's
+  numbers. `space` stages a file or unstages a staged one, and on a line
+  of the diff the hunk that line is in; `a` stages all; `c` brings up a
+  commit screen, whose message is committed as typed; `r` asks again.
+  The standing is read again after each, and when `git status`, asked
+  every 2 s, says something else. A long diff goes on in patches and
+  ends at 1500 lines. What fails is the view's status and the app stays
+  up. Not yet: discard, amend, push, pull, fetch, switching branches,
+  the stash, colour by syntax. `mia api capabilities` lists `git-app`.
+  See [mia git](api.md#mia-git).
+
 - **A conversation is a chat mia desk draws.** `mia chat`, run in a pane
   of a worktree's session, follows the conversation a window of the
   worktree has open — `--window` says which, `--conversation` another —

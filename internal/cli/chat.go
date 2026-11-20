@@ -1,12 +1,10 @@
 package cli
 
 import (
-	"bytes"
 	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"slices"
@@ -14,8 +12,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"unicode/utf16"
-	"unicode/utf8"
 
 	"github.com/charmbracelet/x/term"
 
@@ -23,16 +19,6 @@ import (
 )
 
 const chatUsage = "mia chat [--window <index>] [--conversation <id>]"
-
-// What mia desk takes of a message, as its docs/apps.md says: a message's
-// bytes, a UI's pieces — a chat is one and each of its turns one more — a
-// patch's changes, and the characters it keeps of a turn's words.
-const (
-	muiLimit  = 256 << 10
-	muiPieces = 2000
-	muiOps    = 500
-	muiProse  = 64000
-)
 
 // chatTurns is how many turns the view said whole has at most: under what
 // the window takes, so that turns can be added to it by patches before it
@@ -42,23 +28,6 @@ const chatTurns = 1500
 // patchEnvelope is more than a patch's message is around its changes: its
 // version and its pane.
 const patchEnvelope = 64
-
-// muiMessage is one message to the window: the whole view, a patch of
-// changes to the one shown, or close.
-type muiMessage struct {
-	V      int               `json:"v"`
-	Pane   string            `json:"pane,omitempty"`
-	Title  string            `json:"title,omitempty"`
-	Status *muiStatus        `json:"status,omitempty"`
-	View   *chatPiece        `json:"view,omitempty"`
-	Patch  []json.RawMessage `json:"patch,omitempty"`
-	Close  bool              `json:"close,omitempty"`
-}
-
-type muiStatus struct {
-	Text string `json:"text"`
-	Tone string `json:"tone,omitempty"`
-}
 
 // chatPiece is the window's chat: a conversation's turns, the field that
 // types to its agent under them with reply, and Stop while working.
@@ -84,36 +53,6 @@ type chatOp struct {
 type chatTurn struct {
 	n    int
 	json json.RawMessage
-}
-
-// encode is a value as JSON with every character past ASCII a \u escape,
-// as the window's own events are: no byte of a message is one a terminal
-// on the way reads as its own.
-func encode(value any) []byte {
-	data, _ := json.Marshal(value) // of these types, none fails
-	var out bytes.Buffer
-	for _, r := range string(data) {
-		switch {
-		case r < utf8.RuneSelf:
-			out.WriteByte(byte(r))
-		case r > 0xFFFF:
-			high, low := utf16.EncodeRune(r)
-			fmt.Fprintf(&out, `\u%04x\u%04x`, high, low)
-		default:
-			fmt.Fprintf(&out, `\u%04x`, r)
-		}
-	}
-	return out.Bytes()
-}
-
-// framed is a message as it is written to the terminal: an APC string,
-// and inside tmux in tmux's passthrough, each ESC of it doubled.
-func framed(message []byte, tmux bool) []byte {
-	apc := "\033_Mui " + string(message) + "\033\\"
-	if tmux {
-		apc = "\033Ptmux;" + strings.ReplaceAll(apc, "\033", "\033\033") + "\033\\"
-	}
-	return []byte(apc)
 }
 
 // drawn reports whether the window reads a turn: one of a kind it knows,
@@ -251,13 +190,6 @@ func (t *talk) atWork(on bool) [][]byte {
 	return [][]byte{encode(muiMessage{V: 1, Pane: t.pane, Patch: []json.RawMessage{encode(chatOp{Op: "working", ID: "chat", On: &on})}})}
 }
 
-// chatMark is what the window types before each event, in a bracketed
-// paste; chatEventMost is more than one event is long.
-const (
-	chatMark      = "\x1fmia:"
-	chatEventMost = 64 << 10
-)
-
 // chatEvent is what the person did in the window's chat: send with the
 // words typed, choose with the question's turn and its option counted
 // from 0, stop, close.
@@ -268,45 +200,15 @@ type chatEvent struct {
 	Option   int    `json:"option"`
 }
 
-// chatEvents is the events whole in what was read, and what of it is kept
-// for the next read: an event, or its mark, cut short.
+// chatEvents is the chat's events whole in what was read, and what of it
+// is kept for the next read.
 func chatEvents(buffer string) ([]chatEvent, string) {
-	var found []chatEvent
-	for {
-		at := strings.Index(buffer, chatMark)
-		if at < 0 {
-			break
-		}
-		rest := buffer[at+len(chatMark):]
-		decoder := json.NewDecoder(strings.NewReader(rest))
-		var event chatEvent
-		err := decoder.Decode(&event)
-		if (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)) && len(rest) < chatEventMost {
-			return found, buffer[at:]
-		}
-		if err == nil {
-			found = append(found, event)
-			rest = rest[decoder.InputOffset():]
-		}
-		buffer = rest // what does not read is passed over
-	}
-	if at := strings.LastIndexByte(buffer, chatMark[0]); at >= 0 && strings.HasPrefix(chatMark, buffer[at:]) {
-		return found, buffer[at:]
-	}
-	return found, ""
+	return muiEvents[chatEvent](buffer)
 }
 
-// typed is what one read of the terminal says: the events in it, what is
-// kept for the next read, whether the pane came into sight, and whether
-// the person typed q or ⌃C in the plain terminal, to leave.
+// typed is what one read of the terminal says to a chat.
 func typed(buffer, data string) (events []chatEvent, rest string, sight, leave bool) {
-	sight = strings.Contains(data, "\033[I")
-	data = strings.NewReplacer("\033[I", "", "\033[O", "").Replace(data)
-	if !strings.Contains(buffer+data, chatMark) && (data == "q" || data == "\x03") {
-		return nil, buffer, sight, true
-	}
-	events, rest = chatEvents(buffer + data)
-	return events, rest, sight, false
+	return muiTyped[chatEvent](buffer, data)
 }
 
 // chatOf is the conversation a chat shows, of a worktree's, the last
@@ -396,29 +298,12 @@ func cmdChat(a *app.App, args []string) int {
 			}
 		}()
 	}
-	keys := make(chan string)
-	go func() {
-		data := make([]byte, 64<<10)
-		for {
-			n, err := os.Stdin.Read(data)
-			if n > 0 {
-				select {
-				case keys <- string(data[:n]):
-				case <-stop:
-					return
-				}
-			}
-			if err != nil {
-				close(keys)
-				return
-			}
-		}
-	}()
+	keys := muiKeys(stop)
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer signal.Stop(signals)
 
-	before, err := term.MakeRaw(os.Stdin.Fd())
+	say, shut, err := muiOpen(view.pane, "mia chat: the plain terminal. In mia desk "+view.title+" is drawn over it as a chat; q or ⌃C leaves.")
 	if err != nil {
 		return fail(err)
 	}
@@ -428,18 +313,7 @@ func cmdChat(a *app.App, args []string) int {
 			fmt.Fprintf(os.Stderr, "mia: %v\n", failure) // once the terminal is itself again
 		}
 	}()
-	tmux := os.Getenv("TMUX") != ""
-	say := func(messages ...[]byte) {
-		for _, message := range messages {
-			_, _ = os.Stdout.Write(framed(message, tmux))
-		}
-	}
-	defer func() {
-		say(encode(muiMessage{V: 1, Pane: view.pane, Close: true}))
-		_, _ = os.Stdout.WriteString("\033[?2004l\033[?1004l\r\n")
-		_ = term.Restore(os.Stdin.Fd(), before)
-	}()
-	_, _ = os.Stdout.WriteString("\033[?2004h\033[?1004h" + "mia chat: the plain terminal. In mia desk " + view.title + " is drawn over it as a chat; q or ⌃C leaves.\r\n")
+	defer shut()
 
 	buffer := ""
 	for {
