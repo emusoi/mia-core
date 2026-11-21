@@ -131,6 +131,9 @@ func Run(args []string) int {
 	case "review": // from any folder too: what is not a worktree is shown as that
 		return cmdReview(rest)
 	case "api":
+		if code, asked := askServer(rest); asked {
+			return code
+		}
 		return answerAPI(atTerminal(), rest)
 	}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -66,8 +65,14 @@ type reply struct {
 // byHand is `mia api` typed in a folder, by this process and no server.
 func byHand(t *testing.T, dir string, args ...string) reply {
 	t.Helper()
-	t.Chdir(dir)
 	t.Setenv("MIA_NO_SERVE", "1")
+	return capture(t, dir, append([]string{"api"}, args...)...)
+}
+
+// capture is mia typed in a folder: what it printed, said and exited with.
+func capture(t *testing.T, dir string, args ...string) reply {
+	t.Helper()
+	t.Chdir(dir)
 	files := [2]*os.File{}
 	for i := range files {
 		file, err := os.CreateTemp(t.TempDir(), "said")
@@ -79,7 +84,7 @@ func byHand(t *testing.T, dir string, args ...string) reply {
 	}
 	stdout, stderr := os.Stdout, os.Stderr
 	os.Stdout, os.Stderr = files[0], files[1]
-	code := Run(append([]string{"api"}, args...))
+	code := Run(args)
 	os.Stdout, os.Stderr = stdout, stderr
 	out, _ := os.ReadFile(files[0].Name())
 	errs, _ := os.ReadFile(files[1].Name())
@@ -246,18 +251,7 @@ func TestTheServerSaysItsBuildAndWhatTheAPISpeaks(t *testing.T) {
 // socket nobody answers on, left by a server that was killed, is taken.
 func TestASecondServerIsRefusedAndASocketLeftBehindIsTaken(t *testing.T) {
 	isolateServe(t)
-	if err := os.MkdirAll(serveDir(), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	left, err := net.ListenUnix("unix", &net.UnixAddr{Name: serveSocket(), Net: "unix"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	left.SetUnlinkOnClose(false)
-	left.Close()
-	if _, err := os.Stat(serveSocket()); err != nil {
-		t.Fatalf("no socket was left behind: %v", err)
-	}
+	leaveASocket(t)
 	serveIn(t)
 	if _, ok := serving(); !ok {
 		t.Fatal("the server does not answer on the socket it took")

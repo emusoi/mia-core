@@ -5,12 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -119,6 +121,38 @@ func serving() (serveVersion, bool) {
 		return serveVersion{}, false
 	}
 	return version, true
+}
+
+// askServer is `mia api <query>` asked of the server, when one of this
+// build answers: what it printed is printed, and what it exited with is
+// given. Not asked: when none answers or it is another build of mia, which
+// may answer what this one would not, when MIA_NO_SERVE is set, and for
+// --follow; the query is then answered here, as it always was.
+func askServer(rest []string) (code int, asked bool) {
+	if os.Getenv("MIA_NO_SERVE") != "" || len(rest) == 0 || slices.Contains(rest, "--follow") {
+		return 0, false
+	}
+	here, err := os.Getwd()
+	if err != nil {
+		return 0, false
+	}
+	if running, ok := serving(); !ok || running.Build != gateway.Build() {
+		return 0, false
+	}
+	response, err := serveClient(0).Get("http://mia/api/" + url.PathEscape(rest[0]) + "?" + url.Values{"dir": {here}, "arg": rest[1:]}.Encode())
+	if err != nil {
+		return 0, false
+	}
+	defer response.Body.Close()
+	out, err := io.ReadAll(response.Body)
+	code, noCode := strconv.Atoi(response.Header.Get("Mia-Exit"))
+	said, unread := url.QueryUnescape(response.Header.Get("Mia-Stderr"))
+	if err != nil || noCode != nil || unread != nil {
+		return 0, false // it went as it answered: nothing of it was printed
+	}
+	fmt.Fprint(os.Stderr, said)
+	os.Stdout.Write(out)
+	return code, true
 }
 
 // server is `mia serve`. It holds no truth: each repository is kept open
