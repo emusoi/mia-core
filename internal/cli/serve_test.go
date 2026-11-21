@@ -34,14 +34,17 @@ func isolateServe(t *testing.T) {
 }
 
 // serveIn starts the server in this test, on the test's own socket, until
-// the test ends.
-func serveIn(t *testing.T) *server {
+// the test ends; set is what is changed of it before it serves.
+func serveIn(t *testing.T, set ...func(*server)) *server {
 	t.Helper()
 	listener, err := listenServe()
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := newServer()
+	for _, set := range set {
+		set(s)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- s.serve(ctx, listener) }()

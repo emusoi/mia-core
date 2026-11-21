@@ -41,9 +41,11 @@ func cmdServe(args []string) int {
 // serveHere is `mia serve`: the server, in the foreground, until it is
 // told to stop.
 func serveHere() int {
-	// what it runs is of no pane: the one it was started from is its starter's
-	os.Unsetenv("TMUX_PANE")
-	os.Unsetenv("MIA_TMUX_PANE")
+	// it is in no tmux, whatever it was started from: it reads the tmux
+	// server a plain terminal would, and watches it as a client of its own
+	for _, name := range []string{"TMUX", "TMUX_PANE", "MIA_TMUX_PANE"} {
+		os.Unsetenv(name)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	listener, err := listenServe()
@@ -122,6 +124,10 @@ type server struct {
 	build string
 	mu    sync.Mutex
 	kept  map[string]*kept
+	hub   *hub
+	ctx   context.Context // done when the server is told to stop
+	// how often it looks, while anyone listens
+	tick, backstop, settle, retry time.Duration
 }
 
 // kept is a repository held open, asked one question at a time.
@@ -133,7 +139,9 @@ type kept struct {
 }
 
 func newServer() *server {
-	return &server{build: gateway.Build(), kept: map[string]*kept{}}
+	s := &server{build: gateway.Build(), kept: map[string]*kept{}, tick: serveTick, backstop: serveBackstop, settle: serveSettle, retry: serveRetry}
+	s.hub = &hub{s: s, topics: map[string]*topic{}, seen: map[string]string{}, kick: make(chan struct{}, 1)}
+	return s
 }
 
 func (s *server) handler() http.Handler {
@@ -143,10 +151,12 @@ func (s *server) handler() http.Handler {
 		json.NewEncoder(w).Encode(serveVersion{Build: s.build, API: apiVersion, Version: versionOf(version), Pid: os.Getpid()})
 	})
 	mux.HandleFunc("GET /api/{query}", s.read)
+	mux.HandleFunc("GET /events", s.events)
 	return mux
 }
 
 func (s *server) serve(ctx context.Context, listener net.Listener) error {
+	s.ctx = ctx
 	web := &http.Server{Handler: s.handler(), ReadHeaderTimeout: 30 * time.Second}
 	go func() {
 		<-ctx.Done()
