@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -223,14 +224,62 @@ type chatTurn struct {
 // A switch is where the conversation went from one agent to another, with
 // what happened at its right: tone warn while what the new agent goes on
 // from has still to be sent to it. A model is the lighter line where the
-// same agent went from one model to another.
+// same agent went from one model to another. An offer is something the
+// person can do now, in its words, with what is known at its right and
+// the key that does it: a press on it says the button of its id.
 type chatBand struct {
 	N    int    `json:"n"`
 	Kind string `json:"kind"`
 	From string `json:"from,omitempty"`
 	To   string `json:"to,omitempty"`
+	Text string `json:"text,omitempty"`
 	Note string `json:"note,omitempty"`
 	Tone string `json:"tone,omitempty"`
+	Key  string `json:"key,omitempty"`
+	ID   string `json:"id,omitempty"`
+}
+
+// chatLimits is how each agent says it has no more of its plan to answer
+// with, for now: that a limit was reached or hit, never a limit only
+// spoken of. The last is any other agent's.
+var chatLimits = []struct {
+	agent string
+	says  *regexp.Regexp
+}{
+	{"claude", regexp.MustCompile(`(?i)\b(?:(?:usage|5-hour|weekly|session|opus|sonnet) limit reached|(?:reached|hit) your (?:(?:usage|5-hour|weekly|session) )?limit|out of extra usage)\b`)},
+	{"codex", regexp.MustCompile(`(?i)\b(?:(?:reached|hit) your (?:usage|rate) limit|(?:usage|rate) limit (?:reached|exceeded))\b`)},
+	{"", regexp.MustCompile(`(?i)\b(?:(?:reached|hit) your (?:usage|rate) limit|(?:usage|rate) limit (?:reached|exceeded))\b`)},
+}
+
+// chatResets is when a limit ends, where the reply says: the hour it
+// resets at, or how long until it can be tried again.
+var chatResets = regexp.MustCompile(`(?i)\bresets?(?: at)? (\d{1,2}(?::\d{2})? ?(?:am|pm)?)|\btry again in ([^.,;()\n]+)`)
+
+// limited reports whether a reply says its agent hit its usage or rate
+// limit, and what is known of when that ends ("claude resets at 18:00"; ""
+// when the reply does not say). Only a reply that is short, or that says
+// it at once, is taken to: a long one that comes to a limit further on is
+// prose about limits.
+func limited(agent, reply string) (note string, hit bool) {
+	reply = strings.TrimSpace(reply)
+	at := slices.IndexFunc(chatLimits, func(one struct {
+		agent string
+		says  *regexp.Regexp
+	}) bool {
+		return one.agent == agent || one.agent == ""
+	})
+	found := chatLimits[at].says.FindStringIndex(reply)
+	if found == nil || len(reply) > 300 && found[0] > 40 {
+		return "", false
+	}
+	switch when := chatResets.FindStringSubmatch(reply); {
+	case when == nil:
+	case when[1] != "":
+		note = agent + " resets at " + strings.TrimSpace(when[1])
+	default:
+		note = agent + " again in " + strings.TrimSpace(when[2])
+	}
+	return note, true
 }
 
 // banded is a band as a turn of the chat, at its place.
@@ -399,6 +448,11 @@ type talk struct {
 	// at the place asksAt, 0 until it has one.
 	asks   *app.Asks
 	asksAt int
+	// offers is the turn of the app's own under a reply that says the agent
+	// hit its limit, to go on with another: of which reply, by its words,
+	// at which place, and nil when that reply says no such thing.
+	offerOf string
+	offer   *chatBand
 	// placed is how many places turns of the app's own took.
 	placed int
 	// own is those turns of the app's own that the window was told, by
@@ -466,16 +520,27 @@ func (t *talk) place() int {
 }
 
 // extras is the app's own turns, each at a place of its own after the
-// transcript's last: what was sent and is not in it yet, then what the
+// transcript's last: under a last reply that says the agent hit its limit,
+// the offer to go on with another, until anything is sent or said after
+// it; what was sent and is not in the transcript yet; then what the
 // window's screen asks, unless the transcript ends on a question nobody
 // answered — that one is the asking.
 func (t *talk) extras() []chatTurn {
 	open := false
+	var own []chatTurn
 	if len(t.turns) > 0 {
 		last := t.turns[len(t.turns)-1]
 		open = last.kind == "question" && !t.answered[last.n]
+		if of := strconv.Itoa(last.n) + last.words; of != t.offerOf {
+			t.offerOf, t.offer = of, nil
+			if note, hit := limited(t.agent, strings.TrimPrefix(strings.TrimSuffix(last.words, "\x00"), "said\x00")); t.reply && last.kind == "said" && hit {
+				t.offer = &chatBand{N: t.place(), Kind: "offer", Text: "Go on with another agent", Note: note, Key: "m", ID: "open-models"}
+			}
+		}
+		if t.offer != nil && len(t.sent) == 0 {
+			own = append(own, banded(*t.offer))
+		}
 	}
-	var own []chatTurn
 	for _, sent := range t.sent {
 		own = append(own, worded(app.Turn{N: sent.n, Kind: "asked", Text: sent.text}))
 	}

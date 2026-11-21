@@ -37,7 +37,7 @@ type shownPiece struct {
 // a row of the chat's own.
 type shownTurn struct {
 	app.Turn
-	From, To, Note, Tone string
+	From, To, Note, Tone, Key, ID string
 }
 
 // find is the first piece of a kind in a piece, itself too, and nil for none.
@@ -1327,6 +1327,80 @@ func TestTheFirstThingSentAfterAHandingCarriesTheConversation(t *testing.T) {
 	other.whole()
 	if told := only(t, other.heard([]app.Turn{{N: 1, Kind: "asked", Text: first}})); !slices.Equal(ops(told), []string{"turn", "unturn", "turn"}) || told.Patch[1].N != 2 || told.Patch[2].Turn.N != 3 || told.Patch[2].Turn.Note != "context handed over" {
 		t.Errorf("sent by another chat: %+v", told.Patch)
+	}
+}
+
+// A reply that says its agent hit its usage or rate limit is told from one
+// that only speaks of limits: it says a limit was reached or hit, and is
+// short or says so at once. When the limit ends is read where it is said.
+func TestAReplyThatSaysTheAgentHitItsLimitIsTold(t *testing.T) {
+	long := strings.Repeat("The retry loop backs off and the tests cover three tries. ", 8)
+	for _, c := range []struct {
+		agent, reply string
+		hit          bool
+		note         string
+	}{
+		{"claude", "You have reached your usage limit. It resets at 18:00.", true, "claude resets at 18:00"},
+		{"claude", "Claude usage limit reached. Your limit will reset at 6pm (America/New_York).", true, "claude resets at 6pm"},
+		{"claude", "5-hour limit reached ∙ resets 6pm", true, "claude resets at 6pm"},
+		{"claude", "Weekly limit reached ∙ resets 9:30 am", true, "claude resets at 9:30 am"},
+		{"claude", "You've hit your limit · resets 3am", true, "claude resets at 3am"},
+		{"claude", "You're out of extra usage · resets 11pm", true, "claude resets at 11pm"},
+		{"claude", "Usage limit reached. " + long, true, ""},
+		{"codex", "You've hit your usage limit. Upgrade to Pro, or try again in 3 hours 12 minutes.", true, "codex again in 3 hours 12 minutes"},
+		{"codex", "Rate limit reached for gpt-6-luna. Please try again in 20s.", true, "codex again in 20s"},
+		{"opencode", "Rate limit exceeded", true, ""},
+		// prose that speaks of limits
+		{"claude", "The usage limit is read from the config, and the rate limit is 100 a minute.", false, ""},
+		{"claude", "I added a test for when the rate limit resets at 6pm.", false, ""},
+		{"codex", "The 5-hour limit reached by the loop is its cap.", false, ""},
+		{"claude", long + "Then the client says the usage limit reached its cap and you have hit your limit of retries.", false, ""},
+		{"codex", "Done. `wait` doubles after each failed run.", false, ""},
+		{"claude", "", false, ""},
+	} {
+		if note, hit := limited(c.agent, c.reply); hit != c.hit || note != c.note {
+			t.Errorf("%s says %.60q: %v %q, want %v %q", c.agent, c.reply, hit, note, c.hit, c.note)
+		}
+	}
+}
+
+// Under a last reply that says the agent hit its limit the chat offers to
+// go on with another agent, as a turn of its own that names the key and
+// the button it presses, with when the limit ends; it goes when the next
+// turn comes or something is sent, and a chat that types to no window
+// offers nothing.
+func TestAReplyAtItsLimitIsFollowedByAnOfferToGoOnWithAnotherAgent(t *testing.T) {
+	chat := &talk{pane: "%3", agent: "claude", reply: true}
+	chat.heard([]app.Turn{{N: 1, Kind: "asked", Text: "cap the wait"}, {N: 2, Kind: "said", Text: "You have reached your usage limit. It resets at 18:00."}})
+	got := read(t, chat.whole())
+	offer := got.View.Turns[len(got.View.Turns)-1]
+	if len(got.View.Turns) != 3 || offer.Kind != "offer" || offer.N != chatOwn+1 || offer.Text != "Go on with another agent" || offer.Note != "claude resets at 18:00" || offer.Key != "m" || offer.ID != "open-models" {
+		t.Fatalf("offered as %+v", got.View.Turns)
+	}
+	view := &chatView{talk: chat, window: "2", runs: app.Runs{Agent: "claude"}}
+	if deed := view.deed(chatEvent{E: "press", ID: offer.ID}); deed.do != chatModelsUp {
+		t.Errorf("a press on it asks %+v", deed)
+	}
+	if again := chat.asked(nil); again != nil {
+		t.Errorf("said again with nothing changed: %s", again)
+	}
+	// the next turn takes it away
+	next := only(t, chat.heard([]app.Turn{{N: 3, Kind: "said", Text: "Back. The cap is in."}}))
+	if !slices.Equal(ops(next), []string{"unturn", "turn"}) || next.Patch[0].N != chatOwn+1 || next.Patch[1].Turn.N != 3 {
+		t.Errorf("the next turn: %+v", next.Patch)
+	}
+	// offered again under another such reply, and gone as soon as something is sent
+	again := only(t, chat.heard([]app.Turn{{N: 4, Kind: "said", Text: "5-hour limit reached"}}))
+	if !slices.Equal(ops(again), []string{"turn", "turn"}) || again.Patch[1].Turn.Kind != "offer" || again.Patch[1].Turn.N != chatOwn+2 || again.Patch[1].Turn.Note != "" {
+		t.Errorf("another reply at its limit: %+v", again.Patch)
+	}
+	if sent := only(t, chat.sends("try now")); !slices.Equal(ops(sent), []string{"unturn", "turn"}) || sent.Patch[0].N != chatOwn+2 || sent.Patch[1].Turn.Text != "try now" {
+		t.Errorf("sent after it: %+v", sent.Patch)
+	}
+	shown := &talk{pane: "%4", agent: "claude"}
+	shown.heard([]app.Turn{{N: 1, Kind: "said", Text: "Usage limit reached."}})
+	if got := read(t, shown.whole()); len(got.View.Turns) != 1 {
+		t.Errorf("a conversation only shown offers %+v", got.View.Turns)
 	}
 }
 
