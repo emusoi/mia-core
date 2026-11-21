@@ -25,7 +25,7 @@ import (
 	"github.com/emusoi/mia-core/internal/git"
 )
 
-const serveUsage = "mia serve"
+const serveUsage = "mia serve [install|uninstall|start|stop|status]"
 
 // serveDir is where `mia serve` keeps its socket, beside the gateway's
 // files in mia's config folder.
@@ -34,10 +34,25 @@ func serveDir() string { return filepath.Join(config.Dir(), "serve") }
 func serveSocket() string { return filepath.Join(serveDir(), "serve.sock") }
 
 func cmdServe(args []string) int {
-	if len(args) > 0 {
+	if len(args) == 0 {
+		return serveHere()
+	}
+	if len(args) > 1 {
 		return usageErr(serveUsage)
 	}
-	return serveHere()
+	switch args[0] {
+	case "install":
+		return serveInstall()
+	case "uninstall":
+		return serveUninstall()
+	case "start":
+		return serveStart()
+	case "stop":
+		return serveStop()
+	case "status":
+		return serveStatus()
+	}
+	return usageErr(serveUsage)
 }
 
 // serveHere is `mia serve`: the server, in the foreground, until it is
@@ -163,8 +178,8 @@ type server struct {
 	kept  map[string]*kept
 	hub   *hub
 	ctx   context.Context // done when the server is told to stop
-	// how often it looks, while anyone listens
-	tick, backstop, settle, retry time.Duration
+	// how often it looks, while anyone listens, and whether mia was rebuilt
+	tick, backstop, settle, retry, rebuilt time.Duration
 }
 
 // kept is a repository held open, asked one question at a time.
@@ -176,7 +191,7 @@ type kept struct {
 }
 
 func newServer() *server {
-	s := &server{build: gateway.Build(), kept: map[string]*kept{}, tick: serveTick, backstop: serveBackstop, settle: serveSettle, retry: serveRetry}
+	s := &server{build: gateway.Build(), kept: map[string]*kept{}, tick: serveTick, backstop: serveBackstop, settle: serveSettle, retry: serveRetry, rebuilt: serveRebuilt}
 	s.hub = &hub{s: s, topics: map[string]*topic{}, seen: map[string]string{}, kick: make(chan struct{}, 1)}
 	return s
 }
@@ -193,12 +208,34 @@ func (s *server) handler() http.Handler {
 	return mux
 }
 
+// serve answers on the listener until it is told to stop, or until the
+// program it was started from is another build: it ends then, for the
+// service that keeps it to start the new one, as `mia api` asks only a
+// server of its own build.
 func (s *server) serve(ctx context.Context, listener net.Listener) error {
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
 	s.ctx = ctx
 	web := &http.Server{Handler: s.handler(), ReadHeaderTimeout: 30 * time.Second}
 	go func() {
 		<-ctx.Done()
 		web.Close()
+	}()
+	go func() {
+		look := time.NewTicker(s.rebuilt)
+		defer look.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-look.C:
+				if gateway.Build() != s.build {
+					fmt.Fprintln(os.Stderr, "mia serve: mia was rebuilt — this build ends, for the new one to serve")
+					stop()
+					return
+				}
+			}
+		}
 	}()
 	if err := web.Serve(listener); err != nil && err != http.ErrServerClosed {
 		return err

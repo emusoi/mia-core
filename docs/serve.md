@@ -6,14 +6,16 @@ asks. It holds no truth: every answer is read from the same records, git
 and tmux that `mia api` reads, and killing it loses nothing.
 
 ```bash
-mia serve        # in the foreground, until ^C or SIGTERM
+mia serve           # in the foreground, until ^C or SIGTERM
+mia serve install   # as a service of launchd or systemd: see below
 ```
 
 It says where it listens on stderr and runs until it is told to stop. A
 second one is refused while the first answers, naming the first's process
 id; a socket nobody answers on, left by one that was killed, is taken. It
 is in no tmux, whatever it was started from: it reads the tmux server a
-plain terminal would.
+plain terminal would. It ends when the program it was started from is
+rebuilt, for a [service](#as-a-service) to start the new build.
 
 Each repository it is asked about is kept open between questions, and
 opened again when its configuration, the person's configuration or what
@@ -52,8 +54,9 @@ the same words on stderr and the same exit code. Otherwise it reads for
 itself, as it always did:
 
 - no server runs, or the socket is one a killed server left;
-- the server is another build — after `make install`, until it is started
-  again — which may answer what this one would not;
+- the server is another build — after `make install`, for the moment
+  until it sees itself rebuilt and ends — which may answer what this one
+  would not;
 - the answer was cut off;
 - the query has `--follow`, which is a stream ([events](#get-events) have it);
 - `MIA_NO_SERVE` is set and not empty.
@@ -257,43 +260,81 @@ is refused, `403` with `code` `64` and why, and nothing of it is done:
 
 ## As a service
 
-There is no `mia serve install` yet: a service is written by hand. Each
-runs `mia serve` with your `PATH`, starts it at login and starts it again
-when it ends. After `make install` it is another build, which `mia api`
-does not ask until the service is started again.
+```bash
+mia serve install      # write the service and start it: at login, and again whenever it ends
+mia serve status       # whether it is installed and runs, and who answers on the socket
+mia serve stop         # stop it, until mia serve start or the next login
+mia serve start        # start it, or start it again
+mia serve uninstall    # stop it and take its file away
+```
+
+`install` writes the service with the program it is typed as, `mia
+serve`, and with the environment the server's answers depend on, taken
+from the shell it is typed in where that sets it: `PATH`, `TMUX_TMPDIR`,
+`XDG_CONFIG_HOME` (where the socket is), `XDG_DATA_HOME`,
+`CLAUDE_CONFIG_DIR`, `CODEX_HOME` and `PI_CODING_AGENT_DIR`. Typed again,
+it writes the service again with the environment as it is then.
+
+A server that sees the program it was started from rebuilt — after `make
+install`, by the path, size and modification time `GET /version` says —
+ends itself, each two seconds, and the service starts the new build.
+
+`status` says:
+
+```
+service   running — /Users/user/Library/LaunchAgents/com.emusoi.mia.serve.plist
+socket    answers — pid 61963, this build: /Users/user/.local/bin/mia 16710802 1795302025695053983
+log       /Users/user/.config/mia/serve/serve.log
+```
 
 ### macOS: launchd
 
-`~/Library/LaunchAgents/mia.serve.plist`, with `which mia` and your
-`echo $PATH` written in:
+A user agent, `~/Library/LaunchAgents/com.emusoi.mia.serve.plist`, in
+`gui/<uid>`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>mia.serve</string>
-  <key>ProgramArguments</key>
-  <array><string>/Users/user/.local/bin/mia</string><string>serve</string></array>
-  <key>EnvironmentVariables</key>
-  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardErrorPath</key><string>/Users/user/Library/Logs/mia-serve.log</string>
+	<key>Label</key>
+	<string>com.emusoi.mia.serve</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/user/.local/bin/mia</string>
+		<string>serve</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/Users/user/.local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>/Users/user/.config/mia/serve/serve.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/user/.config/mia/serve/serve.log</string>
 </dict>
 </plist>
 ```
 
-```bash
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/mia.serve.plist   # install and start
-launchctl kickstart -k gui/$(id -u)/mia.serve                              # start it again, after make install
-launchctl bootout gui/$(id -u)/mia.serve                                   # stop and uninstall
-rm ~/Library/LaunchAgents/mia.serve.plist
-```
+| verb | asks launchd |
+|---|---|
+| `install` | `launchctl bootout gui/<uid>/com.emusoi.mia.serve` when it is loaded, then `launchctl bootstrap gui/<uid> <plist>` |
+| `start` | `launchctl kickstart -k gui/<uid>/com.emusoi.mia.serve` when it is loaded, else `launchctl bootstrap` |
+| `stop` | `launchctl bootout gui/<uid>/com.emusoi.mia.serve`: launchd starts again a job it keeps alive that ends, so stopping it lets go of it; the plist stays and the next login loads it |
+| `uninstall` | `launchctl bootout` when it is loaded, and the plist removed |
+
+Whether it is loaded is `launchctl print gui/<uid>/com.emusoi.mia.serve`.
 
 ### Linux: systemd
 
-`~/.config/systemd/user/mia-serve.service`:
+A user unit, `~/.config/systemd/user/mia-serve.service`, as the
+gateway's is; what it says is in the journal, `journalctl --user -u
+mia-serve`:
 
 ```ini
 [Unit]
@@ -303,20 +344,20 @@ Description=mia serve
 ExecStart=/home/user/.local/bin/mia serve
 Restart=always
 RestartSec=2
-Environment=PATH=/home/user/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment="PATH=/home/user/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
 [Install]
 WantedBy=default.target
 ```
 
-```bash
-systemctl --user daemon-reload
-systemctl --user enable --now mia-serve     # install and start
-systemctl --user restart mia-serve          # start it again, after make install
-systemctl --user disable --now mia-serve    # stop and uninstall
-rm ~/.config/systemd/user/mia-serve.service
-loginctl enable-linger $USER                # optional: keep it running while you are logged out
-```
+| verb | asks systemd |
+|---|---|
+| `install` | `systemctl --user daemon-reload`, `enable mia-serve`, `restart mia-serve` |
+| `start` | `systemctl --user restart mia-serve` |
+| `stop` | `systemctl --user stop mia-serve`, when `is-active` |
+| `uninstall` | `systemctl --user disable --now mia-serve`, the unit removed, `daemon-reload` |
+
+`loginctl enable-linger $USER` keeps it running while you are logged out.
 
 ## Other machines, later
 

@@ -28,6 +28,7 @@ const (
 	serveBackstop = 30 * time.Second // at everything, whatever was seen to change
 	serveSettle   = 150 * time.Millisecond
 	serveRetry    = 5 * time.Second // for a tmux server to watch, while none runs
+	serveRebuilt  = 2 * time.Second // at whether mia was rebuilt
 )
 
 // event is one answer on GET /events, a line of JSON after `data: `.

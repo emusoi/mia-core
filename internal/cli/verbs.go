@@ -61,7 +61,7 @@ var verbs = []Verb{
 	{"tmux", "mia tmux [install|uninstall|menu <client>]", "mia's part of the tmux status line, its two popups and its menu, printed, added to ~/.tmux.conf, or taken out; menu draws prefix m", true, ""},
 	{"signal", "mia signal <worktree> <kind> [text] [--style s] [--rank n] [--from source] [--for d|--until seen] · clear · ls", "what anything outside mia says about a worktree, shown as its setter asks", false, ""},
 	{"api", "mia api <query>", "structured state, for clients and scripts", true, ""},
-	{"serve", serveUsage, "the server of this machine, in the foreground: over a socket in mia's config folder it answers `mia api`, which asks it when it is the same build, says when an answer changes and runs verbs; it holds no truth, and killing it loses nothing", false, ""},
+	{"serve", serveUsage, "the server of this machine, in the foreground or, installed, as a launchd or systemd service: over a socket in mia's config folder it answers `mia api`, which asks it when it is the same build, says when an answer changes and runs verbs; it holds no truth, and killing it loses nothing", false, ""},
 	{"doctor", "mia doctor", "check tools, configuration, gateway, machines and environments", true, ""},
 	{"plugin", "mia plugin [ls|enable <name>|disable <name>]", "programs named mia-<name> that add verbs; installed on PATH, run once enabled", true, ""},
 	{"dash", "mia dash", "the radar, under its old name", false, ""},

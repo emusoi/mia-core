@@ -17,8 +17,11 @@ on GitHub; a tag without its section is not released.
   something changed; and runs a verb for whoever asks, `POST /run`,
   refusing one that needs a terminal. `mia api` asks it when it runs and
   is the same build, and reads for itself otherwise, or when
-  `MIA_NO_SERVE` is set. It runs in the foreground; a launchd or systemd
-  service is written by hand. See [mia serve](serve.md).
+  `MIA_NO_SERVE` is set. It runs in the foreground, or as a launchd or
+  systemd service, `mia serve install|uninstall|start|stop|status`,
+  written with the environment of the shell it is installed from; a
+  server that sees mia rebuilt ends, for the service to start the new
+  build. See [mia serve](serve.md).
 
 - **The chat's models and Earlier are modals.** In `mia chat`, `models`
   and `earlier` no longer take the chat's place: each is a card over it,
