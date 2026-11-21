@@ -46,6 +46,9 @@ func serveHere() int {
 	for _, name := range []string{"TMUX", "TMUX_PANE", "MIA_TMUX_PANE"} {
 		os.Unsetenv(name)
 	}
+	// what it runs, a verb or a plugin, reads for itself: one that asked the
+	// server back would wait on the repository its own question holds
+	os.Setenv("MIA_NO_SERVE", "1")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	listener, err := listenServe()
@@ -152,6 +155,7 @@ func (s *server) handler() http.Handler {
 	})
 	mux.HandleFunc("GET /api/{query}", s.read)
 	mux.HandleFunc("GET /events", s.events)
+	mux.HandleFunc("POST /run", s.run)
 	return mux
 }
 
