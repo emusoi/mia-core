@@ -121,7 +121,7 @@ func cmdMain(args []string) int {
 		case err != nil:
 			return fail(err)
 		case state:
-			return sayMainOf(machine.Name, out)
+			return sayMainOf(asker{out: os.Stdout, errs: os.Stderr}, machine.Name, out)
 		case out != "":
 			fmt.Println(out)
 		}
@@ -189,13 +189,13 @@ func cmdMain(args []string) int {
 
 // sayMainOf prints where the main agent stands as another machine's mia
 // said it, with that machine's name where it said local.
-func sayMainOf(machine, said string) int {
+func sayMainOf(who asker, machine, said string) int {
 	var state app.MainState
 	if err := json.Unmarshal([]byte(said), &state); err != nil {
-		return fail(fmt.Errorf("%s's mia did not say where the main agent stands: %w", machine, err))
+		return who.fail(fmt.Errorf("%s's mia did not say where the main agent stands: %w", machine, err))
 	}
 	state.Machine = machine
-	return emit(state)
+	return who.emit(state)
 }
 
 func sayMain(state app.MainState, asJSON bool) int {
@@ -222,75 +222,75 @@ func sayMain(state app.MainState, asJSON bool) int {
 
 // cmdAPIMain is the queries that are about no repository's worktrees but
 // the person's: the main agent, and where every agent stands.
-func cmdAPIMain(args []string) int {
+func cmdAPIMain(who asker, args []string) int {
 	a, err := atMain()
 	if err != nil {
-		return fail(err)
+		return who.fail(err)
 	}
 	query, rest := args[0], args[1:]
 	if query == "standing" {
 		here := take(&rest, "--here")
 		seen := takeValue(&rest, "--seen")
 		if len(rest) > 0 {
-			return usageErr(standingUsage)
+			return who.usage(standingUsage)
 		}
 		if seen != "" {
 			if err := a.SeeStanding(seen); err != nil {
-				return fail(err)
+				return who.fail(err)
 			}
 		}
 		standing, err := a.Standing(!here)
 		if err != nil {
-			return fail(err)
+			return who.fail(err)
 		}
-		return emit(standing)
+		return who.emit(standing)
 	}
 	machine, elsewhere, err := a.MainElsewhere()
 	if err != nil {
-		return fail(err)
+		return who.fail(err)
 	}
 	if len(rest) == 0 {
 		if elsewhere {
 			out, err := a.OnMainMachine(machine, true, "api", "main")
 			if err != nil {
-				return fail(err)
+				return who.fail(err)
 			}
-			return sayMainOf(machine.Name, out)
+			return sayMainOf(who, machine.Name, out)
 		}
-		return emit(a.Main())
+		return who.emit(a.Main())
 	}
 	if len(rest) == 1 && rest[0] == "conversations" {
 		if elsewhere {
 			out, err := a.OnMainMachine(machine, true, "api", "main", "conversations")
 			if err != nil {
-				return fail(err)
+				return who.fail(err)
 			}
-			fmt.Println(out) // its conversations, as its mia said them
+			fmt.Fprintln(who.out, out) // its conversations, as its mia said them
 			return exitOK
 		}
 		heads, problems := a.MainConversations()
 		for _, problem := range problems {
-			fmt.Fprintln(os.Stderr, "mia:", problem) // the others are listed all the same
+			fmt.Fprintln(who.errs, "mia:", problem) // the others are listed all the same
 		}
-		return emit(append([]app.Head{}, heads...))
+		return who.emit(append([]app.Head{}, heads...))
 	}
 	conversation, follow := takeValue(&rest, "--conversation"), take(&rest, "--follow")
 	after := 0
 	if value := takeValue(&rest, "--after"); value != "" {
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
-			return usageErr(mainTurnsUsage + followNote)
+			return who.usage(mainTurnsUsage + followNote)
 		}
 		after = n
 	}
 	if len(rest) != 1 || rest[0] != "turns" {
-		return usageErr(mainTurnsUsage + followNote)
+		return who.usage(mainTurnsUsage + followNote)
 	}
 	if elsewhere && follow {
-		return fail(fmt.Errorf("--follow reads a main agent on this machine, and it lives on %s — follow it with mia there", machine.Name))
+		return who.fail(fmt.Errorf("--follow reads a main agent on this machine, and it lives on %s — follow it with mia there", machine.Name))
 	}
 	if follow {
-		return followTurns(func(stop <-chan struct{}, say func([]app.Turn) error) error {
+		return who.follow(func(stop <-chan struct{}, say func([]app.Turn) error) error {
 			return a.FollowMain(conversation, after, stop, say)
 		})
 	}
@@ -301,14 +301,14 @@ func cmdAPIMain(args []string) int {
 		}
 		out, err := a.OnMainMachine(machine, true, ask...)
 		if err != nil {
-			return fail(err)
+			return who.fail(err)
 		}
-		fmt.Println(out) // its turns, as its mia said them
+		fmt.Fprintln(who.out, out) // its turns, as its mia said them
 		return exitOK
 	}
 	turns, err := a.MainTurns(conversation, after)
 	if err != nil {
-		return fail(err)
+		return who.fail(err)
 	}
-	return emit(turns)
+	return who.emit(turns)
 }

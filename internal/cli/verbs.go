@@ -18,7 +18,7 @@ var groupOf = map[string]string{
 	"dash": "Working", "stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working",
 	"env":    "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
-	"api": "Records", "role": "Working", "signal": "Records", "radar": "Working", "tmux": "Working", "move": "Worktrees", "resurrect": "Worktrees", "why": "Records", "recall": "Records", "conversation": "Records", "archive": "Worktrees", "fork": "Worktrees", "unarchive": "Worktrees", "plugin": "Records", "doctor": "Records", "main": "Working", "account": "Working",
+	"api": "Records", "serve": "Records", "role": "Working", "signal": "Records", "radar": "Working", "tmux": "Working", "move": "Worktrees", "resurrect": "Worktrees", "why": "Records", "recall": "Records", "conversation": "Records", "archive": "Worktrees", "fork": "Worktrees", "unarchive": "Worktrees", "plugin": "Records", "doctor": "Records", "main": "Working", "account": "Working",
 }
 
 var verbs = []Verb{
@@ -61,6 +61,7 @@ var verbs = []Verb{
 	{"tmux", "mia tmux [install|uninstall|menu <client>]", "mia's part of the tmux status line, its two popups and its menu, printed, added to ~/.tmux.conf, or taken out; menu draws prefix m", true, ""},
 	{"signal", "mia signal <worktree> <kind> [text] [--style s] [--rank n] [--from source] [--for d|--until seen] · clear · ls", "what anything outside mia says about a worktree, shown as its setter asks", false, ""},
 	{"api", "mia api <query>", "structured state, for clients and scripts", true, ""},
+	{"serve", serveUsage, "the server of this machine, in the foreground: it answers `mia api` over a socket in mia's config folder, each repository kept open between questions; it holds no truth, and killing it loses nothing", false, ""},
 	{"doctor", "mia doctor", "check tools, configuration, gateway, machines and environments", true, ""},
 	{"plugin", "mia plugin [ls|enable <name>|disable <name>]", "programs named mia-<name> that add verbs; installed on PATH, run once enabled", true, ""},
 	{"dash", "mia dash", "the radar, under its old name", false, ""},

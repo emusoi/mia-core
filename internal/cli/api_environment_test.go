@@ -56,7 +56,7 @@ esac
 			previous := os.Stdout
 			os.Stdout = output
 			t.Cleanup(func() { os.Stdout = previous })
-			if code := cmdAPI(a, []string{query, "longido"}); code != exitOK {
+			if code := cmdAPI(atTerminal(), a, []string{query, "longido"}); code != exitOK {
 				t.Fatalf("mia api %s exited %d", query, code)
 			}
 			calls, err := os.ReadFile(log)

@@ -54,7 +54,7 @@ func TestStackAPISaysWhatStackShowSays(t *testing.T) {
 		}
 		return layers
 	}
-	api := layersOf(func() int { return cmdAPI(a, []string{"stack", "longido"}) })
+	api := layersOf(func() int { return cmdAPI(atTerminal(), a, []string{"stack", "longido"}) })
 	show := layersOf(func() int { return cmdStack(a, []string{"--in", "longido", "show"}, true) })
 	if !reflect.DeepEqual(api, show) {
 		t.Errorf("mia api stack says\n%+v\nmia stack show --json says\n%+v", api, show)

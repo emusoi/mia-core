@@ -37,7 +37,7 @@ func TestWorktreesAPIFiltersExactNamesAndKeepsAnEmptyArray(t *testing.T) {
 			previous := os.Stdout
 			os.Stdout = output
 			t.Cleanup(func() { os.Stdout = previous })
-			if code := cmdAPI(a, []string{"worktrees", name}); code != exitOK {
+			if code := cmdAPI(atTerminal(), a, []string{"worktrees", name}); code != exitOK {
 				t.Fatalf("mia api worktrees exited %d", code)
 			}
 			if _, err := output.Seek(0, 0); err != nil {

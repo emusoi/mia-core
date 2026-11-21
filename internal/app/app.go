@@ -979,15 +979,24 @@ func (a *App) Run(query string, argv []string) error {
 }
 
 func (a *App) RecordOrHere(query string) (model.Record, error) {
+	here := ""
+	if query == "" {
+		var err error
+		if here, err = os.Getwd(); err != nil {
+			return model.Record{}, err
+		}
+	}
+	return a.RecordOrIn(query, here)
+}
+
+// RecordOrIn is RecordOrHere, here being a folder that is given: what
+// `mia serve` is asked from is not the folder it runs in.
+func (a *App) RecordOrIn(query, here string) (model.Record, error) {
 	resolver, err := a.Resolver()
 	if err != nil {
 		return model.Record{}, err
 	}
 	if query == "" {
-		here, err := os.Getwd()
-		if err != nil {
-			return model.Record{}, err
-		}
 		if query, err = resolver.Here(here); err != nil {
 			return model.Record{}, err
 		}

@@ -2,9 +2,9 @@ package cli
 
 import (
 	"cmp"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -102,6 +102,8 @@ func Run(args []string) int {
 		return cmdShellIntegration(rest)
 	case "gateway":
 		return cmdGateway(rest, asJSON)
+	case "serve":
+		return cmdServe(rest)
 	case "status-line":
 		return cmdStatusLine(rest)
 	case "tmux":
@@ -129,58 +131,7 @@ func Run(args []string) int {
 	case "review": // from any folder too: what is not a worktree is shown as that
 		return cmdReview(rest)
 	case "api":
-		if len(rest) > 0 && (rest[0] == "main" || rest[0] == "standing") { // the person's, from anywhere
-			return cmdAPIMain(rest)
-		}
-		if len(rest) > 0 && rest[0] == "agents" { // every agent, from anywhere: a repository's config too, when in one
-			if len(rest) > 1 {
-				return usageErr("mia api agents")
-			}
-			c := configHere()
-			a := app.Outside()
-			a.Config, a.Plugins = c, pluginHost(c)
-			return emit(a.AgentModels())
-		}
-		if len(rest) > 0 && rest[0] == "apps" { // the person's, from anywhere
-			if len(rest) > 1 {
-				return usageErr("mia api apps")
-			}
-			c := configHere()
-			a := app.Outside()
-			a.Config, a.Plugins = c, pluginHost(c)
-			apps, problems := a.Apps()
-			for _, problem := range problems {
-				fmt.Fprintln(os.Stderr, "mia:", problem) // the others are listed all the same
-			}
-			return emit(apps)
-		}
-		if len(rest) > 0 && rest[0] == "accounts" { // the person's, from anywhere
-			projects := take(&rest, "--projects")
-			if len(rest) > 1 {
-				return usageErr("mia api accounts [--projects]")
-			}
-			a, err := atAccounts()
-			if err != nil {
-				return fail(err)
-			}
-			if projects {
-				return emit(a.Projects())
-			}
-			return emit(a.Accounts())
-		}
-		if len(rest) > 0 && rest[0] == "setups" { // the person's, from anywhere: a repository's by default, when in one
-			return cmdAPISetups(rest[1:])
-		}
-		if len(rest) == 1 && rest[0] == "repos" { // every repository, from anywhere
-			repos, err := app.Repositories()
-			if err != nil {
-				return fail(err)
-			}
-			return emit(repos)
-		}
-		if len(rest) == 0 || !slices.Contains(apiQueryList, rest[0]) || rest[0] == "capabilities" {
-			return cmdAPI(nil, rest) // the usage, what the API speaks, a query there is not: no repository's
-		}
+		return answerAPI(atTerminal(), rest)
 	}
 
 	here, err := os.Getwd()
@@ -191,9 +142,6 @@ func Run(args []string) int {
 	if err != nil {
 		if verb == "tmux" { // prefix m, where a printed error is seen by no one
 			return tmuxSay(rest[1:], err)
-		}
-		if verb == "api" && len(rest) == 1 && (rest[0] == "machines" || rest[0] == "here") && errors.Is(err, git.ErrNotARepository) {
-			return cmdAPI(app.Outside(), rest) // the machines are the same from anywhere
 		}
 		return fail(err)
 	}
@@ -470,8 +418,6 @@ func Run(args []string) int {
 		return cmdEnv(a, rest, asJSON)
 	case "dev":
 		return cmdDev(a, rest, asJSON)
-	case "api":
-		return cmdAPI(a, rest)
 	case "dash":
 		return cmdDash(a, rest)
 	case "stack":
@@ -973,12 +919,7 @@ func take(args *[]string, flag string) bool {
 }
 
 func emit(value any) int {
-	data, err := json.MarshalIndent(value, "", "  ")
-	if err != nil {
-		return fail(err)
-	}
-	fmt.Println(string(data))
-	return exitOK
+	return asker{out: os.Stdout, errs: os.Stderr}.emit(value)
 }
 
 func exitFor(err error) int {
@@ -1602,14 +1543,21 @@ func said(chosen app.Chosen) string {
 }
 
 func configHere() config.Config {
-	if here, err := os.Getwd(); err == nil {
-		if a, err := app.Open(here); err == nil {
+	here, _ := os.Getwd()
+	return configAt(here, os.Stderr)
+}
+
+// configAt is the configuration of the repository a folder is in, or the
+// person's own outside one.
+func configAt(dir string, errs io.Writer) config.Config {
+	if dir != "" {
+		if a, err := app.Open(dir); err == nil {
 			return a.Config
 		}
 	}
 	c, err := config.Load("")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "mia: %v\n", err)
+		fmt.Fprintf(errs, "mia: %v\n", err)
 	}
 	return c
 }

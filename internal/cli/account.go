@@ -20,9 +20,15 @@ const accountUsage = "mia account [ls|add <agent> <name> [--in <worktree>]|login
 // here, whose worktrees a window can sign one in to, or, outside one, the
 // main agent's folder. Accounts are the person's, the same from anywhere.
 func atAccounts() (*app.App, error) {
+	here, _ := os.Getwd()
+	return accountsAt(here)
+}
+
+// accountsAt is atAccounts, here being a folder that is given.
+func accountsAt(dir string) (*app.App, error) {
 	a, err := app.AtMain()
-	if here, werr := os.Getwd(); werr == nil {
-		if in, oerr := app.Open(here); oerr == nil {
+	if dir != "" {
+		if in, oerr := app.Open(dir); oerr == nil {
 			a, err = in, nil
 		}
 	}

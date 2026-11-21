@@ -110,7 +110,7 @@ esac
 			stdout := os.Stdout
 			os.Stdout = output
 			t.Cleanup(func() { os.Stdout = stdout })
-			if code := cmdAPI(a, []string{"env", "longido"}); code != exitOK {
+			if code := cmdAPI(atTerminal(), a, []string{"env", "longido"}); code != exitOK {
 				t.Fatalf("mia api env exited %d", code)
 			}
 			if _, err := output.Seek(0, 0); err != nil {
