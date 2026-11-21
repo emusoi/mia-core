@@ -140,6 +140,36 @@ func TestGoingBackToTheAgentAConversationCameFromTakesItsOwnUpAgain(t *testing.T
 	}
 }
 
+// A conversation over a handoff's budget has turns of its middle left out,
+// and the file that has them all named; asked for whole, none is left out
+// and there is no other file.
+func TestAHandoffAskedForWholeLeavesNoTurnOut(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	claudeDir := agentHomes(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := a.New("feature")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lines []string
+	for range 40 {
+		lines = append(lines, claudeSays(record.Path, "user", quoted(strings.Repeat("word ", 500)), ""))
+	}
+	put(t, filepath.Join(claudeDir(record.Path), "long.jsonl"), lines...)
+	latest, err := a.ContinueConversation(app.Continue{ID: "long", With: "codex", DryRun: true})
+	if err != nil || latest.Turns != 40 || latest.LeftOut == 0 || latest.Full == "" {
+		t.Fatalf("its latest: %d turns, %d left out, full %q, %v", latest.Turns, latest.LeftOut, latest.Full, err)
+	}
+	whole, err := a.ContinueConversation(app.Continue{ID: "long", With: "codex", DryRun: true, Whole: true})
+	if err != nil || whole.Turns != 40 || whole.LeftOut != 0 || whole.Full != "" || whole.Handoff != latest.Handoff {
+		t.Fatalf("whole: %d turns, %d left out, full %q, %v", whole.Turns, whole.LeftOut, whole.Full, err)
+	}
+}
+
 // A conversation with claude, and one with pi, is written out as a handoff
 // in the git folder — who said what, each thing done in a line, nothing of
 // what came back — and a window opens with the other agent, told to read

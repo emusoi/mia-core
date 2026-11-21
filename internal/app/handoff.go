@@ -37,6 +37,8 @@ type Continue struct {
 	// Quiet starts the agent and tells it nothing: whoever asked says the
 	// handoff to it themselves, with the first thing the person sends.
 	Quiet bool
+	// Whole leaves no turn out of the handoff, however long it is.
+	Whole bool
 }
 
 // Talk names one conversation: whose it is, and its id.
@@ -188,7 +190,11 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 	now := time.Now()
 	named := filepath.Join(a.MiaDir, "handoffs", record.Name, notInName.ReplaceAllString(head.Agent+"-"+head.ID, "-"))
 	file, full := named+".md", named+"-full.md"
-	text, left := handoff(head, turns, now, handoffBudget, full)
+	budget := handoffBudget
+	if want.Whole {
+		budget = 0
+	}
+	text, left := handoff(head, turns, now, budget, full)
 	if left == 0 {
 		full = ""
 	}

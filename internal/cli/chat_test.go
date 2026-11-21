@@ -66,6 +66,7 @@ type heardByWindow struct {
 	Keys   []chatKey   `json:"keys"`
 	Patch  []struct {
 		Op, ID, Text, Tone string
+		Keys               []chatKey
 		N                  int
 		Turn               *shownTurn
 		On                 *bool
@@ -648,10 +649,13 @@ func TestTheModelsAreAModalOverTheChat(t *testing.T) {
 		t.Fatalf("put up as %+v", got)
 	}
 	modal := got.Patch[0].Node
-	if modal.T != "modal" || modal.ID != "over" || modal.Title != "Model" || modal.W != 520 || len(modal.Children) != 3 || modal.Children[1].T != "divider" || modal.find("chat") != nil {
+	if modal.T != "modal" || modal.ID != "over" || modal.Title != "Model" || modal.W != 520 || len(modal.Children) != 5 || modal.Children[1].T != "divider" || modal.Children[3].T != "divider" || modal.find("chat") != nil {
 		t.Fatalf("modal = %+v", modal)
 	}
-	field, list := modal.Children[0], modal.Children[2]
+	field, list := modal.Children[0], modal.Children[4]
+	if does := modal.Children[2]; does.ID != "does" || !list.Live || view.under != "a|claude|opus" || len(does.Children) != 1 || does.Children[0].Children[0].Text != "opus" || does.Children[0].Children[0].Style != "strong" {
+		t.Errorf("the line that says what the row under the keys does = %+v", does)
+	}
 	if field.T != "field" || field.ID != "q" || !field.Bare || !field.Live || field.List != "models" || field.Right != "5 models" || field.Icon != "search" {
 		t.Errorf("field = %+v", field)
 	}
@@ -693,7 +697,7 @@ func TestTheModelsAreAModalOverTheChat(t *testing.T) {
 	}
 	// why a pick was not done is said at the modal's foot, in it
 	view.told = &muiStatus{Text: "claude cannot be switched to another model while it runs", Tone: "bad"}
-	if foot := pieceOf(t, view.models(false)).Children; len(foot) != 4 || foot[3].T != "text" || foot[3].Tone != "bad" || !strings.HasPrefix(foot[3].Text, "claude cannot be switched") {
+	if foot := pieceOf(t, view.models(false)).Children; len(foot) != 6 || foot[5].T != "text" || foot[5].Tone != "bad" || !strings.HasPrefix(foot[5].Text, "claude cannot be switched") {
 		t.Errorf("foot = %+v", foot)
 	}
 
@@ -713,6 +717,140 @@ func TestTheModelsAreAModalOverTheChat(t *testing.T) {
 	}
 	if row, ok := chatModelOf(chatModel{agent: "pi", model: "a|b/c"}.id()); !ok || row.agent != "pi" || row.model != "a|b/c" {
 		t.Errorf("a model's id read back: %+v", row)
+	}
+}
+
+// The line under the models' search line says what picking the row under
+// the keys does, and follows the keys. A model of this chat's agent: what
+// it goes from and to, in place. Another agent's: who to whom and what is
+// carried, the latest turns or the whole conversation, with the counts a
+// dry run gave; tab, and a press on either, flips which, the foot says
+// tab only then, and a pick hands over what was chosen. An agent the
+// conversation came from: it takes its own up again, and its group says
+// it was in this chat.
+func TestTheLineUnderTheModelsSearchSaysWhatAPickDoes(t *testing.T) {
+	view := &chatView{talk: &talk{pane: "%5", agent: "claude", reply: true}, worktree: "monduli", window: "2", id: "c1",
+		runs: app.Runs{Agent: "claude", Model: "opus", Effort: "high", Live: true}, agents: chatAgents(), came: []string{"opencode"},
+		would: map[string]chatWould{
+			"codex":    {done: app.Continued{Turns: 42, LeftOut: 6}},
+			"opencode": {done: app.Continued{Turns: 8, Resumes: "o1"}},
+		}}
+	view.talk.heard([]app.Turn{{N: 1, Kind: "asked", Text: "hello"}})
+	said := func(piece *shownPiece) string {
+		var all []string
+		var walk func(p shownPiece)
+		walk = func(p shownPiece) {
+			switch p.T {
+			case "text":
+				all = append(all, p.Text)
+			case "tabs":
+				all = append(all, "["+p.Selected+"]")
+			case "button":
+				all = append(all, "<"+p.Key+">")
+			}
+			for _, child := range p.Children {
+				walk(child)
+			}
+		}
+		walk(*piece)
+		return strings.Join(all, " ")
+	}
+	does := func(got heardByWindow) string {
+		t.Helper()
+		modal := got.Patch[0].Node
+		if modal == nil || len(modal.Children) < 3 || modal.Children[2].ID != "does" {
+			t.Fatalf("no line in %+v", got.Patch)
+		}
+		return said(&modal.Children[2])
+	}
+	keys := func(got heardByWindow) string {
+		if len(got.Patch) < 2 || got.Patch[len(got.Patch)-1].Op != "keys" {
+			return "unsaid"
+		}
+		var all []string
+		for _, key := range got.Patch[len(got.Patch)-1].Keys {
+			all = append(all, key.Key+" "+key.Label+" "+key.ID)
+		}
+		return strings.Join(all, ", ")
+	}
+	move := func(to string) heardByWindow {
+		t.Helper()
+		deed := view.deed(chatEvent{E: "move", List: "models", ID: to})
+		if deed != (chatDeed{do: chatUnder, id: to}) {
+			t.Fatalf("the keys moved to %s ask %+v", to, deed)
+		}
+		view.under = deed.id
+		return only(t, view.again())
+	}
+
+	// put up on the model that runs: nothing to do
+	up := only(t, view.up(picking))
+	if got := does(up); got != "opus · What this chat runs on." || keys(up) != "unsaid" {
+		t.Errorf("on the model that runs: %q, keys %s", got, keys(up))
+	}
+	if deed := view.deed(chatEvent{E: "move", List: "models", ID: "a|claude|opus"}); deed.do != chatNothing {
+		t.Errorf("the keys said where they are ask %+v", deed)
+	}
+	// this agent's other model
+	if got := move("a|claude|sonnet"); does(got) != "opus → sonnet · Switches in place. Nothing is re-sent." || keys(got) != "unsaid" {
+		t.Errorf("another model of this agent: %q, keys %s", does(got), keys(got))
+	}
+	// another agent's: the choice, the latest turns first, and tab in the foot
+	got := move("a|codex|gpt-6-luna")
+	if does(got) != "claude → codex carries [latest] <tab> The last 36 of 42 turns, as many as fit. Sent with your next message." || keys(got) != "tab latest or whole flip" {
+		t.Errorf("another agent's: %q, keys %s", does(got), keys(got))
+	}
+	if deed := view.deed(chatEvent{E: "pick", List: "models", ID: "a|codex|gpt-6-luna"}); deed != (chatDeed{do: chatHand, agent: "codex", model: "gpt-6-luna"}) {
+		t.Errorf("picked with the latest: %+v", deed)
+	}
+	// tab flips it, and what is picked then carries the whole conversation
+	flip := view.deed(chatEvent{E: "press", ID: "flip"})
+	if flip != (chatDeed{do: chatCarries, whole: true}) {
+		t.Fatalf("tab asks %+v", flip)
+	}
+	view.whole = flip.whole
+	if got := only(t, view.again()); does(got) != "claude → codex carries [whole] <tab> All 42 turns. Slower, and uses more of your plan." || keys(got) != "unsaid" {
+		t.Errorf("flipped: %q, keys %s", does(got), keys(got))
+	}
+	deed := view.deed(chatEvent{E: "pick", List: "models", ID: "a|codex|gpt-6-luna", Sub: "high"})
+	if deed != (chatDeed{do: chatHand, agent: "codex", model: "gpt-6-luna", effort: "high", whole: true}) {
+		t.Fatalf("picked with the whole: %+v", deed)
+	}
+	mia := &fakeMia{done: app.Continued{Sent: true}}
+	if handTo(mia, model.Record{Name: "monduli"}, view.id, "", "claude", deed.agent, deed.model, deed.effort, deed.whole); !slices.Equal(mia.asked, []string{"continue c1 in monduli with codex gpt-6-luna high quiet=true whole"}) {
+		t.Errorf("handed over as %q", mia.asked)
+	}
+	// a press on a choice takes that one, and tab again the other
+	if back := view.deed(chatEvent{E: "pick", List: "carry", ID: "latest"}); back != (chatDeed{do: chatCarries}) {
+		t.Errorf("a press on Latest asks %+v", back)
+	}
+	if again := view.deed(chatEvent{E: "press", ID: "flip"}); again != (chatDeed{do: chatCarries}) {
+		t.Errorf("tab again asks %+v", again)
+	}
+	// an agent the conversation came from: no choice, and the foot's tab goes
+	back := move("a|opencode|")
+	if does(back) != "claude → opencode · opencode takes its own conversation up again · 8 turns since" || keys(back) != "" {
+		t.Errorf("an agent it came from: %q, keys %q", does(back), keys(back))
+	}
+	list := back.Patch[0].Node.find("list")
+	if at := slices.IndexFunc(list.Items, func(item chatItem) bool { return item.Head == "Opencode" }); at < 0 || list.Items[at].Tag != "was in this chat" {
+		t.Errorf("its group's head: %+v", list.Items)
+	}
+	// what would not be done says why; taken away, the foot's keys stay none
+	view.would["codex"] = chatWould{err: errors.New("nothing is said yet in claude's conversation c1")}
+	if got := move("a|codex|gpt-6-luna"); does(got) != "claude → codex · nothing is said yet in claude's conversation c1" || keys(got) != "unsaid" {
+		t.Errorf("refused: %q, keys %s", does(got), keys(got))
+	}
+	view.would["codex"] = chatWould{done: app.Continued{Turns: 1}}
+	if got := only(t, view.again()); does(got) != "claude → codex carries [whole] <tab> All 1 turn. Slower, and uses more of your plan." || keys(got) != "tab latest or whole flip" {
+		t.Errorf("one turn: %q, keys %s", does(got), keys(got))
+	}
+	// the view said whole puts the modal back with the foot's key, and esc takes both away
+	if all := view.talk.said(); len(all) != 2 || !slices.Equal(ops(read(t, all[1])), []string{"add", "keys"}) {
+		t.Errorf("said whole: %s", all)
+	}
+	if shut := only(t, view.shut()); !slices.Equal(ops(shut), []string{"remove", "keys"}) || len(shut.Patch[1].Keys) != 0 || view.talk.with != nil {
+		t.Errorf("taken away: %+v", shut.Patch)
 	}
 }
 
@@ -1048,7 +1186,11 @@ type fakeMia struct {
 }
 
 func (f *fakeMia) ContinueConversation(want app.Continue) (app.Continued, error) {
-	f.asked = append(f.asked, fmt.Sprintf("continue %s in %s with %s %s %s quiet=%v", want.ID, want.Worktree, want.With, want.Model, want.Effort, want.Quiet))
+	asked := fmt.Sprintf("continue %s in %s with %s %s %s quiet=%v", want.ID, want.Worktree, want.With, want.Model, want.Effort, want.Quiet)
+	if want.Whole {
+		asked += " whole"
+	}
+	f.asked = append(f.asked, asked)
 	return f.done, f.refuses
 }
 
@@ -1086,7 +1228,7 @@ func TestAnotherAgentsModelHandsTheConversationOverAndClosesTheOldWindowLast(t *
 				t.Fatalf("%s to %s asks %+v", from.Name, to.Name, deed)
 			}
 			mia := &fakeMia{done: app.Continued{Sent: true, To: app.ContinuedTo{Agent: to.Name, Window: app.WindowRef{Index: 5, Name: to.Name}}}}
-			went := handTo(mia, record, view.id, view.window, from.Name, deed.agent, deed.model, deed.effort)
+			went := handTo(mia, record, view.id, view.window, from.Name, deed.agent, deed.model, deed.effort, deed.whole)
 			want := []string{fmt.Sprintf("continue c1 in monduli with %s %s %s quiet=true", to.Name, pick.model, sub), "close monduli 2"}
 			if !slices.Equal(mia.asked, want) || !went.went || went.tone != "ok" || went.text != from.Name+" stopped · "+to.Name+" goes on with this conversation" {
 				t.Errorf("%s to %s: asked %q, went %+v", from.Name, to.Name, mia.asked, went)
@@ -1095,19 +1237,19 @@ func TestAnotherAgentsModelHandsTheConversationOverAndClosesTheOldWindowLast(t *
 	}
 
 	mia := &fakeMia{refuses: errors.New("nothing is said yet in claude's conversation c1")}
-	if went := handTo(mia, record, "c1", "2", "claude", "codex", "", ""); went.went || went.tone != "bad" || went.text != "nothing is said yet in claude's conversation c1" || len(mia.asked) != 1 {
+	if went := handTo(mia, record, "c1", "2", "claude", "codex", "", "", false); went.went || went.tone != "bad" || went.text != "nothing is said yet in claude's conversation c1" || len(mia.asked) != 1 {
 		t.Errorf("refused: %+v, asked %q", went, mia.asked)
 	}
 	mia = &fakeMia{done: app.Continued{Problem: "codex ended as soon as it started, saying:\n  not signed in"}}
-	if went := handTo(mia, record, "c1", "2", "claude", "codex", "", ""); went.went || went.tone != "bad" || !strings.HasPrefix(went.text, "claude still runs — codex ended as soon as it started") || len(mia.asked) != 1 {
+	if went := handTo(mia, record, "c1", "2", "claude", "codex", "", "", false); went.went || went.tone != "bad" || !strings.HasPrefix(went.text, "claude still runs — codex ended as soon as it started") || len(mia.asked) != 1 {
 		t.Errorf("the other agent ended: %+v, asked %q", went, mia.asked)
 	}
 	mia = &fakeMia{done: app.Continued{Sent: true}}
-	if went := handTo(mia, record, "c1", "", "claude", "codex", "", ""); !went.went || went.text != "codex goes on with this conversation · claude's window stays" || len(mia.asked) != 1 {
+	if went := handTo(mia, record, "c1", "", "claude", "codex", "", "", false); !went.went || went.text != "codex goes on with this conversation · claude's window stays" || len(mia.asked) != 1 {
 		t.Errorf("with no window to close: %+v, asked %q", went, mia.asked)
 	}
 	mia = &fakeMia{done: app.Continued{Sent: true}, stays: errors.New("no window 2")}
-	if went := handTo(mia, record, "c1", "2", "claude", "codex", "", ""); !went.went || went.tone != "warn" || !strings.Contains(went.text, "claude's window is still open: no window 2") {
+	if went := handTo(mia, record, "c1", "2", "claude", "codex", "", "", false); !went.went || went.tone != "warn" || !strings.Contains(went.text, "claude's window is still open: no window 2") {
 		t.Errorf("a window that would not close: %+v", went)
 	}
 
@@ -1145,8 +1287,8 @@ func TestTheFirstThingSentAfterAHandingCarriesTheConversation(t *testing.T) {
 	for n := 1; n <= 400; n++ {
 		long += fmt.Sprintf("\n### %d · user\n\n%s\n", n, strings.Repeat("word ", 60))
 	}
-	cut := carried("claude", long, "/repo/full.md", "go on", chatCarry)
-	if len(cut) > chatCarry+500 || !strings.HasPrefix(cut, "The conversation so far, with claude:\n\n[Only its last turns are here: the whole of it is in /repo/full.md]\n\n### ") ||
+	cut := carried("claude", long, "/repo/full.md", "go on", 48<<10)
+	if len(cut) > 48<<10+500 || !strings.HasPrefix(cut, "The conversation so far, with claude:\n\n[Only its last turns are here: the whole of it is in /repo/full.md]\n\n### ") ||
 		!strings.Contains(cut, "\n### 400 · user\n") || strings.Contains(cut, "\n### 1 · user\n") || !strings.HasSuffix(cut, chatRule+"\n\ngo on") {
 		t.Errorf("a long one is said in %d bytes: %.200q … %.80q", len(cut), cut, cut[len(cut)-80:])
 	}
@@ -1366,7 +1508,7 @@ func TestWhatAWindowGoesOnFromIsSaidOnceWhicheverChatSendsFirst(t *testing.T) {
 		t.Errorf("with its file gone: %q", text)
 	}
 	kept["5"] = app.Carried{From: "claude", ID: "c1", File: "/repo/claude-c1.md", Full: "/repo/claude-c1-full.md"}
-	handoff = "## The conversation\n" + strings.Repeat("\n### 1 · user\n\n"+strings.Repeat("word ", 400)+"\n", 60)
+	handoff = "## The conversation\n" + strings.Repeat("\n### 1 · user\n\n"+strings.Repeat("word ", 400)+"\n", 300)
 	if text, _ := typedFor(kept, record, "5", "go on", read); !strings.Contains(text, "the whole of it is in /repo/claude-c1-full.md]") {
 		t.Errorf("a long one does not say where every turn is: %.200q", text)
 	}
