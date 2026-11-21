@@ -30,7 +30,14 @@ type shownPiece struct {
 	Grow, W, H, Max                                                                                    int
 	Children                                                                                           []shownPiece
 	Items                                                                                              []chatItem
-	Turns                                                                                              []app.Turn
+	Turns                                                                                              []shownTurn
+}
+
+// shownTurn is a turn of a chat as the window reads it: a transcript's, or
+// a row of the chat's own.
+type shownTurn struct {
+	app.Turn
+	From, To, Note, Tone string
 }
 
 // find is the first piece of a kind in a piece, itself too, and nil for none.
@@ -60,7 +67,7 @@ type heardByWindow struct {
 	Patch  []struct {
 		Op, ID, Text, Tone string
 		N                  int
-		Turn               *app.Turn
+		Turn               *shownTurn
 		On                 *bool
 		Node               *shownPiece
 	} `json:"patch"`
@@ -113,7 +120,7 @@ func only(t *testing.T, messages [][]byte) heardByWindow {
 	return read(t, messages[0])
 }
 
-func numbers(turns []app.Turn) []int {
+func numbers(turns []shownTurn) []int {
 	var ns []int
 	for _, turn := range turns {
 		ns = append(ns, turn.N)
@@ -1144,23 +1151,167 @@ func TestTheFirstThingSentAfterAHandingCarriesTheConversation(t *testing.T) {
 		t.Errorf("a long one is said in %d bytes: %.200q … %.80q", len(cut), cut, cut[len(cut)-80:])
 	}
 
-	// the chat goes on from the one before: its turns stay over a quiet line, and what is heard comes after
-	before := &talk{agent: "claude"}
-	before.heard([]app.Turn{{N: 1, Kind: "asked", Text: "make it faster"}, {N: 2, Kind: "said", Text: "It is faster."}})
+	// the chat goes on from the one before: its turns stay over the switch, which waits, and what is heard comes after
 	chat := &talk{pane: "%3", agent: "codex", reply: true, nth: 1}
-	chat.goesOn(before)
+	chat.lays([]chatPart{{turns: []app.Turn{{N: 1, Kind: "asked", Text: "make it faster"}, {N: 2, Kind: "said", Text: "It is faster."}},
+		then: switched(app.Handed{From: app.Talk{Agent: "claude"}, To: app.Talk{Agent: "codex"}, Turns: 2}), waits: true}, {own: true}})
 	got := read(t, chat.whole())
-	if !slices.Equal(numbers(got.View.Turns), []int{1, 2, 3}) || got.View.Turns[2].Kind != "tool" || got.View.Turns[2].Text != "continued by codex" || got.View.ID != "chat-1" {
+	if band := got.View.Turns[2]; !slices.Equal(numbers(got.View.Turns), []int{1, 2, 3}) || band.Kind != "switch" || band.From != "claude" || band.To != "codex" ||
+		band.Note != "context goes with your next message" || band.Tone != "warn" || got.View.ID != "chat-1" {
 		t.Fatalf("gone on: %+v", got.View)
 	}
 	sent := only(t, chat.sends("and the tests"))
 	if sent.Patch[0].Turn.N != chatOwn+1 || sent.Patch[0].Turn.Text != "and the tests" {
 		t.Errorf("sent is said as %+v", sent.Patch[0].Turn)
 	}
+	// sent with it: the switch says what was handed over, at the place kept for it, and waits no more
+	went := only(t, chat.patch(chat.handed()...))
+	if band := went.Patch[1].Turn; !slices.Equal(ops(went), []string{"unturn", "turn"}) || went.Patch[0].N != 3 || band.N != 4 || band.Kind != "switch" || band.Note != "context handed over · 2 turns" || band.Tone != "" || chat.handed() != nil {
+		t.Errorf("handed over: %+v", went.Patch)
+	}
 	heard := only(t, chat.heard([]app.Turn{{N: 1, Kind: "asked", Text: first}, {N: 2, Kind: "question", Text: "Which?", Options: []string{"A", "B"}}, {N: 3, Kind: "answer", Text: "A", Question: 2}}))
-	if !slices.Equal(ops(heard), []string{"unturn", "turn", "turn", "turn"}) || heard.Patch[0].N != chatOwn+1 || heard.Patch[1].ID != "chat-1" || heard.Patch[1].Turn.N != 4 || heard.Patch[1].Turn.Text != "and the tests" ||
-		heard.Patch[3].Turn.N != 6 || heard.Patch[3].Turn.Question != 5 || len(chat.sent) != 0 {
+	if !slices.Equal(ops(heard), []string{"unturn", "turn", "turn", "turn"}) || heard.Patch[0].N != chatOwn+1 || heard.Patch[1].ID != "chat-1" || heard.Patch[1].Turn.N != 5 || heard.Patch[1].Turn.Text != "and the tests" ||
+		heard.Patch[3].Turn.N != 7 || heard.Patch[3].Turn.Question != 6 || len(chat.sent) != 0 {
 		t.Errorf("its transcript's turns: %+v, sent %+v", heard.Patch, chat.sent)
+	}
+	// a model changed now stands after the last turn heard, and what is heard next after it
+	row := chat.put(chatBand{Kind: "model", From: "gpt-6-luna", To: "gpt-6-luna-mini"})
+	if next := only(t, chat.heard([]app.Turn{{N: 4, Kind: "said", Text: "A it is."}})); row.n != 8 || next.Patch[0].Turn.N != 9 {
+		t.Errorf("a model's line at %d, the turn after it at %+v", row.n, next.Patch[0].Turn)
+	}
+	// another chat of the window sent what it goes on from: the switch waits no more once the agent writes of it
+	other := &talk{pane: "%4", agent: "codex", reply: true}
+	other.lays([]chatPart{{turns: []app.Turn{{N: 1, Kind: "asked", Text: "make it faster"}}, then: switched(app.Handed{From: app.Talk{Agent: "claude"}, To: app.Talk{Agent: "codex"}}), waits: true}, {own: true}})
+	other.whole()
+	if told := only(t, other.heard([]app.Turn{{N: 1, Kind: "asked", Text: first}})); !slices.Equal(ops(told), []string{"turn", "unturn", "turn"}) || told.Patch[1].N != 2 || told.Patch[2].Turn.N != 3 || told.Patch[2].Turn.Note != "context handed over" {
+		t.Errorf("sent by another chat: %+v", told.Patch)
+	}
+}
+
+// What a window runs on, changed in place, is said in a line: its models,
+// or its efforts where the model stays; nothing changed, nothing is said.
+func TestAModelChangedInPlaceIsSaidInALine(t *testing.T) {
+	for _, c := range []struct {
+		was, now app.Runs
+		from, to string
+	}{
+		{app.Runs{Model: "opus", Effort: "high"}, app.Runs{Model: "sonnet", Effort: "high"}, "opus", "sonnet"},
+		{app.Runs{}, app.Runs{Model: "sonnet"}, "default", "sonnet"},
+		{app.Runs{Model: "opus", Effort: "high"}, app.Runs{Model: "opus", Effort: "low"}, "opus high", "opus low"},
+		{app.Runs{Model: "opus", Effort: "high"}, app.Runs{Model: "opus", Effort: "high"}, "", ""},
+	} {
+		band, changed := modelled(c.was, c.now)
+		if changed != (c.from != "") || changed && band != (chatBand{Kind: "model", From: c.from, To: c.to}) {
+			t.Errorf("%+v to %+v: %+v %v", c.was, c.now, band, changed)
+		}
+	}
+}
+
+// A chat of a conversation that went from agent to agent shows each switch
+// where it happened, by the handoffs' records: the turns said with each
+// agent in the order they were said, the agent that took its own
+// conversation up again with its earlier turns before those said with the
+// other meanwhile, a model changed in this chat after the turn it was
+// changed after, and the last switch waiting while its window still keeps
+// what it goes on from. Nothing of it is kept by the chat: one started
+// again says the same.
+func TestAChatSaysEachSwitchOfAgentsWhereItHappened(t *testing.T) {
+	gittest.Isolate(t)
+	claude := filepath.Join(os.Getenv("HOME"), ".claude")
+	t.Setenv("CLAUDE_CONFIG_DIR", claude)
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("PI_CODING_AGENT_DIR", "")
+	repo := gittest.New(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := a.New("switched")
+	if err != nil {
+		t.Fatal(err)
+	}
+	write := func(file string, lines ...string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cwd, _ := json.Marshal(record.Path)
+	carries := func(from, words string) string {
+		text, _ := json.Marshal(carried(from, "### 1 · user\n\nmake it faster\n", "/h/full.md", words, chatCarry))
+		return string(text)
+	}
+	says := func(kind, at, content string) string {
+		return `{"type":"` + kind + `","cwd":` + string(cwd) + `,"timestamp":"2026-11-02T` + at + `Z","message":{"content":` + content + `}}`
+	}
+	write(filepath.Join(claude, "projects", regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(record.Path, "-"), "c1.jsonl"),
+		says("user", "10:00:00", `"make it faster"`), says("assistant", "10:00:05", `[{"type":"text","text":"It is faster."}]`),
+		says("user", "10:04:00", carries("pi", "does it need a test")), says("assistant", "10:04:05", `[{"type":"text","text":"Yes, one."}]`))
+	write(filepath.Join(os.Getenv("HOME"), ".pi", "agent", "sessions", "-"+strings.ReplaceAll(record.Path, "/", "-")+"--", "2026-11-02T10-02-00-000Z_p1.jsonl"),
+		`{"type":"session","version":3,"id":"p1","timestamp":"2026-11-02T10:02:00.000Z","cwd":`+string(cwd)+`}`,
+		`{"type":"message","timestamp":"2026-11-02T10:02:00.000Z","message":{"role":"user","content":[{"type":"text","text":`+carries("claude", "cap the wait")+`}]}}`,
+		`{"type":"message","timestamp":"2026-11-02T10:02:05.000Z","message":{"role":"assistant","content":[{"type":"text","text":"Capped."}]}}`)
+	handoffs := filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name)
+	name, _ := json.Marshal(record.Name)
+	write(filepath.Join(handoffs, "claude-c1.1.json"), `{"from":{"agent":"claude","id":"c1","worktree":`+string(name)+`},"to":{"agent":"pi","window":{"index":2,"name":"pi"},"id":"p1"},"handoff":"/h/claude-c1.md","at":"2026-11-02T10:01:00Z","turns":42,"left_out":6}`)
+	write(filepath.Join(handoffs, "pi-p1.2.json"), `{"from":{"agent":"pi","id":"p1","worktree":`+string(name)+`},"to":{"agent":"claude","window":{"index":3,"name":"claude"},"id":"c1"},"handoff":"/h/pi-p1.md","at":"2026-11-02T10:03:00Z","turns":2,"resumes":"c1"}`)
+	// (One written before a handing's turns were kept: it says who went on from whom, and no count.)
+	write(filepath.Join(handoffs, "claude-c1.3.json"), `{"from":{"agent":"claude","id":"c1","worktree":`+string(name)+`},"to":{"agent":"codex","window":{"index":4,"name":"codex"}},"handoff":"/h/claude-c1.md","at":"2026-11-02T10:05:00Z"}`)
+
+	shows := func(run *chatRun, of, from app.Talk) []string {
+		t.Helper()
+		chat := &talk{pane: "%1", agent: of.Agent, reply: true}
+		chat.lays(run.parts(of, from))
+		if from.ID == "" { // (What a chat that waits hears is in another test: an asked turn after the switch ends the wait.)
+			turns, err := a.ConversationIn(of.ID, record.Name, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			chat.heard(turns)
+		}
+		var all []string
+		for _, turn := range read(t, chat.whole()).View.Turns {
+			switch turn.Kind {
+			case "switch", "model":
+				all = append(all, strings.TrimSpace(fmt.Sprintf("%s: %s > %s | %s | %s", turn.Kind, turn.From, turn.To, turn.Note, turn.Tone)))
+			default:
+				all = append(all, turn.Kind+": "+turn.Text)
+			}
+		}
+		return all
+	}
+	run := &chatRun{a: a, record: record}
+	claudes, pis := app.Talk{Agent: "claude", ID: "c1"}, app.Talk{Agent: "pi", ID: "p1"}
+	first := []string{"asked: make it faster", "said: It is faster.", "switch: claude > pi | context handed over · 42 turns · 6 left out |"}
+	with := []string{"asked: cap the wait", "said: Capped."}
+	back := []string{"asked: does it need a test", "said: Yes, one."}
+	// pi's, which went on from claude's: claude's turns until then, the switch, its own
+	if got := shows(run, pis, app.Talk{}); !slices.Equal(got, slices.Concat(first, with)) {
+		t.Errorf("the chat of the conversation it was handed to:\n%s", strings.Join(got, "\n"))
+	}
+	// claude's, taken up again: its turns before, those said with pi, and its own since
+	again := slices.Concat(first, with, []string{"switch: pi > claude | took its own conversation up again · 2 turns since |"}, back)
+	if got := shows(run, claudes, app.Talk{}); !slices.Equal(got, again) {
+		t.Errorf("the chat of the conversation taken up again:\n%s", strings.Join(got, "\n"))
+	}
+	// while its window still keeps what was said with pi since, that switch waits: before any of its own turns is heard
+	waits := slices.Concat(first[2:], with, []string{"switch: pi > claude | context goes with your next message | warn"})
+	if got := shows(run, claudes, pis); !slices.Equal(got, waits) {
+		t.Errorf("while it has still to be sent:\n%s", strings.Join(got, "\n"))
+	}
+	// handed on to codex, which has written nothing yet, with a model changed after claude's second turn in this chat
+	run.models = []chatModelled{{of: claudes, after: 2, band: chatBand{Kind: "model", From: "opus", To: "sonnet"}}}
+	all := slices.Concat(first[:2], []string{"model: opus > sonnet |  |"}, first[2:], with, again[len(again)-3:],
+		[]string{"switch: claude > codex | context goes with your next message | warn"})
+	if got := shows(run, app.Talk{Agent: "codex"}, claudes); !slices.Equal(got, all) {
+		t.Errorf("handed on again, a model changed on the way:\n%s", strings.Join(got, "\n"))
+	}
+	// and in claude's own chat, the model's line stands where it was changed
+	if got := shows(run, claudes, app.Talk{}); !slices.Equal(got, slices.Concat(first[:2], []string{"model: opus > sonnet |  |"}, again[2:])) {
+		t.Errorf("a model changed, in the chat it was changed in:\n%s", strings.Join(got, "\n"))
 	}
 }
 
@@ -1294,10 +1445,24 @@ func TestAHandingIsKeptOnTheNewWindowUntilTheFirstSend(t *testing.T) {
 	// a chat started after, for the new window: the turns so far, and the first send carries the conversation
 	second := chat(window)
 	got := read(t, second.view.talk.whole())
-	if !slices.Equal(numbers(got.View.Turns), []int{1, 2, 3}) || got.View.Turns[1].Text != "It is faster." || got.View.Turns[2].Text != "continued by echo" {
+	if band := got.View.Turns[2]; !slices.Equal(numbers(got.View.Turns), []int{1, 2, 3}) || got.View.Turns[1].Text != "It is faster." ||
+		band.Kind != "switch" || band.From != "claude" || band.To != "echo" || band.Tone != "warn" {
 		t.Fatalf("a chat started after shows %+v", got.View.Turns)
 	}
+	said = nil
 	second.act(chatDeed{do: chatSend, text: "and the tests"})
+	// sent with it: the switch says what was handed over, by the handoff's record
+	if len(said) != 2 {
+		t.Fatalf("the send said %s", said)
+	}
+	if went := read(t, said[1]); !slices.Equal(ops(went), []string{"unturn", "turn"}) || went.Patch[1].Turn.N != 4 || went.Patch[1].Turn.Note != "context handed over · 2 turns" {
+		t.Errorf("once sent, the switch is said as %s", said[1])
+	}
+	if records, _ := filepath.Glob(filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "claude-c1.*.json")); len(records) != 1 {
+		t.Errorf("the handoff's records: %v", records)
+	} else if kept, _ := os.ReadFile(records[0]); !strings.Contains(string(kept), `"turns":2`) || strings.Contains(string(kept), "left_out") || strings.Contains(string(kept), "resumes") {
+		t.Errorf("the record keeps %s", kept)
+	}
 	screenShows(t, record.Name, window, "The conversation so far, with claude:", "It is faster.", chatRule, "and the tests")
 	if _, on := a.CarriedInWindow(record, window); on {
 		t.Error("said, and the window still keeps it")

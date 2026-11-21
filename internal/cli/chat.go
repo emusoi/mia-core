@@ -205,6 +205,66 @@ type chatTurn struct {
 	json  json.RawMessage
 }
 
+// chatBand is a row of the chat's own among its turns, across its column.
+// A switch is where the conversation went from one agent to another, with
+// what happened at its right: tone warn while what the new agent goes on
+// from has still to be sent to it. A model is the lighter line where the
+// same agent went from one model to another.
+type chatBand struct {
+	N    int    `json:"n"`
+	Kind string `json:"kind"`
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
+	Note string `json:"note,omitempty"`
+	Tone string `json:"tone,omitempty"`
+}
+
+// banded is a band as a turn of the chat, at its place.
+func banded(band chatBand) chatTurn { return chatTurn{n: band.N, kind: band.Kind, json: encode(band)} }
+
+// waiting is a switch as it stands until what it says was handed over is
+// sent, with the person's next message: at the place before its own.
+func waiting(band chatBand) chatBand {
+	band.N, band.Note, band.Tone = band.N-1, "context goes with your next message", "warn"
+	return band
+}
+
+// switched is the band of a handing: what was handed over, in how many
+// turns and how many of them left out, or that the agent took its own
+// conversation up again and how many turns were said since.
+func switched(handed app.Handed) *chatBand {
+	note, since := "context handed over", ""
+	if handed.Resumed {
+		note, since = "took its own conversation up again", " since"
+	}
+	if handed.Turns > 0 {
+		note += " · " + counted(handed.Turns, "turn") + since
+	}
+	if handed.LeftOut > 0 {
+		note += fmt.Sprintf(" · %d left out", handed.LeftOut)
+	}
+	return &chatBand{Kind: "switch", From: handed.From.Agent, To: handed.To.Agent, Note: note}
+}
+
+// chatCut is where turns of the conversation followed stand in the chat:
+// those numbered from on stand add after their own numbers, behind the
+// turns of the conversations before it and the rows of the chat's own.
+type chatCut struct{ from, add int }
+
+// chatPart is one stretch of a chat that went from agent to agent, in the
+// order it is read: another conversation's turns read back, which stay as
+// they are, or with own those of the conversation followed up to the one
+// numbered until (0: all the rest); then the row of the chat's own that
+// stands after the stretch, which with waits says a handing whose
+// conversation has still to be sent.
+type chatPart struct {
+	turns []app.Turn
+	own   bool
+	until int
+	then  *chatBand
+	waits bool
+}
+
 // drawn reports whether the window reads a turn: one of a kind it knows,
 // with what that kind must have. One it cannot read is left out of a view,
 // and in a patch drops the whole patch.
@@ -338,9 +398,14 @@ type talk struct {
 	// of another conversation is another piece, as the window keeps the
 	// turns a chat was told.
 	nth int
-	// offset is added to the place of each turn heard: the turns of the
-	// conversation this one goes on from stand before them.
-	offset int
+	// cuts is where each turn heard stands: after the turns of the
+	// conversations this one goes on from, and the rows of the chat's own.
+	// last is the highest number heard.
+	cuts []chatCut
+	last int
+	// waits is the switch whose conversation has still to be sent to the
+	// agent, as it is said once it was: until then it is said as waiting.
+	waits *chatBand
 	// over is the modal that stands over the chat, nil for none, and keys
 	// the piece of it the keys are put on. A view said whole is said
 	// without it and it is put back by a patch: the chat's turns are those
@@ -366,6 +431,16 @@ func (t *talk) id() string {
 // find is where the transcript's turn n is among the turns, or would be.
 func (t *talk) find(n int) (int, bool) {
 	return slices.BinarySearchFunc(t.turns, n, func(have chatTurn, n int) int { return cmp.Compare(have.n, n) })
+}
+
+// at is the place of the turn of a number in the conversation followed.
+func (t *talk) at(n int) int {
+	for _, cut := range slices.Backward(t.cuts) {
+		if n >= cut.from {
+			return n + cut.add
+		}
+	}
+	return n
 }
 
 // place is the next place for a turn of the app's own.
@@ -532,11 +607,12 @@ func (t *talk) heard(turns []app.Turn) [][]byte {
 	var changed []chatTurn
 	passed := false // a turn came that is none of what was sent from here
 	for _, turn := range turns {
+		t.last = max(t.last, turn.N)
 		if !drawn(turn) {
 			continue
 		}
-		if turn.N += t.offset; turn.Question > 0 {
-			turn.Question += t.offset
+		if turn.N = t.at(turn.N); turn.Question > 0 {
+			turn.Question = t.at(turn.Question)
 		}
 		if turn.Kind == "asked" {
 			turn.Text = ownWords(turn.Text) // not the conversation said in front of them
@@ -565,6 +641,9 @@ func (t *talk) heard(turns []app.Turn) [][]byte {
 		changed = append(changed, one)
 	}
 	var after []json.RawMessage
+	if t.waits != nil && slices.ContainsFunc(changed, func(turn chatTurn) bool { return turn.kind == "asked" && turn.n > t.waits.N }) {
+		after = t.handed() // the agent was sent something: another chat of its window sent what it goes on from
+	}
 	if passed && len(t.sent) > 0 {
 		waits := ""
 		for _, sent := range t.sent {
@@ -579,15 +658,71 @@ func (t *talk) heard(turns []app.Turn) [][]byte {
 	return t.says(changed, after...)
 }
 
-// goesOn makes the chat go on from another: that one's turns stay, over a
-// quiet line that says who goes on, and what this one hears comes after.
-func (t *talk) goesOn(from *talk) {
-	last := 0
-	if len(from.turns) > 0 {
-		last = from.turns[len(from.turns)-1].n
+// lays makes the chat one that went from agent to agent, of its stretches
+// in order: the turns read back stay, each stretch after the one before; a
+// row of the chat's own stands after its stretch, with a place before its
+// own kept for it as it is said while it waits; and what is heard of the
+// conversation followed stands where its stretches are.
+func (t *talk) lays(parts []chatPart) {
+	t.answered = map[int]bool{}
+	place, next := 0, 1 // the last place taken, and the first number of the conversation followed not laid yet
+	for _, part := range parts {
+		switch {
+		case part.own:
+			t.cuts = append(t.cuts, chatCut{next, place - next + 1})
+			if part.until >= next {
+				place, next = place+part.until-next+1, part.until+1
+			}
+		case len(part.turns) > 0:
+			read := &talk{cuts: []chatCut{{0, place - part.turns[0].N + 1}}}
+			read.heard(part.turns)
+			t.turns = append(t.turns, read.turns...)
+			maps.Copy(t.answered, read.answered)
+			place = read.at(part.turns[len(part.turns)-1].N)
+		}
+		if part.then == nil {
+			continue
+		}
+		band := *part.then
+		band.N, place = place+2, place+2
+		if part.waits {
+			t.waits = &band
+			t.turns = append(t.turns, banded(waiting(band)))
+			continue
+		}
+		t.turns = append(t.turns, banded(band))
 	}
-	line := worded(app.Turn{N: last + 1, Kind: "tool", Text: "continued by " + t.agent})
-	t.turns, t.offset, t.answered = append(slices.Clone(from.turns), line), line.n, from.answered
+}
+
+// handed takes that what the agent goes on from was sent to it, and is the
+// changes that say so: the switch that waited taken out, and what it says
+// was handed over put in at its own place.
+func (t *talk) handed() []json.RawMessage {
+	if t.waits == nil {
+		return nil
+	}
+	now, was := *t.waits, waiting(*t.waits)
+	t.waits = nil
+	if at, found := t.find(was.N); found {
+		t.turns[at] = banded(now)
+	}
+	if !t.shown[was.N] {
+		return nil
+	}
+	delete(t.shown, was.N)
+	t.shown[now.N] = true
+	return []json.RawMessage{encode(chatOp{Op: "unturn", ID: t.id(), N: was.N}), encode(chatOp{Op: "turn", ID: t.id(), Turn: banded(now).json})}
+}
+
+// put stands a row of the chat's own after the last turn heard, and is
+// the row as a turn: what is heard after it stands after it.
+func (t *talk) put(band chatBand) chatTurn {
+	band.N = t.at(t.last + 1)
+	t.cuts = append(t.cuts, chatCut{t.last + 1, band.N - t.last})
+	row := banded(band)
+	at, _ := t.find(row.n)
+	t.turns = slices.Insert(t.turns, at, row)
+	return row
 }
 
 // chatRule is the line between a conversation said in front of what the
@@ -798,6 +933,17 @@ func chatModelOf(id string) (chatModel, bool) {
 		return chatModel{agent: parts[1], model: strings.Join(parts[2:], "|")}, true
 	}
 	return chatModel{}, false
+}
+
+// modelled is the line that says a window's agent went from what it ran on
+// to what it runs on now: its models, or with one model its efforts; false
+// when neither changed.
+func modelled(was, now app.Runs) (chatBand, bool) {
+	from, to := cmp.Or(was.Model, "default"), cmp.Or(now.Model, "default")
+	if from == to {
+		from, to = strings.TrimSpace(from+" "+was.Effort), strings.TrimSpace(to+" "+now.Effort)
+	}
+	return chatBand{Kind: "model", From: from, To: to}, from != to
 }
 
 // chatModels is the rows of the models: the setups used in this
@@ -1283,6 +1429,8 @@ type chatRun struct {
 	// pressed is when an answer was last pressed in the window: its screen
 	// is not asked what it asks for a moment after, while it still shows it.
 	pressed time.Time
+	// models is the models changed in this chat, the first first.
+	models []chatModelled
 }
 
 // note says how things stand as the status, alone: nothing, and it is
@@ -1342,16 +1490,91 @@ func (r *chatRun) aim(head app.Head, window string) {
 			r.note(v.runs.Agent+"'s replies are in its terminal: mia reads none of its conversations. What is sent here is typed to it", "warn")
 		}
 	}
-	if carried, on := r.a.CarriedInWindow(r.record, window); window != "" && on && !carried.Resumed {
-		// its agent goes on from another's conversation: that one's turns stay over what it says
-		before := &talk{}
-		turns, _ := r.a.ConversationIn(carried.ID, r.record.Name, 0)
-		before.heard(turns)
-		v.talk.goesOn(before)
+	var from app.Talk // what its agent goes on from and was not sent yet
+	if carried, on := r.a.CarriedInWindow(r.record, window); window != "" && on {
+		from = app.Talk{Agent: carried.From, ID: carried.ID}
 	}
+	v.talk.lays(r.parts(app.Talk{Agent: v.runs.Agent, ID: head.ID}, from))
 	if head.ID != "" {
 		r.follow(head.ID)
 	}
+}
+
+// chatModelled is a model's change in a conversation, kept while the chat
+// runs: after which of its turns, and the line that says it.
+type chatModelled struct {
+	of    app.Talk
+	after int
+	band  chatBand
+}
+
+// parts is the stretches of the chat of a conversation that went from
+// agent to agent, by the handings that led to it: each conversation it was
+// with by its turns said between two handings, the switch after it, and
+// last the conversation followed. A conversation its agent took up again
+// has its earlier turns before those said with the other agent meanwhile,
+// by when each turn was said; a turn that says no time is in the last
+// stretch its conversation has. from is the conversation the window's
+// agent has still to be sent: the last switch waits. A model changed in
+// this chat stands after the turn it was changed after.
+func (r *chatRun) parts(of, from app.Talk) []chatPart {
+	chain := r.a.Handings(of.Agent, of.ID, from)
+	read := map[app.Talk][]app.Turn{}
+	turns := func(of app.Talk) []app.Turn {
+		if _, done := read[of]; !done {
+			read[of], _ = r.a.ConversationIn(of.ID, r.record.Name, 0)
+		}
+		return read[of]
+	}
+	var parts []chatPart
+	laid := 0 // the last number of the conversation followed that has its stretch
+	stretch := func(with app.Talk, in func(app.Turn) bool, then *chatBand, waits bool) {
+		var all []app.Turn
+		for _, turn := range turns(with) {
+			if in(turn) {
+				all = append(all, turn)
+			}
+		}
+		own := with == of && of.ID != ""
+		if own && len(all) > 0 {
+			laid = all[len(all)-1].N
+		}
+		for _, row := range r.models {
+			at := slices.IndexFunc(all, func(turn app.Turn) bool { return turn.N == row.after }) + 1
+			if row.of != with || at == 0 {
+				continue
+			}
+			parts = append(parts, chatPart{turns: all[:at], own: own, until: row.after, then: &row.band})
+			all = all[at:]
+		}
+		part := chatPart{turns: all, own: own && len(all) > 0, then: then, waits: waits}
+		if part.own {
+			part.until = all[len(all)-1].N
+		}
+		parts = append(parts, part)
+	}
+	for i, handed := range chain {
+		var after time.Time
+		if i > 0 {
+			after = chain[i-1].At
+		}
+		with := handed.From
+		again := slices.ContainsFunc(chain[i+1:], func(later app.Handed) bool { return later.From == with }) || with == of && of.ID != ""
+		stretch(with, func(turn app.Turn) bool {
+			if turn.At.IsZero() {
+				return !again
+			}
+			return turn.At.After(after) && !turn.At.After(handed.At)
+		}, switched(handed), i == len(chain)-1 && from.ID != "")
+	}
+	if of.ID != "" && slices.ContainsFunc(r.models, func(row chatModelled) bool { return row.of == of }) {
+		stretch(of, func(turn app.Turn) bool { return turn.N > laid }, nil, false)
+		parts = parts[:len(parts)-1] // what is left of it is heard as it is followed
+	}
+	if len(parts) == 0 {
+		return nil
+	}
+	return append(parts, chatPart{own: true})
 }
 
 // index is the window typed into, by its number.
@@ -1429,6 +1652,8 @@ func (r *chatRun) act(deed chatDeed) {
 		if err := send(r.record, v.window, words); err != nil {
 			back()
 			r.say(v.talk.refused(err)...)
+		} else if words != deed.text {
+			r.say(v.talk.patch(v.talk.handed()...)...) // what the agent goes on from went with it
 		}
 	case chatChoose:
 		r.note("", "")
@@ -1469,10 +1694,21 @@ func (r *chatRun) act(deed chatDeed) {
 			r.tell(err)
 			return
 		}
+		was := v.runs
 		v.runs.Model, v.runs.Effort = now.Model, now.Effort
 		v.talk.about = chatAbout(v.runs)
-		r.say(v.shut(encode(chatOp{Op: "set", ID: "about", Node: chatHead(v.talk.about)}),
-			v.talk.went(v.runs.Agent+" switched to "+strings.TrimSpace(deed.model+" "+deed.effort), "ok"))...)
+		changes := []json.RawMessage{encode(chatOp{Op: "set", ID: "about", Node: chatHead(v.talk.about)}),
+			v.talk.went(v.runs.Agent+" switched to "+strings.TrimSpace(deed.model+" "+deed.effort), "ok")}
+		if band, changed := modelled(was, v.runs); changed {
+			// kept while the chat runs: mia keeps what a window runs on now, not what it ran on before
+			r.models = append(r.models, chatModelled{app.Talk{Agent: v.agent(), ID: v.id}, v.talk.last, band})
+			row := v.talk.put(band)
+			if v.talk.shown != nil {
+				v.talk.shown[row.n] = true
+				changes = append(changes, encode(chatOp{Op: "turn", ID: v.talk.id(), Turn: row.json}))
+			}
+		}
+		r.say(v.shut(changes...)...)
 	case chatHand:
 		from, window := v.agent(), v.window
 		if r.a.WindowHasPane(r.record, window, v.talk.pane) {

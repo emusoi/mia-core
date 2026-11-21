@@ -227,7 +227,7 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 	}
 	// which went on as which is kept, for a list of conversations to say
 	link := fmt.Sprintf("%s.%d.json", named, now.UnixMilli())
-	if err := writeHandedOn(link, handedOn{From: done.From, To: done.To, Handoff: file, At: instant(now)}); err != nil {
+	if err := writeHandedOn(link, handedOn{From: done.From, To: done.To, Handoff: file, At: instant(now), Turns: done.Turns, LeftOut: left, Resumes: resumes}); err != nil {
 		return done, fmt.Errorf("%s: window %s opened, and that it goes on from %s's %s is not kept: %w", record.Name, done.To.Window.Name, head.Agent, head.ID, err)
 	}
 	if chosen != (Chosen{}) {
@@ -313,12 +313,59 @@ func headIn(heads []Head, worktree, window string) (Head, error) {
 }
 
 // handedOn is the record of one handoff, kept beside it: which conversation
-// went on with which agent, in which window, and when.
+// went on with which agent, in which window, and when; how many turns the
+// handoff had and how many of them it left out; and the agent's own
+// conversation it took up again, when it did. One written before those
+// were kept has none of the three.
 type handedOn struct {
 	From    ContinuedFrom `json:"from"`
 	To      ContinuedTo   `json:"to"`
 	Handoff string        `json:"handoff"`
 	At      time.Time     `json:"at"`
+	Turns   int           `json:"turns,omitempty"`
+	LeftOut int           `json:"left_out,omitempty"`
+	Resumes string        `json:"resumes,omitempty"`
+}
+
+// Handed is one handing of a conversation to another agent, as its record
+// keeps it: from which to which and when, how many turns were handed over
+// and how many of them were left out, and whether the agent took its own
+// conversation up again and was handed only what was said since.
+type Handed struct {
+	From, To       Talk
+	At             time.Time
+	Turns, LeftOut int
+	Resumed        bool
+}
+
+// Handings is how a conversation came to be with its agent: each handing
+// that led to it, the first first, back through the conversation each was
+// from to one no handing began. A conversation is handed to more than
+// once when its agent took it up again, so each step back is the last
+// handing to it before the one after. A conversation its agent has not
+// written of yet, or that no handing is known to have begun, is told by
+// from: the one its window still goes on from.
+func (a *App) Handings(agent, id string, from Talk) []Handed {
+	_, all := a.handedOnIn()
+	var chain []Handed
+	var until time.Time
+	for {
+		var last *handedOn
+		for i := range all {
+			one := &all[i]
+			began := id != "" && one.To.ID == id
+			waits := from.ID != "" && one.To.ID == "" && one.From.Agent == from.Agent && one.From.ID == from.ID
+			if one.To.Agent == agent && (began || waits) && (until.IsZero() || one.At.Before(until)) && (last == nil || one.At.After(last.At)) {
+				last = one
+			}
+		}
+		if last == nil {
+			return chain
+		}
+		chain = slices.Insert(chain, 0, Handed{From: Talk{Agent: last.From.Agent, ID: last.From.ID}, To: Talk{Agent: last.To.Agent, ID: last.To.ID},
+			At: last.At, Turns: last.Turns, LeftOut: last.LeftOut, Resumed: last.Resumes != ""})
+		agent, id, from, until = last.From.Agent, last.From.ID, Talk{}, last.At
+	}
 }
 
 // writeHandedOn keeps a handoff's record: whole or not at all, whoever
