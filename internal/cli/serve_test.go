@@ -115,34 +115,32 @@ func served(t *testing.T, dir string, args ...string) reply {
 	return reply{string(out), errs, code}
 }
 
-// withoutHealth is an answer less what is measured as it is asked, the
-// load and the memory of the machine: two askings never measure the same.
-func withoutHealth(t *testing.T, answer string) string {
+// withoutHealth is an answer of machines or here less what is measured
+// as it is asked, the load and the memory of the machine: two askings
+// never measure the same.
+func withoutHealth(t *testing.T, query, answer string) string {
 	t.Helper()
-	var value any
-	if err := json.Unmarshal([]byte(answer), &value); err != nil {
-		t.Fatalf("%v: %s", err, answer)
-	}
-	var strip func(any)
-	strip = func(value any) {
-		switch value := value.(type) {
-		case map[string]any:
-			delete(value, "health")
-			for _, inner := range value {
-				strip(inner)
+	var cut []byte
+	var err error
+	if query == "here" {
+		var here app.HereState
+		if err = json.Unmarshal([]byte(answer), &here); err == nil {
+			here.Health = nil
+			cut, err = json.Marshal(here)
+		}
+	} else {
+		var machines []app.MachineState
+		if err = json.Unmarshal([]byte(answer), &machines); err == nil {
+			for i := range machines {
+				machines[i].Health = nil
 			}
-		case []any:
-			for _, inner := range value {
-				strip(inner)
-			}
+			cut, err = json.Marshal(machines)
 		}
 	}
-	strip(value)
-	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("%v: %s", err, answer)
 	}
-	return string(data)
+	return string(cut)
 }
 
 // aWorktree is a repository with a worktree mia keeps, longido.
@@ -189,7 +187,7 @@ func TestTheServerAnswersEveryQueryAsTheCommandLineDoes(t *testing.T) {
 			}
 			want, got := byHand(t, dir, args...), served(t, dir, args...)
 			if args[0] == "machines" || args[0] == "here" {
-				want.out, got.out = withoutHealth(t, want.out), withoutHealth(t, got.out)
+				want.out, got.out = withoutHealth(t, args[0], want.out), withoutHealth(t, args[0], got.out)
 			}
 			if got != want {
 				t.Errorf("mia api %s in %s\nthe server: %+v\nthe command line: %+v", strings.Join(args, " "), dir, got, want)

@@ -82,14 +82,17 @@ func TestWhatMiaAPIPrintsIsTheServers(t *testing.T) {
 	mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(serveVersion{Build: gateway.Build(), API: apiVersion})
 	})
-	asked := func(r *http.Request) map[string]any {
-		return map[string]any{"query": r.PathValue("query"), "dir": r.URL.Query().Get("dir"), "args": r.URL.Query()["arg"]}
+	// what the server was asked, as it answers it here
+	type askedOf struct {
+		Query string   `json:"query"`
+		Dir   string   `json:"dir"`
+		Args  []string `json:"args"`
 	}
 	mux.HandleFunc("GET /api/{query}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Mia-Exit", "3")
 		w.Header().Set("Mia-Stderr", url.QueryEscape("mia: said by the server\n"))
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(asked(r))
+		json.NewEncoder(w).Encode(askedOf{Query: r.PathValue("query"), Dir: r.URL.Query().Get("dir"), Args: r.URL.Query()["arg"]})
 	})
 	web := &http.Server{Handler: mux}
 	go web.Serve(listener)
@@ -99,7 +102,7 @@ func TestWhatMiaAPIPrintsIsTheServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := json.Marshal(map[string]any{"query": "worktrees", "dir": here, "args": []string{"longido"}})
+	want, err := json.Marshal(askedOf{Query: "worktrees", Dir: here, Args: []string{"longido"}})
 	if err != nil {
 		t.Fatal(err)
 	}
