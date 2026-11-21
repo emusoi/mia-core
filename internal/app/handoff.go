@@ -68,6 +68,10 @@ type ContinuedTo struct {
 type Continued struct {
 	From ContinuedFrom `json:"from"`
 	To   ContinuedTo   `json:"to"`
+	// Resumes is the agent's own conversation it took up again, when this
+	// one had gone on from it: the handoff is then only what was said
+	// since, and To.ID is that conversation.
+	Resumes string `json:"resumes,omitempty"`
 	// Handoff is the file the conversation was written out to, of Turns
 	// turns. One over handoffBudget has LeftOut turns of its middle left
 	// out, and Full is the file that has them all.
@@ -157,6 +161,22 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 	if launch, set := a.Config.Launch[agent.Name]; set && a.AgentOf(launch) == agent.Name {
 		command = launch
 	}
+	// Back to the agent this conversation went on from: that agent takes
+	// its own up again, with all it knew, and is said only what was said
+	// since it was handed on, none of it what was said in front of the
+	// person's first words then.
+	resumes := ""
+	if back, since := a.wentOnFrom(head, agent, heads); back != "" {
+		if again, err := agent.resume(back); err == nil {
+			resumes, command = back, again
+			turns = slices.DeleteFunc(slices.Clone(turns), func(t Turn) bool { return !t.At.IsZero() && t.At.Before(since) })
+			for i := range turns {
+				if turns[i].Kind == turnAsked {
+					turns[i].Text = OwnWords(turns[i].Text)
+				}
+			}
+		}
+	}
 	command, chosen, err := a.CommandWith(command, want.Model, want.Effort, want.Account)
 	if err != nil {
 		return Continued{}, err
@@ -173,7 +193,7 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 		full = ""
 	}
 	done := Continued{From: ContinuedFrom{Agent: head.Agent, ID: head.ID, Worktree: record.Name, Window: head.Window},
-		To: ContinuedTo{Agent: agent.Name, Window: WindowRef{Name: window}}, Handoff: file, Full: full, Turns: len(turns), LeftOut: left,
+		To: ContinuedTo{Agent: agent.Name, Window: WindowRef{Name: window}, ID: resumes}, Resumes: resumes, Handoff: file, Full: full, Turns: len(turns), LeftOut: left,
 		Command: command, Instruction: instruction(head.Agent, file),
 		Model: chosen.Model, Effort: chosen.Effort, Account: chosen.Account, DryRun: want.DryRun}
 	if done.Account == "" && agent.AccountEnv != "" {
@@ -227,6 +247,28 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 	}
 	done.Sent = done.Problem == ""
 	return done, nil
+}
+
+// wentOnFrom is the conversation of agent's that head went on from, and
+// when it was handed on: the last handoff to head from one of agent's
+// that is still there, in head's worktree, with no window having it open
+// and a way to take it up again. "" when head went on from none.
+func (a *App) wentOnFrom(head Head, agent Agent, heads []Head) (id string, since time.Time) {
+	if agent.resume == nil {
+		return "", time.Time{}
+	}
+	_, all := a.handedOnIn()
+	for _, one := range all {
+		if one.To.Agent != head.Agent || one.To.ID != head.ID || one.From.Agent != agent.Name || one.At.Before(since) {
+			continue
+		}
+		if slices.ContainsFunc(heads, func(h Head) bool {
+			return h.Agent == agent.Name && h.ID == one.From.ID && h.Worktree == head.Worktree && !h.Gone && !h.Running
+		}) {
+			id, since = one.From.ID, one.At
+		}
+	}
+	return id, since
 }
 
 // itsOwn is why a conversation is not handed to the agent it is with: that
@@ -370,7 +412,8 @@ func begunBy(heads []Head, one handedOn, first func(Head) string) string {
 		if h.Agent != one.To.Agent || h.Worktree != one.From.Worktree || h.Started.Before(at) || (found != nil && !h.Started.Before(found.Started)) {
 			continue
 		}
-		names := strings.Contains(h.Asked, one.Handoff)
+		// (Told to read the file, or sent it in front of the person's first words.)
+		names := strings.Contains(h.Asked, one.Handoff) || strings.HasPrefix(h.Asked, CarriedOpens(one.From.Agent))
 		if shown, cut := strings.CutSuffix(h.Asked, "…"); !names && cut && endsWithin(shown, one.Handoff) {
 			names = strings.Contains(first(*h), one.Handoff)
 		}

@@ -115,4 +115,13 @@ func TestTheConversationAHandoffBeganIsToldByItsFirstMessage(t *testing.T) {
 	if got := begunBy(heads, one, first); got != "short" || len(read) != 0 {
 		t.Errorf("begunBy = %q, having read %v", got, read)
 	}
+	// Told nothing, and sent the conversation in front of the person's first words: told by how that begins.
+	heads = []Head{heads[0], conversation("quiet", "claude", "feature", at, CarriedOpens("pi")+"\n\n# Handoff\n\n"+CarriedRule+"\n\nand the tests"),
+		conversation("codex's", "claude", "feature", at, CarriedOpens("codex")+"\n\nx")}
+	if got := begunBy(heads, one, first); got != "quiet" {
+		t.Errorf("begunBy = %q, want quiet", got)
+	}
+	if got := OwnWords(CarriedOpens("pi") + "\n\nall of it\n\n" + CarriedRule + "\n\nand the tests"); got != "and the tests" {
+		t.Errorf("OwnWords = %q", got)
+	}
 }

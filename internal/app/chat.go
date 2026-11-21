@@ -24,9 +24,29 @@ type Carried struct {
 	ID   string `json:"id"`
 	File string `json:"file"`
 	Full string `json:"full,omitempty"`
+	// Resumed: the agent took its own conversation up again, and the file
+	// is only what was said with From since: its own turns are before them.
+	Resumed bool `json:"resumed,omitempty"`
 }
 
 const carriedOption = "@mia_context"
+
+// CarriedRule is the line between a conversation said in front of what the
+// person sent and their own words: after it, the message is theirs.
+const CarriedRule = "----- end of the conversation so far -----"
+
+// CarriedOpens is how a message that carries a conversation with an agent
+// begins: what says, of an agent's first message, that it goes on from one.
+func CarriedOpens(from string) string { return "The conversation so far, with " + from + ":" }
+
+// OwnWords is what the person themselves sent, of a message that may have
+// a conversation said in front of it: what follows the rule.
+func OwnWords(text string) string {
+	if at := strings.LastIndex(text, CarriedRule); at >= 0 {
+		return strings.TrimSpace(text[at+len(CarriedRule):])
+	}
+	return text
+}
 
 // option is what is kept on the window, and carriedIn reads it back:
 // nothing kept, or what does not read, is nothing carried.

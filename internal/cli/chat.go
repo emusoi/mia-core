@@ -592,7 +592,7 @@ func (t *talk) goesOn(from *talk) {
 
 // chatRule is the line between a conversation said in front of what the
 // person sends and their own words.
-const chatRule = "----- end of the conversation so far -----"
+const chatRule = app.CarriedRule
 
 // carried is the first thing sent to an agent that goes on with another's
 // conversation, as one message: that conversation as mia wrote it out,
@@ -613,17 +613,12 @@ func carried(from, transcript, file, words string, most int) string {
 			transcript += "\n### " + turn
 		}
 	}
-	return "The conversation so far, with " + from + ":\n\n" + strings.TrimSpace(transcript) + "\n\n" + chatRule + "\n\n" + words
+	return app.CarriedOpens(from) + "\n\n" + strings.TrimSpace(transcript) + "\n\n" + chatRule + "\n\n" + words
 }
 
 // ownWords is what the person themselves sent, of a message that may have
 // a conversation said in front of it: what follows the rule.
-func ownWords(text string) string {
-	if at := strings.LastIndex(text, chatRule); at >= 0 {
-		return strings.TrimSpace(text[at+len(chatRule):])
-	}
-	return text
-}
+func ownWords(text string) string { return app.OwnWords(text) }
 
 // atWork takes whether the agent is at work, and is the patch that says
 // so when it changed and the view was said.
@@ -1347,7 +1342,7 @@ func (r *chatRun) aim(head app.Head, window string) {
 			r.note(v.runs.Agent+"'s replies are in its terminal: mia reads none of its conversations. What is sent here is typed to it", "warn")
 		}
 	}
-	if carried, on := r.a.CarriedInWindow(r.record, window); window != "" && on {
+	if carried, on := r.a.CarriedInWindow(r.record, window); window != "" && on && !carried.Resumed {
 		// its agent goes on from another's conversation: that one's turns stay over what it says
 		before := &talk{}
 		turns, _ := r.a.ConversationIn(carried.ID, r.record.Name, 0)
@@ -1492,8 +1487,11 @@ func (r *chatRun) act(deed chatDeed) {
 		done := went.done
 		to := r.nowAt(done.To.Window)
 		// kept on its window: whichever chat of it sends first says it, this one or one started after
-		kept := r.a.CarryInWindow(r.record, to, app.Carried{From: from, ID: v.id, File: done.Handoff, Full: done.Full})
-		r.aim(app.Head{Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
+		kept := r.carry(to, from, v.id, done)
+		r.aim(app.Head{ID: done.Resumes, Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
+		if done.Resumes != "" {
+			went.text = from + " stopped · " + done.To.Agent + " takes its own conversation up again, with what was said since"
+		}
 		if kept != nil {
 			went.text, went.tone = went.text+" · "+kept.Error(), "warn"
 		}
@@ -1531,13 +1529,23 @@ func (r *chatRun) act(deed chatDeed) {
 		}
 		done := went.done
 		to := r.nowAt(done.To.Window)
-		kept := r.a.CarryInWindow(r.record, to, app.Carried{From: head.Agent, ID: deed.id, File: done.Handoff, Full: done.Full})
-		r.aim(app.Head{Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
+		kept := r.carry(to, head.Agent, deed.id, done)
+		r.aim(app.Head{ID: done.Resumes, Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
 		if kept != nil {
 			went.text, went.tone = went.text+" · "+kept.Error(), "warn"
 		}
 		r.shows(went.text, went.tone)
 	}
+}
+
+// carry keeps on a window what its agent goes on from, for the first thing
+// sent to it: nothing, where an agent that took its own conversation up
+// again was said nothing since.
+func (r *chatRun) carry(window, from, id string, done app.Continued) error {
+	if done.Resumes != "" && done.Turns == 0 {
+		return nil
+	}
+	return r.a.CarryInWindow(r.record, window, app.Carried{From: from, ID: id, File: done.Handoff, Full: done.Full, Resumed: done.Resumes != ""})
 }
 
 // nowAt is where a window stands now, by its name: closing the window of

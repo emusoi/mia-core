@@ -98,6 +98,48 @@ func TestGoingOnWithAnotherAgentDryRunWritesAndStartsNothing(t *testing.T) {
 	}
 }
 
+// Back to the agent a conversation went on from: that agent takes its own
+// up again, by its own id, and the handoff is only what was said since it
+// was handed on. One that went on from no conversation of that agent's is
+// handed over whole, to a new one.
+func TestGoingBackToTheAgentAConversationCameFromTakesItsOwnUpAgain(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	claudeDir := agentHomes(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := a.New("feature")
+	if err != nil {
+		t.Fatal(err)
+	}
+	talked(t, claudeDir, record.Path)
+	whole, err := a.ContinueConversation(app.Continue{ID: "p1", Worktree: record.Name, With: "claude", DryRun: true})
+	if err != nil || whole.Resumes != "" || whole.To.ID != "" || whole.Command != "claude" || whole.Turns < 2 {
+		t.Fatalf("with no handoff before it: %+v %v", whole, err)
+	}
+	handed := func(at string) {
+		t.Helper()
+		os.Remove(filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "claude-c1.1.json")) // put adds to a file
+		put(t, filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "claude-c1.1.json"),
+			`{"from":{"agent":"claude","id":"c1","worktree":`+quoted(record.Name)+`},"to":{"agent":"pi","window":{"index":2,"name":"pi"},"id":"p1"},"handoff":"/h/claude-c1.md","at":"`+at+`"}`)
+	}
+	handed("2026-11-02T09:59:00Z") // before anything pi was said
+	back, err := a.ContinueConversation(app.Continue{ID: "p1", Worktree: record.Name, With: "claude", Model: "opus", DryRun: true})
+	if err != nil || back.Resumes != "c1" || back.To.ID != "c1" || back.Command != "claude '--model' 'opus' --resume c1" || back.Turns != whole.Turns || back.From.Agent != "pi" {
+		t.Fatalf("back = %+v %v", back, err)
+	}
+	handed("2026-11-02T10:00:03.500Z") // after pi's first two turns: only what was said since
+	if since, err := a.ContinueConversation(app.Continue{ID: "p1", Worktree: record.Name, With: "claude", DryRun: true}); err != nil || since.Resumes != "c1" || since.Turns == 0 || since.Turns >= whole.Turns {
+		t.Fatalf("since = %+v %v (whole had %d turns)", since, err, whole.Turns)
+	}
+	// to an agent it did not come from: whole, and a conversation of its own
+	if other, err := a.ContinueConversation(app.Continue{ID: "p1", Worktree: record.Name, With: "codex", DryRun: true}); err != nil || other.Resumes != "" || other.Command != "codex" || other.Turns != whole.Turns {
+		t.Fatalf("other = %+v %v", other, err)
+	}
+}
+
 // A conversation with claude, and one with pi, is written out as a handoff
 // in the git folder — who said what, each thing done in a line, nothing of
 // what came back — and a window opens with the other agent, told to read
