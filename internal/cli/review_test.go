@@ -554,7 +554,7 @@ func TestTheViewIsTheShapeMiaDeskDraws(t *testing.T) {
 	if code.T != "code" || code.ID != "diff" || !code.Live || code.Selected != "0" || len(lines) != 15 {
 		t.Errorf("the code is %+v with %d lines", code, len(lines))
 	}
-	if !strings.Contains(string(messages[0]), `{"kind":"note","text":"self.view.clone() copies the whole view for every patch.","right":"sawa \u00b7 open","tone":"bad","label":"issue \u00b7 major"}`) {
+	if !strings.Contains(string(messages[0]), `{"kind":"note","text":"self.view.clone() copies the whole view for every patch.","right":"sawa \u00b7 open","tone":"bad","label":"issue \u00b7 major","menu":[{"id":"reply","title":"Reply","right":"\u23ce"},{"id":"resolve","title":"Resolve"},{"id":"copy","title":"Copy its text","right":"y"}]}`) {
 		t.Errorf("the finding is not said as a note: %s", messages[0])
 	}
 
@@ -1126,6 +1126,95 @@ func TestAFileAndAFindingCarryTheirMenus(t *testing.T) {
 		if say, _ := reviewDone(view, reviewEvent{E: "focus", ID: on}); !say || view.on != on || !strings.HasPrefix(labels(), want+" f:") {
 			t.Errorf("on %s the keys are %q", on, labels())
 		}
+	}
+}
+
+// A finding's note in the diff carries the menu its row over the files
+// would: a reply, to resolve it where it stands or reopen it where it
+// does not, its words copied. A choice of it, said with the place of the
+// note's line, does what the key does on that finding: ⏎ on its note,
+// resolve and reopen with it open and what is typed under it, y on it.
+// A choice on a line that is no finding's does nothing.
+func TestAFindingsNoteInTheDiffCarriesItsMenu(t *testing.T) {
+	fake := reviewFixed()
+	view := reviewOf(fake)
+	view.filter = reviewAll
+	view.turn("src/talk.rs", reviewNow)
+	_, lines := reviewSaid(t, view.messages(reviewAim{}, reviewNow))
+	stands, settled := view.place("t1"), view.place("t4")
+	if stands < 0 || settled < 0 {
+		t.Fatalf("the notes of t1 and t4 are at %d and %d", stands, settled)
+	}
+	for at, line := range lines {
+		var choices []string
+		for _, choice := range line.Menu {
+			choices = append(choices, strings.TrimSpace(choice.ID+"="+choice.Title+" "+choice.Right))
+		}
+		want := ""
+		switch {
+		case line.Kind != "note":
+		case at == settled:
+			want = "reply=Reply ⏎, reopen=Reopen, copy=Copy its text y"
+		default:
+			want = "reply=Reply ⏎, resolve=Resolve, copy=Copy its text y"
+		}
+		if got := strings.Join(choices, ", "); got != want {
+			t.Errorf("the menu of line %d (%s %q) = %q", at, line.Kind, line.Label, got)
+		}
+	}
+
+	view.typed["t1"], view.typed["t4"] = "measured: it is fine", "it came back"
+	on := func(id string, sub string) reviewEvent {
+		return reviewEvent{E: "pick", List: "diff", ID: strconv.Itoa(view.place(id)), Sub: sub}
+	}
+	// What each key does, the finding open where its key needs it so.
+	keys := map[reviewEvent]reviewDeed{}
+	keys[on("t1", "reply")] = view.deed(reviewEvent{E: "pick", List: "diff", ID: strconv.Itoa(stands)})
+	keys[on("t1", "copy")] = view.deed(reviewEvent{E: "press", ID: "copy", Item: strconv.Itoa(stands)})
+	view.open = "t1"
+	keys[on("t1", "resolve")] = view.deed(reviewEvent{E: "press", ID: "resolve"})
+	view.open = "t4"
+	keys[on("t4", "reopen")] = view.deed(reviewEvent{E: "press", ID: "reopen"})
+	view.open = ""
+	for event, want := range map[reviewEvent]reviewDeed{
+		on("t1", "reply"):   {do: reviewUnfold, id: "t1"},
+		on("t1", "copy"):    {do: reviewCopy, id: "t1", text: fake.state.Threads[0].Posts[0].Body},
+		on("t1", "resolve"): {do: reviewSettle, id: "t1", text: "measured: it is fine"},
+		on("t4", "reopen"):  {do: reviewReopen, id: "t4", text: "it came back"},
+	} {
+		if got := view.deed(event); got != want || got != keys[event] {
+			t.Errorf("%+v does %+v, its key %+v", event, got, keys[event])
+		}
+	}
+	for _, event := range []reviewEvent{
+		on("t1", "reopen"), on("t4", "resolve"), on("t1", "read"),
+		{E: "pick", List: "diff", ID: "0", Sub: "resolve"},
+		{E: "pick", List: "diff", ID: "t1", Sub: "resolve"},
+		{E: "pick", List: "diff", ID: strconv.Itoa(len(view.marks)), Sub: "copy"},
+		{E: "pick", List: "general", ID: "t1", Sub: "resolve"},
+	} {
+		if got := view.deed(event); got != (reviewDeed{}) {
+			t.Errorf("%+v does %+v", event, got)
+		}
+	}
+
+	if reviewDone(view, on("t1", "copy")); view.passing.copy != fake.state.Threads[0].Posts[0].Body || view.passing.toast.Text != "copied what t1 says" {
+		t.Errorf("Copy its text: copied %q, toast %+v", view.passing.copy, view.passing.toast)
+	}
+	// Through sw as the key goes, each on a review as it was: the choice
+	// asks what the key asks, a reply of what is typed and the finding resolved.
+	asked := func(open string, event reviewEvent) [][]string {
+		fake := reviewFixed()
+		view := reviewOf(fake)
+		view.filter = reviewAll
+		view.turn("src/talk.rs", reviewNow)
+		view.typed["t1"], view.open = "measured: it is fine", open
+		reviewDone(view, event)
+		return fake.asked()
+	}
+	byKey, byMenu := asked("t1", reviewEvent{E: "press", ID: "resolve"}), asked("", on("t1", "resolve"))
+	if !reflect.DeepEqual(byMenu, byKey) || len(byMenu) != 2 {
+		t.Errorf("Resolve asks sw %q, the key %q", byMenu, byKey)
 	}
 }
 

@@ -377,7 +377,8 @@ type reviewEntry struct {
 // reviewLine is a line of the code: a hunk's head, a line added, deleted
 // or the same (no kind) with its numbers, a gap, or a note: a finding
 // under the line it is about, with its label in its tone, who filed it
-// at the right and, when it is open, the pieces under its words.
+// at the right, the menu of what can be done to it and, when it is open,
+// the pieces under its words.
 type reviewLine struct {
 	Kind  string        `json:"kind,omitempty"`
 	Text  string        `json:"text"`
@@ -387,6 +388,7 @@ type reviewLine struct {
 	Tone  string        `json:"tone,omitempty"`
 	Label string        `json:"label,omitempty"`
 	Under []reviewPiece `json:"under,omitempty"`
+	Menu  []muiChoice   `json:"menu,omitempty"`
 }
 
 // reviewMark is what a line of the code is, apart from its place, so the
@@ -591,23 +593,27 @@ func reviewGates(gates []sawaGate, most int, now time.Time) []reviewEntry {
 
 // reviewAbove is the findings on the review as a whole as a list holds
 // them, no more than most: each by its first line, its label a lead in
-// its tone, who filed it and how it stands at the right, and the menu
-// of what its state allows: a reply, and to resolve one that stands or
-// reopen one that does not, and its words copied.
+// its tone, who filed it and how it stands at the right, and its menu.
 func reviewAbove(findings []sawaFinding, most int) []reviewEntry {
 	entries := []reviewEntry{{Head: "On the review as a whole", Note: strconv.Itoa(len(findings))}}
 	for _, finding := range findings[:min(len(findings), most)] {
 		label, tone := reviewLabel(finding)
 		said := finding.first()
 		title, _, _ := strings.Cut(said.Body, "\n")
-		menu := []muiChoice{{ID: "reply", Title: "Reply", Right: "⏎"}, {ID: "resolve", Title: "Resolve"}}
-		if !finding.stands() {
-			menu[1] = muiChoice{ID: "reopen", Title: "Reopen"}
-		}
-		menu = append(menu, muiChoice{ID: "copy", Title: "Copy its text", Right: "y"})
-		entries = append(entries, reviewEntry{ID: finding.ID, Title: cutTo(title, gitWordsMost), Lead: label, Tone: tone, Right: cutTo(said.Author+" · "+finding.State, gitWordsMost), Menu: menu})
+		entries = append(entries, reviewEntry{ID: finding.ID, Title: cutTo(title, gitWordsMost), Lead: label, Tone: tone, Right: cutTo(said.Author+" · "+finding.State, gitWordsMost), Menu: finding.menu()})
 	}
 	return entries
+}
+
+// menu is what a finding's state allows, on its row over the files and
+// on its note in the diff: a reply, and to resolve one that stands or
+// reopen one that does not, and its words copied.
+func (f sawaFinding) menu() []muiChoice {
+	menu := []muiChoice{{ID: "reply", Title: "Reply", Right: "⏎"}, {ID: "resolve", Title: "Resolve"}}
+	if !f.stands() {
+		menu[1] = muiChoice{ID: "reopen", Title: "Reopen"}
+	}
+	return append(menu, muiChoice{ID: "copy", Title: "Copy its text", Right: "y"})
 }
 
 // reviewMenus is the list's entries with, on each file, the menu of what
@@ -814,7 +820,7 @@ type reviewNotes struct {
 func (n reviewNotes) note(f sawaFinding) reviewLine {
 	label, tone := reviewLabel(f)
 	said := f.first()
-	line := reviewLine{Kind: "note", Label: label, Tone: tone, Right: cutTo(said.Author+" · "+f.State, gitWordsMost)}
+	line := reviewLine{Kind: "note", Label: label, Tone: tone, Right: cutTo(said.Author+" · "+f.State, gitWordsMost), Menu: f.menu()}
 	if f.ID != n.open {
 		line.Text, _, _ = strings.Cut(said.Body, "\n")
 		line.Text = cutTo(line.Text, gitLineMost)
@@ -1605,24 +1611,33 @@ func (v *reviewView) copying(item string) reviewDeed {
 // deed is what an event does to the view as it stands. A key pressed on
 // a row of the list is about that file, and on a line of the code about
 // that line of the file shown. A choice of a file's menu does what the
-// key of its id does on that file; one of a finding's replies to it,
-// resolves or reopens it with what is typed under it, or copies it. esc
-// under a modal shuts it.
+// key of its id does on that file; one of a finding's, on its row over
+// the files or on its note in the diff (known there by its line's
+// place), replies to it, resolves or reopens it with what is typed under
+// it, or copies it. esc under a modal shuts it.
 func (v *reviewView) deed(event reviewEvent) reviewDeed {
-	switch finding, above := v.finding(event.ID); {
+	id := event.ID
+	switch at, err := strconv.Atoi(event.ID); {
+	case event.List == "general" && v.isAbove(id):
+	case event.List == "diff" && err == nil && at >= 0 && at < len(v.marks) && v.marks[at].note != reviewNew:
+		id = v.marks[at].note
+	default:
+		id = ""
+	}
+	switch finding, ok := v.finding(id); {
 	case event.E != "pick" || event.Sub == "":
 	case event.List == "files":
 		event = reviewEvent{E: "press", ID: event.Sub, Item: event.ID}
-	case event.List != "general" || !above || !v.isAbove(event.ID):
+	case !ok:
 		return reviewDeed{}
 	case event.Sub == "reply":
-		return reviewDeed{do: reviewUnfold, id: event.ID}
+		return reviewDeed{do: reviewUnfold, id: id}
 	case event.Sub == "resolve" && finding.stands():
-		return reviewDeed{do: reviewSettle, id: event.ID, text: v.typed[event.ID]}
+		return reviewDeed{do: reviewSettle, id: id, text: v.typed[id]}
 	case event.Sub == "reopen" && !finding.stands():
-		return reviewDeed{do: reviewReopen, id: event.ID, text: v.typed[event.ID]}
+		return reviewDeed{do: reviewReopen, id: id, text: v.typed[id]}
 	case event.Sub == "copy":
-		return v.copying(event.ID)
+		return v.copying(id)
 	default:
 		return reviewDeed{}
 	}
