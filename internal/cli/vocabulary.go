@@ -37,13 +37,19 @@ staging copy A directory mia keeps on another machine holding its copy of a
 service      A declared long-running process in an environment: a dev server,
              an API, a worker. An id, a command, an optional health check.
 
-gateway      The one long-lived process. It makes <name>.mia reach the right
+gateway      A long-lived process. It makes <name>.mia reach the right
              container, over TLS, on whatever port the app is serving. It
              holds no truth: killing it loses nothing.
 
 route        One name's entry in the gateway. DERIVED from the records every
              time it is asked for, never written down, so nothing can forget
              to publish one and nothing can publish a stale one.
+
+server       'mia serve': a long-lived process of this machine's that
+             answers what 'mia api' answers over a socket of the person's
+             alone, tells whoever listens when an answer changes, and runs
+             a verb for whoever asks. 'mia api' asks it when it runs and is
+             the same build. It holds no truth: killing it loses nothing.
 
 plugin       A program named mia-<name>, in any language, on PATH or in
              ~/.config/mia/plugins. It does nothing until enabled ('mia

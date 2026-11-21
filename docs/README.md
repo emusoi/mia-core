@@ -14,6 +14,7 @@
 | [Configuration](configuration.md) | every setting |
 | [Commands](commands.md) | every command |
 | [Automation](api.md) | JSON, capabilities and exit status |
+| [mia serve](serve.md) | the server: `mia api` over a socket, events when an answer changes, verbs run |
 | [Plugins](plugins.md) | adding commands and signals |
 | [Apps](apps.md) | telling mia what a window runs: name, icon, keys |
 | [Changes](changes.md) | what each release adds, changes and takes away |

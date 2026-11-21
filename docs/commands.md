@@ -89,6 +89,7 @@
 | `mia doctor` | check tools, config, gateway, machines, plugins and environment drift; of a machine that does not answer, what is wrong and the fix |
 | `mia api <query>` | state as JSON |
 | `mia api capabilities` | API version, queries and feature markers |
+| `mia serve` | the [server](serve.md) of this machine, in the foreground: `mia api` over a socket, events when an answer changes, verbs run for whoever asks; `mia api` asks it when it runs, unless `MIA_NO_SERVE` is set |
 | `mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]` | the agent conversations of the repository and its worktrees, the last written to first |
 | `mia api accounts [--projects]` | every agent's accounts, or which one each repository starts each agent's sessions on |
 | `mia api conversation <id> [--worktree <name>] [--after <n>]` | one conversation as turns, for a chat view; `--worktree` picks the copy of one that is in several |

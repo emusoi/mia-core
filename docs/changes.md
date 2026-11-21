@@ -9,6 +9,17 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **`mia serve`, a server of this machine's.** It answers every query of
+  `mia api` over a unix socket of the person's alone,
+  `~/.config/mia/serve/serve.sock`, as `GET /api/<query>`; tells whoever
+  listens to `GET /events` when an answer changes, as server-sent events,
+  asking once for every listener and again only when tmux or a file says
+  something changed; and runs a verb for whoever asks, `POST /run`,
+  refusing one that needs a terminal. `mia api` asks it when it runs and
+  is the same build, and reads for itself otherwise, or when
+  `MIA_NO_SERVE` is set. It runs in the foreground; a launchd or systemd
+  service is written by hand. See [mia serve](serve.md).
+
 - **The chat's models and Earlier are modals.** In `mia chat`, `models`
   and `earlier` no longer take the chat's place: each is a card over it,
   the conversation in sight behind, and `esc` takes it away with nothing

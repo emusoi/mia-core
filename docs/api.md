@@ -2,7 +2,9 @@
 
 `mia` commands are the interface for scripts, `mia-ui` and plugins. Read
 commands that support structured output take `--json`; `mia api` always emits
-JSON.
+JSON. [`mia serve`](serve.md) answers the same queries over a socket, and
+tells a client that listens when an answer changes, so it need not ask
+again; `mia api` asks it when it runs.
 
 ## Discover the interface
 
