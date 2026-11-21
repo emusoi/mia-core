@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"syscall"
 	"unicode/utf16"
@@ -151,10 +152,22 @@ func muiKeys(stop <-chan struct{}) <-chan string {
 // reported, and line on the plain terminal under the UI. say writes
 // messages to the window; shut closes the UI and gives the terminal back
 // as it was.
+//
+// A terminal held past its own three is closed first: mia desk starts a
+// UI in a pty with the pty's master still open in it, and a UI holding
+// that copy keeps its pty from ever ending, so that when desk lets go
+// nothing is read to its end, no hangup comes, and what it writes, once
+// nobody reads it, waits forever.
 func muiOpen(pane, line string) (say func(messages ...[]byte), shut func(), err error) {
 	before, err := term.MakeRaw(os.Stdin.Fd())
 	if err != nil {
 		return nil, nil, err
+	}
+	held, _ := os.ReadDir("/dev/fd")
+	for _, entry := range held {
+		if fd, err := strconv.Atoi(entry.Name()); err == nil && fd > 2 && term.IsTerminal(uintptr(fd)) {
+			_ = syscall.Close(fd)
+		}
 	}
 	tmux := os.Getenv("TMUX") != ""
 	say = func(messages ...[]byte) {
