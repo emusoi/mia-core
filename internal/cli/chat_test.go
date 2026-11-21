@@ -929,18 +929,18 @@ func TestEarlierIsAModalOfAListBesideTheConversationUnderTheKeys(t *testing.T) {
 		t.Fatalf("put up as %+v", got)
 	}
 	modal := got.Patch[0].Node
-	if modal.T != "modal" || modal.ID != "over" || modal.Title != "Earlier" || modal.W != 720 || len(modal.Children) != 2 {
+	if modal.T != "modal" || modal.ID != "over" || modal.Title != "Earlier" || modal.W != 720 || modal.H != 420 || len(modal.Children) != 2 {
 		t.Fatalf("modal = %+v", modal)
 	}
 	if line := modal.Children[0]; line.T != "text" || line.Text != "in monduli · 3 conversations" || line.Style != "dim" {
 		t.Errorf("line = %+v", line)
 	}
 	split := modal.Children[1]
-	if split.T != "row" || !split.Split || len(split.Children) != 2 || split.Children[0].T != "col" || split.Children[0].W != 300 || split.Children[1].T != "col" || split.Children[1].H != 420 {
+	if split.T != "row" || !split.Split || len(split.Children) != 2 || split.Children[0].T != "col" || split.Children[0].W != 300 || split.Children[1].T != "col" || split.Children[1].H != 0 {
 		t.Fatalf("split = %+v", split)
 	}
 	list := split.Children[0].find("list")
-	if list == nil || list.ID != "earlier" || !list.Live || !list.Flat || list.Max != 12 || list.Menu != "more" || list.Selected != "c1" || len(list.Items) != 13 {
+	if list == nil || list.ID != "earlier" || !list.Live || !list.Flat || list.Max != 12 || list.Menu != "more" || list.Selected != "c1" || len(list.Items) != 3 {
 		t.Fatalf("list = %+v", list)
 	}
 	// (a short list is made as tall as the chat beside it by heads with no words, which the keys pass over)

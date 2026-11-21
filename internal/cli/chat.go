@@ -54,8 +54,8 @@ const (
 	// another at its place only as a reply grown longer, so a turn of the
 	// app's own has a place no other turn ever has, and is taken out by it.
 	chatOwn = 1 << 30
-	// chatRoom is how tall the conversation read back in Earlier is, in
-	// points: what the window gives a chat among other pieces.
+	// chatRoom is how tall Earlier's modal is under its title, in points:
+	// the list and the conversation read back beside it share it.
 	chatRoom = 420
 	// chatOver is the id of the modal over the chat: the models, or the
 	// earlier conversations.
@@ -102,6 +102,7 @@ type chatModal struct {
 	ID       string            `json:"id"`
 	Title    string            `json:"title"`
 	W        int               `json:"w"`
+	H        int               `json:"h,omitempty"`
 	Children []json.RawMessage `json:"children"`
 }
 
@@ -947,8 +948,8 @@ func (v *chatView) headOf(id string) (app.Head, bool) {
 // earlier is the modal that says the worktree's conversations over the
 // chat: a list of them — what was first asked, the agent and when at the
 // right, the one a window has open marked as running — and beside it the
-// one under the keys read back, a chat with no field in a room of its own
-// height. An item's menu is what can be done to it: taken up again or gone
+// one under the keys read back, a chat with no field; the two split the
+// modal's height, each from its top. An item's menu is what can be done to it: taken up again or gone
 // to, handed to this chat's agent when it is another's, as c does, and its
 // id copied. placed puts the keys' row on the conversation read back.
 func (v *chatView) earlier(placed bool) json.RawMessage {
@@ -975,14 +976,6 @@ func (v *chatView) earlier(placed bool) json.RawMessage {
 		}
 		list.Items = append(list.Items, item)
 	}
-	// A modal's row stands its sides at its middle, and a chat in it is
-	// chatRoom points tall: heads with no words, which the keys pass over,
-	// make a short list as tall, so that it begins at the top.
-	if rows := len(list.Items); rows > 0 {
-		for tall := 30*rows + 40; tall <= chatRoom-12; tall += 30 {
-			list.Items = append(list.Items, chatItem{Head: " "})
-		}
-	}
 	reading, _ := v.headOf(v.on)
 	read := chatPiece{T: "chat", ID: cutTo("read-"+v.on, chatSaid), Agent: reading.Agent, Turns: []json.RawMessage{}}
 	modal := func() json.RawMessage {
@@ -990,10 +983,11 @@ func (v *chatView) earlier(placed bool) json.RawMessage {
 			encode(chatWords{T: "text", Text: "in " + v.worktree + " · " + counted(len(v.heads), "conversation"), Style: "dim"}),
 			encode(chatBox{T: "row", Split: true, Gap: 16, Children: []json.RawMessage{
 				encode(chatBox{T: "col", W: 300, Children: []json.RawMessage{encode(list)}}),
-				encode(chatBox{T: "col", H: chatRoom, Children: []json.RawMessage{encode(read)}}),
+				encode(chatBox{T: "col", Children: []json.RawMessage{encode(read)}}),
 			}}),
 		}
-		return encode(chatModal{T: "modal", ID: chatOver, Title: "Earlier", W: 720, Children: append(inside, v.foot()...)})
+		// (Of a height: its sides are split in a room, each from the top.)
+		return encode(chatModal{T: "modal", ID: chatOver, Title: "Earlier", W: 720, H: chatRoom, Children: append(inside, v.foot()...)})
 	}
 	for _, turn := range lastThatFit(v.read, muiLimit-2*patchEnvelope-len(modal()), chatReadMost) {
 		read.Turns = append(read.Turns, turn.json)
