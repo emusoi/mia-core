@@ -64,6 +64,46 @@ func kinds(turns []app.Turn) string {
 	return strings.Join(all, " ")
 }
 
+// claude keeps what was pasted into a message between two lines of its
+// own: the first thing sent to it after a conversation was handed to it,
+// which mia pastes with that conversation in front, is a turn of the
+// person's all the same.
+func TestAMessagePastedIntoClaudeIsATurnOfThePersons(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	claudeDir := agentHomes(t)
+	carried := app.CarriedOpens("opencode") + "\n\n# Handoff\n\n### 1 · user\n\nwhich word?\n\n" + app.CarriedRule + "\n\nwhat did I first ask you?"
+	pasted := func(text string) string {
+		return quoted("<pasted_content id=\"e443\">\n" + text + "\n</pasted_content id=\"e443\">")
+	}
+	put(t, filepath.Join(claudeDir(repo.Root), "c1.jsonl"),
+		claudeSays(repo.Root, "user", pasted(carried), ""),
+		claudeSays(repo.Root, "user", `[{"type":"text","text":`+pasted("<html>\n</html>")+`}]`, ""),
+		claudeSays(repo.Root, "user", quoted("see "+"<pasted_content id=\"a1\">\nline one\nline two\n</pasted_content id=\"a1\">"), ""),
+		claudeSays(repo.Root, "user", `"<system-reminder>be brief</system-reminder>"`, ""),
+	)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	turns, err := a.ConversationTurns("c1", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := kinds(turns), "1:asked 2:asked 3:asked"; got != want {
+		t.Fatalf("turns = %s, want %s", got, want)
+	}
+	if turns[0].Text != carried || app.OwnWords(turns[0].Text) != "what did I first ask you?" {
+		t.Errorf("the message with a conversation in front of it = %q", turns[0].Text)
+	}
+	if turns[1].Text != "<html>\n</html>" {
+		t.Errorf("a paste that opens as claude's own lines do = %q", turns[1].Text)
+	}
+	if turns[2].Text != "see line one\nline two" {
+		t.Errorf("a paste after words typed = %q", turns[2].Text)
+	}
+}
+
 func TestAClaudeConversationReadsAsTurns(t *testing.T) {
 	gittest.Isolate(t)
 	repo := gittest.New(t)

@@ -163,8 +163,13 @@ type block struct {
 	ToolUseID string          `json:"tool_use_id"`
 }
 
-// said is what you typed in a user entry; "" for tool results and mia's,
-// claude's or a hook's own messages.
+// claudePaste is the two lines claude keeps what was pasted into a message
+// between: its own, and no words of the person's.
+var claudePaste = regexp.MustCompile(`<pasted_content id="[^"]*">\n|\n</pasted_content id="[^"]*">`)
+
+// said is what you typed in a user entry, what was pasted into it as it
+// was pasted; "" for tool results and mia's, claude's or a hook's own
+// messages.
 func (e entry) said() string {
 	if e.Type != "user" || e.IsMeta {
 		return ""
@@ -183,10 +188,11 @@ func (e entry) said() string {
 		}
 	}
 	text = strings.TrimSpace(text)
-	if strings.HasPrefix(text, "<") || strings.HasPrefix(text, "This session is being continued") {
+	// (A paste is the person's, whatever it opens with.)
+	if !strings.HasPrefix(text, "<pasted_content ") && (strings.HasPrefix(text, "<") || strings.HasPrefix(text, "This session is being continued")) {
 		return ""
 	}
-	return text
+	return strings.TrimSpace(claudePaste.ReplaceAllString(text, ""))
 }
 
 // toolOutput is what tools gave back in a user entry.
