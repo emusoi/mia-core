@@ -1693,3 +1693,240 @@ func TestAHandingIsKeptOnTheNewWindowUntilTheFirstSend(t *testing.T) {
 		t.Error("taken twice")
 	}
 }
+
+// wordsOf is what a piece says, in order: its texts, the choice of its
+// tabs, and the keys of its buttons.
+func wordsOf(piece shownPiece) string {
+	var all []string
+	var walk func(p shownPiece)
+	walk = func(p shownPiece) {
+		switch p.T {
+		case "text":
+			all = append(all, p.Text)
+		case "tabs":
+			all = append(all, "["+p.Selected+"]")
+		case "button":
+			all = append(all, "<"+p.Key+" "+p.ID+">")
+		}
+		for _, child := range p.Children {
+			walk(child)
+		}
+	}
+	walk(piece)
+	return strings.Join(all, " ")
+}
+
+// A model or another agent picked while the agent is at work is not done:
+// it is kept as what comes next, the line over the chat says it, and the
+// models' line says when it is applied, with tab to apply it now. The same
+// picked again lets go of it. At rest a pick is done at once, as it was.
+func TestAPickWhileTheAgentWorksIsKeptAsNext(t *testing.T) {
+	var said [][]byte
+	view := &chatView{talk: &talk{pane: "%5", agent: "claude", reply: true, working: true}, worktree: "monduli", window: "2", id: "c1",
+		runs: app.Runs{Agent: "claude", Model: "opus", Effort: "high", Account: "work", Live: true}, agents: chatAgents(),
+		would: map[string]chatWould{"codex": {done: app.Continued{Turns: 42, LeftOut: 6}}}}
+	run := &chatRun{view: view, say: func(messages ...[]byte) { said = append(said, messages...) }}
+	view.talk.heard([]app.Turn{{N: 1, Kind: "asked", Text: "hello"}})
+	view.up(picking)
+	// what the said messages come to: the line over the chat, the models' line, the row marked, the foot's keys
+	stands := func() (about, does, next string, keys []chatKey) {
+		t.Helper()
+		for _, message := range said {
+			for _, op := range read(t, message).Patch {
+				switch {
+				case op.Op == "set" && op.ID == "about":
+					about = op.Node.Text
+				case op.Op == "set" && op.ID == chatOver:
+					does, next = wordsOf(op.Node.Children[2]), ""
+					for _, item := range op.Node.Children[4].Items {
+						if strings.HasPrefix(item.Right, "next") {
+							next += item.ID + " "
+						}
+					}
+				case op.Op == "keys":
+					keys = op.Keys
+				}
+			}
+		}
+		said = nil
+		return about, does, next, keys
+	}
+	pick := func(id, sub string) chatDeed {
+		view.under = id
+		return view.deed(chatEvent{E: "pick", List: "models", ID: id, Sub: sub})
+	}
+
+	// a model of its own agent: kept, shown, and nothing asked of mia (the run has no app to ask)
+	deed := pick("a|claude|sonnet", "")
+	if deed != (chatDeed{do: chatSwitch, model: "sonnet", later: true}) {
+		t.Fatalf("a model picked while it works asks %+v", deed)
+	}
+	if got := wordsOf(*pieceOf(t, view.models(false)).find("col")); got != "opus → sonnet · Switches in place. Nothing is re-sent. ⏎ keeps it as next: applied when claude finishes this turn." {
+		t.Errorf("before it is picked the line says %q", got)
+	}
+	run.act(deed)
+	about, does, next, keys := stands()
+	if view.next == nil || *view.next != (chatDeed{do: chatSwitch, model: "sonnet"}) || view.mode != picking || about != "claude · opus · high · on work · next: sonnet" {
+		t.Errorf("kept as %+v, the chat's line %q", view.next, about)
+	}
+	if does != "opus → sonnet · Applied when claude finishes this turn. <tab now> tab stops claude and applies it now. ⏎ again clears it." || next != "a|claude|sonnet " ||
+		!slices.Equal(keys, []chatKey{{Key: "tab", Label: "apply now", ID: "now"}}) {
+		t.Errorf("the models say %q, next on %q, keys %+v", does, next, keys)
+	}
+	// a view said whole says it too, and the modal put back has its key
+	if whole := read(t, view.talk.whole()); whole.Whole.find("text").Text != about || view.talk.with == nil {
+		t.Errorf("said whole: %+v", whole.Whole.find("text"))
+	}
+	for _, item := range pieceOf(t, view.models(false)).Children[4].Items {
+		if want := map[string]string{"a|claude|sonnet": "clear", "a|claude|opus": "keep as next", "a|codex|gpt-6-luna": "keep as next"}[item.ID]; want != "" && item.Does != want {
+			t.Errorf("⏎ on %s is said to %q", item.ID, item.Does)
+		}
+	}
+	if now := view.deed(chatEvent{E: "press", ID: "now"}); now != (chatDeed{do: chatNow}) {
+		t.Errorf("tab on it asks %+v", now)
+	}
+
+	// another picked takes its place: an agent, with its model and what is carried
+	view.whole = true
+	run.act(pick("a|codex|gpt-6-luna", "high"))
+	about, does, next, _ = stands()
+	if *view.next != (chatDeed{do: chatHand, agent: "codex", model: "gpt-6-luna", effort: "high", whole: true}) || about != "claude · opus · high · on work · next: codex · gpt-6-luna · high" ||
+		does != "claude → codex · Applied when claude finishes this turn. <tab now> Carries the whole conversation. tab stops claude and applies it now. ⏎ again clears it." || next != "a|codex|gpt-6-luna " {
+		t.Errorf("an agent kept as %+v: %q, %q, next on %q", view.next, about, does, next)
+	}
+
+	// picked again it is let go of: the line over the chat is as it was, and tab is the choice's again
+	again := pick("a|codex|gpt-6-luna", "")
+	if again != (chatDeed{do: chatForget}) {
+		t.Fatalf("picked again asks %+v", again)
+	}
+	run.act(again)
+	about, does, next, keys = stands()
+	if view.next != nil || about != "claude · opus · high · on work" || next != "" || !strings.HasPrefix(does, "claude → codex carries [whole] <tab flip>") ||
+		!slices.Equal(keys, []chatKey{{Key: "tab", Label: "latest or whole", ID: "flip"}}) {
+		t.Errorf("let go of: %+v, %q, %q, next on %q, keys %+v", view.next, about, does, next, keys)
+	}
+	if now := view.deed(chatEvent{E: "press", ID: "now"}); now != (chatDeed{}) {
+		t.Errorf("tab with nothing kept asks %+v", now)
+	}
+
+	// what cannot be done is said, at work or not, and at rest a pick is done at once
+	if deed := pick("a|opencode|", ""); deed.do != chatHand || !deed.later {
+		t.Errorf("an agent with no model: %+v", deed)
+	}
+	view.talk.working = false
+	if deed := pick("a|claude|sonnet", ""); deed != (chatDeed{do: chatSwitch, model: "sonnet"}) {
+		t.Errorf("at rest a pick asks %+v", deed)
+	}
+}
+
+// What was picked while the agent worked is done when its turn ends, not
+// before: nothing is typed into an agent at work. tab stops it, and the
+// pick is done as it comes to rest. Of what the person sends as the turn
+// has just ended, the pick is done first, so the words go to the agent
+// picked, with the conversation in front of them.
+func TestWhatWasPickedWhileTheAgentWorkedIsDoneWhenItsTurnEnds(t *testing.T) {
+	roleLab(t)
+	claude := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", claude)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	repo := gittest.New(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Plugins = pluginHost(config.Config{})
+	record, err := a.New("next")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var said [][]byte
+	chat := func(window string) *chatRun {
+		run := &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, say: func(messages ...[]byte) { said = append(said, messages...) }, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
+		run.aim(app.Head{}, window)
+		t.Cleanup(func() { close(run.quit) })
+		run.view.talk.whole() // said, so what changes is said
+		return run
+	}
+	index := func(name string) string {
+		for _, w := range a.Windows(record) {
+			if w.Name == name {
+				return strconv.Itoa(w.Index)
+			}
+		}
+		t.Fatalf("no window %s", name)
+		return ""
+	}
+	titled := func(window, title string) {
+		t.Helper()
+		if out, err := exec.Command("tmux", "select-pane", "-t", session.Target(record.Name, window), "-T", title).CombinedOutput(); err != nil {
+			t.Fatalf("%v: %s", err, out)
+		}
+	}
+
+	// a model of its own agent, picked while it works
+	if _, err := a.NewWindow(record, "echo", session.What{}, []string{"echo-agent"}); err != nil {
+		t.Fatal(err)
+	}
+	screenShows(t, record.Name, "echo", "echo-agent")
+	titled("echo", "⠋ at work") // as an agent titles its pane while it works
+	own := chat(index("echo"))
+	if v := own.view; v.runs.Agent != "echo" || !v.talk.working {
+		t.Fatalf("a chat of a window at work: %+v, working %v", v.runs, v.talk.working)
+	}
+	own.act(chatDeed{do: chatModelsUp})
+	deed := own.view.deed(chatEvent{E: "pick", List: "models", ID: "a|echo|soft"})
+	own.act(deed)
+	own.looks()
+	if screen, _ := session.Here().Capture(record.Name, "echo", false); !deed.later || own.view.next == nil || own.view.runs.Model != "" || strings.Contains(screen, "/model") || own.view.talk.about != "echo · next: soft" {
+		t.Fatalf("picked while it works: %+v, kept %+v, runs %+v, the line %q, its screen:\n%s", deed, own.view.next, own.view.runs, own.view.talk.about, screen)
+	}
+	// tab: it is stopped, and nothing else is done until it rests
+	own.act(own.view.deed(chatEvent{E: "press", ID: "now"}))
+	if status := own.view.talk.status; own.view.mode != chatting || own.view.next == nil || status == nil || status.Text != "stopping echo: next is soft" {
+		t.Fatalf("applied now: mode %v, kept %+v, status %+v", own.view.mode, own.view.next, status)
+	}
+	titled("echo", "echo-agent at rest")
+	said = nil
+	own.looks()
+	screenShows(t, record.Name, "echo", "/model soft")
+	if own.view.next != nil || own.view.runs.Model != "soft" || own.view.talk.about != "echo · soft" || own.view.talk.status != nil || own.view.talk.working {
+		t.Errorf("once it rests: kept %+v, runs %+v, the line %q, status %+v", own.view.next, own.view.runs, own.view.talk.about, own.view.talk.status)
+	}
+	var changes []string
+	for _, message := range said {
+		changes = append(changes, ops(read(t, message))...)
+	}
+	// no modal stands, and none is taken away: a change to a piece that is not there drops its patch
+	if !slices.Equal(changes, []string{"working", "set", "status", "set", "toast", "turn"}) {
+		t.Errorf("done as %q", changes)
+	}
+
+	// another agent, picked while the agent works: handed to with what the person sends as the turn has ended
+	project := filepath.Join(claude, "projects", regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(record.Path, "-"))
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cwd, _ := json.Marshal(record.Path)
+	lines := `{"type":"user","cwd":` + string(cwd) + `,"timestamp":"2026-11-02T10:00:00Z","message":{"content":"make the list faster"}}` + "\n" +
+		`{"type":"assistant","cwd":` + string(cwd) + `,"timestamp":"2026-11-02T10:00:05Z","message":{"content":[{"type":"text","text":"It is faster."}]}}` + "\n"
+	if err := os.WriteFile(filepath.Join(project, "c1.jsonl"), []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.NewWindow(record, "old", session.What{}, []string{"cat"}); err != nil {
+		t.Fatal(err)
+	}
+	other := chat(index("old"))
+	other.view.id, other.view.runs.Agent, other.view.talk.working = "c1", "claude", true
+	other.act(chatDeed{do: chatModelsUp})
+	other.act(other.view.deed(chatEvent{E: "pick", List: "models", ID: "a|echo|loud"}))
+	other.act(chatDeed{do: chatBack})
+	if next := other.view.next; next == nil || *next != (chatDeed{do: chatHand, agent: "echo", model: "loud"}) || !session.Here().HasWindow(record.Name, "old") || other.view.talk.about != "claude · next: echo · loud" {
+		t.Fatalf("an agent picked while it works: kept %+v, the line %q", next, other.view.talk.about)
+	}
+	other.act(chatDeed{do: chatSend, text: "and the tests"})
+	if other.view.next != nil || other.view.runs.Agent != "echo" || other.view.runs.Model != "loud" || session.Here().HasWindow(record.Name, "old") {
+		t.Fatalf("sent as its turn ended: kept %+v, runs %+v", other.view.next, other.view.runs)
+	}
+	screenShows(t, record.Name, other.view.window, "The conversation so far, with claude:", "It is faster.", chatRule, "and the tests")
+}

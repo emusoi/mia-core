@@ -937,14 +937,18 @@ type chatView struct {
 	query  string
 	// under is the row of them the keys are on, whole whether the whole
 	// conversation is carried to another agent and not its latest turns,
-	// would what handing it to each agent looked at would do, tabbed that
-	// the foot says the key that flips whole, and came the agents the
-	// conversation was with before this one.
+	// would what handing it to each agent looked at would do, tabbed the
+	// button tab presses there, which the foot says, and came the agents
+	// the conversation was with before this one.
 	under  string
 	whole  bool
 	would  map[string]chatWould
-	tabbed bool
+	tabbed string
 	came   []string
+	// next is the model or the agent picked while the agent was at work: it
+	// is switched or handed to when the turn ends, and until then the line
+	// over the chat says it. It is this chat's alone, kept while it runs.
+	next *chatDeed
 
 	// Earlier: the worktree's conversations, the one under the keys with
 	// its turns read back, and the one c was pressed on once.
@@ -994,6 +998,31 @@ func typedFor(kept carrying, record model.Record, window, words string, read fun
 
 // agent is the agent that answers in this chat.
 func (v *chatView) agent() string { return cmp.Or(v.runs.Agent, v.talk.agent) }
+
+// coming is a pick as the line over the chat says it while it is to come:
+// a model and an effort of this chat's agent, or another agent and its.
+func (d chatDeed) coming() string {
+	said := []string{}
+	for _, one := range []string{d.agent, d.model, d.effort} {
+		if one != "" {
+			said = append(said, one)
+		}
+	}
+	if d.do == chatSwitch {
+		return strings.Join(said, " ")
+	}
+	return strings.Join(said, " · ")
+}
+
+// lined makes the line over the chat what it now is, who answers and what
+// was picked to come next, and is the change that says it.
+func (v *chatView) lined() json.RawMessage {
+	v.talk.about = chatAbout(v.runs)
+	if v.next != nil {
+		v.talk.about += " · next: " + v.next.coming()
+	}
+	return encode(chatOp{Op: "set", ID: "about", Node: chatHead(v.talk.about)})
+}
 
 // chatIcon is an agent's icon in the window's own set.
 func chatIcon(agent string) string {
@@ -1163,6 +1192,16 @@ func (v *chatView) models(placed bool) json.RawMessage {
 		for _, one := range agent.Efforts {
 			item.Menu = append(item.Menu, chatItem{ID: one, Title: effortWord(one), Checked: one == effort})
 		}
+		// while the agent works: ⏎ keeps a row as what comes next, and lets go of the one that is
+		switch pick := v.deed(chatEvent{E: "pick", List: "models", ID: item.ID}); {
+		case pick.later:
+			item.Does = "keep as next"
+		case pick.do == chatForget:
+			item.Does, item.Right = "clear", strings.TrimSuffix("next · "+item.Right, " · ")
+			if placed && list.Selected == "" {
+				list.Selected = item.ID // the keys come to what is to come, not to what runs
+			}
+		}
 		if placed && item.Checked && list.Selected == "" {
 			list.Selected = item.ID
 		}
@@ -1188,8 +1227,11 @@ func (v *chatView) models(placed bool) json.RawMessage {
 // who to whom, and what is carried, the conversation's latest turns or the
 // whole of it, as tab chooses, with how many turns that is under it. An
 // agent the conversation came from: that it takes its own up again, and
-// how many turns were said since. What is not done says why.
-func (v *chatView) does() (line json.RawMessage, choice bool) {
+// how many turns were said since. What is not done says why. While the
+// agent is at work a pick is kept as next, and the line says so; on the
+// row that is next it says when it is applied, with the key that stops
+// the agent and applies it now. tab is the button tab presses in it.
+func (v *chatView) does() (line json.RawMessage, tab string) {
 	said := func(words, style string) json.RawMessage {
 		return encode(chatWords{T: "text", Text: words, Style: style})
 	}
@@ -1197,7 +1239,23 @@ func (v *chatView) does() (line json.RawMessage, choice bool) {
 		return encode(chatBox{T: "row", Gap: 8, Children: pieces})
 	}
 	var lines []json.RawMessage
-	switch deed := v.deed(chatEvent{E: "pick", List: "models", ID: v.under}); deed.do {
+	deed := v.deed(chatEvent{E: "pick", List: "models", ID: v.under})
+	if deed.do == chatForget {
+		// the row picked to come next: when it is done, the key that does it now, and how it is let go of
+		next := *v.next
+		lead, carries := v.agent()+" → "+next.agent, "Carries the conversation's latest turns. "
+		if next.whole {
+			carries = "Carries the whole conversation. "
+		}
+		if next.do == chatSwitch {
+			band, _ := modelled(v.runs, app.Runs{Model: cmp.Or(next.model, v.runs.Model), Effort: cmp.Or(next.effort, v.runs.Effort)})
+			lead, carries = band.From+" → "+band.To, ""
+		}
+		lines = append(lines, row(said(lead, "strong"), said("· Applied when "+v.agent()+" finishes this turn.", "dim"), encode(chatBox{T: "col", Grow: 1}), encode(chatButton{T: "button", ID: "now", Key: "tab"})),
+			said(carries+"tab stops "+v.agent()+" and applies it now. ⏎ again clears it.", "dim"))
+		return encode(chatBox{T: "col", ID: "does", Gap: 4, Pad: 4, Children: lines}), "now"
+	}
+	switch deed.do {
 	case chatHand:
 		lead := said(v.agent()+" → "+deed.agent, "strong")
 		would, looked := v.would[deed.agent]
@@ -1214,7 +1272,7 @@ func (v *chatView) does() (line json.RawMessage, choice bool) {
 			}
 			lines = append(lines, row(lead, said("· "+deed.agent+" takes its own conversation up again"+since, "dim")))
 		default:
-			choice = true
+			tab = "flip"
 			tabs := chatTabs{T: "tabs", ID: "carry", Boxed: true, Selected: "latest", Items: []chatItem{{ID: "latest", Title: "Latest"}, {ID: "whole", Title: "Whole conversation"}}}
 			under := fmt.Sprintf("The last %d of %d turns, as many as fit. Sent with your next message.", kept, turns)
 			switch {
@@ -1239,23 +1297,27 @@ func (v *chatView) does() (line json.RawMessage, choice bool) {
 	default:
 		lines = append(lines, said(deed.text, "dim"))
 	}
-	return encode(chatBox{T: "col", ID: "does", Gap: 4, Pad: 4, Children: lines}), choice
+	if deed.later {
+		lines = append(lines, said("⏎ keeps it as next: applied when "+v.agent()+" finishes this turn.", "dim"))
+	}
+	return encode(chatBox{T: "col", ID: "does", Gap: 4, Pad: 4, Children: lines}), tab
 }
 
 // footed is the change that says the keys along the foot, when they are
 // others than were said: tab, while the line over the models holds its
-// choice, and none otherwise. It is put back with the modal too.
+// choice or the key that applies now what is next, and none otherwise. It
+// is put back with the modal too.
 func (v *chatView) footed() []json.RawMessage {
-	choice := false
+	tab := ""
 	if v.mode == picking {
-		_, choice = v.does()
+		_, tab = v.does()
 	}
-	if choice == v.tabbed {
+	if tab == v.tabbed {
 		return nil
 	}
 	keys := []chatKey{}
-	if v.tabbed, v.talk.with = choice, nil; choice {
-		keys = append(keys, chatKey{Key: "tab", Label: "latest or whole", ID: "flip"})
+	if v.tabbed, v.talk.with = tab, nil; tab != "" {
+		keys = append(keys, chatKey{Key: "tab", Label: map[string]string{"flip": "latest or whole", "now": "apply now"}[tab], ID: tab})
 		v.talk.with = encode(chatOp{Op: "keys", Keys: &keys})
 	}
 	return []json.RawMessage{encode(chatOp{Op: "keys", Keys: &keys})}
@@ -1357,6 +1419,9 @@ func (v *chatView) again() [][]byte {
 // shut is the patch that takes the modal away, and makes with it the
 // changes that say what was done in it; the chat behind is as it was.
 func (v *chatView) shut(with ...json.RawMessage) [][]byte {
+	if v.mode == chatting {
+		return v.talk.patch(with...) // none stands: what was picked to come next is done with none over the chat
+	}
 	v.mode, v.told, v.talk.over, v.talk.keys = chatting, nil, nil, ""
 	return v.talk.patch(slices.Concat([]json.RawMessage{encode(chatOp{Op: "remove", ID: chatOver})}, v.footed(), with)...)
 }
@@ -1438,23 +1503,30 @@ const (
 	chatContinue        // hand a conversation to this chat's agent, and show that
 	chatUnder           // say what the model the keys came to does
 	chatCarries         // carry the whole conversation to another agent, or its latest turns
+	chatForget          // let go of what was picked to come next
+	chatNow             // stop the agent, so that what was picked to come next is done now
 )
 
 // chatDeed is what an event does: with the words, the conversation, the
-// model and effort or the question and option it needs.
+// model and effort or the question and option it needs. later, a switch
+// or a handing is not done but kept as what comes next: the agent is at
+// work.
 type chatDeed struct {
 	do               chatDo
 	text, id, agent  string
 	model, effort    string
 	question, option int
 	whole            bool
+	later            bool
 }
 
 // deed is what an event asks of the app as the view stands. In the chat a
 // conversation no window has open is only shown: nothing is sent,
 // answered or stopped. A model of this chat's agent is switched to; one of
 // another agent hands the conversation to that agent, when there is one
-// mia can read. In Earlier ⏎
+// mia can read; while the agent is at work either is kept as what comes
+// next, the same picked again lets go of it, and tab on it stops the agent
+// so that it is done now. In Earlier ⏎
 // on the conversation a window has open shows it and on another takes it
 // up again, as its menu's first item does; c says what handing it over
 // does the first time it is pressed on a conversation, and does it the
@@ -1469,28 +1541,19 @@ func (v *chatView) deed(event chatEvent) chatDeed {
 	case v.mode == picking && event.E == "change" && event.ID == "q":
 		return chatDeed{do: chatNarrow, text: event.Text}
 	case v.mode == picking && event.E == "pick" && event.List == "models":
-		row, ok := chatModelOf(event.ID)
-		if !ok {
-			return chatDeed{}
-		}
-		effort := cmp.Or(event.Sub, row.effort)
-		var agent app.AgentModels
-		for _, one := range v.agents {
-			if one.Name == row.agent {
-				agent = one
-			}
-		}
+		deed := v.picked(event)
 		switch {
-		case row.agent != v.agent() && v.id == "":
-			return chatDeed{do: chatSay, text: "nothing is said here that mia can read yet: there is nothing for " + row.agent + " to go on with"}
-		case row.agent != v.agent():
-			return chatDeed{do: chatHand, agent: row.agent, model: row.model, effort: effort, whole: v.whole}
-		case row.model == "" && effort == "":
-			return chatDeed{do: chatSay, text: row.agent + " is started with no model, and takes none from mia: it is chosen in its terminal"}
-		case !agent.Live && !agent.Again:
-			return chatDeed{do: chatSay, text: row.agent + " cannot be switched to another model while it runs — restart it with --model"}
+		case !v.talk.working || deed.do != chatSwitch && deed.do != chatHand:
+		case v.comes(deed):
+			return chatDeed{do: chatForget}
+		default:
+			deed.later = true
 		}
-		return chatDeed{do: chatSwitch, model: row.model, effort: effort}
+		return deed
+	case v.mode == picking && event.E == "press" && event.ID == "now":
+		if v.next != nil {
+			return chatDeed{do: chatNow}
+		}
 	case v.mode == picking && event.E == "move" && event.List == "models":
 		if event.ID != v.under {
 			return chatDeed{do: chatUnder, id: event.ID}
@@ -1542,6 +1605,40 @@ func (v *chatView) deed(event chatEvent) chatDeed {
 		return chatDeed{do: chatStop}
 	}
 	return chatDeed{}
+}
+
+// comes reports whether a pick is the one kept as what comes next: its
+// agent and model, and its effort where the pick says one.
+func (v *chatView) comes(deed chatDeed) bool {
+	next := v.next
+	return next != nil && next.do == deed.do && next.agent == deed.agent && next.model == deed.model && (deed.effort == "" || deed.effort == next.effort)
+}
+
+// picked is what picking a row of the models asks, whatever the agent is
+// doing.
+func (v *chatView) picked(event chatEvent) chatDeed {
+	row, ok := chatModelOf(event.ID)
+	if !ok {
+		return chatDeed{}
+	}
+	effort := cmp.Or(event.Sub, row.effort)
+	var agent app.AgentModels
+	for _, one := range v.agents {
+		if one.Name == row.agent {
+			agent = one
+		}
+	}
+	switch {
+	case row.agent != v.agent() && v.id == "":
+		return chatDeed{do: chatSay, text: "nothing is said here that mia can read yet: there is nothing for " + row.agent + " to go on with"}
+	case row.agent != v.agent():
+		return chatDeed{do: chatHand, agent: row.agent, model: row.model, effort: effort, whole: v.whole}
+	case row.model == "" && effort == "":
+		return chatDeed{do: chatSay, text: row.agent + " is started with no model, and takes none from mia: it is chosen in its terminal"}
+	case !agent.Live && !agent.Again:
+		return chatDeed{do: chatSay, text: row.agent + " cannot be switched to another model while it runs — restart it with --model"}
+	}
+	return chatDeed{do: chatSwitch, model: row.model, effort: effort}
 }
 
 // chatOf is the conversation a chat shows, of a worktree's, the last
@@ -1653,8 +1750,14 @@ func (r *chatRun) note(text, tone string) {
 	r.say(t.patch(t.stands(status))...)
 }
 
-// tell says at the modal's foot why what was asked in it was not done.
+// tell says at the modal's foot why what was asked in it was not done: as
+// the status, of what was picked to come next and is done with no modal
+// over the chat.
 func (r *chatRun) tell(why error) {
+	if r.view.mode == chatting {
+		r.note(why.Error(), "bad")
+		return
+	}
 	r.view.told = &muiStatus{Text: why.Error(), Tone: "bad"}
 	r.say(r.view.again()...)
 }
@@ -1682,7 +1785,7 @@ func (r *chatRun) aim(head app.Head, window string) {
 	if v.talk != nil {
 		nth = v.talk.nth + 1
 	}
-	v.mode, v.told, v.tabbed, v.window, v.id = chatting, nil, false, window, head.ID
+	v.mode, v.told, v.tabbed, v.next, v.window, v.id = chatting, nil, "", nil, window, head.ID
 	v.runs = app.Runs{Agent: head.Agent, Model: head.Model, Effort: head.Effort, Account: head.Account, Reads: true}
 	if window != "" {
 		if runs := r.a.WindowRuns(r.record, window); runs.Agent != "" {
@@ -1826,13 +1929,18 @@ func (r *chatRun) looks() {
 		if head, err := chatOf(heads, r.record.Name, v.window, ""); err == nil {
 			v.id = head.ID
 			if runs := chatRuns(r.a.WindowRuns(r.record, v.window), head); runs.Agent != "" && runs != v.runs {
-				v.runs, v.talk.agent, v.talk.about = runs, runs.Agent, chatAbout(runs)
+				v.runs, v.talk.agent = runs, runs.Agent
+				v.lined()
 				r.say(v.talk.said()...)
 			}
 			r.follow(head.ID)
 		}
 	}
-	r.say(v.talk.atWork(r.a.AtWork(r.record, r.index()))...)
+	working := r.a.AtWork(r.record, r.index())
+	r.say(v.talk.atWork(working)...)
+	if !working {
+		r.rests()
+	}
 	if time.Since(r.pressed) < 2*time.Second {
 		return
 	}
@@ -1852,7 +1960,17 @@ func (r *chatRun) act(deed chatDeed) {
 	switch deed.do {
 	case chatNothing, chatLeave:
 	case chatSend:
-		r.note("", "")
+		// what was picked to come next and is not done yet, the turn just over: first, so the words go to who was picked
+		if v.next != nil && !r.a.AtWork(r.record, r.index()) {
+			r.say(v.talk.atWork(false)...)
+			if !r.rests() {
+				words := []rune(deed.text)
+				r.say(v.talk.patch(encode(chatOp{Op: "draft", ID: v.talk.id(), Text: string(words[:min(len(words), chatDraft)])}))...)
+				return
+			}
+		} else {
+			r.note("", "")
+		}
 		r.say(v.talk.sends(deed.text)...)
 		send := r.a.SendToWindow
 		words, back := typedFor(r.a, r.record, v.window, deed.text, os.ReadFile)
@@ -1912,50 +2030,25 @@ func (r *chatRun) act(deed chatDeed) {
 		r.say(v.again()...)
 	case chatCopy:
 		r.say(v.talk.patch(encode(chatOp{Op: "copy", Text: deed.id}), v.talk.went("copied "+deed.id, "ok"))...)
-	case chatSwitch:
-		now, err := r.a.SwitchWindow(r.record, v.window, deed.model, deed.effort)
-		if err != nil {
+	case chatSwitch, chatHand:
+		if !deed.later {
+			r.applies(deed)
+			return
+		}
+		deed.later = false
+		v.next = &deed
+		r.say(v.talk.patch(v.lined())...)
+		r.say(v.again()...)
+	case chatForget:
+		v.next = nil
+		r.say(v.talk.patch(v.lined())...)
+		r.say(v.again()...)
+	case chatNow:
+		if err := r.a.StopInWindow(r.record, v.window); err != nil {
 			r.tell(err)
 			return
 		}
-		was := v.runs
-		v.runs.Model, v.runs.Effort = now.Model, now.Effort
-		v.talk.about = chatAbout(v.runs)
-		changes := []json.RawMessage{encode(chatOp{Op: "set", ID: "about", Node: chatHead(v.talk.about)}),
-			v.talk.went(v.runs.Agent+" switched to "+strings.TrimSpace(deed.model+" "+deed.effort), "ok")}
-		if band, changed := modelled(was, v.runs); changed {
-			// kept while the chat runs: mia keeps what a window runs on now, not what it ran on before
-			r.models = append(r.models, chatModelled{app.Talk{Agent: v.agent(), ID: v.id}, v.talk.last, band})
-			row := v.talk.put(band)
-			if v.talk.shown != nil {
-				v.talk.shown[row.n] = true
-				changes = append(changes, encode(chatOp{Op: "turn", ID: v.talk.id(), Turn: row.json}))
-			}
-		}
-		r.say(v.shut(changes...)...)
-	case chatHand:
-		from, window := v.agent(), v.window
-		if r.a.WindowHasPane(r.record, window, v.talk.pane) {
-			window = "" // this chat's own window: closing it would end the chat
-		}
-		r.say(v.shut(v.talk.stands(&muiStatus{Text: cutTo("handing this conversation to "+deed.agent+"…", chatSaid)}))...)
-		went := handTo(r.a, r.record, v.id, window, from, deed.agent, deed.model, deed.effort, deed.whole)
-		if !went.went {
-			r.note(went.text, went.tone)
-			return
-		}
-		done := went.done
-		to := r.nowAt(done.To.Window)
-		// kept on its window: whichever chat of it sends first says it, this one or one started after
-		kept := r.carry(to, from, v.id, done)
-		r.aim(app.Head{ID: done.Resumes, Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
-		if done.Resumes != "" {
-			went.text = from + " stopped · " + done.To.Agent + " takes its own conversation up again, with what was said since"
-		}
-		if kept != nil {
-			went.text, went.tone = went.text+" · "+kept.Error(), "warn"
-		}
-		r.shows(went.text, went.tone)
+		r.say(v.shut(v.talk.stands(&muiStatus{Text: cutTo("stopping "+v.agent()+": next is "+v.next.coming(), chatSaid)}))...)
 	case chatRead:
 		r.read(deed.id)
 		r.say(v.again()...)
@@ -1996,6 +2089,71 @@ func (r *chatRun) act(deed chatDeed) {
 		}
 		r.shows(went.text, went.tone)
 	}
+}
+
+// applies switches this window's agent to a model and an effort, or hands
+// the conversation to another agent and makes the chat that agent's, and
+// says how it went; false when it was not done.
+func (r *chatRun) applies(deed chatDeed) bool {
+	v := r.view
+	if deed.do == chatSwitch {
+		now, err := r.a.SwitchWindow(r.record, v.window, deed.model, deed.effort)
+		if err != nil {
+			r.tell(err)
+			return false
+		}
+		was := v.runs
+		v.runs.Model, v.runs.Effort = now.Model, now.Effort
+		changes := []json.RawMessage{v.lined(),
+			v.talk.went(v.runs.Agent+" switched to "+strings.TrimSpace(deed.model+" "+deed.effort), "ok")}
+		if band, changed := modelled(was, v.runs); changed {
+			// kept while the chat runs: mia keeps what a window runs on now, not what it ran on before
+			r.models = append(r.models, chatModelled{app.Talk{Agent: v.agent(), ID: v.id}, v.talk.last, band})
+			row := v.talk.put(band)
+			if v.talk.shown != nil {
+				v.talk.shown[row.n] = true
+				changes = append(changes, encode(chatOp{Op: "turn", ID: v.talk.id(), Turn: row.json}))
+			}
+		}
+		r.say(v.shut(changes...)...)
+		return true
+	}
+	from, window := v.agent(), v.window
+	if r.a.WindowHasPane(r.record, window, v.talk.pane) {
+		window = "" // this chat's own window: closing it would end the chat
+	}
+	r.say(v.shut(v.talk.stands(&muiStatus{Text: cutTo("handing this conversation to "+deed.agent+"…", chatSaid)}))...)
+	went := handTo(r.a, r.record, v.id, window, from, deed.agent, deed.model, deed.effort, deed.whole)
+	if !went.went {
+		r.note(went.text, went.tone)
+		return false
+	}
+	done := went.done
+	to := r.nowAt(done.To.Window)
+	// kept on its window: whichever chat of it sends first says it, this one or one started after
+	kept := r.carry(to, from, v.id, done)
+	r.aim(app.Head{ID: done.Resumes, Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
+	if done.Resumes != "" {
+		went.text = from + " stopped · " + done.To.Agent + " takes its own conversation up again, with what was said since"
+	}
+	if kept != nil {
+		went.text, went.tone = went.text+" · "+kept.Error(), "warn"
+	}
+	r.shows(went.text, went.tone)
+	return true
+}
+
+// rests does what was picked to come next, now that the agent is not at
+// work; false when there was something and it was not done.
+func (r *chatRun) rests() bool {
+	v := r.view
+	if v.next == nil {
+		return true
+	}
+	deed := *v.next
+	v.next = nil
+	r.say(v.talk.patch(v.lined(), v.talk.stands(nil))...)
+	return r.applies(deed)
 }
 
 // weighs looks at what handing the conversation to the agent of the model
