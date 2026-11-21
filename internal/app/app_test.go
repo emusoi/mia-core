@@ -469,3 +469,36 @@ func TestThePrefixNamesOnlyANewBranch(t *testing.T) {
 		t.Errorf("a new branch is %q, want user/due-dates", got)
 	}
 }
+
+// A worktree made beside another for an agent is named for both, and its
+// branch as the branch the other is on with the agent's name after it: with
+// a number, the same for both, where a worktree has the name, a plan gave
+// it out, or there is such a branch already.
+func TestAWorktreeBesideAnotherIsNamedForItsAgentAndNumberedWhereTaken(t *testing.T) {
+	repo := gittest.New(t)
+	a := open(t, repo)
+	record, err := a.NewNamed("due-dates", "", "ruvuma")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name, branch := a.Beside(record, "codex", nil); name != "ruvuma-codex" || branch != "due-dates-codex" {
+		t.Errorf("with nothing taken: %s on %s", name, branch)
+	}
+	// the branch is taken: the worktree is numbered with it
+	repo.Git("branch", "due-dates-codex")
+	if name, branch := a.Beside(record, "codex", nil); name != "ruvuma-codex-2" || branch != "due-dates-codex-2" {
+		t.Errorf("with the branch taken: %s on %s", name, branch)
+	}
+	// the worktree's name is taken, by one made and by one only planned: the branch is numbered with it
+	if _, err := a.NewNamed("another", "", "ruvuma-codex-2"); err != nil {
+		t.Fatal(err)
+	}
+	if name, branch := a.Beside(record, "codex", []string{"ruvuma-codex-3"}); name != "ruvuma-codex-4" || branch != "due-dates-codex-4" {
+		t.Errorf("with the names taken: %s on %s", name, branch)
+	}
+	// and what it names can be made, from a commit
+	made, err := a.NewNamed("due-dates-codex-4", git.Head(record.Path), "ruvuma-codex-4")
+	if err != nil || made.Name != "ruvuma-codex-4" || git.CurrentBranch(made.Path) != "due-dates-codex-4" || git.Head(made.Path) != git.Head(record.Path) {
+		t.Errorf("made as named: %+v, %v", made, err)
+	}
+}

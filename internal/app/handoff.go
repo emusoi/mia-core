@@ -44,6 +44,10 @@ type Continue struct {
 	// a file of the fork's own. The conversation stays as it was, its
 	// agent never taking it up again as one handed back would be.
 	Upto int
+	// In is the worktree the agent is started in, where it is another than
+	// the conversation's: one made for it. The handoff stays with the
+	// conversation's.
+	In string
 }
 
 // Talk names one conversation: whose it is, and its id.
@@ -64,11 +68,13 @@ type ContinuedFrom struct {
 // ContinuedTo is the agent a conversation goes on with and the window
 // opened for it. ID is its own conversation there, which no agent says as
 // it starts: a list of conversations finds it once the agent has written
-// of it, and it is kept from then on.
+// of it, and it is kept from then on. Worktree is where the window is,
+// when it is another than the conversation's.
 type ContinuedTo struct {
-	Agent  string    `json:"agent"`
-	Window WindowRef `json:"window"`
-	ID     string    `json:"id,omitempty"`
+	Agent    string    `json:"agent"`
+	Worktree string    `json:"worktree,omitempty"`
+	Window   WindowRef `json:"window"`
+	ID       string    `json:"id,omitempty"`
 }
 
 // Continued is what going on with another agent did, or with DryRun would.
@@ -156,8 +162,16 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 	if host.SSH != "" {
 		return Continued{}, fmt.Errorf("%s's session is on a machine, and its conversations with it — go on with one in a worktree that is here", record.Name)
 	}
-	in, _ := a.where()
-	turns, _, err := a.turnsIn(in, head.ID, head.Cwd, head.Agent, 0)
+	// where the agent is started: the conversation's worktree, or the one named
+	in := record
+	if want.In != "" {
+		if in, err = a.RecordOrHere(want.In); err != nil {
+			return Continued{}, err
+		}
+		host = a.sessionOf(in)
+	}
+	folders, _ := a.where()
+	turns, _, err := a.turnsIn(folders, head.ID, head.Cwd, head.Agent, 0)
 	if err != nil {
 		return Continued{}, err
 	}
@@ -198,7 +212,7 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 		return Continued{}, err
 	}
 	window := agent.Name
-	for i := 2; host.HasWindow(record.Name, window); i++ {
+	for i := 2; host.HasWindow(in.Name, window); i++ {
 		window = fmt.Sprintf("%s-%d", agent.Name, i)
 	}
 	now := time.Now()
@@ -216,13 +230,13 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 		full = ""
 	}
 	done := Continued{From: ContinuedFrom{Agent: head.Agent, ID: head.ID, Worktree: record.Name, Window: head.Window},
-		To: ContinuedTo{Agent: agent.Name, Window: WindowRef{Name: window}, ID: resumes}, Resumes: resumes, Handoff: file, Full: full, Turns: len(turns), LeftOut: left, Upto: want.Upto,
+		To: ContinuedTo{Agent: agent.Name, Worktree: want.In, Window: WindowRef{Name: window}, ID: resumes}, Resumes: resumes, Handoff: file, Full: full, Turns: len(turns), LeftOut: left, Upto: want.Upto,
 		Command: command, Instruction: instruction(head.Agent, file),
 		Model: chosen.Model, Effort: chosen.Effort, Account: chosen.Account, DryRun: want.DryRun}
 	if done.Account == "" && agent.AccountEnv != "" {
 		done.Account = DefaultAccount
 	}
-	argv, err := a.LaunchArgv(record, command)
+	argv, err := a.LaunchArgv(in, command)
 	if err != nil || want.DryRun {
 		return done, err
 	}
@@ -240,10 +254,10 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 			return done, err
 		}
 	}
-	if done.To.Window.Name, err = a.NewWindow(record, window, session.What{Kind: session.KindAgent, Label: agent.Name}, argv); err != nil {
+	if done.To.Window.Name, err = a.NewWindow(in, window, session.What{Kind: session.KindAgent, Label: agent.Name}, argv); err != nil {
 		return done, err
 	}
-	for _, w := range host.WindowsOf(record.Name) {
+	for _, w := range host.WindowsOf(in.Name) {
 		if w.Name == done.To.Window.Name {
 			done.To.Window.Index = w.Index
 		}
@@ -251,21 +265,21 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 	// which went on as which is kept, for a list of conversations to say
 	link := fmt.Sprintf("%s.%d.json", named, now.UnixMilli())
 	if err := writeHandedOn(link, handedOn{From: done.From, To: done.To, Handoff: file, At: instant(now), Turns: done.Turns, LeftOut: left, Resumes: resumes, Upto: want.Upto}); err != nil {
-		return done, fmt.Errorf("%s: window %s opened, and that it goes on from %s's %s is not kept: %w", record.Name, done.To.Window.Name, head.Agent, head.ID, err)
+		return done, fmt.Errorf("%s: window %s opened, and that it goes on from %s's %s is not kept: %w", in.Name, done.To.Window.Name, head.Agent, head.ID, err)
 	}
 	if chosen != (Chosen{}) {
-		if err := a.KeepChosen(record, done.To.Window.Name, agent.Name, chosen); err != nil {
-			return done, fmt.Errorf("%s: window %s opened, and what it was started with is not kept: %w", record.Name, done.To.Window.Name, err)
+		if err := a.KeepChosen(in, done.To.Window.Name, agent.Name, chosen); err != nil {
+			return done, fmt.Errorf("%s: window %s opened, and what it was started with is not kept: %w", in.Name, done.To.Window.Name, err)
 		}
 	}
 	// as SayOnceReady says it, but never into the shell an agent that ended leaves behind
-	if said, ended := settle(host, record.Name, done.To.Window.Name); ended {
+	if said, ended := settle(host, in.Name, done.To.Window.Name); ended {
 		done.Problem = fmt.Sprintf("%s ended as soon as it started, saying:\n%s", agent.Name, said)
-	} else if runsNothing(host, record.Name, done.To.Window.Name) {
+	} else if runsNothing(host, in.Name, done.To.Window.Name) {
 		done.Problem = fmt.Sprintf("%s ended as soon as it started, and its window is a shell now: nothing is typed into a shell", agent.Name)
 	} else if want.Quiet {
 		// it runs, and is told nothing
-	} else if err := say(host, record.Name, done.To.Window.Name, agent.Name, "mia window press "+record.Name+" "+done.To.Window.Name+" --", done.Instruction); err != nil {
+	} else if err := say(host, in.Name, done.To.Window.Name, agent.Name, "mia window press "+in.Name+" "+done.To.Window.Name+" --", done.Instruction); err != nil {
 		done.Problem = err.Error()
 	}
 	done.Sent = done.Problem == ""
@@ -483,7 +497,7 @@ func begunBy(heads []Head, one handedOn, first func(Head) string) string {
 	var found *Head
 	for i := range heads {
 		h := &heads[i]
-		if h.Agent != one.To.Agent || h.Worktree != one.From.Worktree || h.Started.Before(at) || (found != nil && !h.Started.Before(found.Started)) {
+		if h.Agent != one.To.Agent || h.Worktree != cmp.Or(one.To.Worktree, one.From.Worktree) || h.Started.Before(at) || (found != nil && !h.Started.Before(found.Started)) {
 			continue
 		}
 		// (Told to read the file, or sent it in front of the person's first words.)

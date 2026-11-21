@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -344,6 +346,34 @@ func (a *App) NewNamed(branch, from, name string) (model.Record, error) {
 		a.Emit("worktree.created", record, nil)
 	}
 	return record, err
+}
+
+// Beside is the name and the branch of a worktree to make beside record
+// for an agent: record's own name and the branch it is on, each with the
+// agent's name after it, and a number after that, the same for both,
+// where a worktree has the name or there is such a branch already; the
+// branch of a worktree on none is called as the worktree is. planned is
+// the names given out and not made yet. The branch is as NewNamed makes
+// it: with the prefix a new branch of the person's is given.
+func (a *App) Beside(record model.Record, agent string, planned []string) (name, branch string) {
+	records, _ := a.Store.Load()
+	on := cmp.Or(git.CurrentBranch(record.Path), record.Name)
+	if a.Config.Prefix != "" && !strings.HasPrefix(on, a.Config.Prefix) {
+		on = a.Config.Prefix + on
+	}
+	for i := 1; ; i++ {
+		after := "-" + agent
+		if i > 1 {
+			after += "-" + strconv.Itoa(i)
+		}
+		name, branch = record.Name+after, on+after
+		_, missing := os.Stat(a.Root + "." + name)
+		_, held := a.Names.Owner(name)
+		named := slices.Contains(planned, name) || slices.ContainsFunc(records, func(one model.Record) bool { return one.Name == name })
+		if missing != nil && !held && !named && !git.BranchExists(a.Root, branch) && git.RevParse(a.Root, "refs/remotes/origin/"+branch) == "" {
+			return name, branch
+		}
+	}
 }
 
 // newWorktree makes a worktree for branch, a new branch starting at start

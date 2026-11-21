@@ -653,7 +653,7 @@ func TestTheModelsAreAModalOverTheChat(t *testing.T) {
 		t.Fatalf("put up as %+v", got)
 	}
 	modal := got.Patch[0].Node
-	if modal.T != "modal" || modal.ID != "over" || modal.Title != "Model" || modal.W != 520 || len(modal.Children) != 5 || modal.Children[1].T != "divider" || modal.Children[3].T != "divider" || modal.find("chat") != nil {
+	if modal.T != "modal" || modal.ID != "over" || modal.Title != "Model" || modal.W != 520 || len(modal.Children) != 7 || modal.Children[1].T != "divider" || modal.Children[3].T != "divider" || modal.Children[5].T != "divider" || modal.find("chat") != nil {
 		t.Fatalf("modal = %+v", modal)
 	}
 	field, list := modal.Children[0], modal.Children[4]
@@ -701,7 +701,7 @@ func TestTheModelsAreAModalOverTheChat(t *testing.T) {
 	}
 	// why a pick was not done is said at the modal's foot, in it
 	view.told = &muiStatus{Text: "claude cannot be switched to another model while it runs", Tone: "bad"}
-	if foot := pieceOf(t, view.models(false)).Children; len(foot) != 6 || foot[5].T != "text" || foot[5].Tone != "bad" || !strings.HasPrefix(foot[5].Text, "claude cannot be switched") {
+	if foot := pieceOf(t, view.models(false)).Children; len(foot) != 8 || foot[6].ID != "mark" || foot[7].T != "text" || foot[7].Tone != "bad" || !strings.HasPrefix(foot[7].Text, "claude cannot be switched") {
 		t.Errorf("foot = %+v", foot)
 	}
 
@@ -1321,7 +1321,7 @@ func TestTheFirstThingSentAfterAHandingCarriesTheConversation(t *testing.T) {
 		t.Errorf("its transcript's turns: %+v, sent %+v", heard.Patch, chat.sent)
 	}
 	// a model changed now stands after the last turn heard, and what is heard next after it
-	row := chat.put(chatBand{Kind: "model", From: "gpt-6-luna", To: "gpt-6-luna-mini"})
+	row := chat.put(chatBand{Kind: "model", From: "gpt-6-luna", To: "gpt-6-luna-mini"}, 0)
 	if next := only(t, chat.heard([]app.Turn{{N: 4, Kind: "said", Text: "A it is."}})); row.n != 8 || next.Patch[0].Turn.N != 9 {
 		t.Errorf("a model's line at %d, the turn after it at %+v", row.n, next.Patch[0].Turn)
 	}
@@ -2144,5 +2144,352 @@ func TestAConversationForkedFromAReplyGoesOnInAWindowOfItsOwn(t *testing.T) {
 	first.act(chatDeed{do: chatSend, text: "go on"})
 	if screen := screenShows(t, record.Name, old, "go on"); strings.Contains(screen, "The conversation so far") {
 		t.Errorf("the window it was forked from was sent the conversation:\n%s", screen)
+	}
+}
+
+// Rows of the models are marked with ⇧⏎, the one key the search line lets
+// through, by the button that says so under the list: the line under the
+// search line then says how many agents the next message is sent to, this
+// chat's here and each other in a worktree of its own, with esc on a cap to
+// clear the marks, and the rows marked are checked beside the one that
+// runs. The row this chat runs on is not marked, and none is while
+// something is picked to come next or what the agent goes on from has
+// still to be sent. ⏎ keeps them: the line over the chat names them and
+// the chat's field says how many agents hear what is typed. What is sent
+// then is put up to be confirmed, a row for each worktree made, and
+// Cancel makes nothing and gives the words back.
+func TestRowsMarkedInTheModelsSendTheNextMessageToSeveralAgents(t *testing.T) {
+	var said [][]byte
+	view := &chatView{talk: &talk{pane: "%5", agent: "claude", reply: true}, worktree: "monduli", window: "2", id: "c1",
+		runs: app.Runs{Agent: "claude", Model: "opus", Effort: "high", Live: true}, agents: chatAgents(), would: map[string]chatWould{}}
+	run := &chatRun{view: view, say: func(messages ...[]byte) { said = append(said, messages...) }}
+	view.talk.heard([]app.Turn{{N: 1, Kind: "asked", Text: "hello"}})
+	view.up(picking)
+	if mark := pieceOf(t, view.models(false)).Children[6]; mark.T != "button" || mark.ID != "mark" || mark.Key != "⇧⏎" {
+		t.Fatalf("the button that marks: %+v", mark)
+	}
+	// what the said messages come to: the models' line, the rows checked, the foot's keys, and the view said whole last
+	stands := func() (does string, checked []string, keys []chatKey, whole *heardByWindow) {
+		t.Helper()
+		for _, message := range said {
+			got := read(t, message)
+			if got.Whole != nil {
+				whole = &got
+			}
+			for _, op := range got.Patch {
+				switch {
+				case (op.Op == "set" || op.Op == "add") && op.Node != nil && op.Node.ID == chatOver:
+					does, checked = wordsOf(op.Node.Children[2]), nil
+					for _, item := range op.Node.Children[4].Items {
+						if item.Checked {
+							checked = append(checked, item.ID)
+						}
+					}
+				case op.Op == "keys":
+					keys = op.Keys
+				}
+			}
+		}
+		said = nil
+		return does, checked, keys, whole
+	}
+	mark := func(id string) chatDeed { return view.deed(chatEvent{E: "press", ID: "mark", Item: id}) }
+
+	// the row this chat runs on: it hears the message here whatever is marked
+	if deed := mark("a|claude|opus"); deed.do != chatSay || !strings.Contains(deed.text, "claude gets your next message here in any case") {
+		t.Errorf("marking the row that runs asks %+v", deed)
+	}
+	// one other agent's row, then another's
+	if deed := mark("a|codex|gpt-6-luna"); deed != (chatDeed{do: chatToggle, id: "a|codex|gpt-6-luna"}) {
+		t.Fatalf("marking a row asks %+v", deed)
+	}
+	run.act(mark("a|codex|gpt-6-luna"))
+	does, checked, keys, _ := stands()
+	if does != "Sends your next message to 2 agents <esc unmark> claude here · codex in a worktree of its own" ||
+		!slices.Equal(checked, []string{"a|claude|opus", "a|codex|gpt-6-luna"}) || !slices.Equal(keys, []chatKey{{Key: "esc", Label: "clear marks", ID: "unmark"}}) {
+		t.Errorf("one row marked: %q, checked %v, keys %+v", does, checked, keys)
+	}
+	run.act(mark("a|opencode|"))
+	if does, checked, _, _ := stands(); does != "Sends your next message to 3 agents <esc unmark> claude here · codex and opencode each in a worktree of their own" ||
+		!slices.Equal(checked, []string{"a|claude|opus", "a|codex|gpt-6-luna", "a|opencode|"}) {
+		t.Errorf("two rows marked: %q, checked %v", does, checked)
+	}
+	// the same again takes a mark off
+	run.act(mark("a|opencode|"))
+	if does, checked, _, _ := stands(); !strings.HasPrefix(does, "Sends your next message to 2 agents") || len(checked) != 2 {
+		t.Errorf("a mark taken off: %q, checked %v", does, checked)
+	}
+	run.act(mark("a|opencode|"))
+	// esc is the marks' first, wherever the keys are; ⏎ keeps them
+	for _, event := range []chatEvent{{E: "press", ID: "unmark"}, {E: "dismiss", ID: chatOver}} {
+		if deed := view.deed(event); deed.do != chatUnmark {
+			t.Errorf("%+v with rows marked asks %+v", event, deed)
+		}
+	}
+	if deed := view.deed(chatEvent{E: "pick", List: "models", ID: "a|claude|sonnet"}); deed.do != chatFan {
+		t.Fatalf("⏎ with rows marked asks %+v", deed)
+	}
+	stands()
+	run.act(chatDeed{do: chatFan})
+	_, _, _, whole := stands()
+	if view.mode != chatting || len(view.fans) != 2 || view.marks != nil || whole == nil ||
+		whole.Whole.find("text").Text != "claude · opus · high · fan-out: codex · gpt-6-luna, opencode" || whole.View.Placeholder != "Say something to 3 agents" {
+		t.Fatalf("kept: mode %v, %+v, said %+v", view.mode, view.fans, whole)
+	}
+	// put up again they are marked, to add to or clear: esc lets go of them
+	view.marks = slices.Clone(view.fans)
+	view.up(picking)
+	run.act(view.deed(chatEvent{E: "press", ID: "unmark"}))
+	does, checked, keys, whole = stands()
+	if view.mode != picking || view.fans != nil || view.marks != nil || does != "opus · What this chat runs on." || !slices.Equal(checked, []string{"a|claude|opus"}) || len(keys) != 0 ||
+		whole == nil || whole.Whole.find("text").Text != "claude · opus · high" || whole.View.Placeholder != "" {
+		t.Errorf("cleared: mode %v, %+v, line %q, checked %v, keys %+v, said %+v", view.mode, view.fans, does, checked, keys, whole)
+	}
+	// not offered while something waits: why is said at the modal's foot
+	view.next = &chatDeed{do: chatSwitch, model: "sonnet"}
+	if deed := mark("a|codex|gpt-6-luna"); deed.do != chatSay || !strings.HasPrefix(deed.text, "sonnet is picked to come next") {
+		t.Errorf("marking with a pick to come asks %+v", deed)
+	}
+	view.next, view.talk.waits = nil, &chatBand{Kind: "switch", From: "codex", To: "claude"}
+	if deed := mark("a|codex|gpt-6-luna"); deed.do != chatSay || !strings.HasPrefix(deed.text, "what claude goes on from has still to be sent") {
+		t.Errorf("marking with a conversation still to send asks %+v", deed)
+	}
+	view.talk.waits = nil
+	view.shut()
+
+	// what sending makes, put up before any of it is made
+	view.fans = []chatModel{{agent: "codex", model: "gpt-6-luna"}, {agent: "opencode"}}
+	view.plan = &chatPlan{text: "try it your way", dirty: true, makes: []chatMake{{view.fans[0], "monduli-codex", "retry-codex"}, {view.fans[1], "monduli-opencode-2", "retry-opencode-2"}}}
+	up := only(t, view.up(confirming))
+	if modal := up.Patch[0].Node; !slices.Equal(ops(up), []string{"add"}) || modal.Title != "Send to 3 agents" || view.talk.keys != "create" ||
+		wordsOf(*modal) != "worktree monduli-codex on branch retry-codex · codex · gpt-6-luna worktree monduli-opencode-2 on branch retry-opencode-2 · opencode Uncommitted changes here are not copied. <⏎ create> <esc cancel>" {
+		t.Errorf("to be confirmed: %s", wordsOf(*up.Patch[0].Node))
+	}
+	if deed := view.deed(chatEvent{E: "press", ID: "create"}); deed.do != chatCreate {
+		t.Errorf("Create asks %+v", deed)
+	}
+	if deed := view.deed(chatEvent{E: "send", Text: "more"}); deed.do != chatNothing {
+		t.Errorf("a send under it asks %+v", deed)
+	}
+	for _, event := range []chatEvent{{E: "press", ID: "cancel"}, {E: "dismiss", ID: chatOver}} {
+		if deed := view.deed(event); deed.do != chatBack {
+			t.Errorf("%+v asks %+v", event, deed)
+		}
+	}
+	said = nil
+	run.act(chatDeed{do: chatBack})
+	if back := only(t, said); !slices.Equal(ops(back), []string{"remove", "draft"}) || back.Patch[1].Text != "try it your way" || view.plan != nil || view.mode != chatting || len(view.fans) != 2 {
+		t.Errorf("cancelled: %s, plan %+v, %+v", said, view.plan, view.fans)
+	}
+}
+
+// fanLab is a chat of a window that runs cat, in a worktree of a
+// repository where the echo agent is installed, with two of echo's models
+// marked and kept: what is said in the chat, and the window's number. With
+// lines the worktree has claude's conversation c1 of them, and the chat is
+// of it.
+func fanLab(t *testing.T, turns int) (a *app.App, repo *gittest.Repo, record model.Record, run *chatRun, messages *[][]byte, old string) {
+	t.Helper()
+	roleLab(t)
+	claude := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", claude)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	repo = gittest.New(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Plugins = pluginHost(config.Config{})
+	if record, err = a.New("forked"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.NewWindow(record, "old", session.What{}, []string{"cat"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range a.Windows(record) {
+		if w.Name == "old" {
+			old = strconv.Itoa(w.Index)
+		}
+	}
+	messages = new([][]byte)
+	run = &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, say: func(said ...[]byte) { *messages = append(*messages, said...) }, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
+	run.aim(app.Head{}, old)
+	t.Cleanup(func() { close(run.quit) })
+	run.view.runs.Agent = "claude"
+	run.say(run.view.talk.said()...)
+	if turns > 0 {
+		project := filepath.Join(claude, "projects", regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(record.Path, "-"))
+		if err := os.MkdirAll(project, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		cwd, _ := json.Marshal(record.Path)
+		lines := ""
+		for i := range turns {
+			who, content := "user", fmt.Sprintf(`"asked %d"`, i+1)
+			if i%2 == 1 {
+				who, content = "assistant", fmt.Sprintf(`[{"type":"text","text":"Reply %d."}]`, i+1)
+			}
+			lines += fmt.Sprintf(`{"type":"%s","cwd":%s,"timestamp":"2026-11-02T10:00:%02dZ","message":{"content":%s}}`+"\n", who, cwd, i, content)
+		}
+		if err := os.WriteFile(filepath.Join(project, "c1.jsonl"), []byte(lines), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		said, err := a.ConversationIn("c1", record.Name, 0)
+		if err != nil || len(said) != turns {
+			t.Fatalf("the conversation: %+v, %v", said, err)
+		}
+		run.view.id = "c1"
+		run.view.talk.heard(said)
+	}
+	run.act(run.view.deed(chatEvent{E: "press", ID: "open-models"}))
+	for _, id := range []string{"a|echo|loud", "a|echo|soft"} {
+		run.act(run.view.deed(chatEvent{E: "press", ID: "mark", Item: id}))
+	}
+	run.act(run.view.deed(chatEvent{E: "pick", List: "models", ID: "a|echo|soft"}))
+	if v := run.view; v.mode != chatting || len(v.fans) != 2 || v.talk.about != "claude · fan-out: echo · loud, echo · soft" || v.talk.hint != "Say something to 3 agents" {
+		t.Fatalf("the fan-out kept: mode %v, %+v, %q, %q", v.mode, v.fans, v.talk.about, v.talk.hint)
+	}
+	return a, repo, record, run, messages, old
+}
+
+// A message sent with a fan-out kept is first put up to be confirmed, with
+// exactly what is made: Cancel makes nothing and gives the words back.
+// Create makes a worktree for each agent at this one's last commit, named
+// and on a branch named for it with a number where taken, starts the agent
+// in it and sends it the conversation up to its last turn in front of the
+// words; then this chat's own agent is typed the words alone, the fan-out
+// is let go of, and a band of the chat's own says who else they went to.
+func TestAMessageFannedOutGoesToEachAgentInAWorktreeOfItsOwn(t *testing.T) {
+	a, repo, record, run, messages, old := fanLab(t, 4)
+	v := run.view
+	if err := os.WriteFile(filepath.Join(record.Path, "scratch"), []byte("not committed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	one, two := record.Name+"-echo", record.Name+"-echo-2"
+	*messages = nil
+	run.act(v.deed(chatEvent{E: "send", Text: "try it your way"}))
+	up := only(t, *messages)
+	if want := "worktree " + one + " on branch forked-echo · echo · loud worktree " + two + " on branch forked-echo-2 · echo · soft Uncommitted changes here are not copied. <⏎ create> <esc cancel>"; v.mode != confirming || wordsOf(*up.Patch[0].Node) != want {
+		t.Fatalf("to be confirmed, mode %v: %s", v.mode, wordsOf(*up.Patch[0].Node))
+	}
+	// cancelled: nothing is made or sent, and the words are the field's again
+	*messages = nil
+	run.act(v.deed(chatEvent{E: "dismiss", ID: chatOver}))
+	records, _ := a.Store.Load()
+	if back := only(t, *messages); back.Patch[len(back.Patch)-1].Op != "draft" || back.Patch[len(back.Patch)-1].Text != "try it your way" || len(records) != 1 ||
+		repo.Git("branch", "--list", "forked-echo*") != "" || len(v.fans) != 2 {
+		t.Fatalf("cancelled: %s, worktrees %+v, branches %q", *messages, records, repo.Git("branch", "--list", "forked-echo*"))
+	}
+	if screen, _ := session.Here().Capture(record.Name, old, false); strings.Contains(screen, "try it your way") {
+		t.Fatalf("cancelled, and it was sent:\n%s", screen)
+	}
+
+	// confirmed
+	run.act(v.deed(chatEvent{E: "send", Text: "try it your way"}))
+	*messages = nil
+	run.act(v.deed(chatEvent{E: "press", ID: "create"}))
+	head := repo.GitIn(record.Path, "rev-parse", "HEAD")
+	for name, model := range map[string]string{one: "loud", two: "soft"} {
+		path := repo.Root + "." + name
+		if repo.GitIn(path, "rev-parse", "HEAD") != head || repo.GitIn(path, "symbolic-ref", "--short", "HEAD") != strings.Replace(name, record.Name, "forked", 1) {
+			t.Errorf("%s is at %s on %s", name, repo.GitIn(path, "rev-parse", "HEAD"), repo.GitIn(path, "symbolic-ref", "--short", "HEAD"))
+		}
+		if _, err := os.Stat(filepath.Join(path, "scratch")); err == nil {
+			t.Errorf("%s has what was not committed", name)
+		}
+		made, err := a.RecordOrHere(name)
+		if runs := a.WindowRuns(made, "echo"); err != nil || runs.Agent != "echo" || runs.Model != model {
+			t.Errorf("%s runs %+v, %v", name, runs, err)
+		}
+		screenShows(t, name, "echo", "The conversation so far, with claude:", "Reply 4.", chatRule, "try it your way")
+	}
+	// this chat's own agent: the words alone, in place
+	if screen := screenShows(t, record.Name, old, "try it your way"); strings.Contains(screen, "The conversation so far") {
+		t.Errorf("this chat's agent was sent the conversation:\n%s", screen)
+	}
+	var toasts []string
+	var band *shownTurn
+	for _, message := range *messages {
+		for _, op := range read(t, message).Patch {
+			switch {
+			case op.Op == "toast":
+				toasts = append(toasts, op.Text)
+			case op.Op == "turn" && op.Turn.Kind == "switch":
+				band = op.Turn
+			}
+		}
+	}
+	if !slices.Equal(toasts, []string{"echo started in " + one, "echo started in " + two}) {
+		t.Errorf("said as each started: %q", toasts)
+	}
+	if band == nil || band.From != "sent to 3 agents" || band.To != "" || band.Note != "echo in "+one+" · echo in "+two {
+		t.Errorf("the band: %+v", band)
+	}
+	if v.fans != nil || v.plan != nil || v.talk.about != "claude" || v.talk.hint != "" || v.talk.status != nil {
+		t.Errorf("after it: %+v, %q, %q, %+v", v.fans, v.talk.about, v.talk.hint, v.talk.status)
+	}
+	// under what was sent, once the transcript says it; and each is kept as a fork, in the worktree it is in
+	v.talk.heard([]app.Turn{{N: 5, Kind: "asked", Text: "try it your way"}, {N: 6, Kind: "said", Text: "Tried."}})
+	got := read(t, v.talk.whole())
+	if turns := got.View.Turns; len(turns) != 7 || turns[4].Text != "try it your way" || turns[5].From != "sent to 3 agents" || turns[6].Text != "Tried." {
+		t.Errorf("the chat shows %+v", got.View.Turns)
+	}
+	kept, _ := filepath.Glob(filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "claude-c1-to-4.*.json"))
+	if len(kept) != 2 {
+		t.Fatalf("the records: %v", kept)
+	}
+	for _, file := range kept {
+		if text, _ := os.ReadFile(file); !strings.Contains(string(text), `"upto":4`) || !strings.Contains(string(text), `"worktree":"`+one) {
+			t.Errorf("a record keeps %s", text)
+		}
+	}
+}
+
+// A fan-out stops where one of its agents cannot be made: what was made
+// before stays as it is and heard the words, nothing more is made or sent,
+// this chat's own agent is sent nothing, the words are the field's again,
+// the status says what was made and what failed, and the agents not sent
+// to are still kept. From a chat with nothing said yet an agent is started
+// plainly and sent the words alone.
+func TestAFanOutThatFailsLeavesWhatWasMadeAndSendsNothingFurther(t *testing.T) {
+	a, repo, record, run, messages, old := fanLab(t, 0)
+	v := run.view
+	one, two := record.Name+"-echo", record.Name+"-echo-2"
+	run.act(v.deed(chatEvent{E: "send", Text: "try it your way"}))
+	if v.mode != confirming || v.plan.makes[1].name != two || v.plan.makes[1].branch != "forked-echo-2" || v.plan.dirty {
+		t.Fatalf("to be confirmed: mode %v, %+v", v.mode, v.plan)
+	}
+	repo.Git("branch", "forked-echo-2") // taken since it was put up
+	*messages = nil
+	run.act(v.deed(chatEvent{E: "press", ID: "create"}))
+	screen := screenShows(t, one, "echo", "echo-agent --model loud", "try it your way")
+	if strings.Contains(screen, "The conversation so far") {
+		t.Errorf("the first was sent a conversation there is none of:\n%s", screen)
+	}
+	records, _ := a.Store.Load()
+	if len(records) != 2 || session.Here().Exists(two) {
+		t.Errorf("made after it failed: %+v", records)
+	}
+	if screen, _ := session.Here().Capture(record.Name, old, false); strings.Contains(screen, "try it your way") {
+		t.Errorf("this chat's agent was sent it:\n%s", screen)
+	}
+	var status *muiStatus
+	draft := ""
+	for _, message := range *messages {
+		got := read(t, message)
+		if got.Whole != nil {
+			status = got.Status
+		}
+		for _, op := range got.Patch {
+			if op.Op == "draft" {
+				draft = op.Text
+			}
+		}
+	}
+	if status == nil || status.Tone != "bad" || !strings.HasPrefix(status.Text, "stopped at echo: nothing sent to claude · made: echo in "+one+" · ") || !strings.Contains(status.Text, "forked-echo-2 already exists") {
+		t.Errorf("the status: %+v", status)
+	}
+	if draft != "try it your way" || len(v.fans) != 1 || v.fans[0].model != "soft" || v.talk.hint != "Say something to 2 agents" || v.talk.about != "claude · fan-out: echo · soft" {
+		t.Errorf("after it: draft %q, %+v, %q, %q", draft, v.fans, v.talk.hint, v.talk.about)
 	}
 }
