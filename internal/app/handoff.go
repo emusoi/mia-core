@@ -39,6 +39,11 @@ type Continue struct {
 	Quiet bool
 	// Whole leaves no turn out of the handoff, however long it is.
 	Whole bool
+	// Upto makes it a fork: only the turns up to the one of this number
+	// are handed over, to an agent that may be the conversation's own, in
+	// a file of the fork's own. The conversation stays as it was, its
+	// agent never taking it up again as one handed back would be.
+	Upto int
 }
 
 // Talk names one conversation: whose it is, and its id.
@@ -81,6 +86,8 @@ type Continued struct {
 	Full    string `json:"full,omitempty"`
 	Turns   int    `json:"turns"`
 	LeftOut int    `json:"left_out,omitempty"`
+	// Upto is the turn a fork was made from, the last it has.
+	Upto int `json:"upto,omitempty"`
 	// Command is what the window runs.
 	Command string `json:"command"`
 	// Instruction is the agent's first message, and Sent whether mia typed
@@ -135,7 +142,7 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 			return Continued{}, fmt.Errorf("no conversation %s here — `mia api conversations` lists them, each with its id", want.ID)
 		}
 	}
-	if head.Agent == agent.Name {
+	if head.Agent == agent.Name && want.Upto == 0 {
 		return Continued{}, a.itsOwn(head, want)
 	}
 	if head.Worktree == "" || head.Gone {
@@ -157,6 +164,13 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 	if len(turns) == 0 {
 		return Continued{}, fmt.Errorf("nothing is said yet in %s's conversation %s in %s: there is nothing to go on from", head.Agent, head.ID, record.Name)
 	}
+	if want.Upto > 0 {
+		last := slices.IndexFunc(turns, func(t Turn) bool { return t.N == want.Upto })
+		if last < 0 {
+			return Continued{}, fmt.Errorf("%s's conversation %s in %s has no turn %d to fork from", head.Agent, head.ID, record.Name, want.Upto)
+		}
+		turns = turns[:last+1]
+	}
 
 	// as `mia window new <worktree> <agent>` starts one: the window of that name the config launches, when it runs the agent
 	command := agent.start()
@@ -168,7 +182,7 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 	// since it was handed on, none of it what was said in front of the
 	// person's first words then.
 	resumes := ""
-	if back, since := a.wentOnFrom(head, agent, heads); back != "" {
+	if back, since := a.wentOnFrom(head, agent, heads); back != "" && want.Upto == 0 {
 		if again, err := agent.resume(back); err == nil {
 			resumes, command = back, again
 			turns = slices.DeleteFunc(slices.Clone(turns), func(t Turn) bool { return !t.At.IsZero() && t.At.Before(since) })
@@ -189,6 +203,9 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 	}
 	now := time.Now()
 	named := filepath.Join(a.MiaDir, "handoffs", record.Name, notInName.ReplaceAllString(head.Agent+"-"+head.ID, "-"))
+	if want.Upto > 0 {
+		named += "-to-" + strconv.Itoa(want.Upto) // a fork's own: the handoff of the whole of it may still wait to be sent
+	}
 	file, full := named+".md", named+"-full.md"
 	budget := handoffBudget
 	if want.Whole {
@@ -199,7 +216,7 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 		full = ""
 	}
 	done := Continued{From: ContinuedFrom{Agent: head.Agent, ID: head.ID, Worktree: record.Name, Window: head.Window},
-		To: ContinuedTo{Agent: agent.Name, Window: WindowRef{Name: window}, ID: resumes}, Resumes: resumes, Handoff: file, Full: full, Turns: len(turns), LeftOut: left,
+		To: ContinuedTo{Agent: agent.Name, Window: WindowRef{Name: window}, ID: resumes}, Resumes: resumes, Handoff: file, Full: full, Turns: len(turns), LeftOut: left, Upto: want.Upto,
 		Command: command, Instruction: instruction(head.Agent, file),
 		Model: chosen.Model, Effort: chosen.Effort, Account: chosen.Account, DryRun: want.DryRun}
 	if done.Account == "" && agent.AccountEnv != "" {
@@ -233,7 +250,7 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 	}
 	// which went on as which is kept, for a list of conversations to say
 	link := fmt.Sprintf("%s.%d.json", named, now.UnixMilli())
-	if err := writeHandedOn(link, handedOn{From: done.From, To: done.To, Handoff: file, At: instant(now), Turns: done.Turns, LeftOut: left, Resumes: resumes}); err != nil {
+	if err := writeHandedOn(link, handedOn{From: done.From, To: done.To, Handoff: file, At: instant(now), Turns: done.Turns, LeftOut: left, Resumes: resumes, Upto: want.Upto}); err != nil {
 		return done, fmt.Errorf("%s: window %s opened, and that it goes on from %s's %s is not kept: %w", record.Name, done.To.Window.Name, head.Agent, head.ID, err)
 	}
 	if chosen != (Chosen{}) {
@@ -265,8 +282,8 @@ func (a *App) wentOnFrom(head Head, agent Agent, heads []Head) (id string, since
 	}
 	_, all := a.handedOnIn()
 	for _, one := range all {
-		if one.To.Agent != head.Agent || one.To.ID != head.ID || one.From.Agent != agent.Name || one.At.Before(since) {
-			continue
+		if one.To.Agent != head.Agent || one.To.ID != head.ID || one.From.Agent != agent.Name || one.At.Before(since) || one.Upto > 0 {
+			continue // (a fork leaves the conversation it was made from where it was)
 		}
 		if slices.ContainsFunc(heads, func(h Head) bool {
 			return h.Agent == agent.Name && h.ID == one.From.ID && h.Worktree == head.Worktree && !h.Gone && !h.Running
@@ -320,9 +337,9 @@ func headIn(heads []Head, worktree, window string) (Head, error) {
 
 // handedOn is the record of one handoff, kept beside it: which conversation
 // went on with which agent, in which window, and when; how many turns the
-// handoff had and how many of them it left out; and the agent's own
-// conversation it took up again, when it did. One written before those
-// were kept has none of the three.
+// handoff had and how many of them it left out; the agent's own
+// conversation it took up again, when it did; and of a fork the turn it
+// was made from. One written before those were kept has none of them.
 type handedOn struct {
 	From    ContinuedFrom `json:"from"`
 	To      ContinuedTo   `json:"to"`
@@ -331,17 +348,21 @@ type handedOn struct {
 	Turns   int           `json:"turns,omitempty"`
 	LeftOut int           `json:"left_out,omitempty"`
 	Resumes string        `json:"resumes,omitempty"`
+	Upto    int           `json:"upto,omitempty"`
 }
 
 // Handed is one handing of a conversation to another agent, as its record
 // keeps it: from which to which and when, how many turns were handed over
 // and how many of them were left out, and whether the agent took its own
-// conversation up again and was handed only what was said since.
+// conversation up again and was handed only what was said since. Of a
+// fork, Upto is the turn it was made from: the conversation it was made
+// from went its own way after it.
 type Handed struct {
 	From, To       Talk
 	At             time.Time
 	Turns, LeftOut int
 	Resumed        bool
+	Upto           int
 }
 
 // Handings is how a conversation came to be with its agent: each handing
@@ -369,7 +390,7 @@ func (a *App) Handings(agent, id string, from Talk) []Handed {
 			return chain
 		}
 		chain = slices.Insert(chain, 0, Handed{From: Talk{Agent: last.From.Agent, ID: last.From.ID}, To: Talk{Agent: last.To.Agent, ID: last.To.ID},
-			At: last.At, Turns: last.Turns, LeftOut: last.LeftOut, Resumed: last.Resumes != ""})
+			At: last.At, Turns: last.Turns, LeftOut: last.LeftOut, Resumed: last.Resumes != "", Upto: last.Upto})
 		agent, id, from, until = last.From.Agent, last.From.ID, Talk{}, last.At
 	}
 }
@@ -443,7 +464,7 @@ func (a *App) thread(heads []Head) {
 		for j := range heads {
 			h := &heads[j]
 			switch {
-			case h.Agent == one.From.Agent && h.ID == one.From.ID:
+			case h.Agent == one.From.Agent && h.ID == one.From.ID && one.Upto == 0: // a fork is no going on: what it was made from is as it was
 				h.ContinuedBy = &Talk{Agent: one.To.Agent, ID: one.To.ID}
 			case h.Agent == one.To.Agent && h.ID == one.To.ID:
 				h.Continues = &Talk{Agent: one.From.Agent, ID: one.From.ID}

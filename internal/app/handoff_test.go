@@ -78,10 +78,18 @@ func TestGoingOnWithAnotherAgentDryRunWritesAndStartsNothing(t *testing.T) {
 		by.Handoff != filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "pi-p1.md") {
 		t.Errorf("by its id: %+v %v", by, err)
 	}
+	// a fork: the turns up to one, in a file of its own, and for the conversation's own agent too
+	for _, with := range []string{"codex", "claude"} {
+		if fork, err := a.ContinueConversation(app.Continue{ID: "c1", With: with, Upto: 2, DryRun: true}); err != nil || fork.Turns != 2 || fork.Upto != 2 || fork.To.Agent != with ||
+			fork.Resumes != "" || fork.Handoff != filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "claude-c1-to-2.md") {
+			t.Errorf("forked from its turn 2 for %s: %+v %v", with, fork, err)
+		}
+	}
 	for _, refused := range []struct {
 		want app.Continue
 		says string
 	}{
+		{app.Continue{ID: "c1", With: "codex", Upto: 99, DryRun: true}, "has no turn 99 to fork from"},
 		{app.Continue{ID: "nobody", With: "pi", DryRun: true}, "no conversation nobody here"},
 		{app.Continue{ID: "c1", Worktree: filepath.Base(repo.Root), With: "pi", DryRun: true}, "no conversation c1 in " + filepath.Base(repo.Root)},
 		{app.Continue{ID: "c1", With: "nobody", DryRun: true}, "knows no agent nobody"},

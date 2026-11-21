@@ -183,13 +183,16 @@ type chatItem struct {
 }
 
 // chatPiece is the window's chat: a conversation's turns, the field that
-// types to its agent under them with reply, and Stop while working.
+// types to its agent under them with reply, and Stop while working. Menu
+// is what can be done with a reply, the menu of each: one chosen is said
+// as a pick of the chat, of the reply by its place, with the choice as sub.
 type chatPiece struct {
 	T       string            `json:"t"`
 	ID      string            `json:"id"`
 	Agent   string            `json:"agent"`
 	Reply   bool              `json:"reply"`
 	Working bool              `json:"working"`
+	Menu    []chatItem        `json:"menu,omitempty"`
 	Turns   []json.RawMessage `json:"turns"`
 }
 
@@ -288,17 +291,29 @@ func banded(band chatBand) chatTurn { return chatTurn{n: band.N, kind: band.Kind
 // waiting is a switch as it stands until what it says was handed over is
 // sent, with the person's next message: at the place before its own.
 func waiting(band chatBand) chatBand {
-	band.N, band.Note, band.Tone = band.N-1, "context goes with your next message", "warn"
+	note := "context goes with your next message"
+	if fork, _, _ := strings.Cut(band.Note, " · "); strings.HasPrefix(fork, forkedFrom) {
+		note = fork + " · " + note // a fork says where it was made from all along
+	}
+	band.N, band.Note, band.Tone = band.N-1, note, "warn"
 	return band
 }
 
+// forkedFrom is how the band of a fork begins: the number of the reply it
+// was made from follows.
+const forkedFrom = "forked from reply "
+
 // switched is the band of a handing: what was handed over, in how many
-// turns and how many of them left out, or that the agent took its own
-// conversation up again and how many turns were said since.
+// turns and how many of them left out, that the agent took its own
+// conversation up again and how many turns were said since, or of a fork
+// the reply it was made from.
 func switched(handed app.Handed) *chatBand {
 	note, since := "context handed over", ""
 	if handed.Resumed {
 		note, since = "took its own conversation up again", " since"
+	}
+	if handed.Upto > 0 {
+		note = forkedFrom + strconv.Itoa(handed.Upto)
 	}
 	if handed.Turns > 0 {
 		note += " · " + counted(handed.Turns, "turn") + since
@@ -468,9 +483,11 @@ type talk struct {
 	nth int
 	// cuts is where each turn heard stands: after the turns of the
 	// conversations this one goes on from, and the rows of the chat's own.
-	// last is the highest number heard.
-	cuts []chatCut
-	last int
+	// last is the highest number heard, and numbers the number each turn
+	// heard has in its conversation, by its place.
+	cuts    []chatCut
+	last    int
+	numbers map[int]int
 	// waits is the switch whose conversation has still to be sent to the
 	// agent, as it is said once it was: until then it is said as waiting.
 	waits *chatBand
@@ -554,9 +571,11 @@ func (t *talk) extras() []chatTurn {
 }
 
 // whole is the message that says the whole view: the line over the chat —
-// who answers, and at its right the keys that show the models and the
-// earlier conversations, buttons that tab reaches from the chat's field,
-// which types every letter — and the chat with the last turns that fit.
+// who answers, and at its right the keys that show the models, fork the
+// conversation from its last reply and show the earlier conversations,
+// buttons that tab reaches from the chat's field, which types every
+// letter — and the chat with the last turns that fit, each reply with the
+// menu that copies it or forks the conversation from it.
 // The keys are put on the chat's field, or on the modal's piece while one
 // stands over it.
 func (t *talk) whole() []byte {
@@ -564,7 +583,9 @@ func (t *talk) whole() []byte {
 	chat := chatPiece{T: "chat", ID: t.id(), Agent: t.agent, Reply: t.reply, Working: t.working, Turns: []json.RawMessage{}}
 	var buttons []json.RawMessage
 	if t.reply {
-		buttons = append(buttons, encode(chatButton{T: "button", ID: "open-models", Label: "models", Key: "m"}))
+		chat.Menu = []chatItem{{ID: "copy", Title: "Copy"}, {ID: "fork", Title: "Continue from here with…"}}
+		buttons = append(buttons, encode(chatButton{T: "button", ID: "open-models", Label: "models", Key: "m"}),
+			encode(chatButton{T: "button", ID: "open-fork", Label: "fork", Key: "f"}))
 	}
 	buttons = append(buttons, encode(chatButton{T: "button", ID: "open-earlier", Label: "earlier", Key: "e"}))
 	view := func() json.RawMessage {
@@ -696,9 +717,14 @@ func (t *talk) heard(turns []app.Turn) [][]byte {
 		if !drawn(turn) {
 			continue
 		}
+		number := turn.N
 		if turn.N = t.at(turn.N); turn.Question > 0 {
 			turn.Question = t.at(turn.Question)
 		}
+		if t.numbers == nil {
+			t.numbers = map[int]int{}
+		}
+		t.numbers[turn.N] = number
 		if turn.Kind == "asked" {
 			turn.Text = ownWords(turn.Text) // not the conversation said in front of them
 		}
@@ -743,6 +769,18 @@ func (t *talk) heard(turns []app.Turn) [][]byte {
 	return t.says(changed, after...)
 }
 
+// replied is the reply at a place, the last one for place 0: its words,
+// and its number in the conversation followed, 0 for one said in a
+// conversation this one goes on from.
+func (t *talk) replied(place int) (number int, words string, found bool) {
+	for _, turn := range slices.Backward(t.turns) {
+		if turn.kind == "said" && (place == 0 && t.numbers[turn.n] > 0 || turn.n == place) {
+			return t.numbers[turn.n], strings.TrimSuffix(strings.TrimPrefix(turn.words, "said\x00"), "\x00"), true
+		}
+	}
+	return 0, "", false
+}
+
 // lays makes the chat one that went from agent to agent, of its stretches
 // in order: the turns read back stay, each stretch after the one before; a
 // row of the chat's own stands after its stretch, with a place before its
@@ -760,7 +798,7 @@ func (t *talk) lays(parts []chatPart) {
 			}
 		case len(part.turns) > 0:
 			read := &talk{cuts: []chatCut{{0, place - part.turns[0].N + 1}}}
-			read.heard(part.turns)
+			read.heard(part.turns) // (their numbers are another conversation's: not kept)
 			t.turns = append(t.turns, read.turns...)
 			maps.Copy(t.answered, read.answered)
 			place = read.at(part.turns[len(part.turns)-1].N)
@@ -945,6 +983,11 @@ type chatView struct {
 	would  map[string]chatWould
 	tabbed string
 	came   []string
+	// fork is the reply the models were put up to fork the conversation
+	// from, by its number in the conversation, 0 when they were not: a pick
+	// then starts its agent in a window of its own with the conversation up
+	// to that reply, and this chat stays as it is.
+	fork int
 	// next is the model or the agent picked while the agent was at work: it
 	// is switched or handed to when the turn ends, and until then the line
 	// over the chat says it. It is this chat's alone, kept while it runs.
@@ -1176,6 +1219,10 @@ func (v *chatView) models(placed bool) json.RawMessage {
 			item.Does = "nothing"
 			item.About = []string{row.agent, "cannot be switched while it runs"}
 		}
+		if v.fork > 0 {
+			item.Does = "continue in " + row.agent
+			item.About = []string{"starts " + row.agent + " in a window of its own, with the conversation up to that reply", "this chat stays as it is, and " + v.agent() + " with it"}
+		}
 		if row.model == "" && !row.used {
 			item.Note = "its model is chosen inside it"
 		}
@@ -1218,7 +1265,11 @@ func (v *chatView) models(placed bool) json.RawMessage {
 	field := chatField{T: "field", ID: "q", Placeholder: "Search models", Icon: "search", Right: counted(len(rows), "model"), Bare: true, Live: true, List: "models"}
 	does, _ := v.does()
 	inside := []json.RawMessage{encode(field), encode(chatBox{T: "divider"}), does, encode(chatBox{T: "divider"}), encode(list)}
-	return encode(chatModal{T: "modal", ID: chatOver, Title: "Model", W: 520, Children: append(inside, v.foot()...)})
+	title := "Model"
+	if v.fork > 0 {
+		title = "Continue from reply " + strconv.Itoa(v.fork)
+	}
+	return encode(chatModal{T: "modal", ID: chatOver, Title: title, W: 520, Children: append(inside, v.foot()...)})
 }
 
 // does is the line under the models' search line, which says what picking
@@ -1230,7 +1281,9 @@ func (v *chatView) models(placed bool) json.RawMessage {
 // how many turns were said since. What is not done says why. While the
 // agent is at work a pick is kept as next, and the line says so; on the
 // row that is next it says when it is applied, with the key that stops
-// the agent and applies it now. tab is the button tab presses in it.
+// the agent and applies it now. Put up to fork the conversation, it says
+// who goes on from which reply with what, in a window of its own. tab is
+// the button tab presses in it.
 func (v *chatView) does() (line json.RawMessage, tab string) {
 	said := func(words, style string) json.RawMessage {
 		return encode(chatWords{T: "text", Text: words, Style: style})
@@ -1256,10 +1309,15 @@ func (v *chatView) does() (line json.RawMessage, tab string) {
 		return encode(chatBox{T: "col", ID: "does", Gap: 4, Pad: 4, Children: lines}), "now"
 	}
 	switch deed.do {
-	case chatHand:
+	case chatHand, chatFork:
 		lead := said(v.agent()+" → "+deed.agent, "strong")
 		would, looked := v.would[deed.agent]
 		turns, kept := would.done.Turns, would.done.Turns-would.done.LeftOut
+		// where it goes: with the person's next message here, or of a fork in the window it opens
+		sent := "Sent with your next message."
+		if deed.do == chatFork {
+			sent = "In a new window; this chat stays." // (which reply, the modal's title says)
+		}
 		switch {
 		case !looked:
 			lines = append(lines, row(lead))
@@ -1274,12 +1332,14 @@ func (v *chatView) does() (line json.RawMessage, tab string) {
 		default:
 			tab = "flip"
 			tabs := chatTabs{T: "tabs", ID: "carry", Boxed: true, Selected: "latest", Items: []chatItem{{ID: "latest", Title: "Latest"}, {ID: "whole", Title: "Whole conversation"}}}
-			under := fmt.Sprintf("The last %d of %d turns, as many as fit. Sent with your next message.", kept, turns)
+			under := fmt.Sprintf("The last %d of %d turns, as many as fit. %s", kept, turns, sent)
 			switch {
+			case v.whole && deed.do == chatFork:
+				tabs.Selected, under = "whole", "All "+counted(turns, "turn")+". "+sent
 			case v.whole:
 				tabs.Selected, under = "whole", "All "+counted(turns, "turn")+". Slower, and uses more of your plan."
 			case kept == turns:
-				under = "All " + counted(turns, "turn") + ": they fit. Sent with your next message."
+				under = "All " + counted(turns, "turn") + ": they fit. " + sent
 			}
 			lines = append(lines, row(lead, said("carries", "dim"), encode(tabs), encode(chatBox{T: "col", Grow: 1}), encode(chatButton{T: "button", ID: "flip", Key: "tab"})), said(under, "dim"))
 		}
@@ -1422,7 +1482,7 @@ func (v *chatView) shut(with ...json.RawMessage) [][]byte {
 	if v.mode == chatting {
 		return v.talk.patch(with...) // none stands: what was picked to come next is done with none over the chat
 	}
-	v.mode, v.told, v.talk.over, v.talk.keys = chatting, nil, nil, ""
+	v.mode, v.fork, v.told, v.talk.over, v.talk.keys = chatting, 0, nil, nil, ""
 	return v.talk.patch(slices.Concat([]json.RawMessage{encode(chatOp{Op: "remove", ID: chatOver})}, v.footed(), with)...)
 }
 
@@ -1503,6 +1563,9 @@ const (
 	chatContinue        // hand a conversation to this chat's agent, and show that
 	chatUnder           // say what the model the keys came to does
 	chatCarries         // carry the whole conversation to another agent, or its latest turns
+	chatForkUp          // show the models, to fork the conversation from a reply
+	chatFork            // start an agent in a window of its own on the conversation up to a reply
+	chatCopied          // put a reply's words on the clipboard
 	chatForget          // let go of what was picked to come next
 	chatNow             // stop the agent, so that what was picked to come next is done now
 )
@@ -1526,7 +1589,9 @@ type chatDeed struct {
 // another agent hands the conversation to that agent, when there is one
 // mia can read; while the agent is at work either is kept as what comes
 // next, the same picked again lets go of it, and tab on it stops the agent
-// so that it is done now. In Earlier ⏎
+// so that it is done now. A reply's menu copies it, or puts the models up
+// to fork the conversation from it, as the key that forks does from the
+// last reply; a pick then forks, at work or not. In Earlier ⏎
 // on the conversation a window has open shows it and on another takes it
 // up again, as its menu's first item does; c says what handing it over
 // does the first time it is pressed on a conversation, and does it the
@@ -1597,6 +1662,16 @@ func (v *chatView) deed(event chatEvent) chatDeed {
 	case v.window == "":
 	case event.E == "press" && event.ID == "open-models":
 		return chatDeed{do: chatModelsUp}
+	case event.E == "press" && event.ID == "open-fork":
+		return chatDeed{do: chatForkUp}
+	case event.E == "pick" && event.List == v.talk.id():
+		place, _ := strconv.Atoi(event.ID)
+		switch event.Sub {
+		case "copy":
+			return chatDeed{do: chatCopied, question: place}
+		case "fork":
+			return chatDeed{do: chatForkUp, question: place}
+		}
 	case event.E == "send" && strings.TrimSpace(event.Text) != "":
 		return chatDeed{do: chatSend, text: strings.TrimSpace(event.Text)}
 	case event.E == "choose":
@@ -1615,7 +1690,7 @@ func (v *chatView) comes(deed chatDeed) bool {
 }
 
 // picked is what picking a row of the models asks, whatever the agent is
-// doing.
+// doing: put up to fork the conversation, any agent's row forks it.
 func (v *chatView) picked(event chatEvent) chatDeed {
 	row, ok := chatModelOf(event.ID)
 	if !ok {
@@ -1629,6 +1704,8 @@ func (v *chatView) picked(event chatEvent) chatDeed {
 		}
 	}
 	switch {
+	case v.fork > 0:
+		return chatDeed{do: chatFork, agent: row.agent, model: row.model, effort: effort, whole: v.whole}
 	case row.agent != v.agent() && v.id == "":
 		return chatDeed{do: chatSay, text: "nothing is said here that mia can read yet: there is nothing for " + row.agent + " to go on with"}
 	case row.agent != v.agent():
@@ -1785,7 +1862,7 @@ func (r *chatRun) aim(head app.Head, window string) {
 	if v.talk != nil {
 		nth = v.talk.nth + 1
 	}
-	v.mode, v.told, v.tabbed, v.next, v.window, v.id = chatting, nil, "", nil, window, head.ID
+	v.mode, v.fork, v.told, v.tabbed, v.next, v.window, v.id = chatting, 0, nil, "", nil, window, head.ID
 	v.runs = app.Runs{Agent: head.Agent, Model: head.Model, Effort: head.Effort, Account: head.Account, Reads: true}
 	if window != "" {
 		if runs := r.a.WindowRuns(r.record, window); runs.Agent != "" {
@@ -1874,6 +1951,9 @@ func (r *chatRun) parts(of, from app.Talk) []chatPart {
 		with := handed.From
 		again := slices.ContainsFunc(chain[i+1:], func(later app.Handed) bool { return later.From == with }) || with == of && of.ID != ""
 		stretch(with, func(turn app.Turn) bool {
+			if handed.Upto > 0 && turn.N > handed.Upto {
+				return false // what the conversation it was forked from went on to say is not the fork's
+			}
 			if turn.At.IsZero() {
 				return !again
 			}
@@ -1998,7 +2078,19 @@ func (r *chatRun) act(deed chatDeed) {
 			return
 		}
 		r.note("", "")
-	case chatModelsUp:
+	case chatCopied:
+		if _, words, found := v.talk.replied(deed.question); found {
+			r.say(v.talk.patch(encode(chatOp{Op: "copy", Text: words}), v.talk.went("copied", "ok"))...)
+		}
+	case chatModelsUp, chatForkUp:
+		v.fork = 0
+		if deed.do == chatForkUp {
+			if v.fork, _, _ = v.talk.replied(deed.question); v.fork == 0 {
+				r.note("only a reply of this conversation's own is forked from: there is none here yet, or that one was said with another agent", "warn")
+				return
+			}
+			r.note("", "")
+		}
 		v.agents, v.setups, v.query = r.a.AgentModels(), r.a.Setups(filepath.Base(r.a.Root)), ""
 		v.under, v.whole, v.would = "", false, map[string]chatWould{}
 		v.mode = picking
@@ -2039,6 +2131,24 @@ func (r *chatRun) act(deed chatDeed) {
 		v.next = &deed
 		r.say(v.talk.patch(v.lined())...)
 		r.say(v.again()...)
+	case chatFork:
+		from, reply := v.agent(), v.fork
+		r.say(v.shut(v.talk.stands(&muiStatus{Text: cutTo(fmt.Sprintf("forking this conversation from reply %d, for %s…", reply, deed.agent), chatSaid)}))...)
+		done, err := r.a.ContinueConversation(app.Continue{ID: v.id, Worktree: r.record.Name, With: deed.agent, Model: deed.model, Effort: deed.effort, Quiet: true, Whole: deed.whole, Upto: reply})
+		switch {
+		case err != nil:
+			r.note(err.Error(), "bad")
+			return
+		case !done.Sent:
+			r.note(done.Problem, "bad")
+			return
+		}
+		// kept on its window: the chat of that window says it in front of the first thing sent there
+		text, tone := fmt.Sprintf("%s goes on from reply %d in window %s · this chat stays as it is", deed.agent, reply, done.To.Window.Name), "ok"
+		if err := r.carry(strconv.Itoa(done.To.Window.Index), from, v.id, done); err != nil {
+			text, tone = text+" · "+err.Error(), "warn"
+		}
+		r.say(v.talk.patch(v.talk.stands(nil), v.talk.went(text, tone))...)
 	case chatForget:
 		v.next = nil
 		r.say(v.talk.patch(v.lined())...)
@@ -2157,16 +2267,16 @@ func (r *chatRun) rests() bool {
 }
 
 // weighs looks at what handing the conversation to the agent of the model
-// under the keys would do, writing and starting nothing: once for an
-// agent while the models are up, so moving the keys reads no conversation
-// twice.
+// under the keys would do, or forking it for that agent from the reply the
+// models were put up for, writing and starting nothing: once for an agent
+// while the models are up, so moving the keys reads no conversation twice.
 func (r *chatRun) weighs() {
 	v := r.view
 	row, ok := chatModelOf(v.under)
-	if _, looked := v.would[row.agent]; !ok || looked || row.agent == v.agent() || v.id == "" {
+	if _, looked := v.would[row.agent]; !ok || looked || row.agent == v.agent() && v.fork == 0 || v.id == "" {
 		return
 	}
-	done, err := r.a.ContinueConversation(app.Continue{ID: v.id, Worktree: r.record.Name, With: row.agent, DryRun: true})
+	done, err := r.a.ContinueConversation(app.Continue{ID: v.id, Worktree: r.record.Name, With: row.agent, DryRun: true, Upto: v.fork})
 	v.would[row.agent] = chatWould{done, err}
 }
 

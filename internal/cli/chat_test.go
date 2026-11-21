@@ -25,12 +25,15 @@ import (
 
 // shownPiece is a piece of a view as the window reads it.
 type shownPiece struct {
-	T, ID, Title, Text, Style, Tone, Label, Key, Agent, Placeholder, Icon, Right, List, Menu, Selected string
-	Reply, Working, Bare, Live, Flat, Split                                                            bool
-	Grow, W, H, Max                                                                                    int
-	Children                                                                                           []shownPiece
-	Items                                                                                              []chatItem
-	Turns                                                                                              []shownTurn
+	T, ID, Title, Text, Style, Tone, Label, Key, Agent, Placeholder, Icon, Right, List, Selected string
+	Reply, Working, Bare, Live, Flat, Split                                                      bool
+	Grow, W, H, Max                                                                              int
+	// Menu is a list's word for the way into its items' menus, or a chat's
+	// menu of each reply.
+	Menu     any
+	Children []shownPiece
+	Items    []chatItem
+	Turns    []shownTurn
 }
 
 // shownTurn is a turn of a chat as the window reads it: a transcript's, or
@@ -434,16 +437,17 @@ func TestTheChatFillsItsPaneUnderALineThatSaysWhoAnswers(t *testing.T) {
 		t.Fatalf("view = %+v", got.Whole)
 	}
 	line := got.Whole.Children[0]
-	if line.T != "row" || len(line.Children) != 4 || line.Children[0].Text != "claude · opus · high · on work" || line.Children[0].ID != "about" || line.Children[0].Style != "dim" || line.Children[1].Grow != 1 {
+	if line.T != "row" || len(line.Children) != 5 || line.Children[0].Text != "claude · opus · high · on work" || line.Children[0].ID != "about" || line.Children[0].Style != "dim" || line.Children[1].Grow != 1 {
 		t.Errorf("line = %+v", line)
 	}
-	if m, e := line.Children[2], line.Children[3]; m.T != "button" || m.ID != "open-models" || m.Label != "models" || m.Key != "m" || e.T != "button" || e.ID != "open-earlier" || e.Label != "earlier" || e.Key != "e" {
+	if m, f, e := line.Children[2], line.Children[3], line.Children[4]; m.T != "button" || m.ID != "open-models" || m.Label != "models" || m.Key != "m" ||
+		f.T != "button" || f.ID != "open-fork" || f.Label != "fork" || f.Key != "f" || e.T != "button" || e.ID != "open-earlier" || e.Label != "earlier" || e.Key != "e" {
 		t.Errorf("buttons = %+v", line.Children[2:])
 	}
 
 	shown := &talk{agent: "codex", about: "codex"}
 	got = only(t, shown.heard(nil))
-	if line := got.Whole.Children[0]; got.Focus != "" || got.View.Reply || len(line.Children) != 3 || line.Children[2].ID != "open-earlier" {
+	if line := got.Whole.Children[0]; got.Focus != "" || got.View.Reply || got.View.Menu != nil || len(line.Children) != 3 || line.Children[2].ID != "open-earlier" {
 		t.Errorf("one no window has open: focus %q, line %+v", got.Focus, line)
 	}
 }
@@ -1929,4 +1933,216 @@ func TestWhatWasPickedWhileTheAgentWorkedIsDoneWhenItsTurnEnds(t *testing.T) {
 		t.Fatalf("sent as its turn ended: kept %+v, runs %+v", other.view.next, other.view.runs)
 	}
 	screenShows(t, record.Name, other.view.window, "The conversation so far, with claude:", "It is faster.", chatRule, "and the tests")
+}
+
+// A reply has a menu: its words copied, or the models put up to fork the
+// conversation from it, as the key that forks does from the last reply.
+// Only a reply of the conversation followed is forked from, by its number
+// there. Put up so, a pick of any agent's row, this chat's too, forks: the
+// line says who goes on from which reply with what, and the band of a
+// fork says the reply it was made from, waiting or sent.
+func TestAReplysMenuCopiesItOrForksTheConversationFromIt(t *testing.T) {
+	view := &chatView{talk: &talk{pane: "%5", agent: "claude", reply: true, working: true}, worktree: "monduli", window: "2", id: "c1",
+		runs: app.Runs{Agent: "claude", Model: "opus", Live: true}, agents: chatAgents(),
+		would: map[string]chatWould{"codex": {done: app.Continued{Turns: 9, LeftOut: 2}}, "claude": {done: app.Continued{Turns: 9}}}}
+	// the conversation followed stands after two turns of the one it goes on from
+	view.talk.lays([]chatPart{{turns: []app.Turn{{N: 1, Kind: "asked", Text: "before"}, {N: 2, Kind: "said", Text: "Said with another."}}}, {own: true}})
+	got := only(t, view.talk.heard([]app.Turn{{N: 1, Kind: "asked", Text: "make it faster"}, {N: 2, Kind: "said", Text: "It is faster."}, {N: 3, Kind: "asked", Text: "and the tests"}, {N: 4, Kind: "said", Text: "They pass."}}))
+	if menu, _ := json.Marshal(got.View.Menu); string(menu) != `[{"id":"copy","title":"Copy"},{"id":"fork","title":"Continue from here with…"}]` || !slices.Equal(numbers(got.View.Turns), []int{1, 2, 3, 4, 5, 6}) {
+		t.Fatalf("the chat's menu %s, its turns %v", menu, numbers(got.View.Turns))
+	}
+	for _, c := range []struct {
+		place, number int
+		words         string
+		found         bool
+	}{{0, 4, "They pass.", true}, {4, 2, "It is faster.", true}, {2, 0, "Said with another.", true}, {5, 0, "", false}, {9, 0, "", false}} {
+		if number, words, found := view.talk.replied(c.place); number != c.number || words != c.words || found != c.found {
+			t.Errorf("the reply at %d: %d %q %v", c.place, number, words, found)
+		}
+	}
+	for event, want := range map[chatEvent]chatDeed{
+		{E: "pick", List: "chat", ID: "4", Sub: "copy"}:  {do: chatCopied, question: 4},
+		{E: "pick", List: "chat", ID: "4", Sub: "fork"}:  {do: chatForkUp, question: 4},
+		{E: "press", ID: "open-fork"}:                    {do: chatForkUp},
+		{E: "pick", List: "chat", ID: "4"}:               {},
+		{E: "pick", List: "other", ID: "4", Sub: "fork"}: {},
+	} {
+		if deed := view.deed(event); deed != want {
+			t.Errorf("%+v asks %+v", event, deed)
+		}
+	}
+	var said [][]byte
+	run := &chatRun{view: view, say: func(messages ...[]byte) { said = append(said, messages...) }}
+	run.act(chatDeed{do: chatCopied, question: 4})
+	if copied := only(t, said); !slices.Equal(ops(copied), []string{"copy", "toast"}) || copied.Patch[0].Text != "It is faster." {
+		t.Errorf("copied as %s", said)
+	}
+	said = nil
+	run.act(chatDeed{do: chatForkUp, question: 2}) // another conversation's: nothing is put up
+	if status := view.talk.status; view.mode != chatting || view.fork != 0 || status == nil || status.Tone != "warn" || !strings.Contains(status.Text, "only a reply of this conversation's own") {
+		t.Errorf("forked from another conversation's reply: mode %v, %+v", view.mode, status)
+	}
+
+	// the models put up to fork from reply 2: any row forks, at work or not, and its own agent's too
+	view.fork = 2
+	modal := only(t, view.up(picking)).Patch[0].Node
+	view.under = "a|codex|gpt-6-luna"
+	if line, tab := view.does(); modal.Title != "Continue from reply 2" || tab != "flip" ||
+		wordsOf(*pieceOf(t, line)) != "claude → codex carries [latest] <tab flip> The last 7 of 9 turns, as many as fit. In a new window; this chat stays." {
+		t.Errorf("the models to fork with: %q, %q", modal.Title, wordsOf(*pieceOf(t, line)))
+	}
+	for _, item := range modal.Children[4].Items {
+		if item.ID != "" && (item.Does != "continue in "+strings.Split(item.ID, "|")[1] || len(item.About) != 2 || !strings.Contains(item.About[1], "this chat stays as it is")) {
+			t.Errorf("a row to fork with: %+v", item)
+		}
+	}
+	if deed := view.deed(chatEvent{E: "pick", List: "models", ID: "a|codex|gpt-6-luna", Sub: "high"}); deed != (chatDeed{do: chatFork, agent: "codex", model: "gpt-6-luna", effort: "high"}) {
+		t.Errorf("a pick asks %+v", deed)
+	}
+	view.whole, view.under = true, "a|claude|sonnet"
+	if deed := view.deed(chatEvent{E: "pick", List: "models", ID: "a|claude|sonnet"}); deed != (chatDeed{do: chatFork, agent: "claude", model: "sonnet", whole: true}) {
+		t.Errorf("its own agent's row asks %+v", deed)
+	}
+	if line, _ := view.does(); wordsOf(*pieceOf(t, line)) != "claude → claude carries [whole] <tab flip> All 9 turns. In a new window; this chat stays." {
+		t.Errorf("its own agent's line: %q", wordsOf(*pieceOf(t, line)))
+	}
+	view.shut()
+	if view.fork != 0 {
+		t.Error("taken away, the models still fork")
+	}
+
+	// the band of a fork
+	band := switched(app.Handed{From: app.Talk{Agent: "claude"}, To: app.Talk{Agent: "codex"}, Turns: 9, LeftOut: 2, Upto: 14})
+	if band.Note != "forked from reply 14 · 9 turns · 2 left out" || waiting(*band).Note != "forked from reply 14 · context goes with your next message" {
+		t.Errorf("a fork's band: %q, waiting %q", band.Note, waiting(*band).Note)
+	}
+	if plain := switched(app.Handed{Turns: 9}); waiting(*plain).Note != "context goes with your next message" {
+		t.Errorf("a handing's band waits as %q", waiting(*plain).Note)
+	}
+}
+
+// A conversation forked from a reply goes on with another agent in a
+// window of its own, with only the turns up to that reply: the window of
+// the agent it was with stays open and this chat is as it was. The fork is
+// kept as a handing is, with the reply it was made from, so the chat of
+// its window shows the turns up to that reply and the band that says so,
+// and sends them in front of the first thing said there.
+func TestAConversationForkedFromAReplyGoesOnInAWindowOfItsOwn(t *testing.T) {
+	roleLab(t)
+	claude := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", claude)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	repo := gittest.New(t)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Plugins = pluginHost(config.Config{})
+	record, err := a.New("forked")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := filepath.Join(claude, "projects", regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(record.Path, "-"))
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cwd, _ := json.Marshal(record.Path)
+	said := func(who, at, text string) string {
+		content, _ := json.Marshal(text)
+		if who == "assistant" {
+			content = []byte(`[{"type":"text","text":` + string(content) + `}]`)
+		}
+		return `{"type":"` + who + `","cwd":` + string(cwd) + `,"timestamp":"2026-11-02T10:00:` + at + `Z","message":{"content":` + string(content) + `}}` + "\n"
+	}
+	lines := said("user", "00", "make the list faster") + said("assistant", "05", "It is faster.") + said("user", "10", "now drop the cache") + said("assistant", "15", "The cache is gone.")
+	if err := os.WriteFile(filepath.Join(project, "c1.jsonl"), []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.NewWindow(record, "old", session.What{}, []string{"cat"}); err != nil {
+		t.Fatal(err)
+	}
+	old := ""
+	for _, w := range a.Windows(record) {
+		if w.Name == "old" {
+			old = strconv.Itoa(w.Index)
+		}
+	}
+	var messages [][]byte
+	chat := func(window string) *chatRun {
+		run := &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, say: func(said ...[]byte) { messages = append(messages, said...) }, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
+		run.aim(app.Head{}, window)
+		t.Cleanup(func() { close(run.quit) })
+		return run
+	}
+	first := chat(old)
+	first.view.id, first.view.runs.Agent = "c1", "claude"
+	turns, err := a.ConversationIn("c1", record.Name, 0)
+	if err != nil || len(turns) != 4 {
+		t.Fatalf("the conversation: %+v, %v", turns, err)
+	}
+	first.view.talk.heard(turns)
+
+	// from its first reply, by the reply's menu: the models, and a pick of them
+	first.act(first.view.deed(chatEvent{E: "pick", List: "chat", ID: "2", Sub: "fork"}))
+	if first.view.mode != picking || first.view.fork != 2 {
+		t.Fatalf("the models to fork with: mode %v, from reply %d", first.view.mode, first.view.fork)
+	}
+	// looked at for the agent of the row under the keys, the conversation's own too
+	under, _ := chatModelOf(first.view.under)
+	if would := first.view.would[under.agent]; would.err != nil || would.done.Turns != 2 || would.done.Upto != 2 || !would.done.DryRun {
+		t.Errorf("what forking would do, under the keys %q: %+v", first.view.under, would)
+	}
+	messages = nil
+	first.act(first.view.deed(chatEvent{E: "pick", List: "models", ID: "a|echo|loud"}))
+	if toast := read(t, messages[len(messages)-1]); first.view.mode != chatting || first.view.window != old || first.view.id != "c1" || first.view.runs.Agent != "claude" ||
+		!slices.Equal(ops(toast), []string{"status", "toast"}) || toast.Patch[1].Tone != "ok" || toast.Patch[1].Text != "echo goes on from reply 2 in window echo · this chat stays as it is" {
+		t.Fatalf("forked: window %s, %+v, said %s", first.view.window, first.view.runs, messages)
+	}
+	if !session.Here().HasWindow(record.Name, "old") || !session.Here().HasWindow(record.Name, "echo") {
+		t.Fatal("the window it was forked from is closed, or none was opened")
+	}
+	screenShows(t, record.Name, "echo", "echo-agent --model loud")
+	window := ""
+	for _, w := range a.Windows(record) {
+		if w.Name == "echo" {
+			window = strconv.Itoa(w.Index)
+		}
+	}
+	carried, on := a.CarriedInWindow(record, window)
+	if !on || carried.From != "claude" || carried.ID != "c1" || filepath.Base(carried.File) != "claude-c1-to-2.md" {
+		t.Fatalf("on the fork's window: %+v, %v", carried, on)
+	}
+	if text, _ := os.ReadFile(carried.File); !strings.Contains(string(text), "It is faster.") || strings.Contains(string(text), "drop the cache") || !strings.Contains(string(text), "2 turns, in order") {
+		t.Errorf("the fork's handoff:\n%s", text)
+	}
+	if records, _ := filepath.Glob(filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "claude-c1-to-2.*.json")); len(records) != 1 {
+		t.Errorf("the fork's records: %v", records)
+	} else if kept, _ := os.ReadFile(records[0]); !strings.Contains(string(kept), `"turns":2`) || !strings.Contains(string(kept), `"upto":2`) {
+		t.Errorf("the record keeps %s", kept)
+	}
+	if _, on := a.CarriedInWindow(record, old); on {
+		t.Error("the window it was forked from is to be sent something")
+	}
+
+	// the chat of the fork's window: the turns up to the reply, and the band that says where it was forked from
+	second := chat(window)
+	got := read(t, second.view.talk.whole())
+	if band := got.View.Turns[len(got.View.Turns)-1]; len(got.View.Turns) != 3 || got.View.Turns[1].Text != "It is faster." ||
+		band.Kind != "switch" || band.From != "claude" || band.To != "echo" || band.Tone != "warn" || band.Note != "forked from reply 2 · context goes with your next message" {
+		t.Fatalf("the fork's chat shows %+v", got.View.Turns)
+	}
+	messages = nil
+	second.act(chatDeed{do: chatSend, text: "and the tests"})
+	if went := read(t, messages[len(messages)-1]); !slices.Equal(ops(went), []string{"unturn", "turn"}) || went.Patch[1].Turn.Note != "forked from reply 2 · 2 turns" {
+		t.Errorf("once sent, the band is said as %s", messages[len(messages)-1])
+	}
+	screen := screenShows(t, record.Name, window, "The conversation so far, with claude:", "It is faster.", chatRule, "and the tests")
+	if strings.Contains(screen, "drop the cache") {
+		t.Errorf("the fork was sent what came after the reply:\n%s", screen)
+	}
+	// and the conversation it was forked from is typed to as ever, with nothing in front
+	first.act(chatDeed{do: chatSend, text: "go on"})
+	if screen := screenShows(t, record.Name, old, "go on"); strings.Contains(screen, "The conversation so far") {
+		t.Errorf("the window it was forked from was sent the conversation:\n%s", screen)
+	}
 }
