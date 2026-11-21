@@ -74,6 +74,7 @@ type heardByWindow struct {
 		Turn               *shownTurn
 		On                 *bool
 		Node               *shownPiece
+		Window             string
 	} `json:"patch"`
 	Close bool `json:"close"`
 }
@@ -821,7 +822,7 @@ func TestTheLineUnderTheModelsSearchSaysWhatAPickDoes(t *testing.T) {
 		t.Fatalf("picked with the whole: %+v", deed)
 	}
 	mia := &fakeMia{done: app.Continued{Sent: true}}
-	if handTo(mia, model.Record{Name: "monduli"}, view.id, "", "claude", deed.agent, deed.model, deed.effort, deed.whole); !slices.Equal(mia.asked, []string{"continue c1 in monduli with codex gpt-6-luna high quiet=true whole"}) {
+	if handTo(mia, model.Record{Name: "monduli"}, view.id, "", "claude", deed.agent, deed.model, deed.effort, deed.whole, func(app.Continued) {}); !slices.Equal(mia.asked, []string{"continue c1 in monduli with codex gpt-6-luna high quiet=true whole"}) {
 		t.Errorf("handed over as %q", mia.asked)
 	}
 	// a press on a choice takes that one, and tab again the other
@@ -1198,18 +1199,23 @@ func (f *fakeMia) ContinueConversation(want app.Continue) (app.Continued, error)
 	return f.done, f.refuses
 }
 
-func (f *fakeMia) CloseWindow(record model.Record, window string) error {
-	f.asked = append(f.asked, "close "+record.Name+" "+window)
+func (f *fakeMia) ReplaceWindow(record model.Record, window, with string) error {
+	f.asked = append(f.asked, "close "+record.Name+" "+window+" for "+with)
 	return f.stays
 }
 
 // A model of another agent picked hands the conversation to that agent,
 // for every pair of the agents mia knows: it is started quiet on the
 // model in a window of its own, and only once it runs is the window of
-// the agent it was with closed. Refused, ended as it started, or this
-// chat's own window: nothing is closed, and what is said says why.
+// the agent it was with closed, last, the other's put in front in its
+// place: what is to be done while both are there is done before. Refused,
+// ended as it started, or this chat's own window: nothing is closed, and
+// what is said says why.
 func TestAnotherAgentsModelHandsTheConversationOverAndClosesTheOldWindowLast(t *testing.T) {
 	record := model.Record{Name: "monduli"}
+	ready := func(mia *fakeMia) func(app.Continued) {
+		return func(app.Continued) { mia.asked = append(mia.asked, "ready") }
+	}
 	agents := []app.AgentModels{
 		{Name: "claude", Models: []plugin.Model{{ID: "opus"}}, Efforts: []string{"high"}, Live: true, Installed: true},
 		{Name: "codex", Models: []plugin.Model{{ID: "gpt-6-luna"}}, Efforts: []string{"high"}, Live: true, Installed: true},
@@ -1232,8 +1238,8 @@ func TestAnotherAgentsModelHandsTheConversationOverAndClosesTheOldWindowLast(t *
 				t.Fatalf("%s to %s asks %+v", from.Name, to.Name, deed)
 			}
 			mia := &fakeMia{done: app.Continued{Sent: true, To: app.ContinuedTo{Agent: to.Name, Window: app.WindowRef{Index: 5, Name: to.Name}}}}
-			went := handTo(mia, record, view.id, view.window, from.Name, deed.agent, deed.model, deed.effort, deed.whole)
-			want := []string{fmt.Sprintf("continue c1 in monduli with %s %s %s quiet=true", to.Name, pick.model, sub), "close monduli 2"}
+			went := handTo(mia, record, view.id, view.window, from.Name, deed.agent, deed.model, deed.effort, deed.whole, ready(mia))
+			want := []string{fmt.Sprintf("continue c1 in monduli with %s %s %s quiet=true", to.Name, pick.model, sub), "ready", "close monduli 2 for " + to.Name}
 			if !slices.Equal(mia.asked, want) || !went.went || went.tone != "ok" || went.text != from.Name+" stopped · "+to.Name+" goes on with this conversation" {
 				t.Errorf("%s to %s: asked %q, went %+v", from.Name, to.Name, mia.asked, went)
 			}
@@ -1241,19 +1247,19 @@ func TestAnotherAgentsModelHandsTheConversationOverAndClosesTheOldWindowLast(t *
 	}
 
 	mia := &fakeMia{refuses: errors.New("nothing is said yet in claude's conversation c1")}
-	if went := handTo(mia, record, "c1", "2", "claude", "codex", "", "", false); went.went || went.tone != "bad" || went.text != "nothing is said yet in claude's conversation c1" || len(mia.asked) != 1 {
+	if went := handTo(mia, record, "c1", "2", "claude", "codex", "", "", false, ready(mia)); went.went || went.tone != "bad" || went.text != "nothing is said yet in claude's conversation c1" || len(mia.asked) != 1 {
 		t.Errorf("refused: %+v, asked %q", went, mia.asked)
 	}
 	mia = &fakeMia{done: app.Continued{Problem: "codex ended as soon as it started, saying:\n  not signed in"}}
-	if went := handTo(mia, record, "c1", "2", "claude", "codex", "", "", false); went.went || went.tone != "bad" || !strings.HasPrefix(went.text, "claude still runs — codex ended as soon as it started") || len(mia.asked) != 1 {
+	if went := handTo(mia, record, "c1", "2", "claude", "codex", "", "", false, ready(mia)); went.went || went.tone != "bad" || !strings.HasPrefix(went.text, "claude still runs — codex ended as soon as it started") || len(mia.asked) != 1 {
 		t.Errorf("the other agent ended: %+v, asked %q", went, mia.asked)
 	}
 	mia = &fakeMia{done: app.Continued{Sent: true}}
-	if went := handTo(mia, record, "c1", "", "claude", "codex", "", "", false); !went.went || went.text != "codex goes on with this conversation · claude's window stays" || len(mia.asked) != 1 {
+	if went := handTo(mia, record, "c1", "", "claude", "codex", "", "", false, ready(mia)); !went.went || went.text != "codex goes on with this conversation · claude's window stays" || len(mia.asked) != 2 {
 		t.Errorf("with no window to close: %+v, asked %q", went, mia.asked)
 	}
 	mia = &fakeMia{done: app.Continued{Sent: true}, stays: errors.New("no window 2")}
-	if went := handTo(mia, record, "c1", "2", "claude", "codex", "", "", false); !went.went || went.tone != "warn" || !strings.Contains(went.text, "claude's window is still open: no window 2") {
+	if went := handTo(mia, record, "c1", "2", "claude", "codex", "", "", false, ready(mia)); !went.went || went.tone != "warn" || !strings.Contains(went.text, "claude's window is still open: no window 2") {
 		t.Errorf("a window that would not close: %+v", went)
 	}
 
@@ -1596,8 +1602,11 @@ func TestWhatAWindowGoesOnFromIsSaidOnceWhicheverChatSendsFirst(t *testing.T) {
 // window, where a chat started after finds it: the turns so far over the
 // line that says who goes on, and the handoff said with the first thing
 // sent, after which the window keeps nothing. The old agent's window is
-// closed, and the chat of the new one is said whole with a toast that
-// says so, not a status that stays.
+// closed, the new one's in front wherever it was, in the session and in a
+// view of it, and not the window tmux would choose; before it is closed
+// whoever shows the chat is told which window it is of from now on, and
+// the chat of the new one is said whole with a toast that says so, not a
+// status that stays.
 func TestAHandingIsKeptOnTheNewWindowUntilTheFirstSend(t *testing.T) {
 	roleLab(t)
 	claude := t.TempDir()
@@ -1639,12 +1648,33 @@ func TestAHandingIsKeptOnTheNewWindowUntilTheFirstSend(t *testing.T) {
 		t.Cleanup(func() { close(run.quit) })
 		return run
 	}
+	// the old agent's window is in front, in the session and in a view of it, which has a front window of its own
+	view := session.Name(record.Name) + "-desk1"
+	for _, args := range [][]string{
+		{"select-window", "-t", session.Target(record.Name, "old")},
+		{"new-session", "-d", "-s", view, "-t", session.Target(record.Name, "")},
+		{"select-window", "-t", "=" + view + ":old"},
+	} {
+		if out, err := exec.Command("tmux", args...).CombinedOutput(); err != nil {
+			t.Fatalf("tmux %v: %s", args, out)
+		}
+	}
 	first := chat(old)
 	first.view.id, first.view.runs.Agent = "c1", "claude"
+	first.view.talk.whole() // its view was said: what changes is said to whoever shows it
 	first.act(chatDeed{do: chatHand, agent: "echo", model: "loud"})
-	if len(said) != 2 || first.view.mode != chatting {
+	if len(said) != 4 || first.view.mode != chatting {
 		t.Fatalf("%d messages: %s", len(said), said)
 	}
+	for _, in := range []string{session.Name(record.Name), view} {
+		if out, _ := exec.Command("tmux", "display-message", "-p", "-t", "="+in+":", "#{window_name}").Output(); strings.TrimSpace(string(out)) != "echo" {
+			t.Errorf("in front in %s is %q, not the window of the agent it was handed to", in, out)
+		}
+	}
+	if moved := read(t, said[1]); !slices.Equal(ops(moved), []string{"window"}) || !strings.HasPrefix(moved.Patch[0].Window, "@") || moved.Patch[0].Window != a.WindowID(record, "echo") {
+		t.Errorf("whoever shows the chat is told it is of %s now: %s", a.WindowID(record, "echo"), said[1])
+	}
+	said = said[2:]
 	if whole, toast := read(t, said[0]), read(t, said[1]); whole.View == nil || whole.View.ID != "chat-1" || whole.View.Agent != "echo" ||
 		len(toast.Patch) != 1 || toast.Patch[0].Op != "toast" || toast.Patch[0].Tone != "ok" || toast.Patch[0].Text != "claude stopped · echo goes on with this conversation" {
 		t.Fatalf("said %s", said)

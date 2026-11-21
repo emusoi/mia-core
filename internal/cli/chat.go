@@ -217,6 +217,8 @@ type chatOp struct {
 	Tone string          `json:"tone,omitempty"`
 	Node json.RawMessage `json:"node,omitempty"`
 	Keys *[]chatKey      `json:"keys,omitempty"`
+	// Window is the window a chat is of from now on, by tmux's own name for it.
+	Window string `json:"window,omitempty"`
 }
 
 // chatTurn is a turn as the window is told it, its place, and what it
@@ -1905,7 +1907,7 @@ func chatOf(heads []app.Head, worktree, window, id string) (app.Head, error) {
 // handing is what handing a conversation to another agent asks of mia.
 type handing interface {
 	ContinueConversation(want app.Continue) (app.Continued, error)
-	CloseWindow(record model.Record, window string) error
+	ReplaceWindow(record model.Record, window, with string) error
 }
 
 // handed is how a handing went: whether the chat is now the other agent's
@@ -1921,20 +1923,24 @@ type handed struct {
 // started on a model and an effort in a window of its own, told nothing;
 // whole, no turn of it is left out of what is written.
 // Only once that agent runs is the window of the one it was with closed,
-// so one agent goes on; window is that window, "" when it is not to be
-// closed. Refused, or the other agent not running, nothing is closed and
-// the reason is said.
-func handTo(mia handing, record model.Record, id, window, from, to, model, effort string, whole bool) handed {
+// so one agent goes on, and the other's window is put in front wherever
+// that one was; window is that window, "" when it is not to be closed.
+// ready is called between the two, the other agent running and nothing
+// closed yet: whoever shows this chat may end it as its window goes.
+// Refused, or the other agent not running, nothing is closed and the
+// reason is said.
+func handTo(mia handing, record model.Record, id, window, from, to, model, effort string, whole bool, ready func(app.Continued)) handed {
 	done, err := mia.ContinueConversation(app.Continue{ID: id, Worktree: record.Name, With: to, Model: model, Effort: effort, Quiet: true, Whole: whole})
 	switch {
 	case err != nil:
 		return handed{text: err.Error(), tone: "bad"}
 	case !done.Sent:
 		return handed{done: done, tone: "bad", text: from + " still runs — " + done.Problem}
-	case window == "":
+	}
+	if ready(done); window == "" {
 		return handed{done: done, went: true, tone: "ok", text: to + " goes on with this conversation · " + from + "'s window stays"}
 	}
-	if err := mia.CloseWindow(record, window); err != nil {
+	if err := mia.ReplaceWindow(record, window, done.To.Window.Name); err != nil {
 		return handed{done: done, went: true, tone: "warn", text: fmt.Sprintf("%s goes on with this conversation · %s's window is still open: %v", to, from, err)}
 	}
 	return handed{done: done, went: true, tone: "ok", text: from + " stopped · " + to + " goes on with this conversation"}
@@ -2365,7 +2371,7 @@ func (r *chatRun) act(deed chatDeed) {
 		// As a switch of agents is: this window's agent started on it and told
 		// nothing, the conversation carried in front of the first thing sent.
 		head, _ := v.headOf(deed.id)
-		went := handTo(r.a, r.record, deed.id, "", head.Agent, v.agent(), "", "", false)
+		went := handTo(r.a, r.record, deed.id, "", head.Agent, v.agent(), "", "", false, func(app.Continued) {})
 		if !went.went {
 			v.armed = ""
 			r.note(went.text, went.tone)
@@ -2541,15 +2547,21 @@ func (r *chatRun) applies(deed chatDeed) bool {
 		window = "" // this chat's own window: closing it would end the chat
 	}
 	r.say(v.shut(v.talk.stands(&muiStatus{Text: cutTo("handing this conversation to "+deed.agent+"…", chatSaid)}))...)
-	went := handTo(r.a, r.record, v.id, window, from, deed.agent, deed.model, deed.effort, deed.whole)
+	var kept error
+	went := handTo(r.a, r.record, v.id, window, from, deed.agent, deed.model, deed.effort, deed.whole, func(done app.Continued) {
+		// kept on its window: whichever chat of it sends first says it, this one or one started after
+		kept = r.carry(done.To.Window.Name, from, v.id, done)
+		if window != "" {
+			// whoever shows this chat behind the window about to close shows it behind the other's from now on
+			r.say(v.talk.patch(encode(chatOp{Op: "window", Window: r.a.WindowID(r.record, done.To.Window.Name)}))...)
+		}
+	})
 	if !went.went {
 		r.note(went.text, went.tone)
 		return false
 	}
 	done := went.done
 	to := r.nowAt(done.To.Window)
-	// kept on its window: whichever chat of it sends first says it, this one or one started after
-	kept := r.carry(to, from, v.id, done)
 	r.aim(app.Head{ID: done.Resumes, Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
 	if done.Resumes != "" {
 		went.text = from + " stopped · " + done.To.Agent + " takes its own conversation up again, with what was said since"

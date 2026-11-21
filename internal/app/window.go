@@ -114,6 +114,27 @@ func (a *App) CloseWindow(record model.Record, window string) error {
 	return nil
 }
 
+// ReplaceWindow closes a window of a worktree's session with another of
+// its windows put in front wherever the one closed was: what closing the
+// window of an agent a conversation was handed on from is.
+func (a *App) ReplaceWindow(record model.Record, window, with string) error {
+	host, window, err := a.windowNamed(record, window)
+	if err != nil {
+		return err
+	}
+	if err := host.ReplaceWindow(record.Name, window, with); err != nil {
+		return err
+	}
+	_ = a.Remember() // without the window, so it is not brought back
+	return nil
+}
+
+// WindowID is tmux's own name for a window of a worktree's session, which
+// the window keeps wherever it stands; "" when there is no such window.
+func (a *App) WindowID(record model.Record, window string) string {
+	return a.sessionOf(record).WindowID(record.Name, window)
+}
+
 // SendToWindow types text into a window and Enter after it, unless the
 // window asks something: Enter would answer it.
 func (a *App) SendToWindow(record model.Record, window, text string) error {

@@ -820,4 +820,39 @@ func (h Host) KillWindow(worktree, window string) error {
 	return nil
 }
 
+// WindowID is tmux's own name for a window of a worktree's session, @12,
+// which the window keeps wherever it stands; "" when there is no such
+// window.
+func (h Host) WindowID(worktree, window string) string {
+	out, err := h.run("display-message", "-p", "-t", Target(worktree, window), "#{window_id}")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
+// ReplaceWindow closes a window of a worktree's session and puts another
+// in front in its place: in the session and in each view of it, which has
+// a front window of its own, wherever the one closed was in front. It is
+// one command to tmux, so no session is seen with a window of tmux's
+// choosing in front between the two.
+func (h Host) ReplaceWindow(worktree, window, with string) error {
+	closed, group := h.WindowID(worktree, window), ""
+	if out, err := h.run("display-message", "-p", "-t", Target(worktree, ""), "#{session_group}"); err == nil {
+		group = strings.TrimSpace(out)
+	}
+	sessions, _ := h.run("list-sessions", "-F", "#{session_name}|#{session_group}|#{window_id}")
+	var args []string
+	for line := range strings.SplitSeq(strings.TrimSpace(sessions), "\n") {
+		fields := strings.SplitN(line, "|", 3)
+		if len(fields) == 3 && fields[2] == closed && (fields[0] == Name(worktree) || group != "" && fields[1] == group) {
+			args = append(args, "select-window", "-t", exact(fields[0])+":"+with, ";")
+		}
+	}
+	if out, err := h.run(append(args, "kill-window", "-t", Target(worktree, window))...); err != nil {
+		return fmt.Errorf("stop %s in %s: %s", window, worktree, strings.TrimSpace(out))
+	}
+	return nil
+}
+
 func Exists(worktree string) bool { return Here().Exists(worktree) }
