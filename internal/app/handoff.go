@@ -267,17 +267,23 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 	if err := writeHandedOn(link, handedOn{From: done.From, To: done.To, Handoff: file, At: instant(now), Turns: done.Turns, LeftOut: left, Resumes: resumes, Upto: want.Upto}); err != nil {
 		return done, fmt.Errorf("%s: window %s opened, and that it goes on from %s's %s is not kept: %w", in.Name, done.To.Window.Name, head.Agent, head.ID, err)
 	}
+	// an agent that ended as it started leaves no window, the shell it left closed with it, and is not kept as used here
+	if said, ended := settle(host, in.Name, done.To.Window.Name); ended {
+		done.Problem = fmt.Sprintf("%s ended as soon as it started, saying:\n%s", agent.Name, said)
+		return done, nil
+	}
+	if runsNothing(host, in.Name, done.To.Window.Name) {
+		done.Problem = fmt.Sprintf("%s ended at once: `%s` shows why", agent.Name, agent.Name)
+		_ = a.CloseWindow(in, done.To.Window.Name)
+		return done, nil
+	}
 	if chosen != (Chosen{}) {
 		if err := a.KeepChosen(in, done.To.Window.Name, agent.Name, chosen); err != nil {
 			return done, fmt.Errorf("%s: window %s opened, and what it was started with is not kept: %w", in.Name, done.To.Window.Name, err)
 		}
 	}
-	// as SayOnceReady says it, but never into the shell an agent that ended leaves behind
-	if said, ended := settle(host, in.Name, done.To.Window.Name); ended {
-		done.Problem = fmt.Sprintf("%s ended as soon as it started, saying:\n%s", agent.Name, said)
-	} else if runsNothing(host, in.Name, done.To.Window.Name) {
-		done.Problem = fmt.Sprintf("%s ended as soon as it started, and its window is a shell now: nothing is typed into a shell", agent.Name)
-	} else if want.Quiet {
+	// as SayOnceReady says it
+	if want.Quiet {
 		// it runs, and is told nothing
 	} else if err := say(host, in.Name, done.To.Window.Name, agent.Name, "mia window press "+in.Name+" "+done.To.Window.Name+" --", done.Instruction); err != nil {
 		done.Problem = err.Error()

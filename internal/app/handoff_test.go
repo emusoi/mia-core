@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -283,22 +284,29 @@ echo ready; exec cat >> "$HOME/heard"`})
 		}
 	}
 
-	// an agent that ends as it starts leaves a shell: nothing is typed into it, and the message is given to say
+	// an agent that ends as it starts leaves a shell: nothing is typed into it, its window is closed, what it was
+	// started with is not kept as used, and the message is given to say
 	if err := os.WriteFile(filepath.Join(os.Getenv("HOME"), "broken"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	ended, err := a.ContinueConversation(app.Continue{ID: "p1", With: "echo"})
+	ended, err := a.ContinueConversation(app.Continue{ID: "p1", With: "echo", Model: "soft"})
 	os.Remove(filepath.Join(os.Getenv("HOME"), "broken"))
-	if err != nil || ended.Sent || !strings.Contains(ended.Problem, "echo ended as soon as it started") || !strings.Contains(ended.Instruction, from.Handoff) {
+	if err != nil || ended.Sent || ended.Problem != "echo ended at once: `echo` shows why" || !strings.Contains(ended.Instruction, from.Handoff) {
 		t.Fatalf("an agent that ended = %+v %v", ended, err)
 	}
-	if screen, _ := a.ReadWindow(record, ended.To.Window.Name); strings.Contains(screen, "Read ") {
-		t.Errorf("its first message was typed into the shell it left:\n%s", screen)
+	if ended.To.Window.Name != "echo-3" || session.Here().HasWindow(record.Name, "echo-3") {
+		t.Errorf("the window of an agent that ended is left open: %+v", ended.To.Window)
+	}
+	if slices.ContainsFunc(a.Setups(""), func(s app.Setup) bool { return s.Model == "soft" }) {
+		t.Errorf("what an agent that ended was started with is kept as used: %+v", a.Setups(""))
+	}
+	if told, _ := os.ReadFile(filepath.Join(os.Getenv("HOME"), "heard")); strings.Count(string(told), "Read ") != 2 {
+		t.Errorf("its first message was typed into the shell it left:\n%s", told)
 	}
 
-	// a second time writes the same file again and opens another window
+	// a second time writes the same file again and opens another window, named as the one that ended was
 	again, err := a.ContinueConversation(app.Continue{ID: "c1", With: "echo"})
-	if err != nil || again.Handoff != file || again.To.Window.Name != "echo-4" || !again.Sent {
+	if err != nil || again.Handoff != file || again.To.Window.Name != "echo-3" || !again.Sent {
 		t.Errorf("again = %+v %v", again, err)
 	}
 	// each time is kept beside the handoff: which went on with which agent, in which window. The lab's agent writes no
