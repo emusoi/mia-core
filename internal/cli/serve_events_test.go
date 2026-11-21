@@ -20,9 +20,7 @@ import (
 )
 
 // q is a question as GET /events takes it: what follows /api/ in a read.
-func q(query, dir string, args ...string) string {
-	return query + "?" + url.Values{"dir": {dir}, "arg": args}.Encode()
-}
+func q(query, dir string, args ...string) string { return asked(query, dir, args...) }
 
 // listen is GET /events for the questions, until the test ends: each event
 // as it comes.

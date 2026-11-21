@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/config"
@@ -120,6 +122,15 @@ func answerAPI(who asker, rest []string) int {
 			return who.emit(a.Accounts())
 		case "setups": // the person's, from anywhere: a repository's by default, when in one
 			return cmdAPISetups(who, rest[1:])
+		case "status": // the worktree the folder is in, as git has it: no repository of mia's
+			if len(rest) > 1 {
+				return who.usage("mia api status")
+			}
+			status, err := statusIn(who.dir)
+			if err != nil {
+				return who.fail(err)
+			}
+			return who.emit(status)
 		case "repos": // every repository, from anywhere
 			if len(rest) == 1 {
 				repos, err := app.Repositories()
@@ -242,6 +253,26 @@ func cmdAPI(who asker, a *app.App, args []string) int {
 	case "base":
 		return who.emit(baseBranch{Branch: a.BaseBranch(a.Root)})
 
+	case "window":
+		rest := args[1:]
+		worktree := takeValue(&rest, "--worktree")
+		if len(rest) != 1 {
+			return who.usage(windowQueryUsage)
+		}
+		index, err := strconv.Atoi(rest[0])
+		if err != nil || index < 0 {
+			return who.usage(windowQueryUsage)
+		}
+		record, err := a.RecordOrIn(worktree, who.dir)
+		if err != nil {
+			return who.fail(err)
+		}
+		standing := windowStanding{Working: a.AtWork(record, index)}
+		if asks, on := a.AsksInWindow(record, rest[0]); on {
+			standing.Asks = &asks
+		}
+		return who.emit(standing)
+
 	default:
 		fmt.Fprintf(who.errs, "mia: no such query %q — try one of %s\n", args[0], apiQueries)
 		return exitNotFound
@@ -253,12 +284,75 @@ type baseBranch struct {
 	Branch string `json:"branch"`
 }
 
-var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base", "conversations", "conversation", "main", "standing", "agents", "setups", "accounts", "apps"}
+// windowStanding is what `mia api window` says: whether the agent in a
+// worktree's window is at work, as mia chat says it, and what its screen
+// asks, when it asks something.
+type windowStanding struct {
+	Working bool      `json:"working"`
+	Asks    *app.Asks `json:"asks,omitempty"`
+}
+
+// worktreeStatus is what `mia api status` says: how the worktree a folder
+// is in stands in git, as mia git shows it — its branch, the commit it is
+// at, what it follows and how far apart they are, its files staged,
+// changed and untracked — and how many stashes the repository keeps.
+type worktreeStatus struct {
+	Branch    string       `json:"branch"`
+	Head      string       `json:"head"`
+	Upstream  string       `json:"upstream"`
+	Gone      bool         `json:"gone"`
+	ToPush    int          `json:"to_push"`
+	ToPull    int          `json:"to_pull"`
+	Staged    []statusFile `json:"staged"`
+	Changed   []statusFile `json:"changed"`
+	Untracked []statusFile `json:"untracked"`
+	Stashes   int          `json:"stashes"`
+}
+
+// statusFile is a file of a status, with how long it is and when it was
+// last written in the worktree, which say it was changed again; one that
+// is not there, deleted, has neither.
+type statusFile struct {
+	Path    string    `json:"path"`
+	From    string    `json:"from,omitempty"`
+	State   string    `json:"state,omitempty"`
+	Size    int64     `json:"size"`
+	Written time.Time `json:"written,omitzero"`
+}
+
+// statusIn is how the worktree a folder is in stands in git.
+func statusIn(dir string) (worktreeStatus, error) {
+	top, common, err := git.Repository(dir)
+	if err != nil {
+		return worktreeStatus{}, err
+	}
+	out, err := git.Status(dir)
+	if err != nil {
+		return worktreeStatus{}, err
+	}
+	s := git.ParseStatus(out)
+	files := func(changes []git.Change) []statusFile {
+		listed := make([]statusFile, len(changes))
+		for i, change := range changes {
+			listed[i] = statusFile{Path: change.Path, From: change.From, State: change.State}
+			if info, err := os.Lstat(filepath.Join(top, change.Path)); err == nil {
+				listed[i].Size, listed[i].Written = info.Size(), info.ModTime()
+			}
+		}
+		return listed
+	}
+	stashes, _ := os.ReadFile(filepath.Join(common, "logs", "refs", "stash"))
+	return worktreeStatus{Branch: s.Branch, Head: s.Head, Upstream: s.Upstream, Gone: s.Gone, ToPush: s.ToPush, ToPull: s.ToPull,
+		Staged: files(s.Staged), Changed: files(s.Changed), Untracked: files(s.Untracked), Stashes: bytes.Count(stashes, []byte("\n"))}, nil
+}
+
+var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base", "conversations", "conversation", "main", "standing", "agents", "setups", "accounts", "apps", "status", "window"}
 
 const (
 	setupsUsage        = "mia api setups [--repository <name> | --all]"
 	conversationsUsage = "mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]"
 	conversationUsage  = "mia api conversation <id> [--worktree <name>] [--after <n>] [--follow]"
+	windowQueryUsage   = "mia api window <index> [--worktree <name>]"
 	// followNote is what --follow does, said under a usage that takes it.
 	followNote = "\n--follow: the turns in one line of JSON, then a line of only the new ones each time there are" +
 		"\n  more; a turn that grew, a reply still being written, comes again under the same n: replace by n." +

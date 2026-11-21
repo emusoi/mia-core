@@ -1,0 +1,41 @@
+{
+  "query": "window",
+  "usage": "mia api window \u003cindex\u003e [--worktree \u003cname\u003e]",
+  "inputs": [
+    {
+      "name": "\u003cindex\u003e",
+      "required": true
+    },
+    {
+      "name": "--worktree",
+      "value": "\u003cname\u003e"
+    }
+  ],
+  "output": {
+    "type": "object",
+    "fields": {
+      "asks": {
+        "type": "object",
+        "optional": true,
+        "nullable": true,
+        "fields": {
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "selected": {
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "working": {
+        "type": "boolean"
+      }
+    }
+  }
+}

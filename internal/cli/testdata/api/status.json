@@ -1,0 +1,109 @@
+{
+  "query": "status",
+  "usage": "mia api status",
+  "inputs": [],
+  "output": {
+    "type": "object",
+    "fields": {
+      "branch": {
+        "type": "string"
+      },
+      "changed": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "fields": {
+            "from": {
+              "type": "string",
+              "optional": true
+            },
+            "path": {
+              "type": "string"
+            },
+            "size": {
+              "type": "integer"
+            },
+            "state": {
+              "type": "string",
+              "optional": true
+            },
+            "written": {
+              "type": "time",
+              "optional": true
+            }
+          }
+        }
+      },
+      "gone": {
+        "type": "boolean"
+      },
+      "head": {
+        "type": "string"
+      },
+      "staged": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "fields": {
+            "from": {
+              "type": "string",
+              "optional": true
+            },
+            "path": {
+              "type": "string"
+            },
+            "size": {
+              "type": "integer"
+            },
+            "state": {
+              "type": "string",
+              "optional": true
+            },
+            "written": {
+              "type": "time",
+              "optional": true
+            }
+          }
+        }
+      },
+      "stashes": {
+        "type": "integer"
+      },
+      "to_pull": {
+        "type": "integer"
+      },
+      "to_push": {
+        "type": "integer"
+      },
+      "untracked": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "fields": {
+            "from": {
+              "type": "string",
+              "optional": true
+            },
+            "path": {
+              "type": "string"
+            },
+            "size": {
+              "type": "integer"
+            },
+            "state": {
+              "type": "string",
+              "optional": true
+            },
+            "written": {
+              "type": "time",
+              "optional": true
+            }
+          }
+        }
+      },
+      "upstream": {
+        "type": "string"
+      }
+    }
+  }
+}

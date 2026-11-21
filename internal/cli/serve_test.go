@@ -175,7 +175,8 @@ func TestTheServerAnswersEveryQueryAsTheCommandLineDoes(t *testing.T) {
 		{"conversation", "c1"}, {"conversation"}, {"conversation", "c1", "--follow"},
 		{"main"}, {"main", "conversations"}, {"main", "turns"}, {"main", "turns", "--after", "x"},
 		{"standing"}, {"standing", "--here"}, {"agents"}, {"agents", "x"}, {"setups"}, {"setups", "--all"},
-		{"accounts"}, {"accounts", "--projects"}, {"apps"}, {"nosuchquery"},
+		{"accounts"}, {"accounts", "--projects"}, {"apps"}, {"status"}, {"status", "x"},
+		{"window", "0"}, {"window", "0", "--worktree", "longido"}, {"window"}, {"window", "x"}, {"nosuchquery"},
 	} {
 		asked[args[0]] = true
 		for _, dir := range []string{repo.Root, repo.Root + ".longido", outside} {

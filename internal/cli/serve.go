@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -144,14 +145,11 @@ func serving() (serveVersion, bool) {
 // may answer what this one would not, when MIA_NO_SERVE is set, and for
 // --follow; the query is then answered here, as it always was.
 func askServer(rest []string) (code int, asked bool) {
-	if os.Getenv("MIA_NO_SERVE") != "" || len(rest) == 0 || slices.Contains(rest, "--follow") {
+	if len(rest) == 0 || slices.Contains(rest, "--follow") {
 		return 0, false
 	}
 	here, err := os.Getwd()
-	if err != nil {
-		return 0, false
-	}
-	if running, ok := serving(); !ok || running.Build != gateway.Build() {
+	if err != nil || !ourServer() {
 		return 0, false
 	}
 	response, err := serveClient(0).Get("http://mia/api/" + url.PathEscape(rest[0]) + "?" + url.Values{"dir": {here}, "arg": rest[1:]}.Encode())
@@ -168,6 +166,82 @@ func askServer(rest []string) (code int, asked bool) {
 	fmt.Fprint(os.Stderr, said)
 	os.Stdout.Write(out)
 	return code, true
+}
+
+// ourServer says whether a server of this build answers on the socket, to
+// be asked: another build may answer what this one would not, and none is
+// asked when MIA_NO_SERVE is set.
+func ourServer() bool {
+	if os.Getenv("MIA_NO_SERVE") != "" {
+		return false
+	}
+	running, ok := serving()
+	return ok && running.Build == gateway.Build()
+}
+
+// asked is a question as GET /events takes it, what follows /api/ in a
+// read: a query typed in a folder with the words after it.
+func asked(query, dir string, args ...string) string {
+	return query + "?" + url.Values{"dir": {dir}, "arg": args}.Encode()
+}
+
+// listenServer is GET /events for the questions, of a server of this
+// build: told has a value each time an answer of theirs is another than it
+// was, and is closed when the server goes; hangUp ends the listening. It
+// returns once their answers as they are now came, which are not told.
+// With no server to ask, told is nil.
+func listenServer(questions ...string) (told <-chan struct{}, hangUp func()) {
+	if !ourServer() {
+		return nil, func() {}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://mia/events?"+url.Values{"q": questions}.Encode(), nil)
+	if err != nil {
+		cancel()
+		return nil, func() {}
+	}
+	response, err := serveClient(0).Do(request)
+	if err != nil {
+		cancel()
+		return nil, func() {}
+	}
+	if response.StatusCode != http.StatusOK {
+		response.Body.Close()
+		cancel()
+		return nil, func() {}
+	}
+	changed, now := make(chan struct{}, 1), make(chan struct{})
+	go func() {
+		defer close(changed)
+		defer response.Body.Close()
+		lines := bufio.NewScanner(response.Body)
+		lines.Buffer(nil, 1<<24)
+		heard := map[string]bool{}
+		for lines.Scan() {
+			data, ok := strings.CutPrefix(lines.Text(), "data: ")
+			var one event
+			if !ok || json.Unmarshal([]byte(data), &one) != nil {
+				continue
+			}
+			if !heard[one.Q] {
+				if heard[one.Q] = true; len(heard) == len(questions) {
+					close(now)
+				}
+				continue
+			}
+			select {
+			case changed <- struct{}{}:
+			default: // told already, and not yet heard
+			}
+		}
+	}()
+	select {
+	case <-now:
+		return changed, cancel
+	case <-changed: // closed: it went before it answered
+		cancel()
+		return nil, func() {}
+	}
 }
 
 // server is `mia serve`. It holds no truth: each repository is kept open

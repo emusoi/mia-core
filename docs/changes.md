@@ -21,7 +21,11 @@ on GitHub; a tag without its section is not released.
   systemd service, `mia serve install|uninstall|start|stop|status`,
   written with the environment of the shell it is installed from; a
   server that sees mia rebuilt ends, for the service to start the new
-  build. See [mia serve](serve.md).
+  build. `mia git` and `mia files` listen to it for `mia api status`, a
+  worktree's git status, and `mia chat` for `mia api window`, whether a
+  window's agent is at work and what its screen asks, in place of looking
+  each second or two, when one of their build answers. See
+  [mia serve](serve.md).
 
 - **The chat's models and Earlier are modals.** In `mia chat`, `models`
   and `earlier` no longer take the chat's place: each is a card over it,

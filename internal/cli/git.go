@@ -1865,8 +1865,10 @@ func gitMark(dir, top string) string {
 // beside them, and the keys that stage, discard, commit, amend, undo,
 // stash, switch branch, fetch, pull and push, hand a file to the editor
 // and copy its path. It reads the standing again after each thing done
-// and when the repository changes; what is done with a remote runs
-// beside it, and the keys are taken meanwhile.
+// and when the repository changes, which mia serve tells it of when one
+// of this build answers, and it looks at every two seconds when none
+// does; what is done with a remote runs beside it, and the keys are taken
+// meanwhile.
 func cmdGit(args []string) int {
 	if len(args) > 0 {
 		return usageErr(gitUsage)
@@ -1878,6 +1880,8 @@ func cmdGit(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
+	heard, hangUp := listenServer(asked("status", dir))
+	defer hangUp()
 	view := &gitView{pane: os.Getenv("TMUX_PANE"), dir: dir}
 	view.read(time.Now())
 
@@ -1908,6 +1912,9 @@ func cmdGit(args []string) int {
 	mark := gitMark(dir, view.top) + view.stashMark()
 	poll := time.NewTicker(gitPoll)
 	defer poll.Stop()
+	if heard != nil {
+		poll.Stop()
+	}
 	done := make(chan gitOutcome, 1) // one deed with a remote at a time
 	buffer := ""
 	for {
@@ -1920,6 +1927,13 @@ func cmdGit(args []string) int {
 			return exitOK
 		case outcome := <-done:
 			show(view.finish(outcome, time.Now()))
+		case _, open := <-heard:
+			if !open { // the server went: looked at as with none
+				heard = nil
+				poll.Reset(gitPoll)
+				continue
+			}
+			show(view.read(time.Now()))
 		case <-poll.C:
 			now := gitMark(dir, view.top) + view.stashMark()
 			if now == mark {

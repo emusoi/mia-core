@@ -1974,6 +1974,15 @@ type chatRun struct {
 	// pressed is when an answer was last pressed in the window: its screen
 	// is not asked what it asks for a moment after, while it still shows it.
 	pressed time.Time
+	// told has a value when mia serve says the window's agent went to work
+	// or stopped, or its screen asks another thing; nil while no server of
+	// this build answers, gone once one went, and the window is looked at
+	// each second. owed: what it was told came in that moment, and is
+	// looked at once it is over.
+	told   <-chan struct{}
+	hangUp func()
+	gone   bool
+	owed   bool
 	// models is the models changed in this chat, the first first.
 	models []chatModelled
 }
@@ -2028,6 +2037,7 @@ func (r *chatRun) aim(head app.Head, window string) {
 		nth = v.talk.nth + 1
 	}
 	v.mode, v.fork, v.told, v.tabbed, v.next, v.window, v.id = chatting, 0, nil, "", nil, window, head.ID
+	r.listen()
 	v.marks, v.fans, v.plan = nil, nil, nil
 	v.runs = app.Runs{Agent: head.Agent, Model: head.Model, Effort: head.Effort, Account: head.Account, Reads: true}
 	if window != "" {
@@ -2162,9 +2172,23 @@ func (r *chatRun) follow(id string) {
 	}()
 }
 
-// looks is what a second brings: the conversation of a window that had
-// none, once it has one; whether the agent is at work; and what its
-// window's screen asks.
+// listen has mia serve tell the chat of its window, when one of this build
+// answers: the window's question asked each look, once for all who listen.
+func (r *chatRun) listen() {
+	if r.hangUp != nil {
+		r.hangUp()
+	}
+	r.told, r.hangUp = nil, nil
+	if r.view.window == "" || r.gone {
+		return
+	}
+	r.told, r.hangUp = listenServer(asked("window", r.record.Path, r.view.window, "--worktree", r.record.Name))
+	r.gone = r.told == nil
+}
+
+// looks is what a second brings, or mia serve tells of: the conversation
+// of a window that had none, once it has one; whether the agent is at
+// work; and what its window's screen asks.
 func (r *chatRun) looks() {
 	v := r.view
 	if v.window == "" {
@@ -2187,7 +2211,7 @@ func (r *chatRun) looks() {
 	if !working {
 		r.rests()
 	}
-	if time.Since(r.pressed) < 2*time.Second {
+	if r.owed = time.Since(r.pressed) < 2*time.Second; r.owed {
 		return
 	}
 	var asks *app.Asks
@@ -2671,6 +2695,11 @@ func cmdChat(a *app.App, args []string) int {
 	defer close(stop)
 	run := &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, done: stop, batches: make(chan chatBatch), ended: make(chan chatEnd)}
 	run.aim(head, window)
+	defer func() {
+		if run.hangUp != nil {
+			run.hangUp()
+		}
+	}()
 	keys := muiKeys(stop)
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
@@ -2711,8 +2740,16 @@ func cmdChat(a *app.App, args []string) int {
 			if batch.of == run.of {
 				say(run.view.talk.heard(batch.turns)...)
 			}
-		case <-second.C:
+		case _, open := <-run.told:
+			if !open { // the server went: looked at each second
+				run.told, run.gone = nil, true
+				continue
+			}
 			run.looks()
+		case <-second.C:
+			if run.told == nil || run.owed {
+				run.looks()
+			}
 		case data, open := <-keys:
 			if !open {
 				return exitOK

@@ -2102,7 +2102,9 @@ func (v *filesView) changed() string {
 // it leaves; and the keys that make a file or a folder, rename one,
 // delete one, copy its path, show only what changed, a file's diff
 // against the base and each line's commit, and go to a line, each on a
-// row's menu too. It reads the files again when the repository changes.
+// row's menu too. It reads the files again when the repository changes,
+// which mia serve tells it of when one of this build answers, and it looks
+// at every two seconds when none does.
 func cmdFiles(args []string) int {
 	if len(args) > 0 {
 		return usageErr(filesUsage)
@@ -2114,6 +2116,8 @@ func cmdFiles(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
+	heard, hangUp := listenServer(asked("status", dir))
+	defer hangUp()
 	view := &filesView{pane: os.Getenv("TMUX_PANE"), dir: dir, hitAt: -1}
 	view.read()
 	defer view.quiet()
@@ -2145,11 +2149,21 @@ func cmdFiles(args []string) int {
 	mark := view.changed()
 	poll := time.NewTicker(gitPoll)
 	defer poll.Stop()
+	if heard != nil {
+		poll.Stop()
+	}
 	buffer := ""
 	for {
 		select {
 		case <-signals:
 			return exitOK
+		case _, open := <-heard:
+			if !open { // the server went: looked at as with none
+				heard = nil
+				poll.Reset(gitPoll)
+				continue
+			}
+			show(view.again())
 		case <-poll.C:
 			now := view.changed()
 			if now == mark {

@@ -209,7 +209,17 @@ asked. The server asks again:
   records, its configuration, or a worktree's `HEAD` or index were
   written, looked at each second; every question when the person's
   configuration or the main agent's records were;
+- `status` and `window` each time it looks, each second, as no file
+  says when a worktree's files, a window's screen or whether its agent
+  is at work changed — only who listens is told, and only when the
+  answer is another;
 - every question every thirty seconds.
+
+`mia git` and `mia files` listen to `status` of their worktree, and `mia
+chat` to `window` of its window, when a server of their build answers,
+in place of looking every two seconds or each second; when it goes, they
+look for themselves again. `mia review` looks every two seconds as it
+did: what it looks at, sawa's file, is no question of `mia api`.
 
 A question with `--follow` — `conversation <id> --follow`,
 `main turns --follow` — is the stream `mia api … --follow` prints, an

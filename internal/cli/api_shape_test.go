@@ -49,6 +49,8 @@ var apiShapes = []struct {
 	{"accounts", "mia api accounts [--projects]", reflect.TypeFor[[]app.Account]()},
 	{"accounts --projects", "mia api accounts --projects", reflect.TypeFor[[]app.Project]()},
 	{"apps", "mia api apps", reflect.TypeFor[[]app.Manifest]()},
+	{"status", "mia api status", reflect.TypeFor[worktreeStatus]()},
+	{"window", windowQueryUsage, reflect.TypeFor[windowStanding]()},
 }
 
 // closedSets are the string types whose values are all there are.

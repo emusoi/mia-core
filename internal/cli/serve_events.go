@@ -113,7 +113,12 @@ func parseQ(q string) (question, error) {
 
 // ofARepository are the queries answered from the repository they are
 // asked in; the others are answered from them all, or from none.
-var ofARepository = []string{"worktrees", "machines", "here", "env", "stack", "base", "conversations", "conversation"}
+var ofARepository = []string{"worktrees", "machines", "here", "env", "stack", "base", "conversations", "conversation", "status", "window"}
+
+// eachLook are the queries asked again each time the server looks, as no
+// file says when what they are answered from changed: a worktree's files,
+// and a window's screen and whether its agent is at work.
+var eachLook = []string{"status", "window"}
 
 // join adds a listener to a question, and gives it the answer as it is now.
 func (h *hub) join(q string, asked question, sub *subscriber) *topic {
@@ -133,7 +138,9 @@ func (h *hub) join(q string, asked question, sub *subscriber) *topic {
 	}
 	t.subs[sub] = struct{}{}
 	h.mu.Unlock()
-	h.look() // from now, a change to what it is answered from is seen
+	if changed := h.look(); len(changed) > 0 { // from now, a change to what it is answered from is seen
+		h.round(changed)
+	}
 	t.mu.Lock()
 	if t.last == nil {
 		t.last = eventOf(q, h.s.ask(asked))
@@ -176,7 +183,7 @@ func (h *hub) run() {
 		case <-backstop.C:
 			h.round(nil)
 		case <-tick.C:
-			h.look()
+			h.round(h.look())
 		}
 	}
 }
@@ -189,10 +196,10 @@ func (h *hub) again() {
 	}
 }
 
-// look asks again the questions of each repository whose files were
-// written since it last looked, and all of them when the person's own
-// were. A repository looked at for the first time is only noted.
-func (h *hub) look() {
+// look is each repository whose files were written since it last looked,
+// "" when the person's own were: their questions are to be asked again. A
+// repository looked at for the first time is only noted.
+func (h *hub) look() map[string]bool {
 	h.mu.Lock()
 	watched := map[string]bool{}
 	for _, t := range h.topics {
@@ -201,7 +208,7 @@ func (h *hub) look() {
 	if len(watched) == 0 {
 		h.seen = map[string]string{} // nobody listens: nothing is looked at
 		h.mu.Unlock()
-		return
+		return map[string]bool{}
 	}
 	if watched[""] { // a question of no repository is answered from them all
 		repos, _ := app.Repositories()
@@ -224,9 +231,7 @@ func (h *hub) look() {
 		h.seen[common] = now
 	}
 	h.mu.Unlock()
-	if len(changed) > 0 {
-		h.round(changed)
-	}
+	return changed
 }
 
 // writtenIn is when the files a repository's answers change with were
@@ -251,14 +256,16 @@ func writtenIn(common string) string {
 	)
 }
 
-// round asks the questions again, those of the repositories changed and
-// those of no repository, or all of them when changed is nil, and tells
-// the listeners of each whose answer is not what it was.
+// round asks the questions again, those of the repositories changed, those
+// of no repository when any is and those asked each look, or all of them
+// when changed is nil, and tells the listeners of each whose answer is not
+// what it was.
 func (h *hub) round(changed map[string]bool) {
 	h.mu.Lock()
 	var due []*topic
 	for _, t := range h.topics {
-		if changed == nil || changed[""] || t.common == "" || changed[t.common] {
+		written := len(changed) > 0 && (changed[""] || t.common == "" || changed[t.common])
+		if changed == nil || written || slices.Contains(eachLook, t.question.args[0]) {
 			due = append(due, t)
 		}
 	}

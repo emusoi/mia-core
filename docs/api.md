@@ -42,7 +42,7 @@ flag that is added passes and says to keep it with
 
 | command | returns |
 |---|---|
-| `mia api <query>` | worktrees, machines, here, repositories, environments, stacks, base, conversations, the main agent, standing, agents and apps |
+| `mia api <query>` | worktrees, machines, here, repositories, environments, stacks, base, conversations, the main agent, standing, agents, apps, a worktree's git status and a window's agent |
 | `mia config show --json` | effective global, project and local configuration |
 | `mia doctor --json` | every check and an overall `ok`; failures still exit non-zero |
 | `mia gateway status --json` | `running`, `address`, `pac`, `ca`, `trust`, `differentBuild`, `routes` |
@@ -90,6 +90,35 @@ checked out in none.
 [{"branch":"api","parent":"main","landed":false,"ahead":2,"needs_restack":false,"current":true,"worktree":"monduli"},
  {"branch":"ui","parent":"api","landed":false,"ahead":1,"needs_restack":true,"current":false}]
 ```
+
+`mia api status`, typed in a worktree, is how it stands in git, as
+[mia git](#mia-git) shows it: its `branch` (`""` detached), the commit it
+is at, `head`, what it follows, `upstream`, `gone` when that is no
+longer there, and the commits `to_push` and `to_pull`; its files
+`staged`, `changed` and `untracked`, each with its `path`, `from` when it
+was renamed, `state` (`new`, `deleted`, `renamed`, `conflict`; left out
+for one only changed), and its `size` and when it was last `written` in
+the worktree, left out of one that is not there; and how many `stashes`
+the repository keeps. It is git's own folder, no repository of mia's.
+
+```json
+{"branch":"feature","head":"5d1c…","upstream":"origin/feature","gone":false,"to_push":1,"to_pull":0,
+ "staged":[],"changed":[{"path":"main.go","size":2048,"written":"2026-11-21T18:00:26-05:00"}],"untracked":[],"stashes":0}
+```
+
+`mia api window <index> [--worktree <name>]` is a window of the worktree
+the folder is in, or of the one named: whether its agent is `working`, as
+[mia chat](#apps) says it, and what its screen `asks` when it asks
+something — its `text`, its `options` and the one `selected`.
+
+```json
+{"working":false,"asks":{"text":"Do you want to make this edit?","options":["Yes","No"],"selected":1}}
+```
+
+[`GET /events`](serve.md#get-events) asks these two again each time the
+server looks, every second, as no file says when they change: `mia git`
+and `mia files` listen to `status` and `mia chat` to `window` when a
+server of their build answers.
 
 ## Conversations
 
@@ -194,7 +223,11 @@ buttons, where `m` and `e` (or `⏎`) press them. A window named by
 `--window` that has no conversation mia can read yet is a chat all the
 same, and its conversation is looked for each second; of an agent mia
 reads no conversations of (gemini, cursor-agent) the status says once
-that its replies are in its terminal.
+that its replies are in its terminal. When a [mia serve](serve.md) of
+its build answers, the chat does not look each second: it listens to
+`mia api window` for its window and looks when the server says the agent
+went to work or stopped or the screen asks another thing — its
+conversation, while it has none, among what it looks for then.
 
 - **What is sent** is said at once as an `asked` turn after the last, and
   taken out (`unturn`) in the patch that puts in the transcript's own
@@ -619,8 +652,11 @@ After each of these the standing is read again, and the keys stay on the
 same file where it still is — a file staged is followed into Staged —
 else on the row after it. It is read again by itself when the repository
 changes: `git status` is asked every 2 s, with `--no-optional-locks`, and
-the file the stash is kept in is looked at; the view is said again only
-when it would say something else. A file
+the file the stash is kept in is looked at — or, when a [mia
+serve](serve.md) of its build answers, it is read again when the server
+says `mia api status` of the worktree is another, asked once a second for
+all who listen; the view is said again only when it would say something
+else. A file
 already changed that changes again is seen by its size and time; the
 base moving on is not seen until something else changes, or `r`.
 
@@ -761,8 +797,10 @@ words typed drop what was found, so `⏎` searches for them; a new search
 and `esc` stop one at work.
 
 The files are read again by themselves when the repository changes, as
-`mia git` does it: `git status` is asked every 2 s, and the view is said
-again only when it would say something else. What fails — a command git
+`mia git` does it: `git status` is asked every 2 s, or the server is
+listened to, and the view is said again only when it would say something
+else. Listening, a file git ignores that is shown and written again is
+not seen until something else changes. What fails — a command git
 refuses, an editor that cannot be run — is the view's status, and the
 app stays up. `q` or `⌃C` in the plain terminal leaves; stdin that is no
 terminal is refused, exit 1.
