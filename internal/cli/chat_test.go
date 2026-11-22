@@ -25,15 +25,16 @@ import (
 
 // shownPiece is a piece of a view as the window reads it.
 type shownPiece struct {
-	T, ID, Title, Text, Style, Tone, Label, Key, Agent, Placeholder, Icon, Right, List, Selected string
-	Reply, Working, Bare, Live, Flat, Split                                                      bool
-	Grow, W, H, Max                                                                              int
+	T, ID, Title, Text, Style, Tone, Label, Key, Agent, Placeholder, Icon, Right, List, Selected, Model string
+	Reply, Working, Bare, Live, Flat, Split                                                             bool
+	Grow, W, H, Max                                                                                     int
 	// Menu is a list's word for the way into its items' menus, or a chat's
 	// menu of each reply.
 	Menu     any
 	Children []shownPiece
 	Items    []chatItem
 	Turns    []shownTurn
+	Buttons  []chatButton
 }
 
 // shownTurn is a turn of a chat as the window reads it: a transcript's, or
@@ -434,22 +435,21 @@ func TestTheChatFillsItsPaneUnderALineThatSaysWhoAnswers(t *testing.T) {
 	}
 	view := &talk{pane: "%2", agent: "claude", about: "claude · opus · high · on work", reply: true}
 	got := only(t, view.heard([]app.Turn{{N: 1, Kind: "asked", Text: "hello"}}))
-	if !got.Fill || got.Focus != "chat" || got.Whole.T != "col" || got.Whole.ID != "view" || len(got.Whole.Children) != 2 || got.Whole.Children[1].T != "chat" || len(got.Keys) != 0 {
+	if !got.Fill || got.Focus != "chat" || got.Whole.T != "col" || got.Whole.ID != "view" || len(got.Whole.Children) != 1 || got.Whole.Children[0].T != "chat" || len(got.Keys) != 0 {
 		t.Fatalf("view = %+v", got.Whole)
 	}
-	line := got.Whole.Children[0]
-	if line.T != "row" || len(line.Children) != 5 || line.Children[0].Text != "claude · opus · high · on work" || line.Children[0].ID != "about" || line.Children[0].Style != "dim" || line.Children[1].Grow != 1 {
-		t.Errorf("line = %+v", line)
+	chat := got.Whole.Children[0]
+	if chat.Model != "opus · high · on work" {
+		t.Errorf("model = %q", chat.Model)
 	}
-	if m, f, e := line.Children[2], line.Children[3], line.Children[4]; m.T != "button" || m.ID != "open-models" || m.Label != "models" || m.Key != "m" ||
-		f.T != "button" || f.ID != "open-fork" || f.Label != "fork" || f.Key != "f" || e.T != "button" || e.ID != "open-earlier" || e.Label != "earlier" || e.Key != "e" {
-		t.Errorf("buttons = %+v", line.Children[2:])
+	if b := chat.Buttons; len(b) != 3 || b[0].ID != "open-models" || b[0].Key != "m" || b[1].ID != "open-fork" || b[1].Label != "Fork" || b[1].Key != "f" || b[2].ID != "open-earlier" || b[2].Label != "Earlier" || b[2].Key != "e" {
+		t.Errorf("buttons = %+v", b)
 	}
 
 	shown := &talk{agent: "codex", about: "codex"}
 	got = only(t, shown.heard(nil))
-	if line := got.Whole.Children[0]; got.Focus != "" || got.View.Reply || got.View.Menu != nil || len(line.Children) != 3 || line.Children[2].ID != "open-earlier" {
-		t.Errorf("one no window has open: focus %q, line %+v", got.Focus, line)
+	if b := got.View.Buttons; got.Focus != "" || got.View.Reply || got.View.Menu != nil || len(b) != 1 || b[0].ID != "open-earlier" || got.View.Model != "codex" {
+		t.Errorf("one no window has open: focus %q, buttons %+v, model %q", got.Focus, b, got.View.Model)
 	}
 }
 
@@ -905,8 +905,8 @@ func TestAModalIsPutOverTheChatAndTakenAwayByPatches(t *testing.T) {
 	view.talk.heard(nil)
 	view.up(picking)
 	view.talk.about = "claude · sonnet · low"
-	got := only(t, view.shut(encode(chatOp{Op: "set", ID: "about", Node: chatHead(view.talk.about)}), view.talk.went("claude switched to sonnet low", "ok")))
-	if !slices.Equal(ops(got), []string{"remove", "set", "toast"}) || got.Patch[1].ID != "about" || got.Patch[1].Node.ID != "about" || got.Patch[1].Node.Text != "claude · sonnet · low" ||
+	got := only(t, view.shut(encode(chatOp{Op: "model", ID: view.talk.id(), Text: view.talk.model()}), view.talk.went("claude switched to sonnet low", "ok")))
+	if !slices.Equal(ops(got), []string{"remove", "model", "toast"}) || got.Patch[1].ID != view.talk.id() || got.Patch[1].Text != "sonnet · low" ||
 		got.Patch[2].Text != "claude switched to sonnet low" || got.Patch[2].Tone != "ok" || view.talk.status != nil {
 		t.Errorf("a switch is said as %+v", got.Patch)
 	}
@@ -1768,8 +1768,8 @@ func TestAPickWhileTheAgentWorksIsKeptAsNext(t *testing.T) {
 		for _, message := range said {
 			for _, op := range read(t, message).Patch {
 				switch {
-				case op.Op == "set" && op.ID == "about":
-					about = op.Node.Text
+				case op.Op == "model":
+					about = op.Text
 				case op.Op == "set" && op.ID == chatOver:
 					does, next = wordsOf(op.Node.Children[2]), ""
 					for _, item := range op.Node.Children[4].Items {
@@ -1800,7 +1800,7 @@ func TestAPickWhileTheAgentWorksIsKeptAsNext(t *testing.T) {
 	}
 	run.act(deed)
 	about, does, next, keys := stands()
-	if view.next == nil || *view.next != (chatDeed{do: chatSwitch, model: "sonnet"}) || view.mode != picking || about != "claude · opus · high · on work · next: sonnet" {
+	if view.next == nil || *view.next != (chatDeed{do: chatSwitch, model: "sonnet"}) || view.mode != picking || about != "opus · high · on work · next: sonnet" {
 		t.Errorf("kept as %+v, the chat's line %q", view.next, about)
 	}
 	if does != "opus → sonnet · Applied when claude finishes this turn. <tab now> tab stops claude and applies it now. ⏎ again clears it." || next != "a|claude|sonnet " ||
@@ -1808,8 +1808,8 @@ func TestAPickWhileTheAgentWorksIsKeptAsNext(t *testing.T) {
 		t.Errorf("the models say %q, next on %q, keys %+v", does, next, keys)
 	}
 	// a view said whole says it too, and the modal put back has its key
-	if whole := read(t, view.talk.whole()); whole.Whole.find("text").Text != about || view.talk.with == nil {
-		t.Errorf("said whole: %+v", whole.Whole.find("text"))
+	if whole := read(t, view.talk.whole()); whole.View.Model != about || view.talk.with == nil {
+		t.Errorf("said whole: %q", whole.View.Model)
 	}
 	for _, item := range pieceOf(t, view.models(false)).Children[4].Items {
 		if want := map[string]string{"a|claude|sonnet": "clear", "a|claude|opus": "keep as next", "a|codex|gpt-6-luna": "keep as next"}[item.ID]; want != "" && item.Does != want {
@@ -1824,7 +1824,7 @@ func TestAPickWhileTheAgentWorksIsKeptAsNext(t *testing.T) {
 	view.whole = true
 	run.act(pick("a|codex|gpt-6-luna", "high"))
 	about, does, next, _ = stands()
-	if *view.next != (chatDeed{do: chatHand, agent: "codex", model: "gpt-6-luna", effort: "high", whole: true}) || about != "claude · opus · high · on work · next: codex · gpt-6-luna · high" ||
+	if *view.next != (chatDeed{do: chatHand, agent: "codex", model: "gpt-6-luna", effort: "high", whole: true}) || about != "opus · high · on work · next: codex · gpt-6-luna · high" ||
 		does != "claude → codex · Applied when claude finishes this turn. <tab now> Carries the whole conversation. tab stops claude and applies it now. ⏎ again clears it." || next != "a|codex|gpt-6-luna " {
 		t.Errorf("an agent kept as %+v: %q, %q, next on %q", view.next, about, does, next)
 	}
@@ -1836,7 +1836,7 @@ func TestAPickWhileTheAgentWorksIsKeptAsNext(t *testing.T) {
 	}
 	run.act(again)
 	about, does, next, keys = stands()
-	if view.next != nil || about != "claude · opus · high · on work" || next != "" || !strings.HasPrefix(does, "claude → codex carries [whole] <tab flip>") ||
+	if view.next != nil || about != "opus · high · on work" || next != "" || !strings.HasPrefix(does, "claude → codex carries [whole] <tab flip>") ||
 		!slices.Equal(keys, []chatKey{{Key: "tab", Label: "latest or whole", ID: "flip"}}) {
 		t.Errorf("let go of: %+v, %q, %q, next on %q, keys %+v", view.next, about, does, next, keys)
 	}
@@ -1932,7 +1932,7 @@ func TestWhatWasPickedWhileTheAgentWorkedIsDoneWhenItsTurnEnds(t *testing.T) {
 		changes = append(changes, ops(read(t, message))...)
 	}
 	// no modal stands, and none is taken away: a change to a piece that is not there drops its patch
-	if !slices.Equal(changes, []string{"working", "set", "status", "set", "toast", "turn"}) {
+	if !slices.Equal(changes, []string{"working", "model", "status", "model", "toast", "turn"}) {
 		t.Errorf("done as %q", changes)
 	}
 
@@ -2263,7 +2263,7 @@ func TestRowsMarkedInTheModelsSendTheNextMessageToSeveralAgents(t *testing.T) {
 	run.act(chatDeed{do: chatFan})
 	_, _, _, whole := stands()
 	if view.mode != chatting || len(view.fans) != 2 || view.marks != nil || whole == nil ||
-		whole.Whole.find("text").Text != "claude · opus · high · fan-out: codex · gpt-6-luna, opencode" || whole.View.Placeholder != "Say something to 3 agents" {
+		whole.View.Model != "opus · high · fan-out: codex · gpt-6-luna, opencode" || whole.View.Placeholder != "Say something to 3 agents" {
 		t.Fatalf("kept: mode %v, %+v, said %+v", view.mode, view.fans, whole)
 	}
 	// put up again they are marked, to add to or clear: esc lets go of them
@@ -2272,7 +2272,7 @@ func TestRowsMarkedInTheModelsSendTheNextMessageToSeveralAgents(t *testing.T) {
 	run.act(view.deed(chatEvent{E: "press", ID: "unmark"}))
 	does, checked, keys, whole = stands()
 	if view.mode != picking || view.fans != nil || view.marks != nil || does != "opus · What this chat runs on." || !slices.Equal(checked, []string{"a|claude|opus"}) || len(keys) != 0 ||
-		whole == nil || whole.Whole.find("text").Text != "claude · opus · high" || whole.View.Placeholder != "" {
+		whole == nil || whole.View.Model != "opus · high" || whole.View.Placeholder != "" {
 		t.Errorf("cleared: mode %v, %+v, line %q, checked %v, keys %+v, said %+v", view.mode, view.fans, does, checked, keys, whole)
 	}
 	// not offered while something waits: why is said at the modal's foot

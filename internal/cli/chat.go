@@ -191,6 +191,8 @@ type chatItem struct {
 // is what can be done with a reply, the menu of each: one chosen is said
 // as a pick of the chat, of the reply by its place, with the choice as sub.
 // Placeholder is what its empty field says, where that is not who answers.
+// Model is what the chat runs on, said on the composer's model chooser, and
+// Buttons what the composer offers beside it (the models, fork, earlier).
 type chatPiece struct {
 	T           string            `json:"t"`
 	ID          string            `json:"id"`
@@ -199,6 +201,8 @@ type chatPiece struct {
 	Working     bool              `json:"working"`
 	Placeholder string            `json:"placeholder,omitempty"`
 	Menu        []chatItem        `json:"menu,omitempty"`
+	Model       string            `json:"model,omitempty"`
+	Buttons     []chatButton      `json:"buttons,omitempty"`
 	Turns       []json.RawMessage `json:"turns"`
 }
 
@@ -206,7 +210,8 @@ type chatPiece struct {
 // of it by its place n; whether its agent is at work; words put in its
 // field, on the clipboard, by the title as the status — none takes it
 // away — or over the foot a few seconds as a toast; a piece put last in
-// another, said again whole, or taken out; the keys said along the foot.
+// another, said again whole, or taken out; the keys said along the foot;
+// what a chat runs on (model), its text said on its composer.
 type chatOp struct {
 	Op   string          `json:"op"`
 	ID   string          `json:"id,omitempty"`
@@ -419,17 +424,6 @@ func patches(pane string, changes []json.RawMessage) [][]byte {
 	return all
 }
 
-// chatLine is the quiet line over a chat: its words, a piece said again
-// alone when they change, and at its right end what follows them.
-func chatLine(words string, right ...json.RawMessage) json.RawMessage {
-	left := []json.RawMessage{chatHead(words), encode(chatBox{T: "col", Grow: 1})}
-	return encode(chatBox{T: "row", Pad: 8, Gap: 8, Children: append(left, right...)})
-}
-
-func chatHead(words string) json.RawMessage {
-	return encode(chatWords{T: "text", ID: "about", Text: words, Style: "dim"})
-}
-
 // chatAbout is the line over a chat: the agent, the model and the effort
 // it runs on where mia chose them, and the account it is on.
 func chatAbout(runs app.Runs) string {
@@ -581,26 +575,24 @@ func (t *talk) extras() []chatTurn {
 	return own
 }
 
-// whole is the message that says the whole view: the line over the chat —
-// who answers, and at its right the keys that show the models, fork the
-// conversation from its last reply and show the earlier conversations,
-// buttons that tab reaches from the chat's field, which types every
-// letter — and the chat with the last turns that fit, each reply with the
-// menu that copies it or forks the conversation from it.
+// whole is the message that says the whole view: the chat with the last
+// turns that fit, each reply with the menu that copies it or forks the
+// conversation from it, and on its composer what it runs on and the
+// buttons that show the models, fork the conversation from its last reply
+// and show the earlier conversations.
 // The keys are put on the chat's field, or on the modal's piece while one
 // stands over it.
 func (t *talk) whole() []byte {
 	own := t.extras()
-	chat := chatPiece{T: "chat", ID: t.id(), Agent: t.agent, Reply: t.reply, Working: t.working, Placeholder: t.hint, Turns: []json.RawMessage{}}
-	var buttons []json.RawMessage
+	chat := chatPiece{T: "chat", ID: t.id(), Agent: t.agent, Reply: t.reply, Working: t.working, Placeholder: t.hint, Model: t.model(), Turns: []json.RawMessage{}}
 	if t.reply {
 		chat.Menu = []chatItem{{ID: "copy", Title: "Copy"}, {ID: "fork", Title: "Continue from here with…"}}
-		buttons = append(buttons, encode(chatButton{T: "button", ID: "open-models", Label: "models", Key: "m"}),
-			encode(chatButton{T: "button", ID: "open-fork", Label: "fork", Key: "f"}))
+		chat.Buttons = append(chat.Buttons, chatButton{T: "button", ID: "open-models", Label: "Models", Key: "m"},
+			chatButton{T: "button", ID: "open-fork", Label: "Fork", Key: "f"})
 	}
-	buttons = append(buttons, encode(chatButton{T: "button", ID: "open-earlier", Label: "earlier", Key: "e"}))
+	chat.Buttons = append(chat.Buttons, chatButton{T: "button", ID: "open-earlier", Label: "Earlier", Key: "e"})
 	view := func() json.RawMessage {
-		return encode(chatBox{T: "col", ID: "view", Children: []json.RawMessage{chatLine(t.about, buttons...), encode(chat)}})
+		return encode(chatBox{T: "col", ID: "view", Children: []json.RawMessage{encode(chat)}})
 	}
 	message := chatMessage{V: 1, Pane: t.pane, Fill: true, Status: t.status}
 	switch {
@@ -624,6 +616,12 @@ func (t *talk) whole() []byte {
 	}
 	message.View = view()
 	return encode(message)
+}
+
+// model is what the composer's model chooser says: what the chat runs on
+// past who answers (who answers its field says), else who answers.
+func (t *talk) model() string {
+	return cmp.Or(strings.TrimPrefix(t.about, t.agent+" · "), t.about)
 }
 
 // said is the messages that say the view whole: the view, and after it
@@ -1103,8 +1101,8 @@ func (d chatDeed) coming() string {
 	return strings.Join(said, " · ")
 }
 
-// lined makes the line over the chat what it now is, who answers and what
-// was picked to come next, and is the change that says it.
+// lined makes what the chat runs on what it now is, who answers and what
+// was picked to come next, and is the change that says it on the composer.
 func (v *chatView) lined() json.RawMessage {
 	v.talk.about = chatAbout(v.runs)
 	if v.next != nil {
@@ -1117,7 +1115,7 @@ func (v *chatView) lined() json.RawMessage {
 		}
 		v.talk.about += " · fan-out: " + strings.Join(to, ", ")
 	}
-	return encode(chatOp{Op: "set", ID: "about", Node: chatHead(v.talk.about)})
+	return encode(chatOp{Op: "model", ID: v.talk.id(), Text: v.talk.model()})
 }
 
 // fanned keeps the rows the next message also goes to, none to let go of
