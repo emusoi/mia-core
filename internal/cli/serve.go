@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"net/url"
 	"os"
 	"os/signal"
@@ -284,6 +285,9 @@ func (s *server) handler() http.Handler {
 	mux.HandleFunc("GET /api/{query}", s.read)
 	mux.HandleFunc("GET /events", s.events)
 	mux.HandleFunc("POST /run", s.run)
+	// (Where the server spends its time, for `go tool pprof` over the socket: it is
+	// as private as the socket is.)
+	mux.HandleFunc("GET /debug/pprof/profile", pprof.Profile)
 	return mux
 }
 
