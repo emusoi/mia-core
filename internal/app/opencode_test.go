@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/emusoi/mia-core/internal/gittest"
 )
@@ -103,8 +104,8 @@ func TestOpencodesConversationsAreListedReadAndTakenUpAgain(t *testing.T) {
 		`{"type":"user","id":"m1","time":{"created":1793613000000},"text":"try the other way"}`)
 	session("ses_work", repo.Root, `,"time":{"created":1793612000000,"updated":1793612000500,"busy":1793612001000}`,
 		`{"type":"user","id":"m1","time":{"created":1793612000000},"text":"still at it"}`,
-		`{"type":"assistant","id":"m2","time":{"created":1793612001000},"content":[{"type":"text","text":"Half a sen"},`+
-			`{"type":"tool","id":"t1","name":"write","state":{"status":"streaming","input":"{\"path\":\"cart/no"}}]}`)
+		`{"type":"assistant","id":"m2","time":{"created":1793612001000},"content":[{"type":"text","text":"Writing it down."},`+
+			`{"type":"tool","id":"t1","name":"write","state":{"status":"streaming","input":""}}]}`)
 	session("ses_else", "/somewhere/else", `,"time":{"created":1793613000000,"updated":1793613900000}`,
 		`{"type":"user","id":"m1","time":{"created":1793613000000},"text":"another project's"}`)
 	session("ses_child", record.Path, `,"parentID":"ses_cart","time":{"created":1793613000000,"updated":1793613000000}`,
@@ -157,19 +158,19 @@ func TestOpencodesConversationsAreListedReadAndTakenUpAgain(t *testing.T) {
 		lines = append(lines, fmt.Sprintf("%d %s %s%s", turn.N, turn.Kind, turn.Text, turn.Hash))
 	}
 	want := []string{"1 asked fix the cart total", "2 thought where is the total added up", "3 said Looking at\nthe cart.", "4 tool Read 2 files", "5 tool Edited total.go +2 −1",
-		"6 tool Edited tax.go +1 −1", "7 tool Ran git commit -am cart", "8 tool Asked an agent: find the tax rules", "9 question Round up?",
-		"10 answer Up", "11 tool Used tracker_find", "12 commit 0123abc", "13 said The total adds up now."}
+		"6 tool Edited tax.go +1 −1", "7 tool Ran git commit -am cart", "8 commit 0123abc", "9 tool Asked an agent: find the tax rules", "10 question Round up?",
+		"11 answer Up", "12 tool Used tracker_find", "13 said The total adds up now."}
 	if strings.Join(lines, "|") != strings.Join(want, "|") {
 		t.Fatalf("its turns, what it thought but none it encrypted, and opencode's own notes left out:\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
 	}
 	if turns[1].Seconds != 3 {
 		t.Errorf("how long it thought, from when it began to when it was done: %+v", turns[1])
 	}
-	if q, answer := turns[8], turns[9]; q.Answer != "Up" || strings.Join(q.Options, ",") != "Up,Down" || answer.Question != 9 {
+	if q, answer := turns[9], turns[10]; q.Answer != "Up" || strings.Join(q.Options, ",") != "Up,Down" || answer.Question != 10 {
 		t.Errorf("a question and what was chosen: %+v %+v", q, answer)
 	}
-	if turns[4].File != "cart/total.go" || turns[4].Name != "edit" || turns[5].File != "cart/tax.go" || turns[5].Name != "patch" || turns[7].Name != "subagent" ||
-		turns[11].Subject != "The cart total adds up" || turns[0].At.UnixMilli() != 1793613601000 {
+	if turns[4].File != "cart/total.go" || turns[4].Name != "edit" || turns[5].File != "cart/tax.go" || turns[5].Name != "patch" || turns[8].Name != "subagent" ||
+		turns[7].Subject != "The cart total adds up" || turns[0].At.UnixMilli() != 1793613601000 {
 		t.Errorf("each tool by opencode's name for it, its file, and the commit made: %+v", turns)
 	}
 	if later, err := a.ConversationTurns("ses_cart", 11); err != nil || len(later) != 2 || later[0].N != 12 {
@@ -178,8 +179,8 @@ func TestOpencodesConversationsAreListedReadAndTakenUpAgain(t *testing.T) {
 	if in, err := a.ConversationIn("ses_cart", record.Name, 12); err != nil || len(in) != 1 || in[0].Kind != turnSaid {
 		t.Errorf("by its worktree: %+v %v", in, err)
 	}
-	if work, err := a.ConversationTurns("ses_work", 0); err != nil || len(work) != 1 || work[0].Text != "still at it" {
-		t.Errorf("what the agent is still writing is left for when it is written: %+v %v", work, err)
+	if work, err := a.ConversationTurns("ses_work", 0); err != nil || len(work) != 3 || work[1].Text != "Writing it down." || work[2].Text != "Using write" {
+		t.Errorf("what the agent is still writing, as far as it is written: %+v %v", work, err)
 	}
 	for _, id := range []string{"ses_else", "ses_none", "ses_torn", "--help"} {
 		if turns, err := a.ConversationTurns(id, 0); err == nil {
@@ -248,13 +249,96 @@ case "$3" in *cursor=after+1000) echo '` + page(opencodePage, 2, "after 1002") +
 	}
 }
 
-// A message the agent could not write to its end is written all the same:
-// opencode says why it failed, and writes no more of it.
-func TestAnOpencodeMessageThatFailedIsWritten(t *testing.T) {
-	turns := opencodeTurns([]opencodeMessage{{Type: "user", Text: "fix the cart total"},
-		{Type: "assistant", Content: []opencodePart{{Type: "text", Text: "Looking at the cart."}}, Error: &opencodeError{Type: "api"}}})
-	if len(turns) != 2 || turns[1].Text != "Looking at the cart." {
-		t.Errorf("what it said before it failed: %+v", turns)
+// A message the agent is still writing is read as far as opencode keeps
+// it, and a view that follows it hears each part as it comes, every turn
+// under the number it was first heard by: what it thought and said once
+// each is done, a tool from when it is begun, said again as what it is
+// handed is written and once it ran, and a commit it made right after it.
+// opencode is asked again only once its database was written.
+func TestAnOpencodeReplyIsHeardAsItIsWritten(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	a, err := Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := fakeOpencode(t)
+	db := filepath.Join(opencodeHome(), "opencode.db")
+	if err := os.WriteFile(db, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wal := db + "-wal"
+	exports := func() int {
+		data, _ := os.ReadFile(filepath.Join(store, "asked"))
+		return strings.Count(string(data), "session export ses_live")
+	}
+	asked := `{"type":"user","id":"m1","time":{"created":1793613601000},"text":"fix the cart total"}`
+	reply := func(finish string, parts ...string) string {
+		return `{"type":"assistant","id":"m2","time":{"created":1793613603000},"content":[` + strings.Join(parts, ",") + `]` + finish + `}`
+	}
+	thinking := `{"type":"reasoning","text":"","time":{"created":1793613603000}}`
+	thought := `{"type":"reasoning","text":"where is the total added up","time":{"created":1793613603000,"completed":1793613605000}}`
+	saying, said := `{"type":"text","text":""}`, `{"type":"text","text":"Looking at the cart."}`
+	tool := func(id, name, state string) string {
+		return fmt.Sprintf(`{"type":"tool","id":%q,"name":%q,"state":%s,"time":{"created":1793613606000}}`, id, name, state)
+	}
+	stages := []struct {
+		messages []string
+		want     []string // what is heard: each turn new or grown
+	}{
+		{[]string{asked, reply("", thinking)}, []string{"1 asked fix the cart total"}},
+		{[]string{asked, reply("", thought, saying)}, []string{"2 thought where is the total added up"}},
+		{[]string{asked, reply("", thought, said, tool("t1", "read", `{"status":"streaming","input":""}`))},
+			[]string{"3 said Looking at the cart.", "4 tool Using read"}},
+		{[]string{asked, reply("", thought, said, tool("t1", "read", `{"status":"streaming","input":"{\"path\":\"cart/total.go\"}"}`))},
+			[]string{"4 tool Read total.go"}},
+		{[]string{asked, reply("", thought, said, tool("t1", "read", `{"status":"completed","input":{"path":"cart/total.go"},"content":[{"type":"text","text":"package cart"}]}`),
+			tool("t2", "shell", `{"status":"running","input":{"command":"git commit -am cart"}}`))},
+			[]string{"5 tool Ran git commit -am cart"}},
+		{[]string{asked, reply(`,"finish":"tool-calls"`, thought, said, tool("t1", "read", `{"status":"completed","input":{"path":"cart/total.go"}}`),
+			tool("t2", "shell", `{"status":"completed","input":{"command":"git commit -am cart"},"content":[{"type":"text","text":"[main 0123abc] The cart total adds up"}]}`)),
+			`{"type":"assistant","id":"m3","time":{"created":1793613609000},"content":[{"type":"text","text":"It adds up."}],"finish":"stop"}`},
+			[]string{"6 commit 0123abc", "7 said It adds up."}},
+	}
+	write := func(messages []string) {
+		t.Helper()
+		_, exported := opencodeSaid("ses_live", repo.Root, `,"time":{"created":1793613600000,"busy":1793613602000}`, messages...)
+		if err := os.WriteFile(filepath.Join(store, "ses_live.json"), []byte(exported), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(wal, []byte(fmt.Sprint(time.Now().UnixNano())), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(stages[0].messages)
+	heard := make(chan []Turn, 16)
+	stop := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		done <- a.FollowConversation("ses_live", "", 0, stop, func(turns []Turn) error { heard <- turns; return nil })
+	}()
+	t.Cleanup(func() { close(stop); <-done })
+	for i, stage := range stages {
+		if i > 0 {
+			before := exports()
+			time.Sleep(400 * time.Millisecond)
+			if exports() != before {
+				t.Fatalf("stage %d: exported again with nothing written", i)
+			}
+			write(stage.messages)
+		}
+		select {
+		case turns := <-heard:
+			var got []string
+			for _, turn := range turns {
+				got = append(got, fmt.Sprintf("%d %s %s%s", turn.N, turn.Kind, turn.Text, turn.Hash))
+			}
+			if strings.Join(got, "|") != strings.Join(stage.want, "|") {
+				t.Fatalf("stage %d heard\n%s\nwant\n%s", i, strings.Join(got, "\n"), strings.Join(stage.want, "\n"))
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("stage %d: nothing heard within two seconds", i)
+		}
 	}
 }
 

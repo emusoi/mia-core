@@ -96,28 +96,17 @@ type opencodeExport struct {
 type opencodeMessage struct {
 	Type string `json:"type"`
 	Time struct {
-		Created   int64 `json:"created"`
-		Completed int64 `json:"completed"`
+		Created int64 `json:"created"`
 	} `json:"time"`
 	Text    string         `json:"text"`
 	Content []opencodePart `json:"content"`
-	Finish  string         `json:"finish"` // why the agent stopped writing it, once it has
-	Error   *opencodeError `json:"error"`  // why it could not, when it failed
-}
-
-// opencodeError is why a message was not written to its end.
-type opencodeError struct {
-	Type string `json:"type"`
-}
-
-// written reports whether the agent has done writing it: finished, or
-// failed.
-func (m opencodeMessage) written() bool {
-	return m.Finish != "" || m.Time.Completed != 0 || m.Error != nil
 }
 
 // opencodePart is a part of what the agent said: text, reasoning or the
-// use of a tool.
+// use of a tool. opencode keeps what it streams of each only once that is
+// done: a text or a reasoning is "" until the whole of it is there, and
+// a tool's input "" from when the agent begins to call it until it has
+// written what it hands it, then that, in a string, until the tool runs.
 type opencodePart struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
@@ -129,7 +118,7 @@ type opencodePart struct {
 		Completed int64 `json:"completed"`
 	} `json:"time"`
 	State struct {
-		Input    json.RawMessage `json:"input"` // an object, and a string while it is still being written
+		Input    json.RawMessage `json:"input"` // an object, and a string until the tool runs
 		Content  []opencodeText  `json:"content"`
 		Metadata json.RawMessage `json:"metadata"` // each tool's own
 	} `json:"state"`
@@ -569,12 +558,15 @@ func opencodeTime(ms int64) time.Time {
 }
 
 // opencodeTurns is a conversation's messages as turns, in order, not yet
-// numbered. The last, while the agent is still writing it, is left for
-// when it is written: a turn keeps its number, as a line of a transcript
-// does.
+// numbered, the one the agent is still writing as far as opencode keeps
+// it: what it thought and what it said each once it is done, and a tool
+// from when the agent begins to call it, said again as what it is handed
+// is written. A turn stays where it is as parts are added after it, and
+// so keeps its number as it grows: a commit a tool made is said right
+// after that tool.
 func opencodeTurns(messages []opencodeMessage) []Turn {
 	var all []Turn
-	for i, m := range messages {
+	for _, m := range messages {
 		at := opencodeTime(m.Time.Created)
 		switch m.Type {
 		case "user":
@@ -582,10 +574,7 @@ func opencodeTurns(messages []opencodeMessage) []Turn {
 				all = append(all, Turn{Kind: turnAsked, At: at, Text: m.Text})
 			}
 		case "assistant":
-			if i == len(messages)-1 && !m.written() {
-				continue
-			}
-			var turns, commits []Turn
+			var turns []Turn
 			for _, part := range m.Content {
 				switch part.Type {
 				case "text":
@@ -606,10 +595,10 @@ func opencodeTurns(messages []opencodeMessage) []Turn {
 					for _, c := range part.State.Content {
 						output.WriteString(c.Text)
 					}
-					commits = append(commits, commitTurns(output.String(), at)...)
+					turns = append(turns, commitTurns(output.String(), at)...)
 				}
 			}
-			all = append(append(all, readsTogether(turns)...), commits...)
+			all = append(all, readsTogether(turns)...)
 		}
 	}
 	return all
@@ -619,8 +608,16 @@ func opencodeTurns(messages []opencodeMessage) []Turn {
 // agents'; a question asked is a turn for each, and what was chosen one
 // after it.
 func opencodeTool(part opencodePart, at time.Time) []Turn {
+	input := part.State.Input
+	var written string
+	if json.Unmarshal(input, &written) == nil {
+		if strings.TrimSpace(written) == "" { // begun, and nothing it is handed written yet
+			return []Turn{{Kind: turnTool, At: at, Name: part.Name, Text: "Using " + cmp.Or(opencodeNames[strings.ToLower(part.Name)], part.Name)}}
+		}
+		input = json.RawMessage(written)
+	}
 	var in opencodeInput
-	_ = json.Unmarshal(part.State.Input, &in)
+	_ = json.Unmarshal(input, &in)
 	if len(in.Questions) > 0 {
 		var answered opencodeAnswered
 		_ = json.Unmarshal(part.State.Metadata, &answered)
