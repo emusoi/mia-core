@@ -1,11 +1,15 @@
 package app
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/emusoi/mia-core/internal/gittest"
 )
 
 // A conversation asked for whole each time gives what is new, and a turn
@@ -73,5 +77,92 @@ func TestWhenWrittenAsksOnlyOnceTheAgentWrote(t *testing.T) {
 	}
 	if backstopped != 3 {
 		t.Errorf("past its backstop it is asked whatever is written: %d", backstopped)
+	}
+}
+
+// Each agent that writes a transcript is heard a line at a time as it
+// writes one: a line not yet whole is left for when it is, and each turn
+// comes once its line is there, under the number it keeps — what the
+// agent thought, the tool it calls before it runs, and what it said.
+func TestEachTranscriptIsHeardALineAtATimeAsItIsWritten(t *testing.T) {
+	gittest.Isolate(t)
+	dir := t.TempDir()
+	cwd := strings.ReplaceAll(`"`+dir+`"`, `\`, `\\`)
+	at := `"2026-11-02T10:00:00Z"`
+	for _, agent := range []struct {
+		name   string
+		decode decoder
+		lines  []string
+		want   [][]string // what each line makes heard
+	}{
+		{"claude", claudeLine, []string{
+			`{"type":"user","cwd":` + cwd + `,"timestamp":` + at + `,"message":{"content":"fix the cart"}}`,
+			`{"type":"assistant","cwd":` + cwd + `,"timestamp":` + at + `,"message":{"content":[{"type":"thinking","thinking":"where is it"}]}}`,
+			`{"type":"assistant","cwd":` + cwd + `,"timestamp":` + at + `,"message":{"content":[{"type":"tool_use","id":"u1","name":"Bash","input":{"command":"go test ./cart"}}]}}`,
+			`{"type":"assistant","cwd":` + cwd + `,"timestamp":` + at + `,"message":{"content":[{"type":"text","text":"It is fixed."}]}}`,
+		}, [][]string{{"1 asked"}, {"2 thought"}, {"3 tool"}, {"4 said"}}},
+		{"codex", codexLine, []string{
+			`{"timestamp":` + at + `,"type":"session_meta","payload":{"cwd":` + cwd + `}}` + "\n" +
+				`{"timestamp":` + at + `,"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"fix the cart"}]}}`,
+			`{"timestamp":` + at + `,"type":"response_item","payload":{"type":"reasoning","summary":[{"text":"where is it"}]}}`,
+			`{"timestamp":` + at + `,"type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":[\"bash\",\"-lc\",\"go test ./cart\"]}"}}`,
+			`{"timestamp":` + at + `,"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"It is fixed."}]}}`,
+		}, [][]string{{"1 asked"}, {"2 thought"}, {"3 tool"}, {"4 said"}}},
+		{"pi", piLine, []string{
+			`{"type":"session","cwd":` + cwd + `,"timestamp":` + at + `}` + "\n" +
+				`{"type":"message","timestamp":` + at + `,"message":{"role":"user","content":"fix the cart"}}`,
+			`{"type":"message","timestamp":` + at + `,"message":{"role":"assistant","content":[{"type":"thinking","thinking":"where is it"},{"type":"toolCall","name":"bash","arguments":{"command":"go test ./cart"}}]}}`,
+			`{"type":"message","timestamp":` + at + `,"message":{"role":"toolResult","content":"ok"}}`,
+			`{"type":"message","timestamp":` + at + `,"message":{"role":"assistant","content":[{"type":"text","text":"It is fixed."}]}}`,
+		}, [][]string{{"1 asked"}, {"2 thought", "3 tool"}, nil, {"4 said"}}},
+		{"agy", agyLine, []string{
+			`{"source":"USER_EXPLICIT","type":"USER_INPUT","created_at":` + at + `,"content":"<USER_REQUEST>\nfix the cart\n</USER_REQUEST>"}`,
+			`{"source":"MODEL","type":"PLANNER_RESPONSE","created_at":` + at + `,"thinking":"where is it","tool_calls":[{"name":"run_command","args":{"CommandLine":"go test ./cart"}}]}`,
+			`{"source":"MODEL","type":"RUN_COMMAND","created_at":` + at + `,"content":"ok"}`,
+			`{"source":"MODEL","type":"PLANNER_RESPONSE","created_at":` + at + `,"content":"It is fixed."}`,
+		}, [][]string{{"1 asked"}, {"2 thought", "3 tool"}, nil, {"4 said"}}},
+	} {
+		t.Run(agent.name, func(t *testing.T) {
+			file := filepath.Join(t.TempDir(), "c1.jsonl")
+			if err := os.WriteFile(file, nil, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			reader := transcripts{agent: agent.name, decode: agent.decode,
+				find: func(string, folders, string) []string { return []string{file} },
+				cwd:  func(string) string { return dir }}
+			next, every := reader.follow(folders{Root: dir}, "c1", "", 0)
+			if every > 200*time.Millisecond {
+				t.Errorf("looked at every %s", every)
+			}
+			heard := func() []string {
+				t.Helper()
+				turns, found, err := next()
+				if !found || err != nil {
+					t.Fatalf("found %v, %v", found, err)
+				}
+				var got []string
+				for _, turn := range turns {
+					got = append(got, fmt.Sprintf("%d %s", turn.N, turn.Kind))
+				}
+				return got
+			}
+			heard()
+			for i, line := range agent.lines {
+				f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0)
+				if err != nil {
+					t.Fatal(err)
+				}
+				half := len(line) - 5
+				f.WriteString(line[:half])
+				if got := heard(); got != nil {
+					t.Errorf("line %d heard while half written: %v", i, got)
+				}
+				f.WriteString(line[half:] + "\n")
+				f.Close()
+				if got := heard(); !slices.Equal(got, agent.want[i]) {
+					t.Errorf("line %d heard %v, want %v", i, got, agent.want[i])
+				}
+			}
+		})
 	}
 }
