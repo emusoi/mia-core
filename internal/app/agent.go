@@ -268,6 +268,11 @@ done`,
 	{Name: "opencode", goOn: "--continue", has: []string{"-c", "--continue", "-s", "--session"},
 		resume: fixed("opencode --session %s"), talks: opencodeTalks{},
 		with: words([]string{"mini", "--model", "%s"}, nil), lists: opencodeModels{}.models, again: true},
+	// the Antigravity CLI. Its models are its account's, asked of it, each
+	// at an effort of its own, and it is started with an effort besides
+	{Name: "agy", goOn: "--continue", has: []string{"-c", "--continue", "--conversation"}, home: agyFolder,
+		Efforts: []string{"low", "medium", "high", "xhigh", "max"},
+		with:    words([]string{"--model", "%s"}, []string{"--effort", "%s"}), lists: agyModels{}.models},
 	// its help has a word for a model and names none: it has those the config names
 	{Name: "gemini", goOn: "--resume latest", has: []string{"-r", "--resume"},
 		with: words([]string{"--model", "%s"}, nil)},
@@ -295,6 +300,9 @@ func (a *App) agents() []Agent {
 				t.cache = cache
 				a.agentTable[i].talks = t
 				a.agentTable[i].lists = opencodeModels{cache: filepath.Join(a.MiaDir, "cache", "models")}.models
+			}
+			if a.agentTable[i].Name == "agy" {
+				a.agentTable[i].lists = agyModels{cache: filepath.Join(a.MiaDir, "cache", "models")}.models
 			}
 		}
 		for _, one := range a.pluginAgents() {

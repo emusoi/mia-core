@@ -27,6 +27,14 @@ on GitHub; a tag without its section is not released.
   each second or two, when one of their build answers. See
   [mia serve](serve.md).
 
+- **agy, the Antigravity CLI, is an agent mia knows.** A window that
+  runs `agy` is agy's; `mia api agents` lists it, installed when `agy`
+  is on `PATH`, with the models `agy models` prints, an id and a name a
+  line, kept for an hour as opencode's are, and the efforts `low` to
+  `max`: `mia window new <worktree> agy --model <id> --effort <level>`
+  starts `agy --model <id> --effort <level>`, and the chat's models have
+  them under its name. See [Agents](api.md#agents).
+
 - **The chat's models and Earlier are modals.** In `mia chat`, `models`
   and `earlier` no longer take the chat's place: each is a card over it,
   the conversation in sight behind, and `esc` takes it away with nothing

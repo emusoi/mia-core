@@ -42,7 +42,7 @@ func TestSendAnswerAndStopAreTheSameKeysForEveryAgent(t *testing.T) {
 		name        string
 		reads, live bool
 	}
-	want := []agent{{"claude", true, true}, {"codex", true, true}, {"pi", true, true}, {"opencode", true, false}, {"gemini", false, false}, {"cursor-agent", false, false}}
+	want := []agent{{"claude", true, true}, {"codex", true, true}, {"pi", true, true}, {"opencode", true, false}, {"agy", false, false}, {"gemini", false, false}, {"cursor-agent", false, false}}
 	var known []agent
 	for _, one := range a.AgentModels() {
 		known = append(known, agent{name: one.Name})

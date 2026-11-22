@@ -440,10 +440,9 @@ func (o opencodeTalks) search(in folders, text string, limit int) ([]Recalled, e
 
 // opencodeModels is opencode's models: those of the providers it is
 // signed in to, which only it knows, so its own program is asked —
-// opencode models, a provider/model a line. What it said is kept for
-// modelsKept, so that a list of agents does not start it each time; that
-// it said none, or could not say, for a minute. It is asked only where
-// its conversations are: on this machine, with something kept.
+// opencode models, a provider/model a line — and what it said is kept.
+// It is asked only where its conversations are: on this machine, with
+// something kept.
 type opencodeModels struct {
 	// cache is the folder what it said is kept in; nothing is kept with none.
 	cache string
@@ -451,14 +450,14 @@ type opencodeModels struct {
 
 const modelsKept = time.Hour
 
-// opencodeListing is what is kept of what opencode said its models are.
-type opencodeListing struct {
+// modelListing is what is kept of what an agent said its models are.
+type modelListing struct {
 	At     time.Time      `json:"at"`
 	Models []plugin.Model `json:"models"`
 }
 
 // fresh reports whether what is kept still stands at now.
-func (l opencodeListing) fresh(now time.Time) bool {
+func (l modelListing) fresh(now time.Time) bool {
 	kept := modelsKept
 	if len(l.Models) == 0 {
 		kept = time.Minute
@@ -466,26 +465,41 @@ func (l opencodeListing) fresh(now time.Time) bool {
 	return !l.At.IsZero() && now.Sub(l.At) < kept
 }
 
-func (o opencodeModels) models() []plugin.Model {
+// keptModels is the models an agent says it has, what it said kept in
+// cache, as <agent>.json, for modelsKept, so that a list of agents does
+// not start it each time; that it said none, or could not say, for a
+// minute. ask asks it, and is false where it is not worth asking: then it
+// has none, and nothing is kept.
+func keptModels(cache, agent string, ask func() ([]plugin.Model, bool)) []plugin.Model {
 	file := ""
-	if o.cache != "" {
-		file = filepath.Join(o.cache, "opencode.json")
+	if cache != "" {
+		file = filepath.Join(cache, agent+".json")
 	}
-	var kept opencodeListing
+	var kept modelListing
 	if data, err := os.ReadFile(file); err == nil && json.Unmarshal(data, &kept) == nil && kept.fresh(time.Now()) {
 		return kept.Models
 	}
-	if !(opencodeTalks{}).there() {
+	models, asked := ask()
+	if !asked {
 		return nil
 	}
-	out, _ := run.Tool{Binary: "opencode", Within: AgentTimeout}.Capture("models") // one that fails has none
-	kept = opencodeListing{At: time.Now().UTC(), Models: opencodeListed(out)}
-	if file != "" && os.MkdirAll(o.cache, 0o755) == nil {
+	kept = modelListing{At: time.Now().UTC(), Models: models}
+	if file != "" && os.MkdirAll(cache, 0o755) == nil {
 		if data, err := json.Marshal(kept); err == nil {
 			_ = writeAtomic(file, data)
 		}
 	}
 	return kept.Models
+}
+
+func (o opencodeModels) models() []plugin.Model {
+	return keptModels(o.cache, "opencode", func() ([]plugin.Model, bool) {
+		if !(opencodeTalks{}).there() {
+			return nil, false
+		}
+		out, _ := run.Tool{Binary: "opencode", Within: AgentTimeout}.Capture("models") // one that fails has none
+		return opencodeListed(out), true
+	})
 }
 
 // opencodeListed is the models in what opencode models prints: each line

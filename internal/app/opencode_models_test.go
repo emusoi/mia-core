@@ -54,7 +54,7 @@ func TestOpencodesModelsAreAskedOnceAndKept(t *testing.T) {
 	}
 	kept := func(age time.Duration) {
 		t.Helper()
-		var listing opencodeListing
+		var listing modelListing
 		data, err := os.ReadFile(filepath.Join(cache, "opencode.json"))
 		if err != nil || json.Unmarshal(data, &listing) != nil {
 			t.Fatalf("kept: %s %v", data, err)
@@ -95,7 +95,7 @@ func TestOpencodesModelsAreAskedOnceAndKept(t *testing.T) {
 		t.Errorf("with no cache: %+v", models)
 	}
 
-	if listing := (opencodeListing{}); listing.fresh(time.Now()) {
+	if listing := (modelListing{}); listing.fresh(time.Now()) {
 		t.Error("nothing kept is fresh")
 	}
 }

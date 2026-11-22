@@ -461,6 +461,14 @@ as `opencode mini --model <provider/model> --session <id>` in the pane
 it ran in: the window, its number and what is kept on it stay. One with
 no conversation yet is refused: close it and start it with `--model`.
 
+agy's models, the Antigravity CLI's, are those its account may use:
+mia asks it, `agy models`, and lists each line it prints that is an id
+and a name a tab apart, kept as opencode's are, in
+`mia/cache/models/agy.json`, and asked only where agy has made its
+folder, `~/.gemini/antigravity-cli`. It is started with one and an
+effort as `agy --model <id> --effort <level>`, its efforts `low` to
+`max`.
+
 gemini has a word for a model, `--model`, and neither lists its models
 nor names any in its help: its `models` are those the config names,
 `[agents.gemini] model = "…"`, which it is then started with.
