@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 	"regexp"
 	"runtime/pprof"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -22,6 +24,7 @@ import (
 	"github.com/emusoi/mia-core/internal/gittest"
 	"github.com/emusoi/mia-core/internal/runtime"
 	"github.com/emusoi/mia-core/internal/session"
+	"github.com/emusoi/mia-core/internal/signal"
 )
 
 // restFixture is many repositories and worktrees as a person has them, a
@@ -301,5 +304,154 @@ func TestManyAskingHowBusyMeasureTheMachineOnceAndOneThatIsOffOnce(t *testing.T)
 	}
 	if asked := shimRan(said, "ssh"); asked != 1 {
 		t.Errorf("the machine that is off was asked %d times", asked)
+	}
+}
+
+// A signal said to go at a time goes then: those who listen are told,
+// with no file written and before the server looks at everything.
+func TestASignalThatGoesByItselfIsToldAsItGoes(t *testing.T) {
+	isolateServe(t)
+	repo := aWorktree(t)
+	if err := (signal.Store{Dir: repo.MiaDir()}).Set(signal.Signal{Worktree: "longido", Kind: "note", Text: "for a moment", From: "test", At: time.Now(), Until: time.Now().Add(time.Second)}); err != nil {
+		t.Fatal(err)
+	}
+	serveIn(t, func(s *server) { s.tick, s.backstop, s.retry = 20*time.Millisecond, time.Hour, 50*time.Millisecond })
+	events := listen(t, q("worktrees", repo.Root, "longido"))
+	if one := told(t, events); !strings.Contains(string(one.Result), "for a moment") {
+		t.Fatalf("first = %+v", one)
+	}
+	if one := told(t, events); strings.Contains(string(one.Result), "for a moment") {
+		t.Fatalf("after it went = %+v", one)
+	}
+}
+
+// A turn written to a conversation is told to whoever listens to the
+// conversations, and so is a sign-in to those of the accounts: no file the
+// server stamps of a repository says either, and it does not wait for its
+// look at everything.
+func TestATurnWrittenAndASignInAreToldAsTheyAreWritten(t *testing.T) {
+	isolateServe(t)
+	repo := gittest.New(t)
+	claude, codex := t.TempDir(), t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", claude)
+	t.Setenv("CODEX_HOME", codex)
+	t.Setenv("PI_CODING_AGENT_DIR", t.TempDir())
+	project := filepath.Join(claude, "projects", regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(repo.Root, "-"))
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	root, _ := json.Marshal(repo.Root)
+	line := func(n int) string {
+		return `{"type":"user","cwd":` + string(root) + `,"timestamp":"2026-11-02T10:00:0` + strconv.Itoa(n) + `Z","message":{"content":"ask ` + strconv.Itoa(n) + `"}}` + "\n"
+	}
+	transcript := filepath.Join(project, "c1.jsonl")
+	if err := os.WriteFile(transcript, []byte(line(1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	serveIn(t, func(s *server) { s.tick, s.backstop, s.retry = 20*time.Millisecond, time.Hour, 50*time.Millisecond })
+	conversations, accounts := q("conversations", repo.Root), q("accounts", repo.Root)
+	events := listen(t, conversations, accounts)
+	turns := func(one event) int {
+		var heads []app.Head
+		if err := json.Unmarshal(one.Result, &heads); err != nil || len(heads) != 1 {
+			t.Fatalf("conversations = %+v: %v", one, err)
+		}
+		return heads[0].Turns
+	}
+	codexIn := func(one event) string {
+		var all []app.Account
+		if err := json.Unmarshal(one.Result, &all); err != nil {
+			t.Fatalf("accounts = %+v: %v", one, err)
+		}
+		for _, account := range all {
+			if account.Agent == "codex" && account.Default {
+				return account.LoggedIn
+			}
+		}
+		t.Fatalf("no codex account in %s", one.Result)
+		return ""
+	}
+	for range 2 {
+		switch one := told(t, events); one.Q {
+		case conversations:
+			if got := turns(one); got != 1 {
+				t.Fatalf("first, %d turns", got)
+			}
+		case accounts:
+			if got := codexIn(one); got != "no" {
+				t.Fatalf("first, codex logged in %q", got)
+			}
+		}
+	}
+	f, err := os.OpenFile(transcript, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(line(2)); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	if one := told(t, events); one.Q != conversations || turns(one) != 2 {
+		t.Fatalf("after a turn was written = %+v", one)
+	}
+	// the file codex writes once someone signs in, empty: mia looks only at whether it is there
+	if err := os.WriteFile(filepath.Join(codex, "auth.json"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if one := told(t, events); one.Q != accounts || codexIn(one) != "yes" {
+		t.Fatalf("after a sign-in = %+v", one)
+	}
+}
+
+// The main agent going to work on its own is told as tmux says its pane's
+// title changed, which is no session or window coming or going.
+func TestTheMainAgentGoingToWorkIsToldAsItsPaneSaysSo(t *testing.T) {
+	isolateServe(t)
+	t.Chdir(t.TempDir())
+	socket, err := os.MkdirTemp("/tmp", "mia-serve-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(socket) })
+	t.Setenv("TMUX_TMPDIR", socket)
+	t.Cleanup(func() { exec.Command("tmux", "kill-server").Run() })
+	if out, err := exec.Command("tmux", "new-session", "-d", "-s", session.Name("main"), "-n", "claude", "sleep", "600").CombinedOutput(); err != nil {
+		t.Fatalf("tmux new-session: %s", out)
+	}
+	title := func(title string) {
+		t.Helper()
+		if out, err := exec.Command("tmux", "select-pane", "-t", session.Target("main", "claude"), "-T", title).CombinedOutput(); err != nil {
+			t.Fatalf("%v: %s", err, out)
+		}
+	}
+	title("✳ Claude Code") // claude's own, at rest
+	serveIn(t, func(s *server) { s.tick, s.backstop, s.retry = 20*time.Millisecond, time.Hour, 50*time.Millisecond })
+	events := listen(t, q("main", ""))
+	state := func(one event) app.MainState {
+		var state app.MainState
+		if err := json.Unmarshal(one.Result, &state); err != nil {
+			t.Fatalf("main = %+v: %v", one, err)
+		}
+		return state
+	}
+	if first := state(told(t, events)); !first.Running || first.Working {
+		t.Fatalf("first = %+v", first)
+	}
+	for watching := false; !watching; time.Sleep(25 * time.Millisecond) {
+		out, _ := exec.Command("tmux", "list-sessions", "-F", "#{session_name}").Output()
+		watching = strings.Contains(string(out), "_mia-serve-")
+	}
+	select { // what its coming made tmux say is said, and nothing changed
+	case one := <-events:
+		if state(one).Working {
+			t.Fatalf("at work before its title says so: %+v", one)
+		}
+	case <-time.After(500 * time.Millisecond):
+	}
+	title("⠋ at work")
+	for {
+		if state(told(t, events)).Working {
+			break
+		}
 	}
 }

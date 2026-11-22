@@ -82,6 +82,46 @@ func (a *App) Conversations(want Wanted) (heads []Head, problems []string) {
 	return heads, problems
 }
 
+// writtenLately is how lately a transcript was written to for a turn
+// written to it to be looked for: one older is taken up again rarely, and
+// a server's next look at everything finds it.
+const writtenLately = 24 * time.Hour
+
+// ConversationsWritten is what the conversations of the repository are
+// read from that a turn, or a conversation begun, is written to: each
+// transcript written to lately, and every folder transcripts are in up to
+// the agent's own, whose stamp a transcript added there changes. An agent
+// whose conversations are in no file mia reads, opencode's or a plugin's,
+// has none.
+func (a *App) ConversationsWritten() []string {
+	in, _ := a.where()
+	var paths []string
+	seen := map[string]bool{}
+	add := func(path string) {
+		if !seen[path] {
+			seen[path] = true
+			paths = append(paths, path)
+		}
+	}
+	for _, agent := range a.agents() {
+		t, ok := agent.talks.(transcripts)
+		if !ok {
+			continue
+		}
+		for _, h := range homesOf(t.agent) {
+			for _, file := range t.files(h.dir, in, false) {
+				for dir := filepath.Dir(file); strings.HasPrefix(dir, h.dir+string(filepath.Separator)); dir = filepath.Dir(dir) {
+					add(dir)
+				}
+				if info, err := os.Stat(file); err == nil && time.Since(info.ModTime()) < writtenLately {
+					add(file)
+				}
+			}
+		}
+	}
+	return paths
+}
+
 // instant is a time as a list says it: in UTC, to the millisecond.
 func instant(t time.Time) time.Time { return t.UTC().Truncate(time.Millisecond) }
 

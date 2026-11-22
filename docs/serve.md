@@ -206,11 +206,24 @@ done: nothing waits on a slow one. The server asks again:
   session or a window came, went, was renamed or put in front — it hears
   this as a control-mode client on a session of its own,
   `_mia-serve-<pid>`, and starts no tmux server to hear it;
+- `main`, at once, when tmux tells that client the main agent's panes
+  changed — a pane's title, where claude says it is at work, or when its
+  window last wrote, at most once a second — and once more four seconds
+  after it last told it: an agent that gives its pane no title is at
+  work only while it writes;
 - every question, at once, after a [`POST /run`](#post-run);
 - a repository's questions, and those of no repository but `here` and
   `machines`, when its records, its configuration, or a worktree's
-  `HEAD` or index were written, looked at each second; every question
-  when the person's configuration or the main agent's records were;
+  `HEAD` or index were written, or when one of its signals goes at the
+  time it was set to, looked at each second; every question when the
+  person's configuration or the main agent's records were written, or
+  one of the main agent's signals goes;
+- `conversations` and `main conversations` when a transcript they are
+  read from was written to — each written to in the last day, and every
+  folder transcripts are in, which a conversation begun adds one to —
+  and `accounts` when the folder of an account, or the file in it that
+  is there once someone signed in, came, went or was written: by their
+  stamps alone, looked at each second, never by what is in them;
 - `status` and `window` each time it looks, each second, as no file
   says when a worktree's files, a window's screen or whether its agent
   is at work changed — only who listens is told, and only when the
@@ -218,7 +231,8 @@ done: nothing waits on a slow one. The server asks again:
 - every question every thirty seconds: what no file says — how busy a
   machine is, what another machine says, whether a worktree's files are
   changed as `worktrees` says it, an agent's title in a list of its
-  windows — is as fresh as this.
+  windows, a transcript older than a day taken up again — is as fresh
+  as this.
 
 How busy this machine is, what `here` and `machines` say of it, is
 measured once in ten seconds for every question that asks it, the disk

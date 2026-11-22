@@ -187,6 +187,28 @@ func loggedIn(agent Agent, dir string) string {
 	return loggedNo
 }
 
+// AccountFolders is what logged_in is told from, by their stamps alone:
+// the folder of each agent's accounts, where one is added, each account's
+// folder of every agent mia keeps accounts of, and the file in it that is
+// there once someone signed in.
+func (a *App) AccountFolders() []string {
+	var paths []string
+	for _, agent := range a.agents() {
+		if agent.AccountEnv == "" {
+			continue
+		}
+		paths = append(paths, filepath.Join(accountsDir(), agent.Name))
+		for _, name := range accountsOf(agent) {
+			dir := homeOf(agent, name)
+			paths = append(paths, dir)
+			if agent.signedIn != "" {
+				paths = append(paths, filepath.Join(dir, agent.signedIn))
+			}
+		}
+	}
+	return paths
+}
+
 // withAccount is a command line that runs an agent, with the variable
 // that names the account's folder set before it; as it is for the default
 // account.

@@ -20,6 +20,8 @@ import (
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/config"
 	"github.com/emusoi/mia-core/internal/git"
+	"github.com/emusoi/mia-core/internal/session"
+	"github.com/emusoi/mia-core/internal/signal"
 )
 
 // How often the server looks, while anyone listens.
@@ -29,6 +31,10 @@ const (
 	serveSettle   = 150 * time.Millisecond
 	serveRetry    = 5 * time.Second // for a tmux server to watch, while none runs
 	serveRebuilt  = 2 * time.Second // at whether mia was rebuilt
+	// at the main agent once more, after tmux last said its panes changed:
+	// one that gives its pane no title stops working 3 seconds after it
+	// last wrote, and nothing says so
+	serveQuiet = 4 * time.Second
 )
 
 // event is one answer on GET /events, a line of JSON after `data: `.
@@ -63,16 +69,24 @@ type hub struct {
 	start   sync.Once
 	mu      sync.Mutex
 	topics  map[string]*topic
-	seen    map[string]string // by git folder, "" the person's own: when its files were written
-	changed map[string]bool   // the repositories seen to change since the questions were last asked for it, "" the person's
-	repos   struct {          // the repositories, as Repositories said them when the registry was last written
+	seen    map[string]stamp // by git folder, "" the person's own
+	changed map[string]bool  // the repositories seen to change since the questions were last asked for it, "" the person's
+	repos   struct {         // the repositories, as Repositories said them when the registry was last written
 		registry string
 		all      []app.Repository
 	}
 	kick   chan struct{} // a verb was run: everything is asked again
 	tmux   chan struct{} // tmux says a session or a window changed
+	main   chan struct{} // tmux says the main agent's panes changed
 	lanes  chan struct{} // what is asked at once
 	asking sync.WaitGroup
+}
+
+// stamp is what was seen of a repository's files, or of the person's: when
+// they were written, and when the next of its signals goes by itself.
+type stamp struct {
+	written string
+	expires time.Time // zero when none will
 }
 
 // topic is one question and who listens to it.
@@ -82,10 +96,14 @@ type topic struct {
 	common   string     // the git folder of its repository, "" when it is asked of none
 	mu       sync.Mutex // held while it is asked
 	last     []byte
-	// under the hub's lock: whether it is being asked, and to be asked
-	// again once that is done
-	asking, again bool
-	subs          map[*subscriber]struct{} // under the hub's lock
+	// under the hub's lock: what its answer is read from beyond its
+	// repository's files, and when those were written as it was asked
+	read  []string
+	stamp string
+	// under the hub's lock: whether it is to be asked again for what it
+	// was read from, whether it is being asked, and again once that is done
+	stale, asking, again bool
+	subs                 map[*subscriber]struct{} // under the hub's lock
 }
 
 // subscriber is one GET /events.
@@ -176,10 +194,14 @@ func (h *hub) leave(t *topic, sub *subscriber) {
 }
 
 // answer asks a question, its lock held, and tells each listener whose
-// answer it is not.
+// answer it is not. What it is read from beyond its repository is stamped
+// before it is asked: written while it is, it is asked again.
 func (h *hub) answer(t *topic) {
+	read := h.s.beyond(t.question)
+	stamp := stamped(read)
 	t.last = eventOf(t.q, h.s.ask(t.question))
 	h.mu.Lock()
+	t.read, t.stamp = read, stamp
 	subs := make([]*subscriber, 0, len(t.subs))
 	for sub := range t.subs {
 		subs = append(subs, sub)
@@ -190,13 +212,15 @@ func (h *hub) answer(t *topic) {
 	}
 }
 
-// run asks again: at once when a verb was run or tmux says something, on a
-// short tick when a file was written, and of everything now and then.
+// run asks again: at once when a verb was run, tmux says something or the
+// main agent's panes changed, on a short tick when a file was written or a
+// signal goes, and of everything now and then.
 func (h *hub) run() {
 	tick, backstop := time.NewTicker(h.s.tick), time.NewTicker(h.s.backstop)
 	defer tick.Stop()
 	defer backstop.Stop()
 	everything := func(*topic) bool { return true }
+	var heard time.Time // when tmux last said the main agent's panes changed
 	for {
 		select {
 		case <-h.s.ctx.Done():
@@ -207,18 +231,29 @@ func (h *hub) run() {
 		case <-h.tmux:
 			h.settle(h.tmux)
 			h.round(func(t *topic) bool { return !slices.Contains(ofMachines, t.question.args[0]) })
+		case <-h.main:
+			heard = time.Now()
+			h.round(func(t *topic) bool { return t.question.args[0] == "main" })
 		case <-backstop.C:
 			h.round(everything)
 		case <-tick.C:
 			h.look()
+			// an agent that gives its pane no title is at work while it
+			// writes: once tmux has said nothing of it a while, it is not
+			quiet := !heard.IsZero() && time.Since(heard) >= h.s.quiet
+			if quiet {
+				heard = time.Time{}
+			}
 			h.mu.Lock()
 			changed := h.changed
 			h.changed = map[string]bool{}
 			h.mu.Unlock()
 			h.round(func(t *topic) bool {
-				return changed[""] || changed[t.common] ||
+				stale := t.stale
+				t.stale = false
+				return stale || changed[""] || changed[t.common] ||
 					t.common == "" && len(changed) > 0 && !slices.Contains(ofMachines, t.question.args[0]) || // answered from every repository
-					slices.Contains(eachLook, t.question.args[0])
+					slices.Contains(eachLook, t.question.args[0]) || quiet && t.question.args[0] == "main"
 			})
 		}
 	}
@@ -247,9 +282,10 @@ func wake(one chan struct{}) {
 }
 
 // look notes each repository whose files were written since it last
-// looked, "" when the person's own were: their questions are asked again
-// at the next tick. A repository looked at for the first time is only
-// noted.
+// looked, or one of whose signals has gone by itself since, "" when the
+// person's own were, and each question whose answer was read from files
+// written since: they are asked again at the next tick. A repository
+// looked at for the first time is only noted.
 func (h *hub) look() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -258,7 +294,7 @@ func (h *hub) look() {
 		watched[t.common] = true
 	}
 	if len(watched) == 0 {
-		h.seen = map[string]string{} // nobody listens: nothing is looked at
+		h.seen = map[string]stamp{} // nobody listens: nothing is looked at
 		return
 	}
 	if watched[""] { // a question of no repository is answered from them all
@@ -272,12 +308,25 @@ func (h *hub) look() {
 			delete(h.seen, common)
 		}
 	}
+	now := time.Now()
 	for common := range watched {
-		now := writtenIn(common)
-		if was, looked := h.seen[common]; looked && was != now {
-			h.changed[common] = true
+		was, looked := h.seen[common]
+		is := stamp{written: writtenIn(common), expires: was.expires}
+		if !looked || is.written != was.written || !was.expires.IsZero() && !now.Before(was.expires) {
+			if looked {
+				h.changed[common] = true
+			}
+			is.expires = nextGoes(common)
 		}
-		h.seen[common] = now
+		h.seen[common] = is
+	}
+	for _, t := range h.topics {
+		if t.read == nil {
+			continue
+		}
+		if is := stamped(t.read); is != t.stamp {
+			t.stamp, t.stale = is, true
+		}
 	}
 }
 
@@ -299,11 +348,11 @@ func writtenIn(common string) string {
 		return written(
 			filepath.Join(config.Dir(), "*.json"),
 			filepath.Join(config.Dir(), "*.toml"),
-			filepath.Join(config.Dir(), "main", ".mia", "*.json"),
+			filepath.Join(signalsOf(""), "*.json"),
 		)
 	}
 	files := []string{
-		filepath.Join(common, "mia", "*.json"),
+		filepath.Join(signalsOf(common), "*.json"),
 		filepath.Join(common, "mia", "config.toml"),
 		filepath.Join(filepath.Dir(common), ".mia.toml"),
 		filepath.Join(common, "HEAD"),
@@ -314,6 +363,28 @@ func writtenIn(common string) string {
 		files = append(files, filepath.Join(worktree, "HEAD"), filepath.Join(worktree, "index"))
 	}
 	return written(files...)
+}
+
+// signalsOf is the folder a repository keeps its records and signals in,
+// for "" the main agent's.
+func signalsOf(common string) string {
+	if common == "" {
+		return filepath.Join(config.Dir(), "main", ".mia")
+	}
+	return filepath.Join(common, "mia")
+}
+
+// nextGoes is when the next of a repository's signals goes by itself,
+// for "" the main agent's; zero when none will.
+func nextGoes(common string) time.Time {
+	signals, _ := signal.Store{Dir: signalsOf(common)}.Load()
+	var next time.Time
+	for _, one := range signals {
+		if !one.Until.IsZero() && (next.IsZero() || one.Until.Before(next)) {
+			next = one.Until
+		}
+	}
+	return next
 }
 
 // round has the questions due asked again, each that is not being asked
@@ -359,9 +430,16 @@ func (h *hub) askAgain(t *topic) {
 // renamed or put in front.
 var tmuxSays = []string{"%sessions-changed", "%session-renamed", "%session-window-changed", "%window-pane-changed", "%layout-change", "%window-add", "%window-close", "%window-renamed", "%unlinked-window-add", "%unlinked-window-close", "%unlinked-window-renamed"}
 
+// mainPanes is what tmux is asked to say of the main agent's panes each
+// time it changes, at most once a second: each pane's title, where claude
+// says it is at work, and when its window last wrote, which is how another
+// agent is. Its loops carry no comma, which would end them.
+var mainPanes = "#{S:#{?#{==:#{session_name}," + session.Name("main") + "},#{W:#{P:#{pane_id} #{window_activity} #{pane_title};}},}}"
+
 // watchTmux listens to the tmux server as a control-mode client on a
 // session of its own: everything but how busy a machine is is asked again
-// each time tmux says a session or a window changed. With no tmux server running none is started to
+// each time tmux says a session or a window changed, and the main agent
+// each time its panes do. With no tmux server running none is started to
 // watch (-N): one is looked for again every while. The session goes with
 // the client, and its one pane only sleeps.
 func (h *hub) watchTmux() {
@@ -371,14 +449,17 @@ func (h *hub) watchTmux() {
 		in, _ := tmux.StdinPipe()
 		out, _ := tmux.StdoutPipe()
 		if in != nil && out != nil && tmux.Start() == nil {
-			fmt.Fprintf(in, "set-option -t '=%s:' destroy-unattached on\nrefresh-client -f no-output,ignore-size\n", name)
+			fmt.Fprintf(in, "set-option -t '=%s:' destroy-unattached on\nrefresh-client -f no-output,ignore-size\nrefresh-client -B 'main::%s'\n", name, mainPanes)
 			lines := bufio.NewReader(out)
 			for {
 				line, err := lines.ReadString('\n')
 				if err != nil {
 					break
 				}
-				if slices.ContainsFunc(tmuxSays, func(says string) bool { return strings.HasPrefix(line, says) }) {
+				switch {
+				case strings.HasPrefix(line, "%subscription-changed main "):
+					wake(h.main)
+				case slices.ContainsFunc(tmuxSays, func(says string) bool { return strings.HasPrefix(line, says) }):
 					wake(h.tmux)
 				}
 			}

@@ -256,7 +256,7 @@ type server struct {
 	hub     *hub
 	ctx     context.Context // done when the server is told to stop
 	// how often it looks, while anyone listens, and whether mia was rebuilt
-	tick, backstop, settle, retry, rebuilt time.Duration
+	tick, backstop, settle, retry, rebuilt, quiet time.Duration
 }
 
 // kept is a repository held open, asked one question at a time.
@@ -269,9 +269,9 @@ type kept struct {
 
 func newServer() *server {
 	s := &server{build: gateway.Build(), kept: map[string]*kept{}, outside: app.Outside(),
-		tick: serveTick, backstop: serveBackstop, settle: serveSettle, retry: serveRetry, rebuilt: serveRebuilt}
-	s.hub = &hub{s: s, topics: map[string]*topic{}, seen: map[string]string{}, changed: map[string]bool{},
-		kick: make(chan struct{}, 1), tmux: make(chan struct{}, 1), lanes: make(chan struct{}, 4)}
+		tick: serveTick, backstop: serveBackstop, settle: serveSettle, retry: serveRetry, rebuilt: serveRebuilt, quiet: serveQuiet}
+	s.hub = &hub{s: s, topics: map[string]*topic{}, seen: map[string]stamp{}, changed: map[string]bool{},
+		kick: make(chan struct{}, 1), tmux: make(chan struct{}, 1), main: make(chan struct{}, 1), lanes: make(chan struct{}, 4)}
 	return s
 }
 
@@ -442,6 +442,50 @@ func written(patterns ...string) string {
 		}
 	}
 	return all.String()
+}
+
+// stamped is when each of the paths was last written and how long it is,
+// and which are not there: no pattern, each path the one it names.
+func stamped(paths []string) string {
+	var all strings.Builder
+	for _, path := range paths {
+		if info, err := os.Stat(path); err == nil {
+			fmt.Fprintf(&all, "%d %d\n", info.ModTime().UnixNano(), info.Size())
+		} else {
+			all.WriteString("-\n")
+		}
+	}
+	return all.String()
+}
+
+// beyond is what a question's answer is read from that no file the hub
+// stamps of its repository says changed: the transcripts its conversations
+// are read from, and the folders of the agents' accounts, whose sign-in
+// files say logged_in by being there. Each is looked at each second, by
+// its stamp alone.
+func (s *server) beyond(q question) []string {
+	switch {
+	case q.args[0] == "conversations":
+		held, err := s.repository(q.dir)
+		if err != nil {
+			return nil
+		}
+		defer held.mu.Unlock()
+		return held.app.ConversationsWritten()
+	case q.args[0] == "main" && slices.Contains(q.args[1:], "conversations"):
+		a, err := app.AtMain()
+		if err != nil {
+			return nil
+		}
+		return a.ConversationsWritten()
+	case q.args[0] == "accounts":
+		a, err := app.AtMain()
+		if err != nil {
+			return nil
+		}
+		return a.AccountFolders()
+	}
+	return nil
 }
 
 // read is GET /api/<query>: the bytes `mia api <query>` prints as the body,
