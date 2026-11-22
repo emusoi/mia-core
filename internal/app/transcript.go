@@ -32,6 +32,10 @@ type transcripts struct {
 	id func(path string) string
 	// decode reads one line.
 	decode decoder
+	// cwd is the folder a transcript's conversation was made in, "" while
+	// the agent says none, for an agent whose transcript does not say it;
+	// nil for one whose does.
+	cwd func(path string) string
 	// cache is the folder what was read of each file is kept in.
 	cache string
 }
@@ -143,9 +147,15 @@ func (t transcripts) advance(path string, s *scan, in *folders, each func(Turn))
 	if err != nil {
 		return false
 	}
+	// of an agent that keeps it apart, asked until it says, written or not since
+	placed := s.Cwd == "" && t.cwd != nil
+	if placed {
+		s.Cwd = t.cwd(path)
+		placed = s.Cwd != ""
+	}
 	foreign := func() bool { return in != nil && s.Cwd != "" && !in.holds(s.Cwd) }
 	if foreign() || (s.Size == info.Size() && s.Modified.Equal(info.ModTime())) {
-		return false
+		return placed
 	}
 	if info.Size() < s.end().Offset {
 		*s = scan{}
@@ -414,6 +424,9 @@ func (t transcripts) search(in folders, text string, limit int) ([]Recalled, err
 		}
 		var yours, theirs *Recalled
 		var is about
+		if t.cwd != nil {
+			is.Cwd = t.cwd(file)
+		}
 		_, _ = t.read(file, mark{}, &is, func(turn Turn) {
 			if (turn.Kind != turnAsked && turn.Kind != turnSaid) || !strings.Contains(strings.ToLower(turn.Text), needle) {
 				return

@@ -14,7 +14,7 @@ import (
 // Recalled is one conversation that mentions what was asked for.
 type Recalled struct {
 	Conversation
-	Agent string `json:"agent"` // whose conversation it is: claude, codex, pi, opencode, a plugin's
+	Agent string `json:"agent"` // whose conversation it is: claude, codex, pi, opencode, agy, a plugin's
 	// Worktree is the one its folder is or is in, as a list of
 	// conversations names it: which copy n counts in, of one that was copied.
 	Worktree string `json:"worktree"`

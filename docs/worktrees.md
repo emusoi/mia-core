@@ -348,7 +348,7 @@ mia recall retry loop             # every conversation that mentions it
 Both read the agents' own transcripts of this repository and its
 worktrees, so nothing is recorded as you work, and both say what you asked
 there and how to resume it. `mia why` reads claude's; `mia recall` reads
-claude's, codex's, pi's and opencode's, and those of any agent a
+claude's, codex's, pi's, opencode's and agy's, and those of any agent a
 [plugin adds](plugins.md#an-agent).
 
 ```bash

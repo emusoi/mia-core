@@ -132,15 +132,20 @@ func accountsOf(agent Agent) []string {
 type home struct{ account, dir string }
 
 // homesOf is every account's folder of the agent of that name, default
-// first: where its conversations are. One whose folder mia does not know
-// is left out.
+// first: where its conversations are; of an agent mia keeps no accounts
+// of, its one folder, under no account's name. One whose folder mia does
+// not know is left out.
 func homesOf(name string) []home {
 	agent, known := agentNamed(builtin, name)
 	if !known {
 		return nil
 	}
+	accounts := accountsOf(agent)
+	if agent.AccountEnv == "" {
+		accounts = []string{""} // one folder, of no account mia keeps
+	}
 	var all []home
-	for _, account := range accountsOf(agent) {
+	for _, account := range accounts {
 		if dir := homeOf(agent, account); dir != "" {
 			all = append(all, home{account, dir})
 		}

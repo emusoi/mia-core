@@ -33,7 +33,14 @@ on GitHub; a tag without its section is not released.
   line, kept for an hour as opencode's are, and the efforts `low` to
   `max`: `mia window new <worktree> agy --model <id> --effort <level>`
   starts `agy --model <id> --effort <level>`, and the chat's models have
-  them under its name. See [Agents](api.md#agents).
+  them under its name. Its conversations are listed, read, followed as
+  it writes them and recalled as the others' are: mia reads the steps
+  agy writes of each, in `~/.gemini/antigravity-cli/brain/<id>`, what
+  the person sent without agy's own lines around it — a paste as it was
+  pasted, so a conversation carried to it is the person's — what it
+  said, and each tool it used in a line, and the folder each was made in
+  from what agy keeps of them apart. See [Agents](api.md#agents) and
+  [conversations](api.md#conversations).
 
 - **The chat's models and Earlier are modals.** In `mia chat`, `models`
   and `earlier` no longer take the chat's place: each is a card over it,

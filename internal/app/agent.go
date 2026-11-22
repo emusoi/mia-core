@@ -13,8 +13,8 @@ import (
 
 // Agent is everything mia knows that is one coding agent's own: how to tell
 // it in a window, how it goes on with a conversation, where it keeps them
-// and how they cross to another machine. claude, codex, pi and opencode are
-// compiled in — a move runs from the binary on the other machine, and
+// and how they cross to another machine. claude, codex, pi, opencode and
+// agy are compiled in — a move runs from the binary on the other machine, and
 // listing has to be fast — and a plugin adds one by declaring it in its
 // manifest.
 type Agent struct {
@@ -208,7 +208,7 @@ func fixed(format string) func(string) (string, error) {
 	return func(id string) (string, error) { return strings.ReplaceAll(format, "%s", id), nil }
 }
 
-// builtin is each coding agent mia knows without a plugin. The first four
+// builtin is each coding agent mia knows without a plugin. The first five
 // have conversations mia reads; of the others it knows only how to start
 // them again.
 var builtin = []Agent{
@@ -268,9 +268,12 @@ done`,
 	{Name: "opencode", goOn: "--continue", has: []string{"-c", "--continue", "-s", "--session"},
 		resume: fixed("opencode --session %s"), talks: opencodeTalks{},
 		with: words([]string{"mini", "--model", "%s"}, nil), lists: opencodeModels{}.models, again: true},
-	// the Antigravity CLI. Its models are its account's, asked of it, each
-	// at an effort of its own, and it is started with an effort besides
+	// the Antigravity CLI. Its conversations are each in a folder of its
+	// own whatever the folder they were made in; its models are its
+	// account's, asked of it, each at an effort of its own, and it is
+	// started with an effort besides
 	{Name: "agy", goOn: "--continue", has: []string{"-c", "--continue", "--conversation"}, home: agyFolder,
+		talks:   transcripts{agent: "agy", files: agyFiles, find: agyFind, id: agyID, decode: agyLine, cwd: agyCwd},
 		Efforts: []string{"low", "medium", "high", "xhigh", "max"},
 		with:    words([]string{"--model", "%s"}, []string{"--effort", "%s"}), lists: agyModels{}.models},
 	// its help has a word for a model and names none: it has those the config names

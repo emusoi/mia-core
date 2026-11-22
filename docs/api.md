@@ -129,7 +129,11 @@ the agents' own transcripts, so nothing is recorded as they work. opencode
 keeps its conversations in a database of its own, so mia asks opencode
 for them as JSON (`opencode api GET /api/session`, `opencode session
 export <id>`), and only when opencode is installed and has a data folder;
-each is read again only once it has changed.
+each is read again only once it has changed. agy writes each conversation
+in a folder of its own, `~/.gemini/antigravity-cli/brain/<id>`, as JSON
+lines, and keeps the folder it was made in apart from it, in what was
+typed into it, `history.jsonl`, and in its `cache`, which mia reads it
+from.
 
 ```json
 [{"id":"23f98c02-c52b-4de9-8c69-b322eb153bff","agent":"claude",
@@ -141,7 +145,7 @@ each is read again only once it has changed.
 
 | field | is |
 |---|---|
-| `agent` | whose it is: `claude`, `codex`, `pi`, `opencode`, or the name of an agent a plugin adds |
+| `agent` | whose it is: `claude`, `codex`, `pi`, `opencode`, `agy`, or the name of an agent a plugin adds |
 | `account` | the agent's [account](worktrees.md#an-agents-account) whose folder it is in, `default` for the agent's own; of a plugin's agent, the one its running window was started on. Left out for an agent mia keeps no accounts of |
 | `worktree` | the worktree `cwd` is or is in; a removed one by what followed the main checkout's path; empty when none of this repository's |
 | `gone` | the folder is no more |
