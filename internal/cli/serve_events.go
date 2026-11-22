@@ -387,7 +387,7 @@ func (s *server) events(w http.ResponseWriter, r *http.Request) {
 // conversation there is not, is one event with its exit code.
 func (s *server) follow(q string, asked question, sub *subscriber, stop <-chan struct{}) {
 	var said answer
-	said.code = answerAPI(asker{dir: asked.dir, out: io.Discard, errs: &said.errs, open: openRepository,
+	said.code = answerAPI(asker{dir: asked.dir, out: io.Discard, errs: &said.errs, open: openRepository, outside: app.Outside,
 		follow: func(follow func(stop <-chan struct{}, say func([]app.Turn) error) error) int {
 			err := follow(stop, func(turns []app.Turn) error {
 				data, err := json.Marshal(turns)

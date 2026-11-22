@@ -31,6 +31,9 @@ type asker struct {
 	out  io.Writer
 	errs io.Writer
 	open func(dir string) (*app.App, error)
+	// outside is mia in no repository, for machines and here asked from a
+	// folder in none.
+	outside func() *app.App
 	// follow is a query's --follow, given what says the turns as they come.
 	follow func(func(stop <-chan struct{}, say func([]app.Turn) error) error) int
 }
@@ -38,7 +41,7 @@ type asker struct {
 // atTerminal is who asks from the command line: the folder mia is run in,
 // and its own output.
 func atTerminal() asker {
-	who := asker{out: os.Stdout, errs: os.Stderr, open: openRepository, follow: followTurns}
+	who := asker{out: os.Stdout, errs: os.Stderr, open: openRepository, outside: app.Outside, follow: followTurns}
 	var err error
 	if who.dir, err = os.Getwd(); err != nil {
 		who.open = func(string) (*app.App, error) { return nil, err }
@@ -147,7 +150,7 @@ func answerAPI(who asker, rest []string) int {
 	a, err := who.open(who.dir)
 	if err != nil {
 		if len(rest) == 1 && (rest[0] == "machines" || rest[0] == "here") && errors.Is(err, git.ErrNotARepository) {
-			return cmdAPI(who, app.Outside(), rest) // the machines are the same from anywhere
+			return cmdAPI(who, who.outside(), rest) // the machines are the same from anywhere
 		}
 		return who.fail(err)
 	}

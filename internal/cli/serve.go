@@ -250,8 +250,11 @@ type server struct {
 	build string
 	mu    sync.Mutex
 	kept  map[string]*kept
-	hub   *hub
-	ctx   context.Context // done when the server is told to stop
+	// outside is mia in no repository, held as one is: what it keeps in
+	// memory of a machine that did not answer outlives one question
+	outside *app.App
+	hub     *hub
+	ctx     context.Context // done when the server is told to stop
 	// how often it looks, while anyone listens, and whether mia was rebuilt
 	tick, backstop, settle, retry, rebuilt time.Duration
 }
@@ -265,7 +268,7 @@ type kept struct {
 }
 
 func newServer() *server {
-	s := &server{build: gateway.Build(), kept: map[string]*kept{}, tick: serveTick, backstop: serveBackstop, settle: serveSettle, retry: serveRetry, rebuilt: serveRebuilt}
+	s := &server{build: gateway.Build(), kept: map[string]*kept{}, outside: app.Outside(), tick: serveTick, backstop: serveBackstop, settle: serveSettle, retry: serveRetry, rebuilt: serveRebuilt}
 	s.hub = &hub{s: s, topics: map[string]*topic{}, seen: map[string]string{}, kick: make(chan struct{}, 1)}
 	return s
 }
@@ -341,6 +344,7 @@ func (s *server) ask(q question) *answer {
 	var said answer
 	var held *kept
 	who := asker{dir: q.dir, out: &said.out, errs: &said.errs,
+		outside: func() *app.App { return s.outside },
 		open: func(dir string) (*app.App, error) {
 			one, err := s.repository(dir)
 			if err != nil {
