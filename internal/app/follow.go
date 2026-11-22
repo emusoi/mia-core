@@ -2,7 +2,9 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -22,6 +24,41 @@ func polling(ask func() ([]Turn, bool, error)) func() ([]Turn, bool, error) {
 		}
 		return changed, found, err
 	}
+}
+
+// whenWritten is next asked only when one of the paths written gives has
+// been written since it was last asked, or backstop after, whatever they
+// say; the first call always asks. A reader that has an agent's own
+// program give it a whole conversation each time has it do so only when
+// the agent wrote.
+func whenWritten(written func() []string, backstop time.Duration, next func() ([]Turn, bool, error)) func() ([]Turn, bool, error) {
+	var was string
+	var asked time.Time
+	found := false
+	return func() ([]Turn, bool, error) {
+		is := stamps(written())
+		if !asked.IsZero() && is == was && time.Since(asked) < backstop {
+			return nil, found, nil
+		}
+		was, asked = is, time.Now()
+		turns, ok, err := next()
+		found = ok
+		return turns, ok, err
+	}
+}
+
+// stamps is when each of the paths was last written and how long it is,
+// and which are not there: it changes when one of them does.
+func stamps(paths []string) string {
+	var all strings.Builder
+	for _, path := range paths {
+		if info, err := os.Stat(path); err == nil {
+			fmt.Fprintf(&all, "%d %d\n", info.ModTime().UnixNano(), info.Size())
+		} else {
+			all.WriteString("-\n")
+		}
+	}
+	return all.String()
 }
 
 // follow is turnsIn as a conversation is written to: say is handed what

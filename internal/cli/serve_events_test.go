@@ -249,6 +249,12 @@ func TestAListenerFollowsAConversationAsItIsWritten(t *testing.T) {
 	if got := turns(); len(got) != 1 || got[0].N != 1 || got[0].Text != "make the list faster" {
 		t.Fatalf("first = %+v", got)
 	}
+	// one asked without --follow is asked again once the transcript is
+	// written, at the server's next look, not its backstop
+	asked := listen(t, q("conversation", repo.Root, "c1"))
+	if one := told(t, asked); !strings.Contains(string(one.Result), "make the list faster") {
+		t.Fatalf("asked = %+v", one)
+	}
 	f, err := os.OpenFile(transcript, os.O_APPEND|os.O_WRONLY, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -259,6 +265,10 @@ func TestAListenerFollowsAConversationAsItIsWritten(t *testing.T) {
 	f.Close()
 	if got := turns(); len(got) != 1 || got[0].N != 2 || got[0].Text != "It is faster." {
 		t.Fatalf("second = %+v: only the new turn", got)
+	}
+	heard := time.Now()
+	if one := told(t, asked); !strings.Contains(string(one.Result), "It is faster.") || time.Since(heard) > 3*time.Second {
+		t.Errorf("asked again = %+v, %s after", one, time.Since(heard))
 	}
 	// one there is not ends at once, as the command does, with what it says
 	if one := told(t, listen(t, q("conversation", repo.Root, "c9", "--follow"))); one.Code != exitFailed || one.Stderr == "" {

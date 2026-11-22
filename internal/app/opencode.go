@@ -401,10 +401,46 @@ func (o opencodeTalks) turns(in folders, id, cwd string, after int) ([]Turn, boo
 	return turns, true, nil
 }
 
-// One is exported whole each time, for there is no file of it to read on
-// from: a reply opencode is still writing grows under its n.
+// One is exported whole, for there is no file of it to read on from, each
+// time opencode has written its database: a reply it is still writing
+// grows under its n.
 func (o opencodeTalks) follow(in folders, id, cwd string, after int) (func() ([]Turn, bool, error), time.Duration) {
-	return polling(func() ([]Turn, bool, error) { return o.turns(in, id, cwd, after) }), time.Second
+	next := polling(func() ([]Turn, bool, error) { return o.turns(in, id, cwd, after) })
+	return whenWritten(func() []string { return o.written(in) }, opencodeBackstop, next), 150 * time.Millisecond
+}
+
+// opencodeBackstop is how often one followed is exported whatever its
+// database says: opencode may be writing one mia does not know of.
+const opencodeBackstop = 5 * time.Second
+
+// written is what opencode writes its conversations to as it goes, every
+// folder's alike: its database, the log SQLite writes ahead of it, and its
+// data folder, which one made since is added to — not the memory SQLite
+// shares beside them, which reading writes. OPENCODE_DB names its
+// database; with none, it is opencode*.db there, one for each channel it
+// has run on.
+func (o opencodeTalks) written(folders) []string {
+	home := opencodeHome()
+	if home == "" {
+		return nil
+	}
+	var dbs []string
+	switch db := os.Getenv("OPENCODE_DB"); {
+	case db == ":memory:":
+		return nil
+	case db != "":
+		if !filepath.IsAbs(db) {
+			db = filepath.Join(home, db)
+		}
+		dbs = []string{db}
+	default:
+		dbs, _ = filepath.Glob(filepath.Join(home, "opencode*.db"))
+	}
+	paths := []string{home}
+	for _, db := range dbs {
+		paths = append(paths, db, db+"-wal")
+	}
+	return paths
 }
 
 // ponytail: a search exports every conversation of the folders, each time;

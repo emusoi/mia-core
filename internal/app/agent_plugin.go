@@ -148,6 +148,10 @@ func (p pluginTalks) follow(in folders, id, cwd string, after int) (func() ([]Tu
 	return polling(func() ([]Turn, bool, error) { return p.turns(in, id, cwd, after) }), time.Second
 }
 
+// A plugin does not say where its agent writes: it is asked again each
+// second while followed, and by a server's next look at everything.
+func (p pluginTalks) written(folders) []string { return nil }
+
 func (p pluginTalks) search(in folders, text string, limit int) ([]Recalled, error) {
 	out, err := p.ask(append([]string{"search", text, in.Root}, in.Paths...)...)
 	if err != nil {

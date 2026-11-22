@@ -335,6 +335,36 @@ func (t transcripts) turns(in folders, id, cwd string, after int) ([]Turn, bool,
 	return t.locate(in, id, cwd, after, nil)
 }
 
+// writtenLately is how lately a transcript was written to for a turn
+// written to it to be looked for: one older is taken up again rarely, and
+// a server's next look at everything finds it.
+const writtenLately = 24 * time.Hour
+
+// written is each transcript of the folders' written to lately, and every
+// folder transcripts are in up to the agent's own, whose stamp a
+// transcript added there changes.
+func (t transcripts) written(in folders) []string {
+	var paths []string
+	seen := map[string]bool{}
+	add := func(path string) {
+		if !seen[path] {
+			seen[path] = true
+			paths = append(paths, path)
+		}
+	}
+	for _, h := range homesOf(t.agent) {
+		for _, file := range t.files(h.dir, in, false) {
+			for dir := filepath.Dir(file); strings.HasPrefix(dir, h.dir+string(filepath.Separator)); dir = filepath.Dir(dir) {
+				add(dir)
+			}
+			if info, err := os.Stat(file); err == nil && time.Since(info.ModTime()) < writtenLately {
+				add(file)
+			}
+		}
+	}
+	return paths
+}
+
 // placed is how far a transcript that is followed has been read: the file,
 // where reading stopped, and its size and time when it was.
 type placed struct {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -254,5 +255,38 @@ func TestAnOpencodeMessageThatFailedIsWritten(t *testing.T) {
 		{Type: "assistant", Content: []opencodePart{{Type: "text", Text: "Looking at the cart."}}, Error: &opencodeError{Type: "api"}}})
 	if len(turns) != 2 || turns[1].Text != "Looking at the cart." {
 		t.Errorf("what it said before it failed: %+v", turns)
+	}
+}
+
+// Where opencode writes its conversations as it goes is its database and
+// the log written ahead of it, and its data folder: what a server and a
+// view of one look at to hear it wrote. The memory SQLite shares beside
+// them is written by reading, and is not looked at.
+func TestOpencodeIsHeardWritingItsDatabase(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	a, err := Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fakeOpencode(t)
+	home := opencodeHome()
+	for _, name := range []string{"opencode.db", "opencode.db-wal", "opencode.db-shm", "opencode-beta.db"} {
+		if err := os.WriteFile(filepath.Join(home, name), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	written := a.ConversationsWritten()
+	for _, want := range []string{home, filepath.Join(home, "opencode.db"), filepath.Join(home, "opencode.db-wal"), filepath.Join(home, "opencode-beta.db-wal")} {
+		if !slices.Contains(written, want) {
+			t.Errorf("%s is not looked at: %v", want, written)
+		}
+	}
+	if slices.Contains(written, filepath.Join(home, "opencode.db-shm")) {
+		t.Errorf("what reading writes is looked at: %v", written)
+	}
+	t.Setenv("OPENCODE_DB", "elsewhere.db")
+	if got := (opencodeTalks{}).written(folders{}); !slices.Equal(got, []string{home, filepath.Join(home, "elsewhere.db"), filepath.Join(home, "elsewhere.db-wal")}) {
+		t.Errorf("the database OPENCODE_DB names: %v", got)
 	}
 }

@@ -463,20 +463,20 @@ func stamped(paths []string) string {
 }
 
 // beyond is what a question's answer is read from that no file the hub
-// stamps of its repository says changed: the transcripts its conversations
-// are read from, and the folders of the agents' accounts, whose sign-in
-// files say logged_in by being there. Each is looked at each second, by
-// its stamp alone.
+// stamps of its repository says changed: where the agents write the
+// conversations it is read from, and the folders of the agents' accounts,
+// whose sign-in files say logged_in by being there. Each is looked at each
+// second, by its stamp alone.
 func (s *server) beyond(q question) []string {
 	switch {
-	case q.args[0] == "conversations":
+	case q.args[0] == "conversations" || q.args[0] == "conversation":
 		held, err := s.repository(q.dir)
 		if err != nil {
 			return nil
 		}
 		defer held.mu.Unlock()
 		return held.app.ConversationsWritten()
-	case q.args[0] == "main" && slices.Contains(q.args[1:], "conversations"):
+	case q.args[0] == "main" && (slices.Contains(q.args[1:], "conversations") || slices.Contains(q.args[1:], "turns")):
 		a, err := app.AtMain()
 		if err != nil {
 			return nil
