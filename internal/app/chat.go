@@ -141,11 +141,8 @@ func (a *App) CarryInWindow(record model.Record, window string, carried Carried)
 // CarriedInWindow is what a window's agent goes on from and was not told
 // of yet, when there is any.
 func (a *App) CarriedInWindow(record model.Record, window string) (Carried, bool) {
-	host, window, err := a.windowNamed(record, window)
-	if err != nil {
-		return Carried{}, false
-	}
-	out, err := run.Tool{Binary: "tmux", SSH: host.SSH}.Combined("show-options", "-w", "-q", "-v", "-t", session.Target(record.Name, window), carriedOption)
+	// a window there is not has nothing carried: tmux says none
+	out, err := run.Tool{Binary: "tmux", SSH: a.sessionOf(record).SSH}.Combined("show-options", "-w", "-q", "-v", "-t", session.Target(record.Name, window), carriedOption)
 	if err != nil {
 		return Carried{}, false
 	}
@@ -193,25 +190,60 @@ type Runs struct {
 // WindowRuns is what the window of a worktree's session runs, the window
 // said by its name or number.
 func (a *App) WindowRuns(record model.Record, window string) Runs {
-	host, window, err := a.windowNamed(record, window)
-	if err != nil {
-		return Runs{}
-	}
+	_, _, _, runs := a.windowAgent(record, window)
+	return runs
+}
+
+// windowAgent is the agent a worktree's window runs, the window said by
+// its name or number, the window, and what it runs as WindowRuns says it;
+// known is false for a window there is not, or one that runs no agent mia
+// knows.
+func (a *App) windowAgent(record model.Record, window string) (host session.Host, agent Agent, pane session.Window, runs Runs) {
+	host = a.sessionOf(record)
 	var front func() map[int]string
 	if host.SSH == "" {
 		front = foreground
 	}
 	agent, pane, known := agentInWindow(a.agents(), host.Panes(record.Name), window, front)
 	if !known {
-		return Runs{}
+		return host, Agent{}, session.Window{}, Runs{}
 	}
 	kept := a.chosen()[chosenKey(session.Name(record.Name), pane.PID)]
-	runs := Runs{Agent: agent.Name, Model: kept.Model, Effort: kept.Effort, Account: kept.Account, Reads: agent.talks != nil,
+	runs = Runs{Agent: agent.Name, Model: kept.Model, Effort: kept.Effort, Account: kept.Account, Reads: agent.talks != nil,
 		Live: agent.to != nil, Again: agent.again}
 	if runs.Account == "" && agent.AccountEnv != "" {
 		runs.Account = DefaultAccount
 	}
-	return runs
+	return host, agent, pane, runs
+}
+
+// WindowConversation is the conversation a worktree's window has open, as
+// Conversations marks it, and what the window runs as WindowRuns says it;
+// found is false while it has none mia can read. It is found without
+// listing every conversation of the repository: the one the agent says it
+// holds, claude's, is taken at its word, and of another agent only its own
+// conversations of the worktree are listed. A handoff whose conversation
+// is not known yet has the repository's listed first, which finds it.
+func (a *App) WindowConversation(record model.Record, window string) (head Head, runs Runs, found bool) {
+	host, agent, pane, runs := a.windowAgent(record, window)
+	if runs.Agent == "" || host.SSH != "" || agent.talks == nil {
+		return Head{}, runs, false // a machine's windows are none Conversations marks
+	}
+	if _, all := a.handedOnIn(); slices.ContainsFunc(all, func(one handedOn) bool { return one.To.ID == "" && one.To.Agent == agent.Name }) {
+		a.Conversations(Wanted{Worktree: record.Name, Agent: agent.Name}) // which conversation each began, found and kept
+	}
+	at := &WindowRef{Index: pane.Index, Name: pane.Name}
+	if said := agent.holding(pane.PID); said.ID != "" {
+		return Head{ID: said.ID, Agent: agent.Name, Account: runs.Account, Worktree: record.Name, Model: runs.Model, Effort: runs.Effort,
+			Running: true, Window: at}, runs, true
+	}
+	heads, _ := a.Conversations(Wanted{Worktree: record.Name, Agent: agent.Name})
+	for _, h := range heads {
+		if h.Running && h.Window != nil && h.Window.Index == pane.Index {
+			return h, runs, true
+		}
+	}
+	return Head{}, runs, false
 }
 
 // agentInWindow is the agent a window of a session's panes runs, the

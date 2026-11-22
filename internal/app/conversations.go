@@ -69,7 +69,7 @@ func (a *App) Conversations(want Wanted) (heads []Head, problems []string) {
 		// one format for both, whatever the agent's file and the disk said
 		heads[i].Started, heads[i].Active = instant(heads[i].Started), instant(heads[i].Active)
 	}
-	heads = a.markRunning(heads, records)
+	heads = a.markRunning(heads, records, want.Worktree)
 	a.thread(heads)
 	heads = slices.DeleteFunc(heads, func(h Head) bool {
 		// an agent in a window is listed with what it has open, wanted or not
@@ -156,7 +156,9 @@ func (a *App) worktreeOf(cwd string, records []model.Record) (string, bool) {
 // only by which was written to last, unless the agent says which it holds —
 // claude does, in sessions/<pid>.json. A SessionStart hook that records the
 // id for each window is the upgrade, for codex and pi most of all.
-func (a *App) markRunning(heads []Head, records []model.Record) []Head {
+// Of one worktree wanted only its windows are looked at: what the others
+// have open is not listed.
+func (a *App) markRunning(heads []Head, records []model.Record, wanted string) []Head {
 	panes := session.Here().AllPanes()
 	if len(panes) == 0 {
 		return heads
@@ -167,8 +169,8 @@ func (a *App) markRunning(heads []Head, records []model.Record) []Head {
 	// pane whose program tmux knows by its launcher's name
 	behind := sync.OnceValue(foreground)
 	for _, record := range records {
-		if a.sessionOf(record).SSH != "" {
-			continue // its windows are on a machine, and its conversations with them
+		if a.sessionOf(record).SSH != "" || wanted != "" && record.Name != wanted {
+			continue // its windows are on a machine, and its conversations with them; or not wanted
 		}
 		its := panes[session.Name(record.Name)]
 		titles := map[int]string{}
@@ -324,6 +326,16 @@ func (a *App) ConversationIn(id, worktree string, after int) ([]Turn, error) {
 	return turns, err
 }
 
+// FollowOpen is FollowConversation of a conversation a window has open,
+// as WindowConversation found it: read where it says, of its agent, and
+// nothing while nothing of it is written yet. It begins with its last
+// turns, read back until enough says they are enough, where its agent's
+// transcripts keep where to read them from; with all of them for nil.
+func (a *App) FollowOpen(head Head, enough func([]Turn) bool, stop <-chan struct{}, say func([]Turn) error) error {
+	in, _ := a.where()
+	return a.follow(in, head.ID, head.Cwd, head.Agent, 0, enough, func() error { return nil }, func(turns []Turn) []Turn { return turns }, stop, say)
+}
+
 // FollowConversation is ConversationIn as the conversation is written to:
 // say is handed what ConversationIn gives, then each time it gains turns
 // or one grows, those turns, until stop is closed or say fails.
@@ -333,7 +345,7 @@ func (a *App) FollowConversation(id, worktree string, after int, stop <-chan str
 	if err != nil {
 		return err
 	}
-	return a.follow(in, id, cwd, whose, after, unwritten, func(turns []Turn) []Turn { return turns }, stop, say)
+	return a.follow(in, id, cwd, whose, after, nil, unwritten, func(turns []Turn) []Turn { return turns }, stop, say)
 }
 
 // conversationOf is where ConversationIn reads a conversation: of the copy

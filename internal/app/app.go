@@ -1006,6 +1006,9 @@ func (a *App) RecordOrIn(query, here string) (model.Record, error) {
 		if query, err = resolver.Here(here); err != nil {
 			return model.Record{}, err
 		}
+		if at := slices.IndexFunc(resolver.Records, func(r model.Record) bool { return r.Path == query }); at >= 0 {
+			return resolver.Records[at], nil // the top of a worktree, which git was just asked for
+		}
 	}
 	record, err := resolver.Record(query)
 	if err != nil {

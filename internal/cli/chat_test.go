@@ -207,6 +207,39 @@ func TestAConversationTooLongIsSaidByItsLastTurnsThatFit(t *testing.T) {
 	}
 }
 
+// A chat reads back from a conversation's end only until what it read is
+// enough: the view said whole of the last turns that are enough is the
+// view of all of them.
+func TestTheLastTurnsThatAreEnoughSayTheViewOfAll(t *testing.T) {
+	carried := app.CarriedOpens("codex") + "\n\n" + strings.Repeat("what was said before ", 4000) + "\n\n" + app.CarriedRule + "\n\ngo on"
+	for name, all := range map[string]func(n int) app.Turn{
+		"short":   func(n int) app.Turn { return app.Turn{N: n, Kind: "tool", Text: "Read a file"} },
+		"long":    func(n int) app.Turn { return app.Turn{N: n, Kind: "said", Text: strings.Repeat("word ", 8000)} },
+		"carried": func(n int) app.Turn { return app.Turn{N: n, Kind: "asked", Text: carried} },
+		"wide":    func(n int) app.Turn { return app.Turn{N: n, Kind: "said", Text: strings.Repeat("é", 2*muiProse)} },
+		"unread": func(n int) app.Turn {
+			return app.Turn{N: n, Kind: []string{"said", "asked", "nothing"}[n%3], Text: "a few words " + strconv.Itoa(n)}
+		},
+	} {
+		var turns []app.Turn
+		for n := 1; n <= 3000; n++ {
+			turns = append(turns, all(n))
+		}
+		from := len(turns)
+		for from > 0 && !enough(turns[from:]) {
+			from--
+		}
+		if from == 0 {
+			t.Errorf("%s: all of them were needed", name)
+			continue
+		}
+		whole, last := &talk{agent: "claude"}, &talk{agent: "claude"}
+		if want, got := read(t, whole.heard(turns)[0]), read(t, last.heard(turns[from:])[0]); !slices.Equal(numbers(got.View.Turns), numbers(want.View.Turns)) {
+			t.Errorf("%s: the last %d turns say %v, all of them %v", name, len(turns)-from, numbers(got.View.Turns), numbers(want.View.Turns))
+		}
+	}
+}
+
 // What a followed conversation gains is said as one patch of turn changes,
 // a turn that grew again under its n; more than a patch may change, or
 // hold, as several.
@@ -1649,7 +1682,7 @@ func TestAHandingIsKeptOnTheNewWindowUntilTheFirstSend(t *testing.T) {
 	var said [][]byte
 	chat := func(window string) *chatRun {
 		run := &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, say: func(messages ...[]byte) { said = append(said, messages...) }, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
-		run.aim(app.Head{}, window)
+		run.aim(app.Head{}, window, nil)
 		t.Cleanup(func() { close(run.quit) })
 		return run
 	}
@@ -1882,7 +1915,7 @@ func TestWhatWasPickedWhileTheAgentWorkedIsDoneWhenItsTurnEnds(t *testing.T) {
 	var said [][]byte
 	chat := func(window string) *chatRun {
 		run := &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, say: func(messages ...[]byte) { said = append(said, messages...) }, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
-		run.aim(app.Head{}, window)
+		run.aim(app.Head{}, window, nil)
 		t.Cleanup(func() { close(run.quit) })
 		run.view.talk.whole() // said, so what changes is said
 		return run
@@ -2105,7 +2138,7 @@ func TestAConversationForkedFromAReplyGoesOnInAWindowOfItsOwn(t *testing.T) {
 	var messages [][]byte
 	chat := func(window string) *chatRun {
 		run := &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, say: func(said ...[]byte) { messages = append(messages, said...) }, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
-		run.aim(app.Head{}, window)
+		run.aim(app.Head{}, window, nil)
 		t.Cleanup(func() { close(run.quit) })
 		return run
 	}
@@ -2348,7 +2381,7 @@ func fanLab(t *testing.T, turns int) (a *app.App, repo *gittest.Repo, record mod
 	}
 	messages = new([][]byte)
 	run = &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, say: func(said ...[]byte) { *messages = append(*messages, said...) }, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
-	run.aim(app.Head{}, old)
+	run.aim(app.Head{}, old, nil)
 	t.Cleanup(func() { close(run.quit) })
 	run.view.runs.Agent = "claude"
 	run.say(run.view.talk.said()...)

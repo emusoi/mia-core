@@ -663,7 +663,7 @@ func (a *App) FollowMain(id string, after int, stop <-chan struct{}, say func([]
 		return a.didAll(turns)
 	}
 	in, _ := a.where()
-	return a.follow(in, id, "", "", max(own, after-offset), a.mainUnwritten(id), dress, stop, say)
+	return a.follow(in, id, "", "", max(own, after-offset), nil, a.mainUnwritten(id), dress, stop, say)
 }
 
 // mainUnwritten is what it is that no agent has one of the main agent's

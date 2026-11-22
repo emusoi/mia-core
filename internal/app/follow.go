@@ -29,8 +29,10 @@ func polling(ask func() ([]Turn, bool, error)) func() ([]Turn, bool, error) {
 // grows, those turns, until stop is closed or say fails. Until an agent
 // has the conversation, unwritten says whether that is an error: none
 // when a window has it open and nothing of it is written yet. dress is
-// what is done to turns before they are said.
-func (a *App) follow(in folders, id, cwd, whose string, after int, unwritten func() error, dress func([]Turn) []Turn, stop <-chan struct{}, say func([]Turn) error) error {
+// what is done to turns before they are said. With enough, of an agent
+// whose transcripts keep steps, what is said first is its last turns, read
+// back until enough says they are enough.
+func (a *App) follow(in folders, id, cwd, whose string, after int, enough func([]Turn) bool, unwritten func() error, dress func([]Turn) []Turn, stop <-chan struct{}, say func([]Turn) error) error {
 	type follower struct {
 		agent string
 		next  func() ([]Turn, bool, error)
@@ -40,6 +42,9 @@ func (a *App) follow(in folders, id, cwd, whose string, after int, unwritten fun
 	for _, agent := range a.agents() {
 		if agent.talks != nil && (whose == "" || agent.Name == whose) {
 			next, every := agent.talks.follow(in, id, cwd, after)
+			if t, ok := agent.talks.(transcripts); ok && enough != nil {
+				next, every = t.tail(in, id, cwd, enough)
+			}
 			all = append(all, follower{agent.Name, next, every})
 		}
 	}

@@ -2,10 +2,12 @@ package app_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -712,9 +714,25 @@ func TestAConversationNothingIsSaidInYetIsListedWithItsWindow(t *testing.T) {
 		return heads, strings.Join(all, " ")
 	}
 
+	// what a chat of the window follows, found without a list of them all
+	inWindow := func() string {
+		t.Helper()
+		head, runs, found := a.WindowConversation(wt, "claude")
+		if !found {
+			return ""
+		}
+		if runs.Agent != "claude" || head.Agent != "claude" || !head.Running || head.Window == nil || head.Window.Name != "claude" {
+			t.Errorf("the window's conversation: %+v, runs %+v", head, runs)
+		}
+		return head.ID
+	}
+
 	// it does not say: the newest there is taken as the one, as before
 	if _, got := listed(app.Wanted{}); got != "c1:1*claude" {
 		t.Fatalf("before it says: %s", got)
+	}
+	if got := inWindow(); got != "c1" {
+		t.Errorf("before it says, the window has %q open", got)
 	}
 
 	wrote := time.Now().UnixMilli()
@@ -730,6 +748,9 @@ func TestAConversationNothingIsSaidInYetIsListedWithItsWindow(t *testing.T) {
 	}
 	if _, got := listed(app.Wanted{Worktree: wt.Name, Agent: "claude"}); got != "f1:0*claude c1:1" {
 		t.Errorf("asked for by worktree and agent: %s", got)
+	}
+	if got := inWindow(); got != "f1" {
+		t.Errorf("holding one nothing is said in, the window has %q open", got)
 	}
 	if _, got := listed(app.Wanted{Agent: "codex"}); got != "" {
 		t.Errorf("another agent's were asked for: %s", got)
@@ -775,7 +796,76 @@ func TestAConversationNothingIsSaidInYetIsListedWithItsWindow(t *testing.T) {
 	if _, got := listed(app.Wanted{}); got != "f1:1 c1:1" {
 		t.Errorf("with its window closed: %s", got)
 	}
+	if got := inWindow(); got != "" {
+		t.Errorf("with its window closed, it has %q open", got)
+	}
 	if _, err := a.ConversationTurns("f2", 0); err == nil {
 		t.Error("one no window has any more, and nothing is written of, was read")
+	}
+}
+
+// A conversation a window has open is followed from its last turns, as
+// many as the one who follows says are enough: read back from its end a
+// step at a time, each turn under the number it has in the whole and an
+// answer with its question, once it was read whole once. A transcript
+// written again shorter is read from its start again.
+func TestAnOpenConversationIsFollowedFromItsLastTurns(t *testing.T) {
+	gittest.Isolate(t)
+	repo := gittest.New(t)
+	claudeDir := agentHomes(t)
+	file := filepath.Join(claudeDir(repo.Root), "c1.jsonl")
+	var lines []string
+	for i := range 1200 {
+		lines = append(lines, claudeSays(repo.Root, "user", quoted(fmt.Sprintf("message %d", i)), ""))
+		if i == 595 { // a question asked before a step, answered after it
+			lines = append(lines, claudeSays(repo.Root, "assistant", `[{"type":"tool_use","id":"q1","name":"AskUserQuestion","input":{"questions":[{"question":"Which one?","options":[{"label":"Fast"},{"label":"Small"}]}]}}]`, ""))
+		}
+		if i == 605 {
+			lines = append(lines, claudeSays(repo.Root, "user", `[{"type":"tool_result","tool_use_id":"q1","content":"answered"}]`, `,"toolUseResult":{"questions":[{"question":"Which one?"}],"answers":{"Which one?":"Fast"}}`))
+		}
+	}
+	put(t, file, lines...)
+	a, err := app.Open(repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	whole, err := a.ConversationTurns("c1", 0)
+	if err != nil || len(whole) != 1202 {
+		t.Fatalf("read whole: %d turns, %v", len(whole), err)
+	}
+	head := app.Head{ID: "c1", Agent: "claude", Running: true, Window: &app.WindowRef{Index: 1, Name: "claude"}}
+	first := func(want int) []app.Turn {
+		t.Helper()
+		var got []app.Turn
+		err := a.FollowOpen(head, func(turns []app.Turn) bool { return len(turns) >= want }, make(chan struct{}), func(turns []app.Turn) error {
+			got = turns
+			return errors.New("seen") // nothing more is wanted
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	ends := func(got []app.Turn) bool {
+		return len(got) > 0 && reflect.DeepEqual(got, whole[len(whole)-len(got):])
+	}
+	if got := first(10); len(got) != len(whole) || !ends(got) {
+		t.Fatalf("with no steps yet: %d turns, want all %d", len(got), len(whole))
+	}
+	if got := first(10); len(got) < 10 || len(got) >= 400 || !ends(got) {
+		t.Errorf("from its steps, for 10: %d turns, or not the whole's last", len(got))
+	}
+	got := first(700)
+	if len(got) < 700 || len(got) == len(whole) || !ends(got) {
+		t.Fatalf("for 700: %d turns, or not the whole's last", len(got))
+	}
+	if at := slices.IndexFunc(got, func(turn app.Turn) bool { return turn.Kind == "question" }); at < 0 || got[at].Answer != "Fast" {
+		t.Errorf("the question read back over a step is not answered: %+v", got)
+	}
+	if err := os.WriteFile(file, []byte(strings.Join(lines[:50], "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := first(10); len(got) != 50 || got[0].N != 1 || got[0].Text != "message 0" {
+		t.Errorf("written again shorter: %d turns from %+v, want its 50 from the first", len(got), got[0])
 	}
 }

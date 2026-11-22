@@ -163,7 +163,8 @@ func TestAChatIsToldWhenItsWindowsAgentGoesToWork(t *testing.T) {
 	}
 	chat := func() *chatRun {
 		run := &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, say: func(...[]byte) {}, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
-		run.aim(app.Head{}, window)
+		run.aim(app.Head{}, window, nil)
+		run.listened(<-run.listening) // asked as the chat is said
 		t.Cleanup(func() {
 			close(run.quit)
 			if run.hangUp != nil {

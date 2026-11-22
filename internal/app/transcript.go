@@ -2,6 +2,9 @@ package app
 
 import (
 	"bufio"
+	"cmp"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"maps"
@@ -89,6 +92,13 @@ func (s scan) end() mark {
 // each turn and handing it to each, and returns where it stopped. stop,
 // when given, is asked after every line whether to give up.
 func (t transcripts) read(path string, from mark, about *about, each func(Turn), stop func() bool) (mark, error) {
+	return t.stepping(path, from, about, each, stop, nil)
+}
+
+// stepping is read, and stepped is handed a mark each time the turns
+// read pass another stepTurns: the steps a chat reads a long transcript's
+// last turns from.
+func (t transcripts) stepping(path string, from mark, about *about, each func(Turn), stop func() bool, stepped func(mark)) (mark, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return from, err
@@ -115,6 +125,7 @@ func (t transcripts) read(path string, from mark, about *about, each func(Turn),
 			break // the end, or a line still being written: read next time
 		}
 		at.Offset += int64(len(line))
+		before := at.N
 		for _, turn := range t.decode(line, about) {
 			at.N++
 			turn.N = at.N
@@ -130,11 +141,57 @@ func (t transcripts) read(path string, from mark, about *about, each func(Turn),
 			}
 			each(turn)
 		}
+		if stepped != nil && at.N/stepTurns > before/stepTurns {
+			stepped(mark{Offset: at.Offset, N: at.N, Open: maps.Clone(at.Open)})
+		}
 		if stop != nil && stop() {
 			break
 		}
 	}
 	return at, nil
+}
+
+// stepTurns is how many turns apart the steps of a long transcript are.
+const stepTurns = 200
+
+// stepsFile is where the steps of a transcript are kept: a file of their
+// own beside what a list keeps, read without it.
+func (t transcripts) stepsFile(path string) string {
+	if t.cache == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(path))
+	return filepath.Join(t.cache, "steps", t.agent, hex.EncodeToString(sum[:12])+".json")
+}
+
+// steps is the marks kept of a transcript to read it from, in order; none
+// of a file that is shorter than the last of them, which was written again.
+func (t transcripts) steps(path string, size int64) []mark {
+	var marks []mark
+	if data, err := os.ReadFile(t.stepsFile(path)); err != nil || json.Unmarshal(data, &marks) != nil || len(marks) == 0 || marks[len(marks)-1].Offset > size {
+		return nil
+	}
+	return marks
+}
+
+// stepped is a transcript's steps with one more, and whether it is new:
+// one of each stepTurns turns is kept.
+func stepped(marks []mark, one mark) ([]mark, bool) {
+	at, found := slices.BinarySearchFunc(marks, one.N/stepTurns, func(m mark, step int) int { return cmp.Compare(m.N/stepTurns, step) })
+	if found {
+		return marks, false
+	}
+	return slices.Insert(marks, at, one), true
+}
+
+func (t transcripts) keepSteps(path string, marks []mark) {
+	file := t.stepsFile(path)
+	if file == "" || os.MkdirAll(filepath.Dir(file), 0o755) != nil {
+		return
+	}
+	if data, err := json.Marshal(marks); err == nil {
+		_ = writeAtomic(file, data)
+	}
 }
 
 // advance reads what was written to a transcript since s was kept, and
@@ -292,9 +349,15 @@ type placed struct {
 // is a whole line, written once: none grows under its n.
 func (t transcripts) follow(in folders, id, cwd string, after int) (func() ([]Turn, bool, error), time.Duration) {
 	var at placed
+	return t.onFrom(&at, after, func() ([]Turn, bool, error) { return t.locate(in, id, cwd, after, &at) }), 150 * time.Millisecond
+}
+
+// onFrom is first until it placed the transcript at, then what was written
+// to it since, as follow reads it on.
+func (t transcripts) onFrom(at *placed, after int, first func() ([]Turn, bool, error)) func() ([]Turn, bool, error) {
 	return func() ([]Turn, bool, error) {
 		if at.file == "" {
-			return t.locate(in, id, cwd, after, &at)
+			return first()
 		}
 		info, err := os.Stat(at.file)
 		if err != nil {
@@ -313,7 +376,106 @@ func (t transcripts) follow(in folders, id, cwd string, after int) (func() ([]Tu
 			return nil, true, err
 		}
 		return turns, true, nil
-	}, 150 * time.Millisecond
+	}
+}
+
+// tail is follow of a transcript's last turns, read back from its end a
+// step at a time until enough says they are enough, and from its start
+// while it has no steps. Steps are kept as it is read, so that a long
+// transcript is read whole once. It is found as locate finds it, without
+// what a list keeps.
+func (t transcripts) tail(in folders, id, cwd string, enough func([]Turn) bool) (func() ([]Turn, bool, error), time.Duration) {
+	var at placed
+	return t.onFrom(&at, 0, func() ([]Turn, bool, error) {
+		file, info := t.found(in, id, cwd)
+		if file == "" {
+			return nil, false, nil
+		}
+		marks := t.steps(file, info.Size())
+		var read [][]Turn // what was read from each step, the last first
+		inOrder := func() []Turn {
+			var all []Turn
+			for i := len(read) - 1; i >= 0; i-- {
+				all = append(all, read[i]...)
+			}
+			return all
+		}
+		var passed []mark // steps passed that were not kept
+		end, from := mark{}, len(marks)
+		for {
+			start, upto := mark{}, -1 // from the step, up to the one after it; the last up to the end
+			if from > 0 {
+				start = marks[from-1]
+			}
+			if from < len(marks) {
+				upto = marks[from].N
+			}
+			var turns []Turn
+			got, err := t.stepping(file, start, &about{}, func(turn Turn) { turns = append(turns, turn) },
+				func() bool { return upto >= 0 && len(turns) > 0 && turns[len(turns)-1].N >= upto },
+				func(m mark) { passed = append(passed, m) })
+			if err != nil {
+				return nil, true, err
+			}
+			if upto < 0 {
+				end = got
+			}
+			read = append(read, turns)
+			if from == 0 || enough(inOrder()) {
+				break
+			}
+			from--
+		}
+		grew := false
+		for _, m := range passed {
+			var added bool
+			if marks, added = stepped(marks, m); added {
+				grew = true
+			}
+		}
+		if grew {
+			t.keepSteps(file, marks)
+		}
+		var turns []Turn
+		collect := collecting(0, &turns) // an answer is given to its question, read from another step
+		for _, turn := range inOrder() {
+			collect(turn)
+		}
+		at = placed{file: file, end: end, size: info.Size(), modified: info.ModTime()}
+		return turns, true, nil
+	}), 150 * time.Millisecond
+}
+
+// found is the transcript of a conversation that locate reads, and what
+// the disk says of it: of the copies there are, the last written to that
+// was made in the folders, in cwd when it is given. Where it was made is
+// what the transcript says first.
+func (t transcripts) found(in folders, id, cwd string) (string, os.FileInfo) {
+	if strings.ContainsAny(id, `/\*?[`) {
+		return "", nil
+	}
+	var files []string
+	infos := map[string]os.FileInfo{}
+	for _, h := range homesOf(t.agent) {
+		for _, file := range t.find(h.dir, in, id) {
+			if info, err := os.Stat(file); err == nil && infos[file] == nil {
+				files, infos[file] = append(files, file), info
+			}
+		}
+	}
+	slices.SortStableFunc(files, func(x, y string) int { return infos[y].ModTime().Compare(infos[x].ModTime()) })
+	for _, file := range files {
+		var made about
+		if t.cwd != nil {
+			made.Cwd = t.cwd(file)
+		} else {
+			_, _ = t.read(file, mark{}, &made, func(Turn) {}, func() bool { return made.Cwd != "" })
+		}
+		if in.holds(made.Cwd) && (cwd == "" || made.Cwd == cwd) {
+			return file, infos[file]
+		}
+	}
+	return "", nil
 }
 
 // collecting gathers the turns after after into turns, an answer given to
@@ -385,8 +547,12 @@ func (t transcripts) locate(in folders, id, cwd string, after int, at *placed) (
 				}
 			}
 			turns = nil
-			if _, err := t.read(file, start, &about{}, collect, nil); err != nil {
+			var steps []mark
+			if _, err := t.stepping(file, start, &about{}, collect, nil, func(m mark) { steps = append(steps, m) }); err != nil {
 				return nil, true, err
+			}
+			if start.Offset == 0 && len(steps) > 0 {
+				t.keepSteps(file, steps) // read whole: a chat reads only its end from them
 			}
 		}
 		if at != nil {

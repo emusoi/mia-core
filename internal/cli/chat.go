@@ -13,8 +13,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/x/term"
 
@@ -372,6 +374,27 @@ func worded(turn app.Turn) chatTurn {
 		}
 		turn.Text = string(text[:len(text)/2])
 	}
+}
+
+// enough reports whether the last turns of a conversation, read back from
+// its end, are all a view said whole can say of it: chatTurns it draws, or
+// more words than its message takes — each turn as long as its words, or
+// a quarter of what the window keeps of them, at least.
+func enough(turns []app.Turn) bool {
+	shown, room := 0, muiLimit
+	for _, turn := range slices.Backward(turns) {
+		if !drawn(turn) {
+			continue
+		}
+		if turn.Kind == "asked" {
+			turn.Text = ownWords(turn.Text)
+		}
+		shown, room = shown+1, room-min(utf8.RuneCountInString(turn.Text), muiProse/4)
+		if shown >= chatTurns || room <= 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // lastThatFit is the last of the turns that a view with room bytes for
@@ -1942,6 +1965,8 @@ type chatRun struct {
 	hangUp func()
 	gone   bool
 	owed   bool
+	// listening has what listening comes to, while the server is asked.
+	listening <-chan chatListen
 	// models is the models changed in this chat, the first first.
 	models []chatModelled
 }
@@ -1986,7 +2011,7 @@ func (r *chatRun) shows(text, tone string) {
 // and shown, and its conversation is looked for each second. The chat
 // before it is let go of with what stood over it, and this one is another
 // piece to the window.
-func (r *chatRun) aim(head app.Head, window string) {
+func (r *chatRun) aim(head app.Head, window string, known *chatWindow) {
 	if r.quit != nil {
 		close(r.quit)
 	}
@@ -1996,33 +2021,111 @@ func (r *chatRun) aim(head app.Head, window string) {
 		nth = v.talk.nth + 1
 	}
 	v.mode, v.fork, v.told, v.tabbed, v.next, v.window, v.id = chatting, 0, nil, "", nil, window, head.ID
-	r.listen()
+	if head.ID != "" {
+		r.follow(head) // read while the window is asked of: what it reads is heard once all this is done
+	}
+	if r.hangUp != nil {
+		r.hangUp()
+	}
+	select {
+	case heard := <-r.listening: // of the chat before
+		heard.hangUp()
+	default:
+	}
+	r.told, r.hangUp, r.listening = nil, nil, nil
 	v.marks, v.fans, v.plan = nil, nil, nil
 	v.runs = app.Runs{Agent: head.Agent, Model: head.Model, Effort: head.Effort, Account: head.Account, Reads: true}
+	var seen chatWindow
 	if window != "" {
-		if runs := r.a.WindowRuns(r.record, window); runs.Agent != "" {
-			v.runs = chatRuns(runs, head)
+		if known != nil {
+			seen = *known
+		} else {
+			seen = lookAt(r.a, r.record, window, func() app.Runs { return r.a.WindowRuns(r.record, window) })
+		}
+		r.listen(window)
+		if seen.runs.Agent != "" {
+			v.runs = chatRuns(seen.runs, head)
 		}
 	}
 	v.talk = &talk{pane: os.Getenv("TMUX_PANE"), agent: cmp.Or(v.runs.Agent, "window "+window), about: chatAbout(v.runs), reply: window != "", nth: nth}
 	if window != "" {
-		v.talk.working = r.a.AtWork(r.record, r.index())
+		v.talk.working = seen.working
 		if v.runs.Agent != "" && !v.runs.Reads {
 			r.note(v.runs.Agent+"'s replies are in its terminal: mia reads none of its conversations. What is sent here is typed to it", "warn")
 		}
 	}
 	var from app.Talk // what its agent goes on from and was not sent yet
-	if carried, on := r.a.CarriedInWindow(r.record, window); window != "" && on {
-		from = app.Talk{Agent: carried.From, ID: carried.ID}
+	if seen.on {
+		from = app.Talk{Agent: seen.carried.From, ID: seen.carried.ID}
 	}
 	v.talk.lays(r.parts(app.Talk{Agent: v.runs.Agent, ID: head.ID}, from))
 	v.came = nil
 	for _, handed := range r.a.Handings(v.runs.Agent, head.ID, from) {
 		v.came = append(v.came, handed.From.Agent)
 	}
-	if head.ID != "" {
-		r.follow(head.ID)
+}
+
+// chatWindow is what a chat aimed at a window says of it: what it runs,
+// whether its agent is at work, and what it goes on from, when anything.
+type chatWindow struct {
+	runs    app.Runs
+	working bool
+	carried app.Carried
+	on      bool
+}
+
+// lookAt asks a window what a chat aimed at it says of it, all at once:
+// what it runs as runs says it, and the rest.
+func lookAt(a *app.App, record model.Record, window string, runs func() app.Runs) chatWindow {
+	var seen chatWindow
+	var all sync.WaitGroup
+	index, _ := strconv.Atoi(window)
+	all.Go(func() { seen.runs = runs() })
+	all.Go(func() { seen.working = a.AtWork(record, index) })
+	all.Go(func() { seen.carried, seen.on = a.CarriedInWindow(record, window) })
+	all.Wait()
+	return seen
+}
+
+// chatListen is mia serve listened to for a chat, as listenServer says,
+// and of which chat of the run.
+type chatListen struct {
+	of     int
+	told   <-chan struct{}
+	hangUp func()
+}
+
+// listen has mia serve tell the chat of its window, when one of this build
+// answers: the window's question asked each look, once for all who listen.
+// It is asked while the chat is said, and heard once the server answered:
+// until then the window is looked at each second.
+func (r *chatRun) listen(window string) {
+	if r.gone {
+		return
 	}
+	of, quit, got := r.of, r.quit, make(chan chatListen, 1)
+	r.listening = got
+	go func() {
+		told, hangUp := listenServer(asked("window", r.record.Path, window, "--worktree", r.record.Name))
+		select {
+		case <-quit: // another chat was aimed at meanwhile
+			hangUp()
+		default:
+			got <- chatListen{of, told, hangUp}
+		}
+	}()
+}
+
+// listened takes what listening came to: what the server tells, or that
+// there is none, looked at once, for what changed while it was asked. That
+// of a chat before this one is hung up on.
+func (r *chatRun) listened(heard chatListen) {
+	if r.listening = nil; heard.of != r.of {
+		heard.hangUp()
+		return
+	}
+	r.told, r.hangUp, r.gone = heard.told, heard.hangUp, heard.told == nil
+	r.looks()
 }
 
 // chatModelled is a model's change in a conversation, kept while the chat
@@ -2111,38 +2214,31 @@ func (r *chatRun) index() int {
 	return index
 }
 
-// follow reads a conversation as it is written, for the run to hear.
-func (r *chatRun) follow(id string) {
+// follow reads a conversation as it is written, for the run to hear: one
+// a window has open where the window's agent says it is.
+func (r *chatRun) follow(head app.Head) {
 	of, quit := r.of, r.quit
 	go func() {
-		err := r.a.FollowConversation(id, r.record.Name, 0, quit, func(turns []app.Turn) error {
+		say := func(turns []app.Turn) error {
 			select {
 			case r.batches <- chatBatch{of, turns}:
 				return nil
 			case <-quit:
 				return errors.New("left")
 			}
-		})
+		}
+		var err error
+		if head.Running && head.Window != nil {
+			err = r.a.FollowOpen(head, enough, quit, say)
+		} else {
+			err = r.a.FollowConversation(head.ID, r.record.Name, 0, quit, say)
+		}
 		select {
 		case r.ended <- chatEnd{of, err}:
 		case <-quit:
 		case <-r.done:
 		}
 	}()
-}
-
-// listen has mia serve tell the chat of its window, when one of this build
-// answers: the window's question asked each look, once for all who listen.
-func (r *chatRun) listen() {
-	if r.hangUp != nil {
-		r.hangUp()
-	}
-	r.told, r.hangUp = nil, nil
-	if r.view.window == "" || r.gone {
-		return
-	}
-	r.told, r.hangUp = listenServer(asked("window", r.record.Path, r.view.window, "--worktree", r.record.Name))
-	r.gone = r.told == nil
 }
 
 // looks is what a second brings, or mia serve tells of: the conversation
@@ -2154,15 +2250,14 @@ func (r *chatRun) looks() {
 		return
 	}
 	if v.id == "" && (v.runs.Reads || v.runs.Agent == "") {
-		heads, _ := r.a.Conversations(app.Wanted{Worktree: r.record.Name})
-		if head, err := chatOf(heads, r.record.Name, v.window, ""); err == nil {
+		if head, runs, found := r.a.WindowConversation(r.record, v.window); found {
 			v.id = head.ID
-			if runs := chatRuns(r.a.WindowRuns(r.record, v.window), head); runs.Agent != "" && runs != v.runs {
+			if runs := chatRuns(runs, head); runs.Agent != "" && runs != v.runs {
 				v.runs, v.talk.agent = runs, runs.Agent
 				v.lined()
 				r.say(v.talk.said()...)
 			}
-			r.follow(head.ID)
+			r.follow(head)
 		}
 	}
 	working := r.a.AtWork(r.record, r.index())
@@ -2338,7 +2433,7 @@ func (r *chatRun) act(deed chatDeed) {
 			r.say(v.shut()...)
 			return
 		}
-		r.aim(head, strconv.Itoa(head.Window.Index))
+		r.aim(head, strconv.Itoa(head.Window.Index), nil)
 		r.say(v.talk.said()...)
 	case chatGoOn:
 		done, err := r.a.ResumeConversation(deed.id, r.record.Name, r.record.Name, "", "", "")
@@ -2348,7 +2443,7 @@ func (r *chatRun) act(deed chatDeed) {
 		}
 		head, _ := v.headOf(deed.id)
 		head.Model, head.Effort, head.Account = done.Model, done.Effort, cmp.Or(done.Account, head.Account)
-		r.aim(head, strconv.Itoa(done.Window.Index))
+		r.aim(head, strconv.Itoa(done.Window.Index), nil)
 		r.shows(head.Agent+" goes on with it in window "+done.Window.Name, "ok")
 	case chatContinue:
 		// As a switch of agents is: this window's agent started on it and told
@@ -2363,7 +2458,7 @@ func (r *chatRun) act(deed chatDeed) {
 		done := went.done
 		to := r.nowAt(done.To.Window)
 		kept := r.carry(to, head.Agent, deed.id, done)
-		r.aim(app.Head{ID: done.Resumes, Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
+		r.aim(app.Head{ID: done.Resumes, Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to, nil)
 		if kept != nil {
 			went.text, went.tone = went.text+" · "+kept.Error(), "warn"
 		}
@@ -2545,7 +2640,7 @@ func (r *chatRun) applies(deed chatDeed) bool {
 	}
 	done := went.done
 	to := r.nowAt(done.To.Window)
-	r.aim(app.Head{ID: done.Resumes, Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to)
+	r.aim(app.Head{ID: done.Resumes, Agent: done.To.Agent, Model: done.Model, Effort: done.Effort, Account: done.Account}, to, nil)
 	if done.Resumes != "" {
 		went.text = from + " stopped · " + done.To.Agent + " takes its own conversation up again, with what was said since"
 	}
@@ -2636,24 +2731,37 @@ func cmdChat(a *app.App, args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	heads, problems := a.Conversations(app.Wanted{Worktree: record.Name})
-	head, err := chatOf(heads, record.Name, window, id)
-	switch {
-	case err == nil && head.Running && head.Window != nil:
-		window = strconv.Itoa(head.Window.Index)
-	case err == nil:
-		window = "" // no window has it open: only shown
-	case window == "" || id != "":
-		for _, problem := range problems {
-			fmt.Fprintln(os.Stderr, "mia:", problem)
+	var head app.Head
+	var seen *chatWindow
+	if window != "" && id == "" { // the window's own, found as the window is asked of; none yet is looked for each second
+		found := false
+		looked := lookAt(a, record, window, func() (runs app.Runs) {
+			head, runs, found = a.WindowConversation(record, window)
+			return runs
+		})
+		if seen = &looked; found {
+			window = strconv.Itoa(head.Window.Index)
 		}
-		return fail(err)
+	} else {
+		heads, problems := a.Conversations(app.Wanted{Worktree: record.Name})
+		head, err = chatOf(heads, record.Name, window, id)
+		switch {
+		case err == nil && head.Running && head.Window != nil:
+			window = strconv.Itoa(head.Window.Index)
+		case err == nil:
+			window = "" // no window has it open: only shown
+		default:
+			for _, problem := range problems {
+				fmt.Fprintln(os.Stderr, "mia:", problem)
+			}
+			return fail(err)
+		}
 	}
 
 	stop := make(chan struct{})
 	defer close(stop)
 	run := &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, done: stop, batches: make(chan chatBatch), ended: make(chan chatEnd)}
-	run.aim(head, window)
+	run.aim(head, window, seen)
 	defer func() {
 		if run.hangUp != nil {
 			run.hangUp()
@@ -2699,6 +2807,8 @@ func cmdChat(a *app.App, args []string) int {
 			if batch.of == run.of {
 				say(run.view.talk.heard(batch.turns)...)
 			}
+		case heard := <-run.listening:
+			run.listened(heard)
 		case _, open := <-run.told:
 			if !open { // the server went: looked at each second
 				run.told, run.gone = nil, true
