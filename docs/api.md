@@ -109,7 +109,10 @@ the repository keeps. It is git's own folder, no repository of mia's.
 `mia api window <index> [--worktree <name>]` is a window of the worktree
 the folder is in, or of the one named: whether its agent is `working`, as
 [mia chat](#apps) says it, and what its screen `asks` when it asks
-something — its `text`, its `options` and the one `selected`.
+something — its `text`, its `options` and the one `selected`. agy gives
+its pane no title to say it works by, so of agy's window it is what agy
+itself tells of the conversation the window has open: working until the
+last step it wrote is a reply that calls no tool.
 
 ```json
 {"working":false,"asks":{"text":"Do you want to make this edit?","options":["Yes","No"],"selected":1}}

@@ -124,6 +124,37 @@ exec /bin/sh "$@"`})
 		t.Errorf("one a window has open is left as it is: %+v %v", again, err)
 	}
 
+	// at work until the last step agy wrote is a reply that calls no tool
+	transcript := filepath.Join(agyLogs(agyNow), "transcript_full.jsonl")
+	for _, step := range []struct {
+		line string
+		work bool
+	}{
+		{"", false}, // its last, "Done."
+		{agyStep(13, "USER_EXPLICIT", "USER_INPUT", "2026-11-02T10:01:00Z", `,"content":`+agyAsked("and the map?")), true},
+		{agyStep(14, "MODEL", "PLANNER_RESPONSE", "2026-11-02T10:01:01Z", `,"content":"Looking.","tool_calls":[{"name":"run_command","args":{"CommandLine":"go test ./..."}}]`), true},
+		{agyStep(15, "MODEL", "GENERIC", "2026-11-02T10:01:02Z", `,"content":"ok"`), true},
+		{agyStep(16, "SYSTEM", "SYSTEM_MESSAGE", "2026-11-02T10:01:02Z", `,"content":"a task finished"`), true},
+		{agyStep(17, "MODEL", "PLANNER_RESPONSE", "2026-11-02T10:01:03Z", `,"content":"The map too."`), false},
+	} {
+		if step.line != "" {
+			put(t, transcript, step.line)
+		}
+		if got := a.AtWork(record, done.Window.Index); got != step.work {
+			t.Errorf("after %q at work = %v", step.line, got)
+		}
+	}
+	// a step being written is one not done
+	f, err := os.OpenFile(transcript, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.WriteString(`{"step_index":18,"source":"USER_EXPLICIT","type":"USER_IN`)
+	f.Close()
+	if err != nil || !a.AtWork(record, done.Window.Index) {
+		t.Errorf("with a step half written, at rest: %v", err)
+	}
+
 	now, err := a.SwitchWindow(record, done.Window.Name, "gemini-4-flash", "high")
 	if err != nil || now != (app.Chosen{Model: "gemini-4-flash", Effort: "high"}) {
 		t.Fatalf("switched: %+v, %v", now, err)

@@ -137,3 +137,28 @@ func TestAgysWindowIsKnownByWhatItRuns(t *testing.T) {
 		t.Errorf("by its program: %q", got)
 	}
 }
+
+// A file's last line is read from its end, however long it is; a file of
+// one line is that line, and an empty one none.
+func TestTheLastLineIsReadFromTheEnd(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "t.jsonl")
+	long := strings.Repeat("x", 200<<10)
+	for _, c := range []struct{ written, last string }{
+		{"", ""},
+		{"one", "one"},
+		{"one\n", "one"},
+		{"one\ntwo\n", "two"},
+		{"one\n" + long + "\n", long},
+		{long + "\ntwo", "two"},
+	} {
+		if err := os.WriteFile(file, []byte(c.written), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if got := string(lastLine(file)); got != c.last {
+			t.Errorf("last line of %.20q… = %.20q…, want %.20q…", c.written, got, c.last)
+		}
+	}
+	if lastLine(filepath.Join(t.TempDir(), "none")) != nil {
+		t.Error("a file that is not there has a line")
+	}
+}

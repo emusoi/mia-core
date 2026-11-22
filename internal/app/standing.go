@@ -204,12 +204,19 @@ func (a *App) standingIn(repo Repository, panes map[string][]session.Pane) []sto
 
 // AtWork reports whether the agent in a worktree's window is at work now:
 // the window says so, as a list of windows does, or the worktree stands
-// among the working, as Standing says it.
+// among the working, as Standing says it. agy's says nothing of it: its
+// conversation does.
 func (a *App) AtWork(record model.Record, window int) bool {
 	panes := session.Here().AllPanes()
-	for _, one := range session.WindowsFrom(panes[session.Name(record.Name)]) {
+	its := panes[session.Name(record.Name)]
+	for _, one := range session.WindowsFrom(its) {
 		if one.Index == window && one.Working {
 			return true
+		}
+	}
+	if at := slices.IndexFunc(its, func(p session.Pane) bool { return p.Index == window }); at >= 0 { // a window is its first pane
+		if pane := its[at]; pane.Label == "agy" || agentIn(a.agents(), pane.Command, pane.Title) == "agy" {
+			return a.agyAtWork(record, window)
 		}
 	}
 	for _, one := range a.standingIn(Repository{Name: filepath.Base(a.Root), Path: a.Root}, panes) {

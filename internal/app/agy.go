@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"encoding/json"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/emusoi/mia-core/internal/model"
 	"github.com/emusoi/mia-core/internal/plugin"
 	"github.com/emusoi/mia-core/internal/run"
 )
@@ -253,6 +255,56 @@ func agyArg(value json.RawMessage) json.RawMessage {
 		return value
 	}
 	return json.RawMessage(held)
+}
+
+// agyAtWork reports whether agy in a worktree's window is at work, as agy
+// itself tells it of a conversation: until the last step it wrote of the
+// one the window has open is a reply that calls no tool. A reply is
+// written once the model has done writing it, so one being written is at
+// work; one that waits on the person to allow a tool is too, and asks
+// besides. With nothing written yet it is at rest.
+func (a *App) agyAtWork(record model.Record, window int) bool {
+	heads, _ := a.Conversations(Wanted{Worktree: record.Name, Agent: "agy"})
+	for _, h := range heads {
+		if !h.Running || h.Window == nil || h.Window.Index != window {
+			continue
+		}
+		for _, home := range homesOf("agy") {
+			for _, file := range agyFind(home.dir, folders{}, h.ID) {
+				var last agyStep
+				return json.Unmarshal(lastLine(file), &last) != nil || last.Type != "PLANNER_RESPONSE" || len(last.ToolCalls) > 0
+			}
+		}
+	}
+	return false
+}
+
+// lastLine is a file's last line, read from its end: a transcript runs to
+// megabytes. One still being written is as much of it as there is.
+func lastLine(file string) []byte {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil
+	}
+	for size := int64(64 << 10); ; size *= 2 {
+		from := max(0, info.Size()-size)
+		tail := make([]byte, info.Size()-from)
+		if _, err := f.ReadAt(tail, from); err != nil && err != io.EOF {
+			return nil
+		}
+		tail = bytes.TrimRight(tail, "\n")
+		if at := bytes.LastIndexByte(tail, '\n'); at >= 0 {
+			return tail[at+1:]
+		}
+		if from == 0 {
+			return tail
+		}
+	}
 }
 
 // agyListed is the models in what agy models prints: each line that is an

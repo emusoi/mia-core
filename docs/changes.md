@@ -43,7 +43,10 @@ on GitHub; a tag without its section is not released.
   `agy --conversation <id>`; handed to another agent and back, agy takes
   its own up again so, and is handed only what was said since; and
   `mia window model` and a pick in the chat switch it by starting it
-  again in its pane on its conversation. See [Agents](api.md#agents) and
+  again in its pane on its conversation. Its window has no title that
+  says it works, so `mia api window` and the chat say agy is at work
+  until the last step it wrote of the conversation the window has open
+  is a reply that calls no tool. See [Agents](api.md#agents) and
   [conversations](api.md#conversations).
 
 - **The chat's models and Earlier are modals.** In `mia chat`, `models`
