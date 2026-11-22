@@ -166,11 +166,10 @@ func (a *App) Machines() []MachineState {
 	dir, dirErr := a.RemoteDir()
 	var wg sync.WaitGroup
 	wg.Go(func() {
-		out, err := runtime.Run("", "sh", "-c", probeScript, "sh", a.Root)
+		health, err := localHealth(a.Root)
 		states[0] = MachineState{Machine: runtime.Machine{Name: runtime.Local}, Answers: err == nil, Reach: Diagnose(runtime.Machine{Name: runtime.Local}, err, true)}
 		if err == nil {
 			states[0].Reach.Warnings = a.Linger()
-			health := parseHealth(out)
 			states[0].Health = &health
 		}
 	})
@@ -198,8 +197,7 @@ func (a *App) Here() HereState {
 	for _, m := range machines {
 		state.Machines = append(state.Machines, m.Name)
 	}
-	if out, err := runtime.Run("", "sh", "-c", probeScript, "sh", a.Root); err == nil {
-		health := parseHealth(out)
+	if health, err := localHealth(a.Root); err == nil {
 		state.Health = &health
 	}
 	return state
