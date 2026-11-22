@@ -6,10 +6,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	goruntime "runtime"
 	"slices"
 	"sort"
@@ -41,6 +44,14 @@ type transcripts struct {
 	cwd func(path string) string
 	// cache is the folder what was read of each file is kept in.
 	cache string
+	// live, of an agent that writes a message only once it is done, is
+	// what follows a transcript's name in the name of the file that has
+	// what is not yet written to it: a first line {"size": n} of how long
+	// the transcript was when it was written, -1 for one not there yet,
+	// and then the lines the agent will write, a message still being
+	// written as far as it has. One written for a transcript of another
+	// size is of what has been written since, and is not read.
+	live string
 }
 
 // decoder reads one line of an agent's transcript: what the line says of
@@ -218,15 +229,7 @@ func (t transcripts) advance(path string, s *scan, in *folders, each func(Turn))
 		*s = scan{}
 	}
 	end, err := t.read(path, s.end(), &s.about, func(turn Turn) {
-		switch turn.Kind {
-		case turnAsked:
-			if s.Asks == 0 {
-				s.Asked = oneLine(turn.Text)
-			}
-			s.Asks++
-		case turnSaid:
-			s.Said = oneLine(turn.Text)
-		}
+		s.heard(turn)
 		if each != nil {
 			each(turn)
 		}
@@ -246,6 +249,75 @@ func (t transcripts) advance(path string, s *scan, in *folders, each func(Turn))
 		}
 	}
 	return true
+}
+
+// heard is a turn read into what s says of its conversation.
+func (s *scan) heard(turn Turn) {
+	switch turn.Kind {
+	case turnAsked:
+		if s.Asks == 0 {
+			s.Asked = oneLine(turn.Text)
+		}
+		s.Asks++
+	case turnSaid:
+		s.Said = oneLine(turn.Text)
+	}
+}
+
+// unwritten is the live file of a transcript, and where in it the lines
+// the agent has not yet written begin, when there is one written for the
+// transcript as it is now.
+func (t transcripts) unwritten(file string) (live string, from int64, ok bool) {
+	if t.live == "" {
+		return "", 0, false
+	}
+	live = file + t.live
+	f, err := os.Open(live)
+	if err != nil {
+		return "", 0, false
+	}
+	defer f.Close()
+	first, err := bufio.NewReader(f).ReadSlice('\n')
+	var head struct {
+		Size *int64 `json:"size"`
+	}
+	if err != nil || json.Unmarshal(first, &head) != nil || head.Size == nil {
+		return "", 0, false
+	}
+	size := int64(-1)
+	if info, err := os.Stat(file); err == nil {
+		size = info.Size()
+	}
+	if *head.Size != size {
+		return "", 0, false
+	}
+	return live, int64(len(first)), true
+}
+
+// overlaid is s, not kept, with what the agent has not yet written to file
+// read on after it, each turn of that handed to each under the number it
+// will have once it is written.
+func (t transcripts) overlaid(file string, s scan, each func(Turn)) scan {
+	live, from, ok := t.unwritten(file)
+	if !ok {
+		return s
+	}
+	written := s.end()
+	end, err := t.read(live, mark{Offset: from, N: written.N, Open: written.Open}, &s.about, func(turn Turn) {
+		s.heard(turn)
+		if each != nil {
+			each(turn)
+		}
+	}, nil)
+	if err != nil || end.N == written.N {
+		return s
+	}
+	if info, err := os.Stat(live); err == nil {
+		s.Modified = info.ModTime()
+	}
+	end.Offset = written.Offset // the transcript's own: what is read on from is in it
+	s.Marks = append(slices.Clone(s.Marks), end)
+	return s
 }
 
 func (t transcripts) cacheFile() string {
@@ -321,7 +393,7 @@ func (t transcripts) heads(in folders) ([]Head, error) {
 	}
 	var heads []Head
 	for _, file := range files {
-		s := now[file]
+		s := t.overlaid(file, *now[file], nil)
 		if !in.holds(s.Cwd) || s.end().N == 0 {
 			continue // someone else's, or nothing said in it yet
 		}
@@ -340,9 +412,9 @@ func (t transcripts) turns(in folders, id, cwd string, after int) ([]Turn, bool,
 // a server's next look at everything finds it.
 const writtenLately = 24 * time.Hour
 
-// written is each transcript of the folders' written to lately, and every
-// folder transcripts are in up to the agent's own, whose stamp a
-// transcript added there changes.
+// written is each transcript of the folders' written to lately, with its
+// live file for an agent that has one, and every folder transcripts are
+// in up to the agent's own, whose stamp a transcript added there changes.
 func (t transcripts) written(in folders) []string {
 	var paths []string
 	seen := map[string]bool{}
@@ -357,8 +429,12 @@ func (t transcripts) written(in folders) []string {
 			for dir := filepath.Dir(file); strings.HasPrefix(dir, h.dir+string(filepath.Separator)); dir = filepath.Dir(dir) {
 				add(dir)
 			}
-			if info, err := os.Stat(file); err == nil && time.Since(info.ModTime()) < writtenLately {
+			info, err := os.Stat(file)
+			if err == nil && time.Since(info.ModTime()) < writtenLately {
 				add(file)
+			}
+			if t.live != "" && (err != nil || time.Since(info.ModTime()) < writtenLately) {
+				add(file + t.live) // of one not there yet, all there is of it
 			}
 		}
 	}
@@ -376,36 +452,79 @@ type placed struct {
 
 // follow finds the transcript as turns does, then reads it on from where
 // it stopped each time its size or time changes. A turn of a transcript
-// is a whole line, written once: none grows under its n.
+// is a whole line, written once: none grows under its n. What an agent
+// has not yet written, of one that says in a live file, is read again
+// each time that or the transcript changes, and a turn of it given each
+// time it is not as it was: it grows under the n it keeps once written.
 func (t transcripts) follow(in folders, id, cwd string, after int) (func() ([]Turn, bool, error), time.Duration) {
 	var at placed
 	return t.onFrom(&at, after, func() ([]Turn, bool, error) { return t.locate(in, id, cwd, after, &at) }), 150 * time.Millisecond
 }
 
 // onFrom is first until it placed the transcript at, then what was written
-// to it since, as follow reads it on.
+// to it since, as follow reads it on; what is not yet written, of an agent
+// that says it in a live file, after it each time that or the transcript
+// changes.
 func (t transcripts) onFrom(at *placed, after int, first func() ([]Turn, bool, error)) func() ([]Turn, bool, error) {
+	var heard string        // the live file's stamp, when it was last read
+	shown := map[int]Turn{} // what was given of what is not yet written, by n
+	unwritten := func(turns []Turn) []Turn {
+		if t.live == "" {
+			return turns
+		}
+		heard = stamps([]string{at.file + t.live})
+		for n := range shown {
+			if n <= at.end.N {
+				delete(shown, n) // written: given as it is in the transcript
+			}
+		}
+		t.overlaid(at.file, scan{Marks: []mark{at.end}}, func(turn Turn) {
+			if was, ok := shown[turn.N]; turn.N > after && (!ok || !reflect.DeepEqual(was, turn)) {
+				shown[turn.N] = turn
+				turns = append(turns, turn)
+			}
+		})
+		return turns
+	}
 	return func() ([]Turn, bool, error) {
 		if at.file == "" {
-			return first()
+			turns, found, err := first()
+			if err == nil && at.file != "" && t.live != "" {
+				for _, turn := range turns {
+					if turn.N > at.end.N {
+						shown[turn.N] = turn // what first read of it already
+					}
+				}
+				turns = unwritten(turns) // and what it did not, as tail reads only what is written
+			}
+			return turns, found, err
 		}
+		size, modified := int64(-1), time.Time{}
 		info, err := os.Stat(at.file)
-		if err != nil {
+		switch {
+		case err == nil:
+			size, modified = info.Size(), info.ModTime()
+		case t.live == "" || !errors.Is(err, fs.ErrNotExist):
 			return nil, true, err
 		}
-		if info.Size() == at.size && info.ModTime().Equal(at.modified) {
+		if size == at.size && modified.Equal(at.modified) {
+			if t.live != "" && stamps([]string{at.file + t.live}) != heard {
+				return unwritten(nil), true, nil
+			}
 			return nil, true, nil
 		}
 		from := at.end
-		if info.Size() < from.Offset {
+		if size < from.Offset {
 			from = mark{} // written again from its start: each turn is given again, under its n
 		}
-		at.size, at.modified = info.Size(), info.ModTime()
+		at.size, at.modified = size, modified
 		var turns []Turn
-		if at.end, err = t.read(at.file, from, &about{}, collecting(after, &turns), nil); err != nil {
-			return nil, true, err
+		if size >= 0 {
+			if at.end, err = t.read(at.file, from, &about{}, collecting(after, &turns), nil); err != nil {
+				return nil, true, err
+			}
 		}
-		return turns, true, nil
+		return unwritten(turns), true, nil
 	}
 }
 
@@ -565,7 +684,9 @@ func (t transcripts) locate(in folders, id, cwd string, after int, at *placed) (
 		if t.advance(file, s, nil, collect) {
 			t.keep(all)
 		}
-		if !in.holds(s.Cwd) || (cwd != "" && s.Cwd != cwd) {
+		var unwritten []Turn
+		seen := t.overlaid(file, *s, func(turn Turn) { unwritten = append(unwritten, turn) })
+		if !in.holds(seen.Cwd) || (cwd != "" && seen.Cwd != cwd) {
 			continue
 		}
 		if after < from.N {
@@ -584,6 +705,9 @@ func (t transcripts) locate(in folders, id, cwd string, after int, at *placed) (
 			if start.Offset == 0 && len(steps) > 0 {
 				t.keepSteps(file, steps) // read whole: a chat reads only its end from them
 			}
+		}
+		for _, turn := range unwritten {
+			collect(turn)
 		}
 		if at != nil {
 			*at = placed{file: file, end: s.end(), size: s.Size, modified: s.Modified}

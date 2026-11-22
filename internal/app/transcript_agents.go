@@ -308,10 +308,28 @@ func patchTurn(patch string, at time.Time) Turn {
 
 // ── pi ──────────────────────────────────────────────────────────────────
 // <its folder, ~/.pi/agent>/sessions/-<the folder's path, / as ->--/<time>_<id>.jsonl
+//
+// pi writes a message only once it is done, and nothing of a conversation
+// until its first reply is: mia's extension writes what is not yet written,
+// as the lines pi will write, to the transcript's name with piLive after
+// it, its first line the size of the transcript it goes on from.
+
+const piLive = ".live"
 
 func piFiles(home string, in folders, _ bool) []string {
 	name := func(path string) string { return "-" + strings.ReplaceAll(path, "/", "-") + "--" }
-	return jsonl(dirsOf(in, filepath.Join(home, "sessions"), name, func(root string) string { return "-" + strings.ReplaceAll(root, "/", "-") + "*--" }), false)
+	dirs := dirsOf(in, filepath.Join(home, "sessions"), name, func(root string) string { return "-" + strings.ReplaceAll(root, "/", "-") + "*--" })
+	files := jsonl(dirs, false)
+	// one begun whose first reply is not yet done is its live file alone
+	for _, d := range dirs {
+		live, _ := filepath.Glob(filepath.Join(d, "*.jsonl"+piLive))
+		for _, l := range live {
+			if file := strings.TrimSuffix(l, piLive); !slices.Contains(files, file) {
+				files = append(files, file)
+			}
+		}
+	}
+	return files
 }
 
 func piFind(home string, in folders, id string) []string {
@@ -330,21 +348,27 @@ type piEntry struct {
 	Type      string    `json:"type"`
 	Cwd       string    `json:"cwd"`
 	Timestamp time.Time `json:"timestamp"`
-	Message   struct {
+	// Live is a message pi is still writing, as far as it has: a line of
+	// mia's live file.
+	Live    bool `json:"live"`
+	Message struct {
 		Role    string          `json:"role"`
 		Content json.RawMessage `json:"content"`
 	} `json:"message"`
 }
 
 type piBlock struct {
-	Type      string    `json:"type"`
-	Text      string    `json:"text"`
-	Thinking  string    `json:"thinking"`
-	Redacted  bool      `json:"redacted"` // its thinking is then a stand-in, what was encrypted in its signature
-	Name      string    `json:"name"`
-	Arguments toolInput `json:"arguments"`
+	Type      string          `json:"type"`
+	Text      string          `json:"text"`
+	Thinking  string          `json:"thinking"`
+	Redacted  bool            `json:"redacted"` // its thinking is then a stand-in, what was encrypted in its signature
+	Name      string          `json:"name"`
+	Arguments json.RawMessage `json:"arguments"`
 }
 
+// piLine is a line's turns in the order of what they are made of, what it
+// said where it began to say it: a message still being written keeps each
+// of its turns where it is as more is added after it.
 func piLine(line []byte, about *about) []Turn {
 	var e piEntry
 	_ = json.Unmarshal(line, &e) // a field of another shape leaves the rest read
@@ -365,17 +389,28 @@ func piLine(line []byte, about *about) []Turn {
 		_ = json.Unmarshal(e.Message.Content, &blocks)
 	}
 	var said strings.Builder
-	var thoughts, turns []Turn
+	var turns []Turn
+	saying := -1 // where what it said is among the turns, once it says something
 	for _, b := range blocks {
 		switch b.Type {
 		case "text":
 			said.WriteString(b.Text)
+			if saying < 0 && strings.TrimSpace(said.String()) != "" {
+				saying = len(turns)
+				turns = append(turns, Turn{Kind: turnSaid, At: e.Timestamp})
+			}
 		case "thinking":
 			if !b.Redacted && strings.TrimSpace(b.Thinking) != "" {
-				thoughts = append(thoughts, Turn{Kind: turnThought, At: e.Timestamp, Text: b.Thinking})
+				turns = append(turns, Turn{Kind: turnThought, At: e.Timestamp, Text: b.Thinking})
 			}
 		case "toolCall":
-			turns = append(turns, toolTurn(b.Name, b.Arguments, e.Timestamp))
+			if args := bytes.TrimSpace(b.Arguments); e.Live && (len(args) == 0 || bytes.Equal(args, []byte("{}"))) {
+				turns = append(turns, Turn{Kind: turnTool, At: e.Timestamp, Name: b.Name, Text: "Using " + b.Name}) // begun, nothing it is handed written yet
+				continue
+			}
+			var in toolInput
+			_ = json.Unmarshal(b.Arguments, &in)
+			turns = append(turns, toolTurn(b.Name, in, e.Timestamp))
 		}
 	}
 	text = strings.TrimSpace(said.String())
@@ -385,10 +420,10 @@ func piLine(line []byte, about *about) []Turn {
 			return []Turn{{Kind: turnAsked, At: e.Timestamp, Text: text}}
 		}
 	case "assistant":
-		if text != "" {
-			turns = append([]Turn{{Kind: turnSaid, At: e.Timestamp, Text: text}}, turns...)
+		if saying >= 0 {
+			turns[saying].Text = text
 		}
-		return append(thoughts, readsTogether(turns)...)
+		return readsTogether(turns)
 	case "toolResult":
 		return commitTurns(text, e.Timestamp)
 	}

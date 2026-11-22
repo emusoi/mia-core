@@ -260,7 +260,7 @@ done`,
 		AccountEnv: "PI_CODING_AGENT_DIR", home: ".pi/agent", signedIn: "auth.json",
 		// it loads each extensions/*.ts of its folder as it starts
 		signals: "extensions/mia-signal.ts", says: piSignal,
-		talks: transcripts{agent: "pi", files: piFiles, find: piFind, id: piID, decode: piLine},
+		talks: transcripts{agent: "pi", files: piFiles, find: piFind, id: piID, decode: piLine, live: piLive},
 		// provider/id, as /model in it takes one exactly; its effort is its thinking level
 		Models: []plugin.Model{{ID: "anthropic/claude-opus-5", Label: "Claude Opus 5"}, {ID: "anthropic/claude-sonnet-5", Label: "Claude Sonnet 5"},
 			{ID: "openai-codex/gpt-5.6-sol", Label: "GPT-5.6 Sol"}, {ID: "openai-codex/gpt-5.6-luna", Label: "GPT-5.6 Luna"}},

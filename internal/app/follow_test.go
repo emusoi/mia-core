@@ -166,3 +166,58 @@ func TestEachTranscriptIsHeardALineAtATimeAsItIsWritten(t *testing.T) {
 		})
 	}
 }
+
+// What pi has not yet written is read from mia's live file after what it
+// has, a turn given again only when it is not as it was, each under the
+// number it has once pi writes it; a live file written for the session as
+// it was before is not read.
+func TestWhatPiHasNotYetWrittenIsHeardAfterWhatItHas(t *testing.T) {
+	gittest.Isolate(t)
+	dir := t.TempDir()
+	file := filepath.Join(t.TempDir(), "2026-11-22T10-00-00-000Z_p1.jsonl")
+	cwd := strings.ReplaceAll(`"`+dir+`"`, `\`, `\\`)
+	header := `{"type":"session","id":"p1","cwd":` + cwd + `,"timestamp":"2026-11-22T10:00:00Z"}`
+	asked := `{"type":"message","timestamp":"2026-11-22T10:00:01Z","message":{"role":"user","content":"fix the cart"}}`
+	reply := func(live bool, call string) string {
+		return fmt.Sprintf(`{"type":"message","live":%v,"timestamp":"2026-11-22T10:00:02Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"where"},{"type":"text","text":"Looking."},{"type":"toolCall","name":"bash","arguments":%s}]}}`, live, call)
+	}
+	live := func(size int, lines ...string) {
+		t.Helper()
+		if err := os.WriteFile(file+piLive, []byte(fmt.Sprintf(`{"size":%d}`, size)+"\n"+strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reader := transcripts{agent: "pi", decode: piLine, live: piLive,
+		find: func(string, folders, string) []string { return []string{file} }}
+	next, _ := reader.follow(folders{Root: dir}, "p1", "", 0)
+	heard := func(want ...string) {
+		t.Helper()
+		turns, found, err := next()
+		if !found || err != nil {
+			t.Fatalf("found %v, %v", found, err)
+		}
+		var got []string
+		for _, turn := range turns {
+			got = append(got, fmt.Sprintf("%d %s %s", turn.N, turn.Kind, turn.Text))
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("heard %q, want %q", got, want)
+		}
+	}
+
+	live(-1, header, asked, reply(true, `{}`))
+	heard("1 asked fix the cart", "2 thought where", "3 said Looking.", "4 tool Using bash")
+	live(-1, header, asked, reply(true, `{"command":"go te"}`))
+	heard("4 tool Ran go te")
+
+	written := strings.Join([]string{header, asked, reply(false, `{"command":"go test"}`)}, "\n") + "\n"
+	if err := os.WriteFile(file, []byte(written), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	heard("1 asked fix the cart", "2 thought where", "3 said Looking.", "4 tool Ran go test")
+
+	live(len(written)-1, `{"type":"message","live":true,"timestamp":"2026-11-22T10:00:03Z","message":{"role":"assistant","content":"stale"}}`)
+	heard()
+	live(len(written), `{"type":"message","live":true,"timestamp":"2026-11-22T10:00:03Z","message":{"role":"assistant","content":"Fixed."}}`)
+	heard("5 said Fixed.")
+}
