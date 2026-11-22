@@ -158,16 +158,16 @@ func TestAgysConversationsAreListedReadAndRecalled(t *testing.T) {
 	for _, turn := range turns {
 		lines = append(lines, fmt.Sprintf("%d %s %s%s", turn.N, turn.Kind, turn.Text, turn.Hash))
 	}
-	want := []string{"1 asked make the list   faster", "2 tool Read 2 files", "3 said I will **look**.", "4 tool Edited view.lua +2 −1",
-		"5 tool Ran git commit -am faster", "6 tool Edited c.go +2 −2", "7 tool Wrote list.json +3", "8 tool Searched for slowSort",
-		"9 tool Looked for *_test.go", "10 tool Used list_dir", "11 commit abc1234", "12 asked " + carried, "13 said Done."}
+	want := []string{"1 asked make the list   faster", "2 thought where is the time going", "3 tool Read 2 files", "4 said I will **look**.", "5 tool Edited view.lua +2 −1",
+		"6 tool Ran git commit -am faster", "7 tool Edited c.go +2 −2", "8 tool Wrote list.json +3", "9 tool Searched for slowSort",
+		"10 tool Looked for *_test.go", "11 tool Used list_dir", "12 commit abc1234", "13 asked " + carried, "14 said Done."}
 	if strings.Join(lines, "|") != strings.Join(want, "|") {
-		t.Fatalf("its turns, what it thought and agy's own steps left out:\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
+		t.Fatalf("its turns, what it thought before what it did, and agy's own steps left out:\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
 	}
-	if app.OwnWords(turns[11].Text) != "what did I first ask you?" {
-		t.Errorf("the person's own words, after the conversation pasted in front of them: %q", app.OwnWords(turns[11].Text))
+	if app.OwnWords(turns[12].Text) != "what did I first ask you?" {
+		t.Errorf("the person's own words, after the conversation pasted in front of them: %q", app.OwnWords(turns[12].Text))
 	}
-	if turns[3].File != "/w/list/view.lua" || turns[3].Name != "edit" || turns[6].File != "/w/list/list.json" || turns[10].Subject != "The list is faster" ||
+	if turns[4].File != "/w/list/view.lua" || turns[4].Name != "edit" || turns[7].File != "/w/list/list.json" || turns[11].Subject != "The list is faster" ||
 		!turns[0].At.Equal(time.Date(2026, 11, 2, 10, 0, 0, 0, time.UTC)) {
 		t.Errorf("each tool's file, the commit made, and when: %+v", turns)
 	}
@@ -180,8 +180,8 @@ func TestAgysConversationsAreListedReadAndRecalled(t *testing.T) {
 		old[1].Text != "Ran go test ./..." || old[2].Text != "Read f.py" || old[2].File != "/w/f.py" {
 		t.Errorf("the older agy's, a pasted message as it was pasted and each argument JSON in a string: %+v", old)
 	}
-	if later, err := a.ConversationIn(agyNow, record.Name, 12); err != nil || len(later) != 1 || later[0].Text != "Done." {
-		t.Errorf("by its worktree, those after the twelfth: %+v %v", later, err)
+	if later, err := a.ConversationIn(agyNow, record.Name, 13); err != nil || len(later) != 1 || later[0].Text != "Done." {
+		t.Errorf("by its worktree, those after the thirteenth: %+v %v", later, err)
 	}
 	if _, err := a.ConversationTurns("33333333-3333-4333-8333-333333333333", 0); err == nil {
 		t.Error("another project's is read")
@@ -213,7 +213,7 @@ func TestAnAgyConversationIsFollowedAsItIsWritten(t *testing.T) {
 	said := make(chan []app.Turn, 4)
 	stop := make(chan struct{})
 	defer close(stop)
-	go a.FollowConversation(agyNow, "", 12, stop, func(turns []app.Turn) error {
+	go a.FollowConversation(agyNow, "", 13, stop, func(turns []app.Turn) error {
 		said <- turns
 		return nil
 	})
@@ -228,12 +228,12 @@ func TestAnAgyConversationIsFollowedAsItIsWritten(t *testing.T) {
 		}
 	}
 	if first := next(); len(first) != 1 || first[0].Text != "Done." {
-		t.Fatalf("what it has after the twelfth: %+v", first)
+		t.Fatalf("what it has after the thirteenth: %+v", first)
 	}
 	put(t, filepath.Join(agyLogs(agyNow), "transcript_full.jsonl"),
 		agyStep(13, "USER_EXPLICIT", "USER_INPUT", "2026-11-02T10:01:00Z", `,"content":`+agyAsked("and the map?")),
 		agyStep(14, "MODEL", "PLANNER_RESPONSE", "2026-11-02T10:01:01Z", `,"content":"The map too."`))
-	if then := next(); kinds(then) != "14:asked 15:said" || then[0].Text != "and the map?" {
+	if then := next(); kinds(then) != "15:asked 16:said" || then[0].Text != "and the map?" {
 		t.Errorf("what was written since: %+v", then)
 	}
 }

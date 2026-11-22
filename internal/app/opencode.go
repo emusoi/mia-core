@@ -119,10 +119,15 @@ func (m opencodeMessage) written() bool {
 // opencodePart is a part of what the agent said: text, reasoning or the
 // use of a tool.
 type opencodePart struct {
-	Type  string `json:"type"`
-	Text  string `json:"text"`
-	ID    string `json:"id"`
-	Name  string `json:"name"`
+	Type string `json:"type"`
+	Text string `json:"text"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Time is when a reasoning part was begun and done, in milliseconds
+	Time struct {
+		Created   int64 `json:"created"`
+		Completed int64 `json:"completed"`
+	} `json:"time"`
 	State struct {
 		Input    json.RawMessage `json:"input"` // an object, and a string while it is still being written
 		Content  []opencodeText  `json:"content"`
@@ -550,6 +555,14 @@ func opencodeTurns(messages []opencodeMessage) []Turn {
 				case "text":
 					if strings.TrimSpace(part.Text) != "" {
 						turns = append(turns, Turn{Kind: turnSaid, At: at, Text: part.Text})
+					}
+				case "reasoning": // what it keeps encrypted, in native, is never read
+					if strings.TrimSpace(part.Text) != "" {
+						turn := Turn{Kind: turnThought, At: at, Text: part.Text}
+						if begun, done := part.Time.Created, part.Time.Completed; begun > 0 && done > begun {
+							turn.Seconds = int((done - begun + 500) / 1000)
+						}
+						turns = append(turns, turn)
 					}
 				case "tool":
 					turns = append(turns, opencodeTool(part, at)...)

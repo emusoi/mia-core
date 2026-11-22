@@ -303,24 +303,26 @@ window or conversation is another piece (`chat`, `chat-1`, …).
 
 ```json
 [{"n":1,"kind":"asked","at":"2026-11-02T10:00:00Z","text":"make the list faster"},
- {"n":2,"kind":"said","at":"2026-11-02T10:00:04Z","text":"I will **look** at where the time goes."},
- {"n":3,"kind":"tool","at":"2026-11-02T10:00:05Z","text":"Edited view.lua +12 −3","name":"Edit","file":"/Users/user/src/app.monduli/view.lua"},
- {"n":4,"kind":"question","at":"2026-11-02T10:00:09Z","text":"Which one?","options":["Fast","Small"],"answer":"Fast"},
- {"n":5,"kind":"answer","at":"2026-11-02T10:00:30Z","text":"Fast","question":4},
- {"n":6,"kind":"commit","at":"2026-11-02T10:01:00Z","hash":"abc1234","subject":"The list is faster"}]
+ {"n":2,"kind":"thought","at":"2026-11-02T10:00:02Z","text":"Where does the time go? The sort runs on every keypress.","seconds":2},
+ {"n":3,"kind":"said","at":"2026-11-02T10:00:04Z","text":"I will **look** at where the time goes."},
+ {"n":4,"kind":"tool","at":"2026-11-02T10:00:05Z","text":"Edited view.lua +12 −3","name":"Edit","file":"/Users/user/src/app.monduli/view.lua"},
+ {"n":5,"kind":"question","at":"2026-11-02T10:00:09Z","text":"Which one?","options":["Fast","Small"],"answer":"Fast"},
+ {"n":6,"kind":"answer","at":"2026-11-02T10:00:30Z","text":"Fast","question":5},
+ {"n":7,"kind":"commit","at":"2026-11-02T10:01:00Z","hash":"abc1234","subject":"The list is faster"}]
 ```
 
 | kind | is |
 |---|---|
 | `asked` | what the person said: `text` |
 | `said` | what the agent said: `text`, markdown as written |
+| `thought` | what the agent thought, as its transcript keeps it: `text`, and `seconds`, how long it thought, where the transcript says (opencode's does). Claude's thinking, codex's reasoning summary, and what pi, opencode and agy write of it; thinking that is redacted or encrypted, and its signatures, are never given |
 | `tool` | what the agent did, in a line — `Ran go test ./...`, `Read 3 files` — with the tool's `name`, and `file` when it is one file's |
 | `question` | the agent asked the person to choose: `text`, `options`, and `answer` once it is given |
 | `answer` | the person chose: `text`, and `question`, the `n` of the turn it answers — so a view that already has the question learns of it |
 | `commit` | the agent made a commit: `hash` and `subject` |
 
-What the agent thought, what its tools gave back and what the system told
-it are left out. `mia recall <text…> --json` gives each conversation that
+What its tools gave back and what the system told it are left out, and a
+handoff leaves out what the agent thought. `mia recall <text…> --json` gives each conversation that
 mentions the text with its `agent`, its `worktree` and `n`, the turn to
 open it at; `n` is 0 for words that were a subagent's. A conversation that
 was copied to another worktree is given once for each folder that mentions

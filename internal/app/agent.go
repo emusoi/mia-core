@@ -476,6 +476,8 @@ type WindowRef struct {
 //
 //	asked    what the person said: text
 //	said     what the agent said: text, markdown as written
+//	thought  what the agent thought, of an agent whose transcript keeps it:
+//	         text, and seconds, how long, when the transcript says
 //	tool     what the agent did, in a line: text, name, and file when it is one file's
 //	question the agent asked the person to choose: text, options, and answer once given
 //	answer   what the person chose, when they did: text, and question, the turn it answers
@@ -496,6 +498,7 @@ type Turn struct {
 	Question int       `json:"question,omitempty"`
 	Hash     string    `json:"hash,omitempty"`
 	Subject  string    `json:"subject,omitempty"`
+	Seconds  int       `json:"seconds,omitempty"`
 
 	Verb       string `json:"verb,omitempty"`
 	Repository string `json:"repository,omitempty"`
@@ -517,6 +520,7 @@ type Turn struct {
 const (
 	turnAsked    = "asked"
 	turnSaid     = "said"
+	turnThought  = "thought"
 	turnTool     = "tool"
 	turnQuestion = "question"
 	turnAnswer   = "answer"
@@ -526,7 +530,7 @@ const (
 )
 
 // TurnKinds is every kind a turn is.
-var TurnKinds = []string{turnAsked, turnSaid, turnTool, turnQuestion, turnAnswer, turnCommit, turnDid, turnSwitch}
+var TurnKinds = []string{turnAsked, turnSaid, turnThought, turnTool, turnQuestion, turnAnswer, turnCommit, turnDid, turnSwitch}
 
 // oneLine is text on one line, cut to what a list shows.
 func oneLine(text string) string {

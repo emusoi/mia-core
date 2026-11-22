@@ -156,6 +156,7 @@ type entry struct {
 type block struct {
 	Type      string          `json:"type"`
 	Text      string          `json:"text"`
+	Thinking  string          `json:"thinking"` // of a thinking block: a redacted one's is none
 	Content   json.RawMessage `json:"content"`
 	ID        string          `json:"id"`
 	Name      string          `json:"name"`

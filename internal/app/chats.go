@@ -482,6 +482,7 @@ func (a *App) SwitchChat(to, modelID, effort string) (Switched, error) {
 		if turns, _, err = a.turnsIn(folders, head.ID, head.Cwd, head.Agent, 0); err != nil {
 			return Switched{}, err
 		}
+		turns = slices.DeleteFunc(turns, thought)
 		if back, when := a.wentOnFrom(head, agent, heads); back != "" && len(turns) > 0 {
 			done.Resumes, since = back, when
 			turns = slices.DeleteFunc(slices.Clone(turns), func(t Turn) bool { return !t.At.IsZero() && t.At.Before(since) })

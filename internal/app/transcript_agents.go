@@ -108,6 +108,10 @@ func claudeLine(line []byte, about *about) []Turn {
 			if strings.TrimSpace(b.Text) != "" {
 				turns = append(turns, Turn{Kind: turnSaid, At: e.Timestamp, Text: b.Text})
 			}
+		case "thinking": // redacted_thinking, and a signature, are never shown
+			if strings.TrimSpace(b.Thinking) != "" {
+				turns = append(turns, Turn{Kind: turnThought, At: e.Timestamp, Text: b.Thinking})
+			}
 		case "tool_use":
 			var input toolInput
 			_ = json.Unmarshal(b.Input, &input)
@@ -165,6 +169,11 @@ type codexEntry struct {
 			Type string `json:"type"`
 			Text string `json:"text"`
 		} `json:"content"`
+		// Summary is a reasoning item's, what codex shows of it; what it
+		// keeps encrypted is never read
+		Summary []struct {
+			Text string `json:"text"`
+		} `json:"summary"`
 		Arguments string          `json:"arguments"` // a function's, as JSON in a string
 		Input     string          `json:"input"`     // a custom tool's, as it is
 		Output    json.RawMessage `json:"output"`
@@ -204,6 +213,21 @@ func codexLine(line []byte, about *about) []Turn {
 			return []Turn{{Kind: turnSaid, At: e.Timestamp, Text: said}}
 		case p.Role == "user" && !strings.HasPrefix(said, "<") && !strings.HasPrefix(said, "# AGENTS.md instructions"):
 			return []Turn{{Kind: turnAsked, At: e.Timestamp, Text: said}}
+		}
+	case "reasoning":
+		// what it thought as codex shows it, its summary; where there is none,
+		// the reasoning itself, which some models write out
+		var parts []string
+		for _, sum := range p.Summary {
+			parts = append(parts, sum.Text)
+		}
+		if len(parts) == 0 {
+			for _, c := range p.Content {
+				parts = append(parts, c.Text)
+			}
+		}
+		if thought := strings.TrimSpace(strings.Join(parts, "\n\n")); thought != "" {
+			return []Turn{{Kind: turnThought, At: e.Timestamp, Text: thought}}
 		}
 	case "function_call", "local_shell_call":
 		var call codexCall
@@ -315,6 +339,8 @@ type piEntry struct {
 type piBlock struct {
 	Type      string    `json:"type"`
 	Text      string    `json:"text"`
+	Thinking  string    `json:"thinking"`
+	Redacted  bool      `json:"redacted"` // its thinking is then a stand-in, what was encrypted in its signature
 	Name      string    `json:"name"`
 	Arguments toolInput `json:"arguments"`
 }
@@ -339,11 +365,15 @@ func piLine(line []byte, about *about) []Turn {
 		_ = json.Unmarshal(e.Message.Content, &blocks)
 	}
 	var said strings.Builder
-	var turns []Turn
+	var thoughts, turns []Turn
 	for _, b := range blocks {
 		switch b.Type {
 		case "text":
 			said.WriteString(b.Text)
+		case "thinking":
+			if !b.Redacted && strings.TrimSpace(b.Thinking) != "" {
+				thoughts = append(thoughts, Turn{Kind: turnThought, At: e.Timestamp, Text: b.Thinking})
+			}
 		case "toolCall":
 			turns = append(turns, toolTurn(b.Name, b.Arguments, e.Timestamp))
 		}
@@ -358,7 +388,7 @@ func piLine(line []byte, about *about) []Turn {
 		if text != "" {
 			turns = append([]Turn{{Kind: turnSaid, At: e.Timestamp, Text: text}}, turns...)
 		}
-		return readsTogether(turns)
+		return append(thoughts, readsTogether(turns)...)
 	case "toolResult":
 		return commitTurns(text, e.Timestamp)
 	}

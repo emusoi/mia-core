@@ -48,6 +48,7 @@
           "enum": [
             "asked",
             "said",
+            "thought",
             "tool",
             "question",
             "answer",
@@ -84,6 +85,10 @@
         },
         "repository": {
           "type": "string",
+          "optional": true
+        },
+        "seconds": {
+          "type": "integer",
           "optional": true
         },
         "subject": {

@@ -81,9 +81,9 @@ func TestGoingOnWithAnotherAgentDryRunWritesAndStartsNothing(t *testing.T) {
 	}
 	// a fork: the turns up to one, in a file of its own, and for the conversation's own agent too
 	for _, with := range []string{"codex", "claude"} {
-		if fork, err := a.ContinueConversation(app.Continue{ID: "c1", With: with, Upto: 2, DryRun: true}); err != nil || fork.Turns != 2 || fork.Upto != 2 || fork.To.Agent != with ||
-			fork.Resumes != "" || fork.Handoff != filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "claude-c1-to-2.md") {
-			t.Errorf("forked from its turn 2 for %s: %+v %v", with, fork, err)
+		if fork, err := a.ContinueConversation(app.Continue{ID: "c1", With: with, Upto: 3, DryRun: true}); err != nil || fork.Turns != 2 || fork.Upto != 3 || fork.To.Agent != with ||
+			fork.Resumes != "" || fork.Handoff != filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "claude-c1-to-3.md") {
+			t.Errorf("forked from its turn 3, what it said after it thought, for %s: %+v %v", with, fork, err)
 		}
 	}
 	for _, refused := range []struct {
@@ -241,11 +241,11 @@ echo ready; exec cat >> "$HOME/heard"`})
 		"9 turns, in order\n",
 		"Nothing claude only thought is here.",
 		"### 1 · user · 2026-11-02 10:00 UTC\n\nmake the list faster\n",
-		"### 2 · claude · 2026-11-02 10:00 UTC\n\nI will **look**.\n",
+		"### 3 · claude · 2026-11-02 10:00 UTC\n\nI will **look**.\n",
 		"\nclaude did:\n\n- Read 2 files\n- Edited view.lua +2 −1 (`/w/view.lua`)\n- Ran go test ./...\n- Committed abc1234 The list is faster\n",
-		"### 7 · claude asked · 2026-11-02 10:00 UTC\n\nWhich one?\n- Fast\n- Small\n",
-		"### 8 · user answered · 2026-11-02 10:00 UTC\n\nFast\n",
-		"### 9 · claude · 2026-11-02 10:00 UTC\n\nDone. é",
+		"### 8 · claude asked · 2026-11-02 10:00 UTC\n\nWhich one?\n- Fast\n- Small\n",
+		"### 9 · user answered · 2026-11-02 10:00 UTC\n\nFast\n",
+		"### 10 · claude · 2026-11-02 10:00 UTC\n\nDone. é",
 		"[… 1006 more characters of this message are left out]",
 	} {
 		if !strings.Contains(text, has) {
@@ -257,7 +257,7 @@ echo ready; exec cat >> "$HOME/heard"`})
 			t.Errorf("the handoff has %q: what came back from a tool, or what the agent thought", hasNot)
 		}
 	}
-	if !strings.Contains(text, "### 1 ·") || strings.Index(text, "### 1 ·") > strings.Index(text, "### 2 ·") || strings.Index(text, "claude did:") > strings.Index(text, "### 7 ·") {
+	if !strings.Contains(text, "### 1 ·") || strings.Index(text, "### 1 ·") > strings.Index(text, "### 3 ·") || strings.Index(text, "claude did:") > strings.Index(text, "### 8 ·") {
 		t.Error("the turns are not in order")
 	}
 
@@ -277,7 +277,7 @@ echo ready; exec cat >> "$HOME/heard"`})
 	for _, has := range []string{
 		"# Handoff: a conversation with pi, to go on from",
 		"### 1 · user · 2026-11-02 10:00 UTC\n\ntidy the docs\n",
-		"### 2 · pi · 2026-11-02 10:00 UTC\n\nReading them.\n\npi did:\n\n- Read a.md (`docs/a.md`)\n- Edited a.md +1 −1 (`docs/a.md`)\n- Ran git commit -am tidy\n- Committed 0123abc Tidy the docs\n",
+		"### 3 · pi · 2026-11-02 10:00 UTC\n\nReading them.\n\npi did:\n\n- Read a.md (`docs/a.md`)\n- Edited a.md +1 −1 (`docs/a.md`)\n- Ran git commit -am tidy\n- Committed 0123abc Tidy the docs\n",
 	} {
 		if !strings.Contains(string(pi), has) {
 			t.Errorf("pi's handoff has no %q:\n%s", has, pi)

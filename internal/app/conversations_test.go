@@ -113,7 +113,8 @@ func TestAClaudeConversationReadsAsTurns(t *testing.T) {
 		`{"type":"ai-title","aiTitle":"The list","sessionId":"c1"}`,
 		claudeSays(repo.Root, "user", `"make the list   faster\nplease"`, ""),
 		claudeSays(repo.Root, "user", `"<system-reminder>be brief</system-reminder>"`, `,"isMeta":true`),
-		claudeSays(repo.Root, "assistant", `[{"type":"thinking","thinking":"where is the time going"}]`, ""),
+		claudeSays(repo.Root, "assistant", `[{"type":"thinking","thinking":"where is the time going","signature":"c2lnbmVk"}]`, ""),
+		claudeSays(repo.Root, "assistant", `[{"type":"redacted_thinking","data":"ZW5jcnlwdGVk"},{"type":"thinking","thinking":"","signature":"c2lnbmVk"}]`, ""),
 		claudeSays(repo.Root, "assistant", `[{"type":"text","text":"I will **look**."}]`, ""),
 		claudeSays(repo.Root, "assistant", `[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"/w/a.go"}},{"type":"tool_use","id":"t2","name":"Read","input":{"file_path":"/w/b.go"}}]`, ""),
 		claudeSays(repo.Root, "user", `[{"type":"tool_result","tool_use_id":"t1","content":"package a"}]`, `,"toolUseResult":{"file":"a.go"}`),
@@ -133,33 +134,33 @@ func TestAClaudeConversationReadsAsTurns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := kinds(turns), "1:asked 2:said 3:tool 4:tool 5:tool 6:commit 7:question 8:answer 9:said"; got != want {
-		t.Fatalf("turns = %s, want %s", got, want)
+	if got, want := kinds(turns), "1:asked 2:thought 3:said 4:tool 5:tool 6:tool 7:commit 8:question 9:answer 10:said"; got != want {
+		t.Fatalf("turns = %s, want %s — what it thought, and none of what is redacted or signed", got, want)
 	}
-	if turns[0].Text != "make the list   faster\nplease" || turns[1].Text != "I will **look**." {
-		t.Errorf("what was asked and said, as written: %+v", turns[:2])
+	if turns[0].Text != "make the list   faster\nplease" || turns[1].Text != "where is the time going" || turns[1].Seconds != 0 || turns[2].Text != "I will **look**." {
+		t.Errorf("what was asked, thought and said, as written: %+v", turns[:3])
 	}
-	if turns[2].Text != "Read 2 files" || turns[3].Text != "Edited view.lua +2 −1" || turns[3].File != "/w/view.lua" || turns[4].Text != "Ran go test ./..." || turns[4].Name != "Bash" {
-		t.Errorf("each tool in a line: %+v", turns[2:5])
+	if turns[3].Text != "Read 2 files" || turns[4].Text != "Edited view.lua +2 −1" || turns[4].File != "/w/view.lua" || turns[5].Text != "Ran go test ./..." || turns[5].Name != "Bash" {
+		t.Errorf("each tool in a line: %+v", turns[3:6])
 	}
-	if turns[5].Hash != "abc1234" || turns[5].Subject != "The list is faster" {
-		t.Errorf("the commit made: %+v", turns[5])
+	if turns[6].Hash != "abc1234" || turns[6].Subject != "The list is faster" {
+		t.Errorf("the commit made: %+v", turns[6])
 	}
-	if q := turns[6]; q.Text != "Which one?" || strings.Join(q.Options, ",") != "Fast,Small" || q.Answer != "Fast" || turns[7].Question != 7 || turns[7].Text != "Fast" {
-		t.Errorf("the question, its options and its answer: %+v %+v", q, turns[7])
+	if q := turns[7]; q.Text != "Which one?" || strings.Join(q.Options, ",") != "Fast,Small" || q.Answer != "Fast" || turns[8].Question != 8 || turns[8].Text != "Fast" {
+		t.Errorf("the question, its options and its answer: %+v %+v", q, turns[8])
 	}
 
 	// a view that polls asks for what came after the last it has
-	if later, err := a.ConversationTurns("c1", 9); err != nil || later == nil || len(later) != 0 {
+	if later, err := a.ConversationTurns("c1", 10); err != nil || later == nil || len(later) != 0 {
 		t.Errorf("nothing new: %+v %v", later, err)
 	}
 	put(t, file, claudeSays(repo.Root, "user", `"thanks"`, ""), `{"parentUuid":"p","type":"assistant","cwd":"`)
-	later, err := a.ConversationTurns("c1", 9)
-	if err != nil || kinds(later) != "10:asked" {
+	later, err := a.ConversationTurns("c1", 10)
+	if err != nil || kinds(later) != "11:asked" {
 		t.Errorf("only what is new, and not a line still being written: %s %v", kinds(later), err)
 	}
 	// and one that fell behind what was last read gets the same numbers
-	if back, _ := a.ConversationTurns("c1", 6); kinds(back) != "7:question 8:answer 9:said 10:asked" || back[0].Answer != "Fast" {
+	if back, _ := a.ConversationTurns("c1", 7); kinds(back) != "8:question 9:answer 10:said 11:asked" || back[0].Answer != "Fast" {
 		t.Errorf("from further back: %s", kinds(back))
 	}
 	if _, err := a.ConversationTurns("nobody", 0); err == nil {
@@ -192,7 +193,8 @@ func TestConversationsOfEveryAgentAreListedNewestFirst(t *testing.T) {
 	codex("x1", repo.Root,
 		item(`{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>a folder</environment_context>"}]}`),
 		item(`{"type":"message","role":"user","content":[{"type":"input_text","text":"rename the flag"}]}`),
-		item(`{"type":"reasoning","summary":[]}`),
+		item(`{"type":"reasoning","summary":[],"content":null,"encrypted_content":"gAAAAencrypted"}`),
+		item(`{"type":"reasoning","summary":[{"type":"summary_text","text":"**Finding the flag**"},{"type":"summary_text","text":"It is in cmd."}],"encrypted_content":"gAAAAencrypted"}`),
 		item(`{"type":"function_call","name":"shell","call_id":"k1","arguments":"{\"command\":[\"bash\",\"-lc\",\"go vet ./...\"]}"}`),
 		item(`{"type":"custom_tool_call","name":"apply_patch","call_id":"k2","input":"*** Begin Patch\n*** Update File: cmd/flag.go\n@@\n-old\n+new\n+newer\n*** End Patch"}`),
 		item(`{"type":"function_call_output","call_id":"k1","output":"{\"output\":\"[main def5678] Rename the flag\\n\"}"}`),
@@ -205,7 +207,7 @@ func TestConversationsOfEveryAgentAreListedNewestFirst(t *testing.T) {
 		`{"type":"session","version":3,"id":"p1","timestamp":"2026-11-02T10:00:00.000Z","cwd":`+quoted(repo.Root)+`}`,
 		`{"type":"model_change","id":"m","timestamp":"2026-11-02T10:00:01.000Z"}`,
 		`{"type":"message","timestamp":"2026-11-02T10:00:02.000Z","message":{"role":"user","content":[{"type":"text","text":"tidy the docs"}]}}`,
-		`{"type":"message","timestamp":"2026-11-02T10:00:03.000Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"which"},{"type":"text","text":"Reading them."},{"type":"toolCall","id":"a","name":"read","arguments":{"path":"docs/a.md"}},{"type":"toolCall","id":"b","name":"edit","arguments":{"path":"docs/a.md","edits":[{"oldText":"teh","newText":"the"}]}},{"type":"toolCall","id":"c","name":"bash","arguments":{"command":"git commit -am tidy","timeout":10}}]}}`,
+		`{"type":"message","timestamp":"2026-11-02T10:00:03.000Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"which","thinkingSignature":"c2ln"},{"type":"thinking","thinking":"[Reasoning redacted]","thinkingSignature":"ZW5jcnlwdGVk","redacted":true},{"type":"text","text":"Reading them."},{"type":"toolCall","id":"a","name":"read","arguments":{"path":"docs/a.md"}},{"type":"toolCall","id":"b","name":"edit","arguments":{"path":"docs/a.md","edits":[{"oldText":"teh","newText":"the"}]}},{"type":"toolCall","id":"c","name":"bash","arguments":{"command":"git commit -am tidy","timeout":10}}]}}`,
 		`{"type":"message","timestamp":"2026-11-02T10:00:04.000Z","message":{"role":"toolResult","toolName":"bash","content":[{"type":"text","text":"[main 0123abc] Tidy the docs"}]}}`)
 
 	a, err := app.Open(repo.Root)
@@ -246,21 +248,27 @@ func TestConversationsOfEveryAgentAreListedNewestFirst(t *testing.T) {
 	}
 
 	turns, err := a.ConversationTurns("x1", 0)
-	if err != nil || kinds(turns) != "1:asked 2:tool 3:tool 4:commit 5:said" {
-		t.Fatalf("codex's turns: %s %v", kinds(turns), err)
+	if err != nil || kinds(turns) != "1:asked 2:thought 3:tool 4:tool 5:commit 6:said" {
+		t.Fatalf("codex's turns, a reasoning item with no summary none: %s %v", kinds(turns), err)
 	}
-	if turns[1].Text != "Ran go vet ./..." || turns[2].Text != "Edited flag.go +2 −1" || turns[2].File != "cmd/flag.go" || turns[3].Hash != "def5678" || turns[3].Subject != "Rename the flag" {
-		t.Errorf("codex's tools and commit: %+v", turns[1:4])
+	if turns[1].Text != "**Finding the flag**\n\nIt is in cmd." {
+		t.Errorf("what codex thought, its summary and not what it encrypted: %q", turns[1].Text)
+	}
+	if turns[2].Text != "Ran go vet ./..." || turns[3].Text != "Edited flag.go +2 −1" || turns[3].File != "cmd/flag.go" || turns[4].Hash != "def5678" || turns[4].Subject != "Rename the flag" {
+		t.Errorf("codex's tools and commit: %+v", turns[2:5])
 	}
 	if _, err := a.ConversationTurns("x2", 0); err == nil {
 		t.Error("another project's conversation is not read from here")
 	}
 	turns, err = a.ConversationTurns("p1", 0)
-	if err != nil || kinds(turns) != "1:asked 2:said 3:tool 4:tool 5:tool 6:commit" {
-		t.Fatalf("pi's turns: %s %v", kinds(turns), err)
+	if err != nil || kinds(turns) != "1:asked 2:thought 3:said 4:tool 5:tool 6:tool 7:commit" {
+		t.Fatalf("pi's turns, what it thought first and none redacted: %s %v", kinds(turns), err)
 	}
-	if turns[2].Text != "Read a.md" || turns[3].Text != "Edited a.md +1 −1" || turns[4].Text != "Ran git commit -am tidy" || turns[5].Hash != "0123abc" {
-		t.Errorf("pi's tools and commit: %+v", turns[2:])
+	if turns[1].Text != "which" || turns[2].Text != "Reading them." {
+		t.Errorf("what pi thought, then said: %+v", turns[1:3])
+	}
+	if turns[3].Text != "Read a.md" || turns[4].Text != "Edited a.md +1 −1" || turns[5].Text != "Ran git commit -am tidy" || turns[6].Hash != "0123abc" {
+		t.Errorf("pi's tools and commit: %+v", turns[3:])
 	}
 
 	// recall finds it whichever agent it was said to, and says the turn

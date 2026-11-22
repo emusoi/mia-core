@@ -146,6 +146,8 @@ func TestAChatIsSaidWholeTheFirstTimeTurnsCome(t *testing.T) {
 		{N: 4, Kind: "question", Text: "Go on?", Options: []string{"Yes", "No"}},
 		{N: 5, Kind: "answer", Text: "Yes", Question: 4},
 		{N: 6, Kind: "commit", Hash: "0123abc", Subject: "Sort once"},
+		{N: 7, Kind: "thought", Text: "the sort runs twice", Seconds: 3},
+		{N: 8, Kind: "thought", Text: ""},
 	})
 	if len(messages) != 1 {
 		t.Fatalf("%d messages", len(messages))
@@ -157,8 +159,11 @@ func TestAChatIsSaidWholeTheFirstTimeTurnsCome(t *testing.T) {
 	if v := got.View; v.T != "chat" || v.ID != "chat" || v.Agent != "claude" || !v.Reply || !v.Working {
 		t.Errorf("view = %+v", v)
 	}
-	if ns := numbers(got.View.Turns); !slices.Equal(ns, []int{1, 4, 5, 6}) {
+	if ns := numbers(got.View.Turns); !slices.Equal(ns, []int{1, 4, 5, 6, 7}) {
 		t.Errorf("turns %v", ns)
+	}
+	if thought := got.View.Turns[4]; thought.Kind != "thought" || thought.Text != "the sort runs twice" || thought.Seconds != 3 {
+		t.Errorf("what the agent thought, as the window draws it: %+v", thought)
 	}
 	if first := got.View.Turns[0]; first.Text != "make the list faster — “now”" {
 		t.Errorf("asked = %q", first.Text)

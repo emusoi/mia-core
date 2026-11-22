@@ -83,7 +83,8 @@ func TestOpencodesConversationsAreListedReadAndTakenUpAgain(t *testing.T) {
 		`{"type":"system","id":"m0","time":{"created":1793613600000},"text":"You are in a folder."}`,
 		`{"type":"user","id":"m1","time":{"created":1793613601000},"text":"fix the cart total","files":[],"metadata":{"by":"testuser1"}}`,
 		`{"type":"assistant","id":"m2","time":{"created":1793613603000},"agent":"build","cost":0,"content":[`+
-			`{"type":"reasoning","text":"where is the total added up"},`+
+			`{"type":"reasoning","text":"where is the total added up","time":{"created":1793613603000,"completed":1793613605600}},`+
+			`{"type":"reasoning","text":"","native":{"encrypted":"gAAAAencrypted"}},`+
 			`{"type":"text","text":"Looking at\nthe cart."},`+
 			tool("t1", "read", `{"path":"cart/total.go"}`, `,"content":[{"type":"text","text":"package cart"}]`)+`,`+
 			tool("t2", "read", `{"filePath":"/w/cart/total_test.go","limit":20}`, "")+`,`+
@@ -154,23 +155,26 @@ func TestOpencodesConversationsAreListedReadAndTakenUpAgain(t *testing.T) {
 	for _, turn := range turns {
 		lines = append(lines, fmt.Sprintf("%d %s %s%s", turn.N, turn.Kind, turn.Text, turn.Hash))
 	}
-	want := []string{"1 asked fix the cart total", "2 said Looking at\nthe cart.", "3 tool Read 2 files", "4 tool Edited total.go +2 −1",
-		"5 tool Edited tax.go +1 −1", "6 tool Ran git commit -am cart", "7 tool Asked an agent: find the tax rules", "8 question Round up?",
-		"9 answer Up", "10 tool Used tracker_find", "11 commit 0123abc", "12 said The total adds up now."}
+	want := []string{"1 asked fix the cart total", "2 thought where is the total added up", "3 said Looking at\nthe cart.", "4 tool Read 2 files", "5 tool Edited total.go +2 −1",
+		"6 tool Edited tax.go +1 −1", "7 tool Ran git commit -am cart", "8 tool Asked an agent: find the tax rules", "9 question Round up?",
+		"10 answer Up", "11 tool Used tracker_find", "12 commit 0123abc", "13 said The total adds up now."}
 	if strings.Join(lines, "|") != strings.Join(want, "|") {
-		t.Fatalf("its turns, what it thought and opencode's own notes left out:\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
+		t.Fatalf("its turns, what it thought but none it encrypted, and opencode's own notes left out:\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
 	}
-	if q, answer := turns[7], turns[8]; q.Answer != "Up" || strings.Join(q.Options, ",") != "Up,Down" || answer.Question != 8 {
+	if turns[1].Seconds != 3 {
+		t.Errorf("how long it thought, from when it began to when it was done: %+v", turns[1])
+	}
+	if q, answer := turns[8], turns[9]; q.Answer != "Up" || strings.Join(q.Options, ",") != "Up,Down" || answer.Question != 9 {
 		t.Errorf("a question and what was chosen: %+v %+v", q, answer)
 	}
-	if turns[3].File != "cart/total.go" || turns[3].Name != "edit" || turns[4].File != "cart/tax.go" || turns[4].Name != "patch" || turns[6].Name != "subagent" ||
-		turns[10].Subject != "The cart total adds up" || turns[0].At.UnixMilli() != 1793613601000 {
+	if turns[4].File != "cart/total.go" || turns[4].Name != "edit" || turns[5].File != "cart/tax.go" || turns[5].Name != "patch" || turns[7].Name != "subagent" ||
+		turns[11].Subject != "The cart total adds up" || turns[0].At.UnixMilli() != 1793613601000 {
 		t.Errorf("each tool by opencode's name for it, its file, and the commit made: %+v", turns)
 	}
-	if later, err := a.ConversationTurns("ses_cart", 10); err != nil || len(later) != 2 || later[0].N != 11 {
-		t.Errorf("those after the tenth: %+v %v", later, err)
+	if later, err := a.ConversationTurns("ses_cart", 11); err != nil || len(later) != 2 || later[0].N != 12 {
+		t.Errorf("those after the eleventh: %+v %v", later, err)
 	}
-	if in, err := a.ConversationIn("ses_cart", record.Name, 11); err != nil || len(in) != 1 || in[0].Kind != turnSaid {
+	if in, err := a.ConversationIn("ses_cart", record.Name, 12); err != nil || len(in) != 1 || in[0].Kind != turnSaid {
 		t.Errorf("by its worktree: %+v %v", in, err)
 	}
 	if work, err := a.ConversationTurns("ses_work", 0); err != nil || len(work) != 1 || work[0].Text != "still at it" {

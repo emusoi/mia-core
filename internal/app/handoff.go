@@ -185,6 +185,7 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 		}
 		turns = turns[:last+1]
 	}
+	turns = slices.DeleteFunc(turns, thought) // the other agent is handed what was said and done
 
 	// as `mia window new <worktree> <agent>` starts one: the window of that name the config launches, when it runs the agent
 	command := agent.start()
@@ -566,6 +567,10 @@ func instruction(from, file string) string {
 // handoffMessage is how many characters of one message a handoff has: what
 // is over is left out, and said.
 const handoffMessage = 6000
+
+// thought reports whether a turn is only what the agent thought, which
+// a handoff leaves out.
+func thought(turn Turn) bool { return turn.Kind == turnThought }
 
 // handoffBudget is how many characters of conversation a handoff has: the
 // other agent reads all of it before it does anything, so one over this

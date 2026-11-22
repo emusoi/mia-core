@@ -144,6 +144,7 @@ type agyStep struct {
 	Type      string    `json:"type"`
 	CreatedAt time.Time `json:"created_at"`
 	Content   string    `json:"content"`
+	Thinking  string    `json:"thinking"` // what the agent thought, of its reply
 	ToolCalls []agyCall `json:"tool_calls"`
 }
 
@@ -166,6 +167,9 @@ func agyLine(line []byte, about *about) []Turn {
 		}
 	case s.Type == "PLANNER_RESPONSE":
 		var turns []Turn
+		if strings.TrimSpace(s.Thinking) != "" {
+			turns = append(turns, Turn{Kind: turnThought, At: s.CreatedAt, Text: s.Thinking})
+		}
 		if strings.TrimSpace(s.Content) != "" {
 			turns = append(turns, Turn{Kind: turnSaid, At: s.CreatedAt, Text: s.Content})
 		}

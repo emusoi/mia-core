@@ -346,7 +346,7 @@ type chatPart struct {
 // and in a patch drops the whole patch.
 func drawn(turn app.Turn) bool {
 	switch turn.Kind {
-	case "asked", "said", "tool", "question":
+	case "asked", "said", "thought", "tool", "question":
 		return turn.Text != ""
 	case "answer":
 		return turn.Text != "" && turn.Question > 0
