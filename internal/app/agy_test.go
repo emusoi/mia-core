@@ -99,7 +99,7 @@ func TestAgyIsAskedForItsModelsOnceAndStartedWithOneAndAnEffort(t *testing.T) {
 	if at < 0 {
 		t.Fatalf("agy is not among the agents: %+v", all)
 	}
-	if its := all[at]; !slices.Equal(its.Models, want) || !slices.Equal(its.Efforts, []string{"low", "medium", "high", "xhigh", "max"}) || !its.Installed || its.Live {
+	if its := all[at]; !slices.Equal(its.Models, want) || !slices.Equal(its.Efforts, []string{"low", "medium", "high", "xhigh", "max"}) || !its.Installed || its.Live || !its.Again {
 		t.Errorf("agy = %+v", its)
 	}
 	argv, chosen, err := a.ArgvWith([]string{"agy"}, "gemini-4-flash", "high", "")

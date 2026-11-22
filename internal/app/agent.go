@@ -271,11 +271,14 @@ done`,
 	// the Antigravity CLI. Its conversations are each in a folder of its
 	// own whatever the folder they were made in; its models are its
 	// account's, asked of it, each at an effort of its own, and it is
-	// started with an effort besides
+	// started with an effort besides. Nothing typed into it is known to
+	// switch it, so it is switched by being started again on its
+	// conversation
 	{Name: "agy", goOn: "--continue", has: []string{"-c", "--continue", "--conversation"}, home: agyFolder,
+		resume:  fixed("agy --conversation %s"),
 		talks:   transcripts{agent: "agy", files: agyFiles, find: agyFind, id: agyID, decode: agyLine, cwd: agyCwd},
 		Efforts: []string{"low", "medium", "high", "xhigh", "max"},
-		with:    words([]string{"--model", "%s"}, []string{"--effort", "%s"}), lists: agyModels{}.models},
+		with:    words([]string{"--model", "%s"}, []string{"--effort", "%s"}), lists: agyModels{}.models, again: true},
 	// its help has a word for a model and names none: it has those the config names
 	{Name: "gemini", goOn: "--resume latest", has: []string{"-r", "--resume"},
 		with: words([]string{"--model", "%s"}, nil)},

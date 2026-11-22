@@ -471,7 +471,10 @@ and a name a tab apart, kept as opencode's are, in
 `mia/cache/models/agy.json`, and asked only where agy has made its
 folder, `~/.gemini/antigravity-cli`. It is started with one and an
 effort as `agy --model <id> --effort <level>`, its efforts `low` to
-`max`.
+`max`. A conversation of its is taken up again as `agy --conversation
+<id>`, and nothing typed into it is known to switch it, so it is
+switched as opencode is, started again in its pane as `agy --model <id>
+--effort <level> --conversation <id>`.
 
 gemini has a word for a model, `--model`, and neither lists its models
 nor names any in its help: its `models` are those the config names,

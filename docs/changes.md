@@ -39,7 +39,11 @@ on GitHub; a tag without its section is not released.
   the person sent without agy's own lines around it — a paste as it was
   pasted, so a conversation carried to it is the person's — what it
   said, and each tool it used in a line, and the folder each was made in
-  from what agy keeps of them apart. See [Agents](api.md#agents) and
+  from what agy keeps of them apart. One is taken up again as
+  `agy --conversation <id>`; handed to another agent and back, agy takes
+  its own up again so, and is handed only what was said since; and
+  `mia window model` and a pick in the chat switch it by starting it
+  again in its pane on its conversation. See [Agents](api.md#agents) and
   [conversations](api.md#conversations).
 
 - **The chat's models and Earlier are modals.** In `mia chat`, `models`
