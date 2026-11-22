@@ -340,6 +340,63 @@ func TestWorkingIsSaidWhenItChanges(t *testing.T) {
 	}
 }
 
+// What is sent says at once that the agent works, before its window shows
+// it — some never do — and it keeps saying so until a reply came after and
+// the conversation was still a moment, the window showed it at work and
+// then at rest, or a while passed.
+func TestWhatWasSentSaysTheAgentWorksUntilItReplies(t *testing.T) {
+	now := time.Now().Add(time.Minute) // after any turn heard here
+	view := &talk{pane: "%3", agent: "opencode", reply: true}
+	view.heard([]app.Turn{{N: 1, Kind: "asked", Text: "hello"}, {N: 2, Kind: "said", Text: "Hello."}})
+	working := func(messages [][]byte) string {
+		t.Helper()
+		if len(messages) == 0 {
+			return "unchanged"
+		}
+		got := only(t, messages)
+		if len(got.Patch) != 1 || got.Patch[0].Op != "working" || got.Patch[0].On == nil {
+			t.Fatalf("not a working patch: %+v", got.Patch)
+		}
+		return strconv.FormatBool(*got.Patch[0].On)
+	}
+	if got := working(view.patch(view.awaiting(now))); got != "true" {
+		t.Fatalf("as it is sent: %s", got)
+	}
+	if got := working(view.seen(false, now.Add(time.Second))); got != "unchanged" || !view.working {
+		t.Errorf("the window not showing it yet: %s", got)
+	}
+	view.heard([]app.Turn{{N: 3, Kind: "asked", Text: "make it faster"}})
+	if got := working(view.seen(false, now.Add(2*time.Second))); got != "unchanged" {
+		t.Errorf("its own words heard back, no reply yet: %s", got)
+	}
+	view.heard([]app.Turn{{N: 4, Kind: "said", Text: "It is"}})
+	if got := working(view.seen(false, time.Now())); got != "unchanged" {
+		t.Errorf("a reply is being written: %s", got)
+	}
+	if got := working(view.seen(false, time.Now().Add(chatStill))); got != "false" {
+		t.Errorf("the reply came, and nothing since: %s", got)
+	}
+
+	view.awaiting(now)
+	if got := working(view.seen(true, now.Add(time.Second))); got != "unchanged" {
+		t.Errorf("the window shows it at work: %s", got)
+	}
+	if got := working(view.seen(false, now.Add(2*time.Second))); got != "false" {
+		t.Errorf("then at rest, with no reply: %s", got)
+	}
+
+	view.awaiting(now)
+	if got := working(view.seen(false, now.Add(chatAwaits-time.Second))); got != "unchanged" {
+		t.Errorf("not yet a while: %s", got)
+	}
+	if got := working(view.seen(false, now.Add(chatAwaits+time.Second))); got != "false" {
+		t.Errorf("after a while with nothing: %s", got)
+	}
+	if got := working(view.seen(true, now.Add(chatAwaits+2*time.Second))); got != "true" {
+		t.Errorf("with nothing awaited, as the window shows it: %s", got)
+	}
+}
+
 // Inside tmux a message goes in tmux's passthrough, each ESC of it doubled.
 func TestAMessageInTmuxGoesInItsPassthrough(t *testing.T) {
 	if got := string(framed([]byte(`{"v":1}`), false)); got != "\033_Mui {\"v\":1}\033\\" {
@@ -1739,11 +1796,11 @@ func TestAHandingIsKeptOnTheNewWindowUntilTheFirstSend(t *testing.T) {
 	}
 	said = nil
 	second.act(chatDeed{do: chatSend, text: "and the tests"})
-	// sent with it: the switch says what was handed over, by the handoff's record
+	// sent with it: the switch says what was handed over, by the handoff's record, and the agent works
 	if len(said) != 2 {
 		t.Fatalf("the send said %s", said)
 	}
-	if went := read(t, said[1]); !slices.Equal(ops(went), []string{"unturn", "turn"}) || went.Patch[1].Turn.N != 4 || went.Patch[1].Turn.Note != "context handed over · 2 turns" {
+	if went := read(t, said[1]); !slices.Equal(ops(went), []string{"unturn", "turn", "working"}) || went.Patch[1].Turn.N != 4 || went.Patch[1].Turn.Note != "context handed over · 2 turns" {
 		t.Errorf("once sent, the switch is said as %s", said[1])
 	}
 	if records, _ := filepath.Glob(filepath.Join(repo.Root, ".git", "mia", "handoffs", record.Name, "claude-c1.*.json")); len(records) != 1 {
@@ -2201,7 +2258,7 @@ func TestAConversationForkedFromAReplyGoesOnInAWindowOfItsOwn(t *testing.T) {
 	}
 	messages = nil
 	second.act(chatDeed{do: chatSend, text: "and the tests"})
-	if went := read(t, messages[len(messages)-1]); !slices.Equal(ops(went), []string{"unturn", "turn"}) || went.Patch[1].Turn.Note != "forked from reply 2 · 2 turns" {
+	if went := read(t, messages[len(messages)-1]); !slices.Equal(ops(went), []string{"unturn", "turn", "working"}) || went.Patch[1].Turn.Note != "forked from reply 2 · 2 turns" {
 		t.Errorf("once sent, the band is said as %s", messages[len(messages)-1])
 	}
 	screen := screenShows(t, record.Name, window, "The conversation so far, with claude:", "It is faster.", chatRule, "and the tests")

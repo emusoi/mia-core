@@ -510,6 +510,18 @@ type talk struct {
 	keys string
 	// with is the change put back with the modal: the keys its foot says.
 	with json.RawMessage
+	// awaits is when the last thing sent from here went, while it waits on
+	// a reply: the chat says its agent works from then, before its window
+	// shows it — some never do — until a reply came after and the
+	// conversation was still for chatStill, the window showed it at work
+	// and then at rest, or chatAwaits passed. after is the last number
+	// heard as it went, worked whether the window showed it at work since,
+	// lastSaid the number of the last reply heard, and changed when a turn
+	// last came or grew.
+	awaits          time.Time
+	after, lastSaid int
+	worked          bool
+	changed         time.Time
 }
 
 // chatSent is words sent from here, and the place their turn was said at.
@@ -733,6 +745,9 @@ func (t *talk) heard(turns []app.Turn) [][]byte {
 			continue
 		}
 		number := turn.N
+		if turn.Kind == "said" {
+			t.lastSaid = max(t.lastSaid, number)
+		}
 		if turn.N = t.at(turn.N); turn.Question > 0 {
 			turn.Question = t.at(turn.Question)
 		}
@@ -765,6 +780,9 @@ func (t *talk) heard(turns []app.Turn) [][]byte {
 			}
 		}
 		changed = append(changed, one)
+	}
+	if len(changed) > 0 {
+		t.changed = time.Now()
 	}
 	var after []json.RawMessage
 	if t.waits != nil && slices.ContainsFunc(changed, func(turn chatTurn) bool { return turn.kind == "asked" && turn.n > t.waits.N }) {
@@ -873,14 +891,55 @@ const chatRule = app.CarriedRule
 // a conversation said in front of it: what follows the rule.
 func ownWords(text string) string { return app.OwnWords(text) }
 
+// chatAwaits is how long a chat says an agent works after something was
+// sent to it, at most, while its window does not show it and no reply came;
+// chatStill how long its conversation is still, after a reply came, for
+// the reply to be done: one is written as it is said.
+const (
+	chatAwaits = 90 * time.Second
+	chatStill  = 2 * time.Second
+)
+
+// awaiting takes that something sent from here went to the agent, and is
+// the change that says it works at once; nil when it was said to.
+func (t *talk) awaiting(now time.Time) json.RawMessage {
+	t.awaits, t.after, t.worked = now, t.last, false
+	return t.works(true)
+}
+
+// seen takes whether the window shows its agent at work, and is the patch
+// that says whether it works when that changed: while what was sent
+// awaits a reply, it works.
+func (t *talk) seen(on bool, now time.Time) [][]byte {
+	switch {
+	case t.awaits.IsZero():
+	case on:
+		t.worked = true
+	case t.worked || t.lastSaid > t.after && now.Sub(t.changed) >= chatStill || now.Sub(t.awaits) > chatAwaits:
+		t.awaits = time.Time{}
+	default:
+		on = true
+	}
+	return t.atWork(on)
+}
+
 // atWork takes whether the agent is at work, and is the patch that says
 // so when it changed and the view was said.
 func (t *talk) atWork(on bool) [][]byte {
+	if change := t.works(on); change != nil {
+		return t.patch(change)
+	}
+	return nil
+}
+
+// works takes whether the agent is at work, and is the change that says
+// so when it changed; nil when it did not.
+func (t *talk) works(on bool) json.RawMessage {
 	if on == t.working {
 		return nil
 	}
 	t.working = on
-	return t.patch(encode(chatOp{Op: "working", ID: t.id(), On: &on}))
+	return encode(chatOp{Op: "working", ID: t.id(), On: &on})
 }
 
 // sends takes what the person sent, and is the patch that says it at once
@@ -2260,9 +2319,8 @@ func (r *chatRun) looks() {
 			r.follow(head)
 		}
 	}
-	working := r.a.AtWork(r.record, r.index())
-	r.say(v.talk.atWork(working)...)
-	if !working {
+	r.say(v.talk.seen(r.a.AtWork(r.record, r.index()), time.Now())...)
+	if !v.talk.working {
 		r.rests()
 	}
 	if r.owed = time.Since(r.pressed) < 2*time.Second; r.owed {
@@ -2482,9 +2540,14 @@ func (r *chatRun) types(text string) bool {
 		r.say(v.talk.refused(err)...)
 		return false
 	}
+	var changes []json.RawMessage
 	if words != text {
-		r.say(v.talk.patch(v.talk.handed()...)...) // what the agent goes on from went with it
+		changes = v.talk.handed() // what the agent goes on from went with it
 	}
+	if change := v.talk.awaiting(time.Now()); change != nil {
+		changes = append(changes, change)
+	}
+	r.say(v.talk.patch(changes...)...)
 	return true
 }
 
@@ -2819,8 +2882,8 @@ func cmdChat(a *app.App, args []string) int {
 			}
 			run.looks()
 		case <-second.C:
-			if run.told == nil || run.owed {
-				run.looks()
+			if run.told == nil || run.owed || !run.view.talk.awaits.IsZero() {
+				run.looks() // (while what was sent awaits a reply, a window that says nothing ends it)
 			}
 		case data, open := <-keys:
 			if !open {
