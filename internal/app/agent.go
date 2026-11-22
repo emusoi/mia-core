@@ -508,6 +508,8 @@ type Turn struct {
 	From string `json:"from,omitempty"`
 	To   string `json:"to,omitempty"`
 	Note string `json:"note,omitempty"`
+	// Tone is warn on a switch whose handover is still to be sent.
+	Tone string `json:"tone,omitempty"`
 
 	// ref ties a question to its answer while a transcript is read: the id
 	// the agent gave the asking.

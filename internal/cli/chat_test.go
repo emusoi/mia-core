@@ -40,8 +40,8 @@ type shownPiece struct {
 // shownTurn is a turn of a chat as the window reads it: a transcript's, or
 // a row of the chat's own.
 type shownTurn struct {
-	app.Turn      // a switch's from, to and note among it
-	Tone, Key, ID string
+	app.Turn // a switch's from, to, note and tone among it
+	Key, ID  string
 }
 
 // find is the first piece of a kind in a piece, itself too, and nil for none.

@@ -352,11 +352,11 @@ func (a *App) threadBefore(state MainState) (before []Turn, own int) {
 			}
 			before = append(before, turn)
 		}
-		note := handed.Note()
+		note, tone := handed.Note(), ""
 		if i == len(chain)-1 && from.ID != "" {
-			note = CarriedWaits
+			note, tone = CarriedWaits, "warn"
 		}
-		before = append(before, Turn{N: len(before) + 1, Kind: turnSwitch, At: handed.At, From: handed.From.Agent, To: handed.To.Agent, Note: note})
+		before = append(before, Turn{N: len(before) + 1, Kind: turnSwitch, At: handed.At, From: handed.From.Agent, To: handed.To.Agent, Note: note, Tone: tone})
 	}
 	return before, own
 }

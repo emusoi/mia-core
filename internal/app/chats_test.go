@@ -261,7 +261,7 @@ func TestAChatSwitchedToAnotherAgentCarriesItsConversationOver(t *testing.T) {
 		t.Errorf("stopped and started again it would be %+v, %v", again.Main(), err)
 	}
 	turns, err := c.MainTurns("", 0)
-	if err != nil || kinds(turns) != "1:asked 2:said 3:switch" || turns[2].From != "echo" || turns[2].To != "claude" || turns[2].Note != app.CarriedWaits {
+	if err != nil || kinds(turns) != "1:asked 2:said 3:switch" || turns[2].From != "echo" || turns[2].To != "claude" || turns[2].Note != app.CarriedWaits || turns[2].Tone != "warn" {
 		t.Fatalf("turns before anything is said to it = %s %+v, %v", kinds(turns), turns, err)
 	}
 

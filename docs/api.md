@@ -393,8 +393,10 @@ Switched to another agent with [`mia main switch`](main.md#another-agent-mid-con
 its turns are those of the conversations it went on from, each followed
 by a `switch` turn, then those of the one it has open, numbered on from
 them, what the person asked their own words without the conversation
-said in front of them. `--after` and `--follow` count them so. A mia has
-it when its capabilities have `chat-switch`.
+said in front of them. `--after` and `--follow` count them so. The last
+switch has `"tone":"warn"` and the note `context goes with your next
+message` while what it hands over is still to be sent. A mia has it when
+its capabilities have `chat-switch`.
 
 ```json
 [{"n":11,"kind":"said","at":"2026-11-02T10:05:00Z","text":"goba is on it"},
