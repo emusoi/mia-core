@@ -747,7 +747,10 @@ func (a *App) surveyRepository() (*listing, error) {
 		a.counts = stack.CountsAt(filepath.Join(a.MiaDir, "cache", "counts.json"))
 	}
 	a.loadFacts()
-	base := a.BaseBranch(a.Root)
+	base := a.Config.Base // as BaseBranch says it, from the files where they say it
+	if base == "" {
+		base = git.DefaultBranchAt(a.Root, common, heads)
+	}
 	a.survey, a.trees = &stack.Survey{Base: base, Heads: heads}, trees
 	if ctx.baseHead = heads[base]; ctx.baseHead == "" {
 		ctx.baseHead = git.RevParse(a.Root, base)

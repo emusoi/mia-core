@@ -305,6 +305,21 @@ func DefaultBranch(dir string) string {
 	return ""
 }
 
+// DefaultBranchAt is DefaultBranch as the repository's files say it, as
+// HeadsAt reads its branches: origin's HEAD as it is kept, or with none a
+// branch main among heads. git is asked only where they say neither.
+func DefaultBranchAt(dir, common string, heads map[string]string) string {
+	data, err := os.ReadFile(filepath.Join(common, "refs", "remotes", "origin", "HEAD"))
+	if err == nil {
+		if ref, ok := strings.CutPrefix(strings.TrimSpace(string(data)), "ref: refs/remotes/"); ok {
+			return ref
+		}
+	} else if _, ok := heads["main"]; ok && os.IsNotExist(err) {
+		return "main"
+	}
+	return DefaultBranch(dir)
+}
+
 func IsAncestor(dir, ancestor, descendant string) bool {
 	_, err := run(dir, "merge-base", "--is-ancestor", ancestor, descendant)
 	return err == nil

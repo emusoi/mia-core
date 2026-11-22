@@ -73,8 +73,8 @@ func TestListDiscoversTheBaseOnceAndRefreshesItOnTheNextSurvey(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if count := strings.Count(string(calls), "symbolic-ref --short refs/remotes/origin/HEAD\n"); count != 1 {
-			t.Errorf("base %s: discovered the base %d times, want once", check.ref, count)
+		if count := strings.Count(string(calls), "symbolic-ref --short refs/remotes/origin/HEAD\n"); count != 0 {
+			t.Errorf("base %s: asked git for the base %d times, which origin's HEAD as it is kept says", check.ref, count)
 		}
 		if a.Config.Base != "" {
 			t.Fatalf("listing rewrote the configured base to %q", a.Config.Base)

@@ -236,3 +236,22 @@ func TestAPullRequestsHeadComesFromTheRemoteThatHasIt(t *testing.T) {
 		t.Fatal("pull request 8 is nowhere, yet one was found")
 	}
 }
+
+// The default branch read from the repository's files is the one git says:
+// origin's HEAD, else main, else master.
+func TestTheDefaultBranchFromTheFilesIsWhatGitSays(t *testing.T) {
+	repo := gittest.New(t)
+	common := filepath.Join(repo.Root, ".git")
+	check := func(want string) {
+		t.Helper()
+		if got, asked := git.DefaultBranchAt(repo.Root, common, git.HeadsAt(common)), git.DefaultBranch(repo.Root); got != want || asked != want {
+			t.Errorf("from the files %q, from git %q, want %q", got, asked, want)
+		}
+	}
+	check("main")
+	repo.Git("branch", "-m", "main", "master")
+	check("master")
+	repo.Git("update-ref", "refs/remotes/origin/trunk", "HEAD")
+	repo.Git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk")
+	check("origin/trunk")
+}
