@@ -198,22 +198,34 @@ data: {"q":"base?dir=%2Fhome%2Fuser%2Fsrc%2Fapp","code":0,"result":{"branch":"fe
 Each question's answer comes once, then again only when its bytes are
 another; a question that fails is an answer too. Two listeners with the
 same question share one asking, and a question nobody listens to is not
-asked. The server asks again:
+asked. A question is asked by one asking at a time, four at once in all,
+and one due again while it is being asked is asked once more when that is
+done: nothing waits on a slow one. The server asks again:
 
-- every question, at once, when tmux says a session or a window came,
-  went, was renamed or put in front — it hears this as a control-mode
-  client on a session of its own, `_mia-serve-<pid>`, and starts no tmux
-  server to hear it;
+- every question but `here` and `machines`, at once, when tmux says a
+  session or a window came, went, was renamed or put in front — it hears
+  this as a control-mode client on a session of its own,
+  `_mia-serve-<pid>`, and starts no tmux server to hear it;
 - every question, at once, after a [`POST /run`](#post-run);
-- a repository's questions, and those of no repository, when its
-  records, its configuration, or a worktree's `HEAD` or index were
-  written, looked at each second; every question when the person's
-  configuration or the main agent's records were;
+- a repository's questions, and those of no repository but `here` and
+  `machines`, when its records, its configuration, or a worktree's
+  `HEAD` or index were written, looked at each second; every question
+  when the person's configuration or the main agent's records were;
 - `status` and `window` each time it looks, each second, as no file
   says when a worktree's files, a window's screen or whether its agent
   is at work changed — only who listens is told, and only when the
   answer is another;
-- every question every thirty seconds.
+- every question every thirty seconds: what no file says — how busy a
+  machine is, what another machine says, whether a worktree's files are
+  changed as `worktrees` says it, an agent's title in a list of its
+  windows — is as fresh as this.
+
+How busy this machine is, what `here` and `machines` say of it, is
+measured once in ten seconds for every question that asks it, the disk
+once for each disk; `mia api` alone measures it each time. A machine
+that did not answer is not asked again for thirty seconds, or a minute
+once it has failed twice, from any folder: one that is off costs one
+ssh timeout a while, not one at each asking.
 
 `mia git` and `mia files` listen to `status` of their worktree, and `mia
 chat` to `window` of its window, when a server of their build answers,

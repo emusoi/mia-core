@@ -268,8 +268,10 @@ type kept struct {
 }
 
 func newServer() *server {
-	s := &server{build: gateway.Build(), kept: map[string]*kept{}, outside: app.Outside(), tick: serveTick, backstop: serveBackstop, settle: serveSettle, retry: serveRetry, rebuilt: serveRebuilt}
-	s.hub = &hub{s: s, topics: map[string]*topic{}, seen: map[string]string{}, kick: make(chan struct{}, 1)}
+	s := &server{build: gateway.Build(), kept: map[string]*kept{}, outside: app.Outside(),
+		tick: serveTick, backstop: serveBackstop, settle: serveSettle, retry: serveRetry, rebuilt: serveRebuilt}
+	s.hub = &hub{s: s, topics: map[string]*topic{}, seen: map[string]string{}, changed: map[string]bool{},
+		kick: make(chan struct{}, 1), tmux: make(chan struct{}, 1), lanes: make(chan struct{}, 4)}
 	return s
 }
 
@@ -314,7 +316,14 @@ func (s *server) serve(ctx context.Context, listener net.Listener) error {
 			}
 		}
 	}()
-	if err := web.Serve(listener); err != nil && err != http.ErrServerClosed {
+	err := web.Serve(listener)
+	stop()
+	// what is being asked again is done before what it reads may go; once
+	// the hub's lock is had, the context done, no round starts another
+	s.hub.mu.Lock()
+	s.hub.mu.Unlock()
+	s.hub.asking.Wait()
+	if err != nil && err != http.ErrServerClosed {
 		return err
 	}
 	return nil
@@ -417,11 +426,15 @@ func (k *kept) read() string {
 }
 
 // written is when each file of the patterns was last written and how long
-// it is: it changes when one of them does, comes or goes.
+// it is: it changes when one of them does, comes or goes. A pattern of no
+// wildcard is the one file, looked at once.
 func written(patterns ...string) string {
 	var all strings.Builder
 	for _, pattern := range patterns {
-		files, _ := filepath.Glob(pattern)
+		files := []string{pattern}
+		if strings.ContainsAny(pattern, `*?[\`) {
+			files, _ = filepath.Glob(pattern)
+		}
 		for _, file := range files {
 			if info, err := os.Stat(file); err == nil {
 				fmt.Fprintf(&all, "%s %d %d\n", file, info.ModTime().UnixNano(), info.Size())

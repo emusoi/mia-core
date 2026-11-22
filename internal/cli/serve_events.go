@@ -59,22 +59,33 @@ func eventOf(q string, said *answer) []byte {
 // for all who asked it, and asked again when something it could answer
 // from has changed. A question nobody listens to is not there.
 type hub struct {
-	s      *server
-	start  sync.Once
-	mu     sync.Mutex
-	topics map[string]*topic
-	seen   map[string]string // by git folder, "" the person's own: when its files were written
-	kick   chan struct{}
+	s       *server
+	start   sync.Once
+	mu      sync.Mutex
+	topics  map[string]*topic
+	seen    map[string]string // by git folder, "" the person's own: when its files were written
+	changed map[string]bool   // the repositories seen to change since the questions were last asked for it, "" the person's
+	repos   struct {          // the repositories, as Repositories said them when the registry was last written
+		registry string
+		all      []app.Repository
+	}
+	kick   chan struct{} // a verb was run: everything is asked again
+	tmux   chan struct{} // tmux says a session or a window changed
+	lanes  chan struct{} // what is asked at once
+	asking sync.WaitGroup
 }
 
 // topic is one question and who listens to it.
 type topic struct {
 	q        string
 	question question
-	common   string // the git folder of its repository, "" when it is asked of none
-	mu       sync.Mutex
+	common   string     // the git folder of its repository, "" when it is asked of none
+	mu       sync.Mutex // held while it is asked
 	last     []byte
-	subs     map[*subscriber]struct{} // under the hub's lock
+	// under the hub's lock: whether it is being asked, and to be asked
+	// again once that is done
+	asking, again bool
+	subs          map[*subscriber]struct{} // under the hub's lock
 }
 
 // subscriber is one GET /events.
@@ -120,6 +131,12 @@ var ofARepository = []string{"worktrees", "machines", "here", "env", "stack", "b
 // and a window's screen and whether its agent is at work.
 var eachLook = []string{"status", "window"}
 
+// ofMachines are the queries answered from how busy a machine is and what
+// another machine says over ssh: no tmux, and of no repository but the one
+// they are asked in. What changes them is time, which the backstop is the
+// clock of; tmux saying something, or another repository written, does not.
+var ofMachines = []string{"here", "machines"}
+
 // join adds a listener to a question, and gives it the answer as it is now.
 func (h *hub) join(q string, asked question, sub *subscriber) *topic {
 	h.start.Do(func() {
@@ -138,14 +155,13 @@ func (h *hub) join(q string, asked question, sub *subscriber) *topic {
 	}
 	t.subs[sub] = struct{}{}
 	h.mu.Unlock()
-	if changed := h.look(); len(changed) > 0 { // from now, a change to what it is answered from is seen
-		h.round(changed)
-	}
+	h.look() // from now, a change to what it is answered from is seen
 	t.mu.Lock()
 	if t.last == nil {
-		t.last = eventOf(q, h.s.ask(asked))
+		h.answer(t)
+	} else {
+		sub.tell(q, t.last)
 	}
-	sub.tell(q, t.last)
 	t.mu.Unlock()
 	return t
 }
@@ -159,60 +175,94 @@ func (h *hub) leave(t *topic, sub *subscriber) {
 	}
 }
 
-// run asks again: at once when tmux says something or a verb was run, on a
+// answer asks a question, its lock held, and tells each listener whose
+// answer it is not.
+func (h *hub) answer(t *topic) {
+	t.last = eventOf(t.q, h.s.ask(t.question))
+	h.mu.Lock()
+	subs := make([]*subscriber, 0, len(t.subs))
+	for sub := range t.subs {
+		subs = append(subs, sub)
+	}
+	h.mu.Unlock()
+	for _, sub := range subs {
+		sub.tell(t.q, t.last)
+	}
+}
+
+// run asks again: at once when a verb was run or tmux says something, on a
 // short tick when a file was written, and of everything now and then.
 func (h *hub) run() {
 	tick, backstop := time.NewTicker(h.s.tick), time.NewTicker(h.s.backstop)
 	defer tick.Stop()
 	defer backstop.Stop()
+	everything := func(*topic) bool { return true }
 	for {
 		select {
 		case <-h.s.ctx.Done():
 			return
 		case <-h.kick:
-			select { // what comes in a burst is one change
-			case <-h.s.ctx.Done():
-				return
-			case <-time.After(h.s.settle):
-			}
-			select {
-			case <-h.kick:
-			default:
-			}
-			h.round(nil)
+			h.settle(h.kick)
+			h.round(everything)
+		case <-h.tmux:
+			h.settle(h.tmux)
+			h.round(func(t *topic) bool { return !slices.Contains(ofMachines, t.question.args[0]) })
 		case <-backstop.C:
-			h.round(nil)
+			h.round(everything)
 		case <-tick.C:
-			h.round(h.look())
+			h.look()
+			h.mu.Lock()
+			changed := h.changed
+			h.changed = map[string]bool{}
+			h.mu.Unlock()
+			h.round(func(t *topic) bool {
+				return changed[""] || changed[t.common] ||
+					t.common == "" && len(changed) > 0 && !slices.Contains(ofMachines, t.question.args[0]) || // answered from every repository
+					slices.Contains(eachLook, t.question.args[0])
+			})
 		}
 	}
 }
 
-// again has every question asked again, soon.
-func (h *hub) again() {
+// settle waits out a burst on a channel, which is one change.
+func (h *hub) settle(burst chan struct{}) {
 	select {
-	case h.kick <- struct{}{}:
+	case <-h.s.ctx.Done():
+	case <-time.After(h.s.settle):
+	}
+	select {
+	case <-burst:
 	default:
 	}
 }
 
-// look is each repository whose files were written since it last looked,
-// "" when the person's own were: their questions are to be asked again. A
-// repository looked at for the first time is only noted.
-func (h *hub) look() map[string]bool {
+// again has every question asked again, soon.
+func (h *hub) again() { wake(h.kick) }
+
+func wake(one chan struct{}) {
+	select {
+	case one <- struct{}{}:
+	default:
+	}
+}
+
+// look notes each repository whose files were written since it last
+// looked, "" when the person's own were: their questions are asked again
+// at the next tick. A repository looked at for the first time is only
+// noted.
+func (h *hub) look() {
 	h.mu.Lock()
+	defer h.mu.Unlock()
 	watched := map[string]bool{}
 	for _, t := range h.topics {
 		watched[t.common] = true
 	}
 	if len(watched) == 0 {
 		h.seen = map[string]string{} // nobody listens: nothing is looked at
-		h.mu.Unlock()
-		return map[string]bool{}
+		return
 	}
 	if watched[""] { // a question of no repository is answered from them all
-		repos, _ := app.Repositories()
-		for _, repo := range repos {
+		for _, repo := range h.repositories() {
 			watched[filepath.Join(repo.Path, ".git")] = true
 		}
 	}
@@ -222,16 +272,23 @@ func (h *hub) look() map[string]bool {
 			delete(h.seen, common)
 		}
 	}
-	changed := map[string]bool{}
 	for common := range watched {
 		now := writtenIn(common)
 		if was, looked := h.seen[common]; looked && was != now {
-			changed[common] = true
+			h.changed[common] = true
 		}
 		h.seen[common] = now
 	}
-	h.mu.Unlock()
-	return changed
+}
+
+// repositories is every repository, read again only when the registry
+// they are found from has been written.
+func (h *hub) repositories() []app.Repository {
+	if registry := written(config.NamesPath()); registry != h.repos.registry || h.repos.all == nil {
+		h.repos.all, _ = app.Repositories()
+		h.repos.registry = registry
+	}
+	return h.repos.all
 }
 
 // writtenIn is when the files a repository's answers change with were
@@ -245,52 +302,57 @@ func writtenIn(common string) string {
 			filepath.Join(config.Dir(), "main", ".mia", "*.json"),
 		)
 	}
-	return written(
+	files := []string{
 		filepath.Join(common, "mia", "*.json"),
 		filepath.Join(common, "mia", "config.toml"),
 		filepath.Join(filepath.Dir(common), ".mia.toml"),
 		filepath.Join(common, "HEAD"),
 		filepath.Join(common, "index"),
-		filepath.Join(common, "worktrees", "*", "HEAD"),
-		filepath.Join(common, "worktrees", "*", "index"),
-	)
+	}
+	worktrees, _ := filepath.Glob(filepath.Join(common, "worktrees", "*"))
+	for _, worktree := range worktrees {
+		files = append(files, filepath.Join(worktree, "HEAD"), filepath.Join(worktree, "index"))
+	}
+	return written(files...)
 }
 
-// round asks the questions again, those of the repositories changed, those
-// of no repository when any is and those asked each look, or all of them
-// when changed is nil, and tells the listeners of each whose answer is not
-// what it was.
-func (h *hub) round(changed map[string]bool) {
+// round has the questions due asked again, each that is not being asked
+// already, which is asked once more when it is done; what is due is told
+// under the hub's lock. It does not wait for them.
+func (h *hub) round(due func(*topic) bool) {
 	h.mu.Lock()
-	var due []*topic
+	defer h.mu.Unlock()
+	if h.s.ctx.Err() != nil {
+		return
+	}
 	for _, t := range h.topics {
-		written := len(changed) > 0 && (changed[""] || t.common == "" || changed[t.common])
-		if changed == nil || written || slices.Contains(eachLook, t.question.args[0]) {
-			due = append(due, t)
+		if !due(t) {
+			continue
 		}
+		if t.asking {
+			t.again = true
+			continue
+		}
+		t.asking = true
+		h.asking.Go(func() { h.askAgain(t) })
 	}
+}
+
+// askAgain asks a question again, as often as it was due while it was.
+func (h *hub) askAgain(t *topic) {
+	for again := true; again && h.s.ctx.Err() == nil; {
+		h.lanes <- struct{}{}
+		t.mu.Lock()
+		h.answer(t)
+		t.mu.Unlock()
+		<-h.lanes
+		h.mu.Lock()
+		again, t.again = t.again, false
+		h.mu.Unlock()
+	}
+	h.mu.Lock()
+	t.asking = false
 	h.mu.Unlock()
-	var wg sync.WaitGroup
-	lanes := make(chan struct{}, 4)
-	for _, t := range due {
-		wg.Go(func() {
-			lanes <- struct{}{}
-			defer func() { <-lanes }()
-			t.mu.Lock()
-			defer t.mu.Unlock()
-			t.last = eventOf(t.q, h.s.ask(t.question))
-			h.mu.Lock()
-			subs := make([]*subscriber, 0, len(t.subs))
-			for sub := range t.subs {
-				subs = append(subs, sub)
-			}
-			h.mu.Unlock()
-			for _, sub := range subs {
-				sub.tell(t.q, t.last)
-			}
-		})
-	}
-	wg.Wait()
 }
 
 // tmuxSays is what tmux says when a session or a window comes, goes, is
@@ -298,10 +360,10 @@ func (h *hub) round(changed map[string]bool) {
 var tmuxSays = []string{"%sessions-changed", "%session-renamed", "%session-window-changed", "%window-pane-changed", "%layout-change", "%window-add", "%window-close", "%window-renamed", "%unlinked-window-add", "%unlinked-window-close", "%unlinked-window-renamed"}
 
 // watchTmux listens to the tmux server as a control-mode client on a
-// session of its own, and has everything asked again each time tmux says
-// a session or a window changed. With no tmux server running none is
-// started to watch (-N): one is looked for again every while. The session
-// goes with the client, and its one pane only sleeps.
+// session of its own: everything but how busy a machine is is asked again
+// each time tmux says a session or a window changed. With no tmux server running none is started to
+// watch (-N): one is looked for again every while. The session goes with
+// the client, and its one pane only sleeps.
 func (h *hub) watchTmux() {
 	name := fmt.Sprintf("_mia-serve-%d", os.Getpid())
 	for h.s.ctx.Err() == nil {
@@ -317,7 +379,7 @@ func (h *hub) watchTmux() {
 					break
 				}
 				if slices.ContainsFunc(tmuxSays, func(says string) bool { return strings.HasPrefix(line, says) }) {
-					h.again()
+					wake(h.tmux)
 				}
 			}
 			in.Close()
