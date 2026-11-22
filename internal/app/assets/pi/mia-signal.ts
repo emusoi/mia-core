@@ -11,17 +11,45 @@
 // is no worktree of mia's, the first call says so and no other is made. No
 // call is waited for by pi, each is ended after three seconds, and nothing
 // here throws into pi.
+//
+// And it writes what pi has not yet written of its session, for mia to read
+// as pi writes it: pi writes a message to its session file only once it is
+// done, and nothing of a new session until its first reply is. Next to the
+// session file, under its name with .live after it, at most every 150 ms
+// while a reply is written and replaced whole each time, is
+//
+//   {"size": <how long the session file is, -1 while it is not there>}
+//   <each line pi has kept but not written, of a session not yet there>
+//   <the reply as far as it is written: {"type":"message","live":true,...}>
+//
+// and once pi has written it all the file is gone. It is the one file this
+// writes, and nothing that goes wrong with it reaches pi.
 
 import { spawn } from "node:child_process";
+import { renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+
+interface Message {
+	role?: string;
+	content?: unknown;
+	timestamp?: number;
+}
 
 interface Event {
 	aborted?: boolean;
 	title?: string;
+	message?: Message;
+}
+
+interface Sessions {
+	getSessionFile(): string | undefined;
+	getHeader(): unknown;
+	getEntries(): unknown[];
 }
 
 interface Context {
 	cwd?: string;
 	hasUI?: boolean;
+	sessionManager?: Sessions;
 }
 
 interface Pi {
@@ -34,6 +62,28 @@ const done = ["done", "--style", "green", "--rank", "30", ...from, "--until", "s
 const clear = ["clear", ...from];
 const callFor = 3000; // ms a call has
 const settleFor = 1500; // ms after agent_end with no other run, on a pi with no agent_settled
+const liveEvery = 150; // ms at most between two writes of what pi has not yet written
+
+// unwritten is a message pi is still writing as a line of its session would
+// have it, with only what is read of it.
+const unwritten = (message: Message): unknown => ({
+	type: "message",
+	live: true,
+	timestamp: new Date(typeof message.timestamp === "number" ? message.timestamp : Date.now()).toISOString(),
+	message: {
+		role: message.role,
+		content: Array.isArray(message.content)
+			? message.content.map((b: Record<string, unknown>) => ({
+					type: b?.type,
+					text: b?.text,
+					thinking: b?.thinking,
+					redacted: b?.redacted,
+					name: b?.name,
+					arguments: b?.arguments,
+				}))
+			: message.content,
+	},
+});
 
 export default function (pi: Pi): void {
 	let off = false; // no mia, or no worktree of mia's
@@ -101,6 +151,71 @@ export default function (pi: Pi): void {
 		} catch {}
 	};
 
+	// What pi has not yet written. pi writes a message only after every
+	// handler of its message_end has run: a write here waits liveEvery, and
+	// by then it has.
+	let session: Sessions | undefined;
+	let writing: Message | undefined; // the reply pi is writing
+	let wrote = ""; // the live file, while there is one
+	let soon: ReturnType<typeof setTimeout> | undefined;
+	const forget = (): void => {
+		if (!wrote) return;
+		try {
+			rmSync(wrote, { force: true });
+		} catch {}
+		wrote = "";
+	};
+	const write = (): void => {
+		soon = undefined;
+		let next = "";
+		try {
+			const file = session?.getSessionFile();
+			if (!session || !file) return; // a session pi keeps no file of
+			let size = -1;
+			try {
+				size = statSync(file).size;
+			} catch {}
+			const lines: unknown[] = [];
+			if (size < 0) {
+				const entries = session.getEntries();
+				if (entries.some((e) => (e as { type?: string })?.type === "message")) lines.push(session.getHeader(), ...entries);
+			}
+			if (writing) lines.push(unwritten(writing));
+			if (lines.length === 0) return forget();
+			const live = `${file}.live`;
+			next = `${live}.${process.pid}`;
+			writeFileSync(next, `${[{ size }, ...lines].map((line) => JSON.stringify(line)).join("\n")}\n`);
+			renameSync(next, live);
+			next = "";
+			wrote = live;
+		} catch {
+			if (next) {
+				try {
+					rmSync(next, { force: true });
+				} catch {}
+			}
+		}
+	};
+	const later = (ctx: Context): void => {
+		session = ctx?.sessionManager ?? session;
+		if (soon !== undefined) return;
+		soon = setTimeout(write, liveEvery);
+		soon.unref?.();
+	};
+
+	on("message_start", (e, ctx) => {
+		if (e?.message?.role === "assistant") writing = e.message;
+		later(ctx);
+	});
+	on("message_update", (e, ctx) => {
+		if (e?.message?.role === "assistant") writing = e.message;
+		later(ctx);
+	});
+	on("message_end", (e, ctx) => {
+		if (e?.message?.role === "assistant") writing = undefined;
+		later(ctx);
+	});
+
 	const finish = (ctx: Context, aborted: boolean): void => {
 		clearTimeout(ending);
 		running = asking = false;
@@ -141,6 +256,10 @@ export default function (pi: Pi): void {
 		if (running) call(ctx, busy);
 	});
 	on("session_shutdown", (_e, ctx) => {
+		clearTimeout(soon);
+		soon = undefined;
+		writing = undefined;
+		forget();
 		clearTimeout(ending);
 		if (running) call(ctx, clear);
 		running = asking = false;
