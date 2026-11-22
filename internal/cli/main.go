@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	mainUsage      = "mia main [status|start [--new|--resume <conversation>] [--restart] [--role <role>] [--agent <agent>] [--model <model>] [--effort <effort>] [--account <account>]|stop|say <text…>|press <keys…>|interrupt|model <model> [--effort <effort>]]"
+	mainUsage      = "mia main [status|start [--new|--resume <conversation>] [--restart] [--role <role>] [--agent <agent>] [--model <model>] [--effort <effort>] [--account <account>]|stop|say <text…>|press <keys…>|interrupt|model <model> [--effort <effort>]|switch --agent <agent> [--model <model>] [--effort <effort>]]"
 	mainTurnsUsage = "mia api main [conversations|turns [--conversation <id>] [--after <n>] [--follow]]"
 	standingUsage  = "mia api standing [--here] [--seen <repository>/<worktree>[@<machine>]]"
 )
@@ -44,8 +44,13 @@ func cmdMain(args []string) int {
 	typed := sub == "say" || sub == "press"
 	asJSON := !typed && take(&args, "--json")
 	var agent, model, effort, account string
-	if sub == "start" || sub == "model" {
+	if sub == "start" || sub == "model" || sub == "switch" {
 		model, effort = takeValue(&args, "--model"), takeValue(&args, "--effort")
+	}
+	if sub == "switch" {
+		if agent = takeValue(&args, "--agent"); agent == "" {
+			return usageErr("mia main switch --agent <agent> [--model <model>] [--effort <effort>]")
+		}
 	}
 	var fresh, restart bool
 	var resume, role string
@@ -63,7 +68,7 @@ func cmdMain(args []string) int {
 		}
 		model, args = args[0], nil
 	}
-	if !slices.Contains([]string{"status", "start", "stop", "say", "press", "interrupt", "model"}, sub) || (!typed && len(args) > 0) {
+	if !slices.Contains([]string{"status", "start", "stop", "say", "press", "interrupt", "model", "switch"}, sub) || (!typed && len(args) > 0) {
 		return usageErr(mainUsage)
 	}
 	text := ""
@@ -183,8 +188,35 @@ func cmdMain(args []string) int {
 		}
 		fmt.Printf("the main agent is switched to %s\n", said(chosen))
 		return exitOK
+	case "switch":
+		return saySwitched(a.SwitchChat(agent, model, effort))
 	}
 	return exitFor(a.InterruptMain())
+}
+
+// saySwitched says what going on with another agent did.
+func saySwitched(done app.Switched, err error) int {
+	switch {
+	case err != nil:
+		return fail(err)
+	case done.From == done.To:
+		fmt.Printf("%s goes on with %s, switched to %s\n", chatNamed(done.State), done.To, said(app.Chosen{Model: done.State.Model, Effort: done.State.Effort}))
+	case done.Handoff == "":
+		fmt.Printf("%s goes on with %s; nothing was said with %s to carry over\n", chatNamed(done.State), done.To, done.From)
+	case done.Resumes != "" && done.Turns == 0:
+		fmt.Printf("%s goes on with %s, which takes its own conversation up again: nothing was said since\n", chatNamed(done.State), done.To)
+	default:
+		fmt.Printf("%s goes on with %s, %d turns with %s carried over in front of the next thing said: %s\n", chatNamed(done.State), done.To, done.Turns, done.From, done.Handoff)
+	}
+	return exitOK
+}
+
+// chatNamed is a chat as a line names it.
+func chatNamed(state app.MainState) string {
+	if state.Name == "main" {
+		return "the main agent"
+	}
+	return "chat " + state.Name
 }
 
 // sayMainOf prints where the main agent stands as another machine's mia

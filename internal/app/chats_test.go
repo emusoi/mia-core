@@ -193,3 +193,175 @@ func TestAChatsFirstWordsWaitForWhatItAsksFirst(t *testing.T) {
 		t.Errorf("its first words are said once: %v, %v", sent, err)
 	}
 }
+
+// A chat switched to another agent goes on with its conversation as a
+// window's does: written out, the other agent started in its place and
+// sent it in front of the first thing said, its turns those it went on
+// from, a switch, and its own; switched back, the agent it was with takes
+// its own conversation up again and is handed only what was said since.
+func TestAChatSwitchedToAnotherAgentCarriesItsConversationOver(t *testing.T) {
+	gittest.Isolate(t)
+	ownTmux(t)
+	claudeDir := agentHomes(t)
+	bin := t.TempDir()
+	for _, agent := range []string{"echo-agent", "claude"} {
+		put(t, filepath.Join(bin, agent), "#!/bin/sh", `echo "`+agent+` $*"`, "exec cat")
+		if err := os.Chmod(filepath.Join(bin, agent), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	main, err := app.AtMain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	main.Plugins = plugins(t, map[string]string{"echo": echoPlugin(t)})
+	c, err := main.NewChat("echo", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Plugins = main.Plugins
+	state, err := c.StartMain("", "", "", "")
+	if err != nil || state.Conversation != "e2" {
+		t.Fatalf("started: %+v, %v", state, err)
+	}
+	name := state.Name
+	read := func(window, want string) {
+		t.Helper()
+		var screen string
+		for range 250 {
+			if screen, _ = session.Here().Capture("chat-"+name, window, false); strings.Contains(screen, want) {
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		t.Fatalf("its window never showed %q: %q", want, screen)
+	}
+	if _, err := c.SwitchChat("echo", "", ""); err == nil {
+		t.Error("switched to the agent it runs as")
+	}
+	if _, err := c.SwitchChat("claude", "", ""); err == nil || !strings.Contains(err.Error(), "is at work") {
+		t.Errorf("switched while it writes: %v", err)
+	}
+	time.Sleep(3200 * time.Millisecond) // what it wrote as it started is no work
+
+	done, err := c.SwitchChat("claude", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if done.From != "echo" || done.To != "claude" || done.Turns != 2 || done.Resumes != "" || !done.State.Running || done.State.Agent != "claude" {
+		t.Fatalf("switched: %+v", done)
+	}
+	handoff, err := os.ReadFile(done.Handoff)
+	if err != nil || !strings.Contains(string(handoff), "say it back") {
+		t.Fatalf("its handoff: %q, %v", handoff, err)
+	}
+	read("claude", "claude") // anew, going on with nothing of its own
+	if again, err := app.AtChat(name); err != nil || again.Main().Agent != "claude" {
+		t.Errorf("stopped and started again it would be %+v, %v", again.Main(), err)
+	}
+	turns, err := c.MainTurns("", 0)
+	if err != nil || kinds(turns) != "1:asked 2:said 3:switch" || turns[2].From != "echo" || turns[2].To != "claude" || turns[2].Note != app.CarriedWaits {
+		t.Fatalf("turns before anything is said to it = %s %+v, %v", kinds(turns), turns, err)
+	}
+
+	if err := c.SayToMain("go on"); err != nil {
+		t.Fatal(err)
+	}
+	read("claude", app.CarriedOpens("echo"))
+	read("claude", "go on")
+	now := time.Now().UTC()
+	line := func(kind, content string, at time.Time) string {
+		return `{"parentUuid":"p","type":"` + kind + `","cwd":` + quoted(c.Root) + `,"timestamp":"` + at.Format(time.RFC3339Nano) + `","message":{"content":` + content + `}}`
+	}
+	put(t, filepath.Join(claudeDir(c.Root), "c9.jsonl"),
+		line("user", quoted(app.CarriedText("echo", string(handoff), done.Handoff, "go on", app.CarriedMost)), now),
+		line("assistant", `[{"type":"text","text":"on it"}]`, now.Add(time.Second)))
+	turns, err = c.MainTurns("", 0)
+	if err != nil || kinds(turns) != "1:asked 2:said 3:switch 4:asked 5:said" || turns[2].Note != "context handed over · 2 turns" || turns[3].Text != "go on" || turns[4].Text != "on it" {
+		t.Fatalf("turns once it is said to = %s %+v, %v", kinds(turns), turns, err)
+	}
+	if later, err := c.MainTurns("", 3); err != nil || kinds(later) != "4:asked 5:said" {
+		t.Errorf("after 3 = %s, %v", kinds(later), err)
+	}
+
+	time.Sleep(3200 * time.Millisecond)
+	back, err := c.SwitchChat("echo", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back.From != "claude" || back.To != "echo" || back.Resumes != "e2" || back.Turns != 2 {
+		t.Fatalf("switched back: %+v", back)
+	}
+	read("echo", "echo-agent e2")
+	turns, err = c.MainTurns("", 0)
+	if err != nil || kinds(turns) != "1:asked 2:said 3:switch 4:asked 5:said 6:switch" || turns[5].From != "claude" || turns[5].To != "echo" {
+		t.Fatalf("turns switched back = %s %+v, %v", kinds(turns), turns, err)
+	}
+	stop := make(chan struct{})
+	var first []app.Turn
+	err = c.FollowMain("", 4, stop, func(got []app.Turn) error {
+		if first == nil {
+			first = got
+			close(stop)
+		}
+		return nil
+	})
+	if err != nil || kinds(first) != "5:said 6:switch" {
+		t.Errorf("followed after 4 = %s, %v", kinds(first), err)
+	}
+}
+
+// The main agent is switched as a chat is, and stays with the agent it
+// was switched to when it is started again, until it is switched back to
+// the one [main] names.
+func TestTheMainAgentSwitchedStaysWithTheOtherAgent(t *testing.T) {
+	gittest.Isolate(t)
+	ownTmux(t)
+	agentHomes(t)
+	bin := t.TempDir()
+	for _, agent := range []string{"echo-agent", "claude"} {
+		put(t, filepath.Join(bin, agent), "#!/bin/sh", `echo "`+agent+` $*"`, "exec cat")
+		if err := os.Chmod(filepath.Join(bin, agent), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	put(t, filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "config.toml"), "[main]", `agent = "echo"`)
+	echo := plugins(t, map[string]string{"echo": echoPlugin(t)})
+	open := func() *app.App {
+		t.Helper()
+		a, err := app.AtMain()
+		if err != nil {
+			t.Fatal(err)
+		}
+		a.Plugins = echo
+		return a
+	}
+	if _, err := open().StartMain("", "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(3200 * time.Millisecond)
+	if done, err := open().SwitchChat("claude", "", ""); err != nil || done.Turns != 2 || done.State.Name != "main" || done.State.Agent != "claude" {
+		t.Fatalf("switched: %+v, %v", done, err)
+	}
+	if err := open().StopMain(); err != nil {
+		t.Fatal(err)
+	}
+	if state := open().Main(); state.Running || state.Agent != "claude" {
+		t.Fatalf("stopped, it would start as %+v", state)
+	}
+	if state, err := open().StartMain("", "", "", ""); err != nil || state.Agent != "claude" {
+		t.Fatalf("started again: %+v, %v", state, err)
+	}
+	time.Sleep(3200 * time.Millisecond)
+	if _, err := open().SwitchChat("echo", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := open().StopMain(); err != nil {
+		t.Fatal(err)
+	}
+	if state := open().Main(); state.Agent != "echo" {
+		t.Errorf("switched back, it would start as %+v", state)
+	}
+}

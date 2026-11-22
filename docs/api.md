@@ -387,6 +387,24 @@ reads a main agent on this machine only, and is refused, exit 1, when
  {"n":10,"kind":"tool","at":"2026-11-02T10:02:15Z","text":"Ran mia api standing","name":"Bash"}]
 ```
 
+Switched to another agent with [`mia main switch`](main.md#another-agent-mid-conversation),
+its turns are those of the conversations it went on from, each followed
+by a `switch` turn, then those of the one it has open, numbered on from
+them, what the person asked their own words without the conversation
+said in front of them. `--after` and `--follow` count them so. A mia has
+it when its capabilities have `chat-switch`.
+
+```json
+[{"n":11,"kind":"said","at":"2026-11-02T10:05:00Z","text":"goba is on it"},
+ {"n":12,"kind":"switch","at":"2026-11-02T10:06:00Z","from":"claude","to":"codex","note":"context handed over · 11 turns"},
+ {"n":13,"kind":"asked","at":"2026-11-02T10:06:30Z","text":"and the tests?"}]
+```
+
+`note` says what was handed over — `context handed over`, `took its own
+conversation up again` when it went back to an agent it went on from,
+with how many turns and how many were left out — and is `context goes
+with your next message` until the first thing is said to the agent.
+
 `mia api main turns --conversation <id> [--after <n>]` is one of its
 [earlier conversations](main.md#earlier-conversations) in the same way,
 and `mia api main conversations` lists them: the heads
@@ -453,8 +471,10 @@ says it, with its `name`; `mia api chat main` is `mia api main`. A name
 that is no chat's is refused, exit 1.
 
 `mia api chat turns <name> [--after <n>] [--follow]` is its conversation
-as `mia api main turns` gives it, `did` turns and all; of `main` it is
-`mia api main turns`. `--follow` reads chats on this machine only.
+as `mia api main turns` gives it, `did` and `switch` turns and all; of
+`main` it is `mia api main turns`. `--follow` reads chats on this
+machine only, and follows the conversation open as it starts: switched,
+it is followed again.
 
 A mia has these when its capabilities have `chats`, and `mia serve`
 answers them and [says when they change](serve.md#get-events).

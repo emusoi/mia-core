@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	chatsUsage     = "mia chats [list|new --agent <agent> [--model <model>] [--effort <effort>] [-- <first words…>]|say <name> -- <text…>|press <name> <keys…>|interrupt <name>|stop <name>|start <name>|model <name> <model> [--effort <effort>]|remove <name>]"
+	chatsUsage     = "mia chats [list|new --agent <agent> [--model <model>] [--effort <effort>] [-- <first words…>]|say <name> -- <text…>|press <name> <keys…>|interrupt <name>|stop <name>|start <name>|model <name> <model> [--effort <effort>]|switch <name> --agent <agent> [--model <model>] [--effort <effort>]|remove <name>]"
 	chatQueryUsage = "mia api chat <name>"
 	chatTurnsUsage = "mia api chat turns <name> [--after <n>] [--follow]"
 )
@@ -72,6 +72,12 @@ func cmdChats(args []string) int {
 			return usageErr("mia chats model <name> <model> [--effort <effort>]")
 		}
 		name, model = flags[0], flags[1]
+	case "switch":
+		agent, model, effort = takeValue(&flags, "--agent"), takeValue(&flags, "--model"), takeValue(&flags, "--effort")
+		if agent == "" || len(flags) != 1 || words != "" {
+			return usageErr("mia chats switch <name> --agent <agent> [--model <model>] [--effort <effort>]")
+		}
+		name = flags[0]
 	case "interrupt", "stop", "start", "remove":
 		if len(flags) != 1 || words != "" {
 			return usageErr("mia chats " + sub + " <name>")
@@ -152,6 +158,8 @@ func cmdChats(args []string) int {
 		return exitFor(c.SayToMain(words))
 	case "press":
 		return exitFor(c.PressInMain(words))
+	case "switch":
+		return saySwitched(c.SwitchChat(agent, model, effort))
 	case "model":
 		chosen, err := c.SwitchMain(model, effort)
 		if err != nil {

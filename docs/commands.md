@@ -102,9 +102,11 @@
 | `mia main say <text…>` | type a message into it and submit it; refused while it [asks something](main.md#when-it-asks-first) |
 | `mia main press <keys…>` | type keys into it with no Enter after: `mia main press 1` picks an option when it is the main agent that asks, moving its cursor there and pressing Enter when its options have no numbers |
 | `mia main interrupt` | stop it mid-work |
+| `mia main switch --agent <name> [--model <m>] [--effort <e>]` | have it [go on with another agent](main.md#another-agent-mid-conversation), its conversation carried over and said in front of the next thing said to it; it is that agent from then on |
 | `mia chats [list]` | the [chats](chats.md), the main agent first: name, agent, what it is doing, its first words |
 | `mia chats new --agent <agent> [--model <m>] [--effort <e>] [-- <first words…>]` | make a chat, print its name and start it; its first words are said once it is ready, held while it asks something first |
 | `mia chats say <name> -- <text…>` · `press <name> <keys…>` · `interrupt <name>` · `model <name> <model> [--effort <e>]` | as `mia main say`, `press`, `interrupt` and `model`, to that chat; `main` is the main agent |
+| `mia chats switch <name> --agent <agent> [--model <m>] [--effort <e>]` | as `mia main switch`, to that chat |
 | `mia chats stop <name>` · `start <name>` · `remove <name>` | end its session, its folder and conversations staying; start it again going on with its last conversation; end it and take its folder and its name |
 | `mia api main` | where the main agent stands, from any folder |
 | `mia api main turns [--conversation <id>] [--after <n>]` | its conversation as turns, each of mia's verbs it ran said as what it did; `--conversation` reads one of its earlier ones |

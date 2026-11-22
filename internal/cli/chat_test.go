@@ -40,8 +40,8 @@ type shownPiece struct {
 // shownTurn is a turn of a chat as the window reads it: a transcript's, or
 // a row of the chat's own.
 type shownTurn struct {
-	app.Turn
-	From, To, Note, Tone, Key, ID string
+	app.Turn      // a switch's from, to and note among it
+	Tone, Key, ID string
 }
 
 // find is the first piece of a kind in a piece, itself too, and nil for none.
@@ -1281,7 +1281,7 @@ func TestAnotherAgentsModelHandsTheConversationOverAndClosesTheOldWindowLast(t *
 // the conversation in front, only what follows the rule.
 func TestTheFirstThingSentAfterAHandingCarriesTheConversation(t *testing.T) {
 	handoff := "# Handoff: a conversation with claude, to go on from\n\n## The conversation\n\n### 1 · user\n\nmake it faster\n\n### 2 · claude\n\nIt is faster.\n"
-	first := carried("claude", handoff, "/repo/.git/mia/handoffs/monduli/claude-c1.md", "and the tests", chatCarry)
+	first := app.CarriedText("claude", handoff, "/repo/.git/mia/handoffs/monduli/claude-c1.md", "and the tests", chatCarry)
 	want := "The conversation so far, with claude:\n\n" + strings.TrimSpace(handoff) + "\n\n" + chatRule + "\n\nand the tests"
 	if first != want {
 		t.Errorf("the first thing sent is %q", first)
@@ -1297,7 +1297,7 @@ func TestTheFirstThingSentAfterAHandingCarriesTheConversation(t *testing.T) {
 	for n := 1; n <= 400; n++ {
 		long += fmt.Sprintf("\n### %d · user\n\n%s\n", n, strings.Repeat("word ", 60))
 	}
-	cut := carried("claude", long, "/repo/full.md", "go on", 48<<10)
+	cut := app.CarriedText("claude", long, "/repo/full.md", "go on", 48<<10)
 	if len(cut) > 48<<10+500 || !strings.HasPrefix(cut, "The conversation so far, with claude:\n\n[Only its last turns are here: the whole of it is in /repo/full.md]\n\n### ") ||
 		!strings.Contains(cut, "\n### 400 · user\n") || strings.Contains(cut, "\n### 1 · user\n") || !strings.HasSuffix(cut, chatRule+"\n\ngo on") {
 		t.Errorf("a long one is said in %d bytes: %.200q … %.80q", len(cut), cut, cut[len(cut)-80:])
@@ -1467,7 +1467,7 @@ func TestAChatSaysEachSwitchOfAgentsWhereItHappened(t *testing.T) {
 	}
 	cwd, _ := json.Marshal(record.Path)
 	carries := func(from, words string) string {
-		text, _ := json.Marshal(carried(from, "### 1 · user\n\nmake it faster\n", "/h/full.md", words, chatCarry))
+		text, _ := json.Marshal(app.CarriedText(from, "### 1 · user\n\nmake it faster\n", "/h/full.md", words, chatCarry))
 		return string(text)
 	}
 	says := func(kind, at, content string) string {

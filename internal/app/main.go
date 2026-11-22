@@ -516,14 +516,21 @@ func (a *App) down() error {
 
 // SayToMain types text into the main agent as one message and submits it:
 // pasted, so a line break in it is not an Enter, and Enter after. While it
-// asks something nothing is typed: the Enter would answer it.
+// asks something nothing is typed: the Enter would answer it. The first
+// said to an agent it was switched to has the conversation it goes on
+// from in front of it.
 func (a *App) SayToMain(text string) error {
 	host := a.mainHost()
 	window, _, running := a.mainWindow(host)
 	if !running {
 		return a.down()
 	}
-	return a.mainGone(host, say(host, a.chatSession(), window.Name, window.Name, a.chatVerb("press"), text))
+	typed, back := a.carrying(window.Name, text)
+	err := a.mainGone(host, say(host, a.chatSession(), window.Name, window.Name, a.chatVerb("press"), typed))
+	if err != nil {
+		back()
+	}
+	return err
 }
 
 // say types text into an agent's window as one message and submits it:
@@ -605,41 +612,58 @@ func (a *App) InterruptMain() error {
 // MainTurns is one of the main agent's conversations as turns, those
 // after turn number after, with each of mia's verbs it ran that changed
 // something said as what it did: the one named, which has to be one made
-// in its folder, or with no id the one it has open.
+// in its folder, or with no id the one it has open, after the turns of
+// those it went on from when it was switched to another agent, each
+// followed by its switch.
 func (a *App) MainTurns(id string, after int) ([]Turn, error) {
+	var before []Turn
+	own := 0
 	if id == "" {
-		if id = a.Main().Conversation; id == "" {
-			return []Turn{}, nil
+		state := a.Main()
+		before, own = a.threadBefore(state)
+		if id = state.Conversation; id == "" {
+			return a.didAll(append([]Turn{}, afterTurn(before, after)...)), nil
 		}
 	}
+	offset := len(before) - own
 	in, _ := a.where()
-	turns, found, err := a.turnsIn(in, id, "", "", after)
+	turns, found, err := a.turnsIn(in, id, "", "", max(own, after-offset))
 	if err == nil && !found {
-		if err = a.mainUnwritten(id)(); err == nil {
-			return []Turn{}, nil
-		}
+		err = a.mainUnwritten(id)()
 	}
 	if err != nil {
 		return nil, err
 	}
-	return a.didAll(turns), nil
+	return a.didAll(append(append([]Turn{}, afterTurn(before, after)...), onFrom(turns, own, offset)...)), nil
 }
 
 // FollowMain is MainTurns as the conversation is written to: say is handed
 // what MainTurns gives, then each time it gains turns or one grows, those
 // turns, until stop is closed or say fails. With no id it is the one the
-// main agent has open now; with none open, no turns, and nothing more.
+// main agent has open now; with none open, the turns before it, and
+// nothing more.
 func (a *App) FollowMain(id string, after int, stop <-chan struct{}, say func([]Turn) error) error {
+	var before []Turn
+	own := 0
 	if id == "" {
-		if id = a.Main().Conversation; id == "" {
-			if say([]Turn{}) == nil {
+		state := a.Main()
+		before, own = a.threadBefore(state)
+		if id = state.Conversation; id == "" {
+			if say(a.didAll(append([]Turn{}, afterTurn(before, after)...))) == nil {
 				<-stop
 			}
 			return nil
 		}
 	}
+	offset, first := len(before)-own, true
+	dress := func(turns []Turn) []Turn {
+		if turns = onFrom(turns, own, offset); first {
+			first, turns = false, append(afterTurn(before, after), turns...)
+		}
+		return a.didAll(turns)
+	}
 	in, _ := a.where()
-	return a.follow(in, id, "", "", after, a.mainUnwritten(id), a.didAll, stop, say)
+	return a.follow(in, id, "", "", max(own, after-offset), a.mainUnwritten(id), dress, stop, say)
 }
 
 // mainUnwritten is what it is that no agent has one of the main agent's

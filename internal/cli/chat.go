@@ -46,12 +46,8 @@ const (
 	chatFrame = 720
 	chatDraft = 4000
 	// chatCarry is how many bytes of a conversation gone on from are said
-	// in front of the first thing sent to the agent that goes on with it,
-	// at most: about a hundred thousand tokens, half of what the least of
-	// the agents' models reads at once, so there is room left to answer
-	// in. A handoff is under it unless the whole of a very long
-	// conversation was asked for: tmux pastes more than this in one go.
-	chatCarry    = 400 << 10
+	// in front of the first thing sent to the agent that goes on with it.
+	chatCarry    = app.CarriedMost
 	chatSaid     = 200
 	chatHeads    = 300
 	chatReadMost = 400
@@ -306,7 +302,7 @@ func banded(band chatBand) chatTurn { return chatTurn{n: band.N, kind: band.Kind
 // waiting is a switch as it stands until what it says was handed over is
 // sent, with the person's next message: at the place before its own.
 func waiting(band chatBand) chatBand {
-	note := "context goes with your next message"
+	note := app.CarriedWaits
 	if fork, _, _ := strings.Cut(band.Note, " · "); strings.HasPrefix(fork, forkedFrom) {
 		note = fork + " · " + note // a fork says where it was made from all along
 	}
@@ -316,27 +312,14 @@ func waiting(band chatBand) chatBand {
 
 // forkedFrom is how the band of a fork begins: the number of the reply it
 // was made from follows.
-const forkedFrom = "forked from reply "
+const forkedFrom = app.ForkedFrom
 
 // switched is the band of a handing: what was handed over, in how many
 // turns and how many of them left out, that the agent took its own
 // conversation up again and how many turns were said since, or of a fork
 // the reply it was made from.
 func switched(handed app.Handed) *chatBand {
-	note, since := "context handed over", ""
-	if handed.Resumed {
-		note, since = "took its own conversation up again", " since"
-	}
-	if handed.Upto > 0 {
-		note = forkedFrom + strconv.Itoa(handed.Upto)
-	}
-	if handed.Turns > 0 {
-		note += " · " + counted(handed.Turns, "turn") + since
-	}
-	if handed.LeftOut > 0 {
-		note += fmt.Sprintf(" · %d left out", handed.LeftOut)
-	}
-	return &chatBand{Kind: "switch", From: handed.From.Agent, To: handed.To.Agent, Note: note}
+	return &chatBand{Kind: "switch", From: handed.From.Agent, To: handed.To.Agent, Note: handed.Note()}
 }
 
 // chatCut is where turns of the conversation followed stand in the chat:
@@ -863,28 +846,6 @@ func (t *talk) put(band chatBand, past int) chatTurn {
 // person sends and their own words.
 const chatRule = app.CarriedRule
 
-// carried is the first thing sent to an agent that goes on with another's
-// conversation, as one message: that conversation as mia wrote it out,
-// who said what, then a rule, then the person's words — so the agent
-// answers with it in hand, and is told nothing else. Of one longer than
-// most bytes only its last turns that fit are said, under a line saying
-// where the whole of it is.
-func carried(from, transcript, file, words string, most int) string {
-	if len(transcript) > most {
-		turns := strings.Split(transcript, "\n### ")
-		kept, room := len(turns), most
-		for kept > 1 && len(turns[kept-1]) < room {
-			kept--
-			room -= len(turns[kept]) + len("\n### ")
-		}
-		transcript = "[Only its last turns are here: the whole of it is in " + file + "]\n"
-		for _, turn := range turns[kept:] {
-			transcript += "\n### " + turn
-		}
-	}
-	return app.CarriedOpens(from) + "\n\n" + strings.TrimSpace(transcript) + "\n\n" + chatRule + "\n\n" + words
-}
-
 // ownWords is what the person themselves sent, of a message that may have
 // a conversation said in front of it: what follows the rule.
 func ownWords(text string) string { return app.OwnWords(text) }
@@ -1080,7 +1041,7 @@ func typedFor(kept carrying, record model.Record, window, words string, read fun
 	if err != nil {
 		return "Read " + was.File + ": the conversation so far, with " + was.From + ".\n\n" + chatRule + "\n\n" + words, back
 	}
-	return carried(was.From, string(transcript), cmp.Or(was.Full, was.File), words, chatCarry), back
+	return app.CarriedText(was.From, string(transcript), cmp.Or(was.Full, was.File), words, chatCarry), back
 }
 
 // agent is the agent that answers in this chat.
@@ -2534,7 +2495,7 @@ func (r *chatRun) fan(one chatMake, text, head string) (there bool, err error) {
 	if err != nil {
 		return true, err
 	}
-	return true, r.a.SayToWindow(record, done.To.Window.Name, carried(v.agent(), string(transcript), cmp.Or(done.Full, done.Handoff), text, chatCarry))
+	return true, r.a.SayToWindow(record, done.To.Window.Name, app.CarriedText(v.agent(), string(transcript), cmp.Or(done.Full, done.Handoff), text, chatCarry))
 }
 
 // applies switches this window's agent to a model and an effort, or hands

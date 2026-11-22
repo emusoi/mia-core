@@ -15,6 +15,7 @@ mia chats new --agent claude --model opus --effort high              # one with 
 mia chats say goba -- and the tests?        # say something to it, Enter after
 mia chats press goba 2                      # a key with no Enter: answer what it asks
 mia chats model goba sonnet --effort high   # switch its model while it runs
+mia chats switch goba --agent claude --model opus   # go on with another agent, the conversation carried over
 mia chats interrupt goba                    # stop it mid-work
 mia chats stop goba                         # end its session; its folder and conversations stay
 mia chats start goba                        # start it again, going on with its last conversation
@@ -63,6 +64,16 @@ nothing while it asks something; `press` types keys with no Enter; with
 none running, each says so and that `mia chats start <name>` starts it.
 What follows the name is taken as it is typed: `--json` or `-h` in it are
 words.
+
+## Another agent mid-conversation
+
+`mia chats switch <name> --agent <agent> [--model <model>] [--effort <effort>]`
+has it go on with another agent as [`mia main switch`](main.md#another-agent-mid-conversation)
+has the main agent: what was said is written out as a handoff in its
+folder, the agent it was with stopped, the other started in its place and
+handed the conversation in front of the first thing said to it. It is
+that agent from then on, and its turns hold a `switch` turn where it
+went on.
 
 ## For an app
 

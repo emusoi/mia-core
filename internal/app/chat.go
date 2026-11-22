@@ -39,6 +39,68 @@ const CarriedRule = "----- end of the conversation so far -----"
 // begins: what says, of an agent's first message, that it goes on from one.
 func CarriedOpens(from string) string { return "The conversation so far, with " + from + ":" }
 
+// CarriedMost is how many bytes of a conversation gone on from are said in
+// front of the first thing sent to the agent that goes on with it, at
+// most: about a hundred thousand tokens, half of what the least of the
+// agents' models reads at once, so there is room left to answer in. A
+// handoff is under it unless the whole of a very long conversation was
+// asked for: tmux pastes more than this in one go.
+const CarriedMost = 400 << 10
+
+// CarriedText is the first thing sent to an agent that goes on with
+// another's conversation, as one message: that conversation as mia wrote
+// it out, who said what, then a rule, then the person's words — so the
+// agent answers with it in hand, and is told nothing else. Of one longer
+// than most bytes only its last turns that fit are said, under a line
+// saying where the whole of it is.
+func CarriedText(from, transcript, file, words string, most int) string {
+	if len(transcript) > most {
+		turns := strings.Split(transcript, "\n### ")
+		kept, room := len(turns), most
+		for kept > 1 && len(turns[kept-1]) < room {
+			kept--
+			room -= len(turns[kept]) + len("\n### ")
+		}
+		transcript = "[Only its last turns are here: the whole of it is in " + file + "]\n"
+		for _, turn := range turns[kept:] {
+			transcript += "\n### " + turn
+		}
+	}
+	return CarriedOpens(from) + "\n\n" + strings.TrimSpace(transcript) + "\n\n" + CarriedRule + "\n\n" + words
+}
+
+// CarriedWaits is said of a switch while what was handed over is still to
+// be sent, with the person's next message.
+const CarriedWaits = "context goes with your next message"
+
+// ForkedFrom is how a fork's switch is said: the number of the reply it
+// was made from follows.
+const ForkedFrom = "forked from reply "
+
+// Note is a handing as a switch says it: what was handed over, in how many
+// turns and how many of them left out, that the agent took its own
+// conversation up again and how many turns were said since, or of a fork
+// the reply it was made from.
+func (handed Handed) Note() string {
+	note, since := "context handed over", ""
+	if handed.Resumed {
+		note, since = "took its own conversation up again", " since"
+	}
+	if handed.Upto > 0 {
+		note = ForkedFrom + strconv.Itoa(handed.Upto)
+	}
+	switch {
+	case handed.Turns == 1:
+		note += " · 1 turn" + since
+	case handed.Turns > 1:
+		note += fmt.Sprintf(" · %d turns%s", handed.Turns, since)
+	}
+	if handed.LeftOut > 0 {
+		note += fmt.Sprintf(" · %d left out", handed.LeftOut)
+	}
+	return note
+}
+
 // OwnWords is what the person themselves sent, of a message that may have
 // a conversation said in front of it: what follows the rule.
 func OwnWords(text string) string {

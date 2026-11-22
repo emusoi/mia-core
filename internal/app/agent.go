@@ -482,6 +482,8 @@ type WindowRef struct {
 //	commit   a commit the agent made: hash and subject
 //	did      the main agent ran one of mia's verbs that change something: text,
 //	         verb, and the repository, worktree and machine the command names
+//	switch   a chat went on with another agent, its conversation carried over:
+//	         from, to, and a note of what was handed over
 type Turn struct {
 	N        int       `json:"n"`
 	Kind     string    `json:"kind"`
@@ -500,6 +502,10 @@ type Turn struct {
 	Worktree   string `json:"worktree,omitempty"`
 	Machine    string `json:"machine,omitempty"`
 
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
+	Note string `json:"note,omitempty"`
+
 	// ref ties a question to its answer while a transcript is read: the id
 	// the agent gave the asking.
 	ref string
@@ -516,10 +522,11 @@ const (
 	turnAnswer   = "answer"
 	turnCommit   = "commit"
 	turnDid      = "did"
+	turnSwitch   = "switch"
 )
 
 // TurnKinds is every kind a turn is.
-var TurnKinds = []string{turnAsked, turnSaid, turnTool, turnQuestion, turnAnswer, turnCommit, turnDid}
+var TurnKinds = []string{turnAsked, turnSaid, turnTool, turnQuestion, turnAnswer, turnCommit, turnDid, turnSwitch}
 
 // oneLine is text on one line, cut to what a list shows.
 func oneLine(text string) string {

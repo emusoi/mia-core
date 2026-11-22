@@ -91,12 +91,45 @@ stop` first. Its model and effort are its own under `[agents]`, or those
 agent `[main]` names. From another machine, it is that machine's mia's,
 as every `mia main …` is.
 
+`mia main switch --agent <name> [--model <model>] [--effort <effort>]`
+has it [go on with another agent mid-conversation](#another-agent-mid-conversation),
+and stays that agent from then on.
+
 `mia main start --role <name>` starts it as a [role](worktrees.md#a-role)
 says — its agent, model, effort and account, the `[main]` ones where it
 says none — and, started, sends it the role's body as `mia main say`
 does. A role opens a conversation, so one that runs is refused: `mia main
 stop` first, or `--new --restart`. From another machine it is that
 machine's role of the name.
+
+## Another agent mid-conversation
+
+`mia main switch --agent <name> [--model <model>] [--effort <effort>]`
+has it go on with another agent, its conversation carried over as a
+worktree's window hands one to another: no agent loads another's, so
+what was said is written out as a handoff in its folder, `.mia/handoffs`,
+who said what and each thing done in a line; the agent it was with is
+stopped, the other started in its place with a new conversation, and the
+handoff is said in front of the first thing said to it, with `mia main
+say` or from an app, so it answers with it in hand.
+
+```
+the main agent goes on with codex, 12 turns with claude carried over in front of the next thing said: /home/user/.config/mia/main/.mia/handoffs/main/claude-c1.md
+```
+
+From then on it is that agent: started again, it goes on with that
+agent's conversation, with the model and the effort it was switched
+with, until it is switched back to the agent `[main] agent` names. Back
+to an agent it went on from, that agent takes its own conversation up
+again, and is handed only what was said since. Its turns are the
+conversations it went on from, each followed by a `switch` turn, then its
+own: see [Automation](api.md#the-main-agent). Nothing was said yet, it is
+only started as the other agent.
+
+While it asks something or is at work it is not switched, and says so:
+`mia main interrupt` stops it. Named the agent it runs as, with a model
+or an effort, it is `mia main model`. From another machine it is that
+machine's mia's, as every `mia main …` is.
 
 ## Its model
 

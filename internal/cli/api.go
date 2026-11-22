@@ -420,7 +420,7 @@ func apiCapabilities() capabilities {
 		Queries: apiQueryList,
 		Features: []string{
 			"direct-http", "project-config", "doctor", "environment-readiness", "environment-drift",
-			"local-sessions", "conversations", "main-agent", "standing", "remote-sync-preview", "sync-conflicts", "safe-cleanup", "stack-sync", "merged-gc", "compose-environments", "agent-models", "setups", "resume-model", "main-start-agent", "accounts", "main-asks", "main-start-new", "main-conversations", "machine-reach", "roles", "account-login", "account-user-default", "account-signals", "conversation-continue", "conversation-thread", "apps", "conversation-follow", "chat", "git-app", "files-app", "review-app", "agent-again", "chats",
+			"local-sessions", "conversations", "main-agent", "standing", "remote-sync-preview", "sync-conflicts", "safe-cleanup", "stack-sync", "merged-gc", "compose-environments", "agent-models", "setups", "resume-model", "main-start-agent", "accounts", "main-asks", "main-start-new", "main-conversations", "machine-reach", "roles", "account-login", "account-user-default", "account-signals", "conversation-continue", "conversation-thread", "apps", "conversation-follow", "chat", "git-app", "files-app", "review-app", "agent-again", "chats", "chat-switch",
 		},
 	}
 }

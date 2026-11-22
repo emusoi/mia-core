@@ -41,7 +41,7 @@ func TestTheChatsAnswerOutsideARepositoryAndMainIsOne(t *testing.T) {
 	if _, code := answered(t, "chat", "nobody"); code != exitFailed {
 		t.Errorf("api chat of a chat there is not exited %d", code)
 	}
-	for _, bad := range [][]string{{"chats", "new"}, {"chats", "new", "--agent"}, {"chats", "say", "goba"}, {"chats", "say", "goba", "--"}, {"chats", "press", "goba"}, {"chats", "stop"}, {"chats", "start", "a", "b"}, {"chats", "restart", "goba"}, {"chats", "model", "goba"}} {
+	for _, bad := range [][]string{{"chats", "new"}, {"chats", "new", "--agent"}, {"chats", "say", "goba"}, {"chats", "say", "goba", "--"}, {"chats", "press", "goba"}, {"chats", "stop"}, {"chats", "start", "a", "b"}, {"chats", "restart", "goba"}, {"chats", "model", "goba"}, {"chats", "switch", "goba"}, {"chats", "switch", "--agent", "codex"}, {"main", "switch"}, {"main", "switch", "codex"}} {
 		if code := Run(bad); code != exitUsage {
 			t.Errorf("%v exited %d", bad, code)
 		}
@@ -101,11 +101,13 @@ esac
 		t.Errorf("chats new = %q, exit %d", data, code)
 	}
 	Run([]string{"chats", "say", "goba", "--", "and -h", "--json"})
+	Run([]string{"chats", "switch", "goba", "--agent", "pi", "--model", "sonnet"})
+	Run([]string{"main", "switch", "--agent", "codex", "--effort", "high"})
 	if _, code := answered(t, "chat", "turns", "goba", "--follow"); code != exitFailed {
 		t.Errorf("following a chat on another machine exited %d", code)
 	}
 	data, _ := os.ReadFile(log)
-	for _, want := range []string{"MIA_MAIN_HERE=1 $HOME/.local/bin/mia", "'chats' 'new' '--agent' 'codex' '--' 'look at' '--json'", "'chats' 'say' 'goba' '--' 'and -h' '--json'"} {
+	for _, want := range []string{"MIA_MAIN_HERE=1 $HOME/.local/bin/mia", "'chats' 'new' '--agent' 'codex' '--' 'look at' '--json'", "'chats' 'say' 'goba' '--' 'and -h' '--json'", "'chats' 'switch' 'goba' '--agent' 'pi' '--model' 'sonnet'", "'main' 'switch' '--agent' 'codex' '--effort' 'high'"} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("fedora was not asked %s:\n%s", want, data)
 		}
