@@ -213,17 +213,17 @@ func TestStyleDispatchesToRemoteTmux(t *testing.T) {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(lines) != 3 {
-		t.Fatalf("remote tmux calls = %d, want session style, list windows, window style: %q", len(lines), data)
+	if len(lines) != 2 {
+		t.Fatalf("remote tmux calls = %d, want list windows, then the session's style and the windows' together: %q", len(lines), data)
 	}
-	if !strings.Contains(lines[0], "'set-option' '-t' '=mia-remote:'") || !strings.Contains(lines[0], "';' 'set-option'") {
-		t.Errorf("session options were not batched for the remote Mia session: %q", lines[0])
+	if !strings.Contains(lines[0], "'list-windows' '-t' '=mia-remote:'") {
+		t.Errorf("remote windows were not listed by exact Mia session: %q", lines[0])
 	}
-	if !strings.Contains(lines[1], "'list-windows' '-t' '=mia-remote:'") {
-		t.Errorf("remote windows were not listed by exact Mia session: %q", lines[1])
+	if !strings.Contains(lines[1], "'set-option' '-t' '=mia-remote:'") || !strings.Contains(lines[1], "';' 'set-option'") {
+		t.Errorf("session options were not batched for the remote Mia session: %q", lines[1])
 	}
-	if !strings.Contains(lines[2], "'set-option' '-w' '-t' '%7'") {
-		t.Errorf("window options were not sent to the remote tmux window: %q", lines[2])
+	if !strings.Contains(lines[1], "'set-option' '-w' '-t' '%7'") {
+		t.Errorf("window options were not sent to the remote tmux window: %q", lines[1])
 	}
 	for _, line := range lines {
 		if strings.Contains(line, "'-g'") || strings.Contains(line, "'-f'") {

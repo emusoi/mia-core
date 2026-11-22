@@ -118,3 +118,24 @@ func TestAChatIsToldWhatAWindowsScreenAsks(t *testing.T) {
 		t.Error("a window that is not there asks")
 	}
 }
+
+// An agent mia started by a shell, or one behind node, is told by what is
+// in front in its window's terminal: ps is asked of that terminal alone.
+func TestAWindowsAgentBehindItsShellIsToldByWhatIsInFront(t *testing.T) {
+	gittest.Isolate(t)
+	ownTmux(t)
+	dir, bin := t.TempDir(), t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "pi"), []byte("#!/bin/sh\nprintf 'ready'\nsleep 300\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	a := &app.App{Root: dir}
+	record := model.Record{Name: "behind", Path: dir}
+	if _, err := a.NewWindow(record, "work", session.What{Kind: session.KindAgent}, []string{"sh", "-c", "pi --model anthropic/claude-opus-5; exec sh"}); err != nil {
+		t.Fatal(err)
+	}
+	shows(t, record.Name, "work", "ready")
+	if runs := a.WindowRuns(record, "work"); runs.Agent != "pi" || !runs.Reads {
+		t.Errorf("the window behind its shell runs %+v", runs)
+	}
+}

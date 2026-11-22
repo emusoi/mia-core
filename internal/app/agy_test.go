@@ -127,8 +127,8 @@ func TestAgysWindowIsKnownByWhatItRuns(t *testing.T) {
 			t.Errorf("agentOf(%q) = %q, want %q", command, got, want)
 		}
 	}
-	front := func() map[int]string {
-		return map[int]string{7: "/bin/sh -lc agy '--model' 'gemini-4-flash'; exec '/bin/sh' -l"}
+	front := func(pid int) string {
+		return map[int]string{7: "/bin/sh -lc agy '--model' 'gemini-4-flash'; exec '/bin/sh' -l"}[pid]
 	}
 	if got := agentBehind(builtin, "sh", "host", session.KindAgent, 7, front); got != "agy" {
 		t.Errorf("behind the shell mia started it by: %q", got)

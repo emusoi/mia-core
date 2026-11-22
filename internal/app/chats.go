@@ -464,7 +464,12 @@ func (a *App) SwitchChat(to, modelID, effort string) (Switched, error) {
 			talk = Talk{Agent: carried.From, ID: carried.ID}
 		}
 	}
-	heads, _ := a.Conversations(Wanted{})
+	// of the two agents, the one it was with and the other, which it may have gone on from
+	heads, _ := a.Conversations(Wanted{Agent: talk.Agent})
+	if talk.Agent != "" && talk.Agent != agent.Name {
+		theirs, _ := a.Conversations(Wanted{Agent: agent.Name})
+		heads = append(heads, theirs...)
+	}
 	at := slices.IndexFunc(heads, func(h Head) bool { return h.Agent == talk.Agent && h.ID == talk.ID && talk.ID != "" })
 	done := Switched{From: from, To: agent.Name}
 	var head Head
@@ -501,7 +506,7 @@ func (a *App) SwitchChat(to, modelID, effort string) (Switched, error) {
 			return Switched{}, err
 		}
 	}
-	started, err := a.startMain(agent.Name, modelID, effort, "", done.Resumes == "", done.Resumes, false)
+	started, err := a.startMain(agent.Name, modelID, effort, "", done.Resumes == "", done.Resumes, false, true) // told nothing until the next thing said to it
 	if err != nil {
 		return Switched{}, fmt.Errorf("%s is stopped, and %s did not start: %w — `%s` goes on with %s's conversation", from, agent.Name, err, a.chatVerb("start"), from)
 	}

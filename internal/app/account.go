@@ -294,7 +294,8 @@ func (a *App) accountWindows() map[string][]string {
 		maps.Copy(kept, chosenIn(dir))
 	}
 	table := a.agents()
-	behind := sync.OnceValue(foreground)
+	all := sync.OnceValue(foreground)
+	behind := func(pid int) string { return all()[pid] }
 	using := map[string][]string{}
 	for _, name := range slices.Sorted(maps.Keys(panes)) {
 		worktree, ours := strings.CutPrefix(name, "mia-")
@@ -910,9 +911,9 @@ func (a *App) AccountOfWindow(record model.Record, window, name string) error {
 			pane.Title = p.Title
 		}
 	}
-	var front func() map[int]string
+	var front func(int) string
 	if host.SSH == "" {
-		front = foreground
+		front = foregroundOf
 	}
 	agent, known := agentNamed(a.agents(), agentBehind(a.agents(), pane.Command, pane.Title, pane.Kind, pane.PID, front))
 	if !known {

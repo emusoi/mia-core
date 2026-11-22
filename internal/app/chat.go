@@ -200,9 +200,9 @@ func (a *App) WindowRuns(record model.Record, window string) Runs {
 // knows.
 func (a *App) windowAgent(record model.Record, window string) (host session.Host, agent Agent, pane session.Window, runs Runs) {
 	host = a.sessionOf(record)
-	var front func() map[int]string
+	var front func(int) string
 	if host.SSH == "" {
-		front = foreground
+		front = foregroundOf
 	}
 	agent, pane, known := agentInWindow(a.agents(), host.Panes(record.Name), window, front)
 	if !known {
@@ -252,7 +252,7 @@ func (a *App) WindowConversation(record model.Record, window string) (head Head,
 // named for its version is claude, and one behind node, or behind the
 // shell mia started it by, is who front says it is — and failing that by
 // its window's name, when it is named for its agent.
-func agentInWindow(table []Agent, panes []session.Pane, window string, front func() map[int]string) (Agent, session.Window, bool) {
+func agentInWindow(table []Agent, panes []session.Pane, window string, front func(pid int) string) (Agent, session.Window, bool) {
 	var pane session.Window
 	for _, one := range session.WindowsFrom(panes) {
 		if one.Name == window || strconv.Itoa(one.Index) == window {

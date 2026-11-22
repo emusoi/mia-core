@@ -44,27 +44,30 @@ var miaWindowStyle = [][2]string{
 
 // Style changes only this worktree's tmux session and its windows. The terminal's
 // ANSI palette supplies the light or dark colours for the status and borders.
+// It is one ask of tmux: the session's options and each window's together.
 func (h Host) Style(worktree string) error {
 	target := Target(worktree, "")
 	self, _ := os.Executable()
 	style := append(miaSessionStyle[:len(miaSessionStyle):len(miaSessionStyle)], [2]string{"status-right", quietStatus(self, h.SSH != "")})
-	if err := h.styleOptions(target, false, style); err != nil {
-		return err
-	}
+	args := setting(nil, target, false, style)
 	windows, err := h.run("list-windows", "-t", target, "-F", "#{window_id}")
 	if err != nil {
+		_ = h.setAll(target, args)
 		return fmt.Errorf("list windows for %s: %w", worktree, err)
 	}
 	for _, window := range strings.Fields(windows) {
-		if err := h.styleOptions(window, true, miaWindowStyle); err != nil {
-			return err
-		}
+		args = setting(append(args, ";"), window, true, miaWindowStyle)
 	}
-	return nil
+	return h.setAll(target, args)
 }
 
 func (h Host) styleOptions(target string, window bool, options [][2]string) error {
-	var args []string
+	return h.setAll(target, setting(nil, target, window, options))
+}
+
+// setting is args with the commands that set a target's options, a
+// window's or a session's, after them.
+func setting(args []string, target string, window bool, options [][2]string) []string {
 	for index, option := range options {
 		if index > 0 {
 			args = append(args, ";")
@@ -75,6 +78,11 @@ func (h Host) styleOptions(target string, window bool, options [][2]string) erro
 		}
 		args = append(args, "-t", target, option[0], option[1])
 	}
+	return args
+}
+
+// setAll runs commands that set options, of target as a failure says it.
+func (h Host) setAll(target string, args []string) error {
 	// The persistent control client quotes every argument, including tmux's
 	// command separator. Run these batched commands through tmux directly.
 	command := run.Tool{Binary: "tmux", SSH: h.SSH}

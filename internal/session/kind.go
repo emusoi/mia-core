@@ -49,6 +49,20 @@ type What struct {
 // Mark keeps what a pane is on it, as its pane options @mia_kind and
 // @mia_label.
 func (h Host) Mark(pane string, what What) error {
+	args := marking(pane, what)
+	if args == nil {
+		return nil
+	}
+	// the persistent control client quotes tmux's command separator too
+	if out, err := (run.Tool{Binary: "tmux", SSH: h.SSH}).Combined(args...); err != nil {
+		return fmt.Errorf("mark pane %s %s: %s", pane, what.Kind, strings.TrimSpace(out))
+	}
+	return nil
+}
+
+// marking is the commands that mark a pane with what it is; none of a
+// pane of no kind.
+func marking(pane string, what What) []string {
 	if what.Kind == "" {
 		return nil
 	}
@@ -56,11 +70,7 @@ func (h Host) Mark(pane string, what What) error {
 	if what.Label != "" {
 		args = append(args, ";", "set-option", "-p", "-t", pane, "@mia_label", what.Label)
 	}
-	// the persistent control client quotes tmux's command separator too
-	if out, err := (run.Tool{Binary: "tmux", SSH: h.SSH}).Combined(args...); err != nil {
-		return fmt.Errorf("mark pane %s %s: %s", pane, what.Kind, strings.TrimSpace(out))
-	}
-	return nil
+	return args
 }
 
 // Title is what tmux calls a pane, and a window it names after its active

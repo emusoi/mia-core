@@ -202,7 +202,7 @@ func TestAWindowBehindTheShellMiaStartedItByIsItsAgents(t *testing.T) {
 		{Index: 7, Window: "node", Command: "node", PID: 17, Title: "π - shop"},
 	}
 	asked := 0
-	front := func() map[int]string {
+	front := func(pid int) string {
 		asked++
 		return map[int]string{
 			12: "zsh -lc opencode; exec 'zsh' -l",
@@ -210,7 +210,7 @@ func TestAWindowBehindTheShellMiaStartedItByIsItsAgents(t *testing.T) {
 			15: "zsh -l", // opencode ended: its shell is in front
 			16: "zsh -lc opencode; exec 'zsh' -l",
 			17: "node /opt/pi/cli.js",
-		}
+		}[pid]
 	}
 	for window, want := range map[string]string{"1": "opencode", "2": "opencode", "opencode-2": "opencode", "3": "claude", "4": "opencode", "5": "", "6": "", "7": "pi", "9": ""} {
 		agent, _, known := agentInWindow(builtin, panes, window, front)

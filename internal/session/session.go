@@ -748,9 +748,14 @@ func (h Host) StartWindowWith(env, worktree, dir, window string, what What, argv
 	if err != nil {
 		return fmt.Errorf("start %s in %s: %s", window, worktree, strings.TrimSpace(out))
 	}
-	// a command that ends at once takes its pane with it before it is marked
-	_ = h.Mark(strings.TrimSpace(out), what)
-	_ = h.styleOptions(Target(worktree, window), true, miaWindowStyle)
+	// a command that ends at once takes its pane with it before it is marked;
+	// marked and styled in one ask
+	target := Target(worktree, window)
+	args = marking(strings.TrimSpace(out), what)
+	if args != nil {
+		args = append(args, ";")
+	}
+	_ = h.setAll(target, setting(args, target, true, miaWindowStyle))
 	return nil
 }
 

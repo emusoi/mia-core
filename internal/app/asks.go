@@ -229,18 +229,25 @@ func pressAnswer(host session.Host, worktree, window, keys string) error {
 }
 
 // settleFor is how long an agent just started is watched before its start
-// is said: one that asks something first, or ends, does it by then.
-const settleFor = 3 * time.Second
+// is said: one that asks something first, or ends, does it by then. Ready
+// is how long it has drawn the same to be ready to be typed into, and
+// drawn how long for one that is typed nothing yet to have come up: it is
+// watched only for ending at once.
+const (
+	settleFor   = 3 * time.Second
+	settleReady = time.Second
+	settleDrawn = 400 * time.Millisecond
+)
 
 // settle watches a window just started until it asks something, ends, or
-// has drawn the same for a second, settleFor at most. It is kept on exit
+// has drawn the same for still, settleFor at most. It is kept on exit
 // meanwhile, so an agent that ends leaves what it said: its last lines
 // when it ended, and the window is closed then.
-func settle(host session.Host, worktree, window string) (said string, ended bool) {
+func settle(host session.Host, worktree, window string, still time.Duration) (said string, ended bool) {
 	kept := host.KeepOnExit(worktree, window, true) == nil
 	var screen string
-	still := time.Now()
-	for start := time.Now(); time.Since(start) < settleFor; time.Sleep(100 * time.Millisecond) {
+	since := time.Now()
+	for start := time.Now(); time.Since(start) < settleFor; time.Sleep(50 * time.Millisecond) {
 		now, err := host.Capture(worktree, window, false)
 		if ended = err != nil || host.Ended(worktree, window); ended {
 			// tmux's line that says so scrolls what it printed up out of the screen
@@ -253,8 +260,8 @@ func settle(host session.Host, worktree, window string) (said string, ended bool
 			break
 		}
 		if now != screen || strings.TrimSpace(now) == "" {
-			screen, still = now, time.Now()
-		} else if time.Since(still) >= time.Second {
+			screen, since = now, time.Now()
+		} else if time.Since(since) >= still {
 			break
 		}
 	}

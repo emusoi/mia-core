@@ -166,8 +166,13 @@ func (a *App) markRunning(heads []Head, records []model.Record, wanted string) [
 	table := a.agents()
 	chosen := a.chosen()
 	// every process of a Mac takes ps a tenth of a second: asked only for a
-	// pane whose program tmux knows by its launcher's name
-	behind := sync.OnceValue(foreground)
+	// pane whose program tmux knows by its launcher's name, and of one
+	// worktree's few windows of each terminal alone
+	all := sync.OnceValue(foreground)
+	behind := func(pid int) string { return all()[pid] }
+	if wanted != "" {
+		behind = foregroundOf
+	}
 	for _, record := range records {
 		if a.sessionOf(record).SSH != "" || wanted != "" && record.Name != wanted {
 			continue // its windows are on a machine, and its conversations with them; or not wanted
@@ -271,6 +276,18 @@ func unsaid(agent string, said holds, account, cwd, worktree string) Head {
 		Started: instant(started), Active: instant(cmp.Or(said.Active, started))}
 }
 
+// foregroundOf is foreground of one terminal, by the process it was
+// started with: of its process group in front alone, where foreground asks
+// of every process, a tenth of a second on a Mac.
+func foregroundOf(pid int) string {
+	group, err := run.Local("ps").Capture("-o", "tpgid=", "-p", strconv.Itoa(pid))
+	if err != nil || strings.TrimSpace(group) == "" {
+		return ""
+	}
+	args, _ := run.Local("ps").Capture("-o", "args=", "-p", strings.TrimSpace(group))
+	return args
+}
+
 // foreground is the command line in front in each terminal, by the process
 // the terminal was started with: what a pane runs, whatever shell is
 // between.
@@ -312,8 +329,19 @@ func (a *App) ConversationTurns(id string, after int) ([]Turn, error) {
 // ConversationIn is ConversationTurns of the copy in one worktree, named as
 // a list of conversations names it; with no worktree, the last written to.
 func (a *App) ConversationIn(id, worktree string, after int) ([]Turn, error) {
+	return a.conversationIn(Talk{ID: id}, worktree, after)
+}
+
+// TalkIn is ConversationIn of a conversation whose agent is known: only
+// that agent's conversations are listed to find it.
+func (a *App) TalkIn(talk Talk, worktree string) ([]Turn, error) {
+	return a.conversationIn(talk, worktree, 0)
+}
+
+func (a *App) conversationIn(talk Talk, worktree string, after int) ([]Turn, error) {
+	id := talk.ID
 	in, _ := a.where()
-	cwd, whose, unwritten, err := a.conversationOf(id, worktree)
+	cwd, whose, unwritten, err := a.conversationOf(id, talk.Agent, worktree)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +369,7 @@ func (a *App) FollowOpen(head Head, enough func([]Turn) bool, stop <-chan struct
 // or one grows, those turns, until stop is closed or say fails.
 func (a *App) FollowConversation(id, worktree string, after int, stop <-chan struct{}, say func([]Turn) error) error {
 	in, _ := a.where()
-	cwd, whose, unwritten, err := a.conversationOf(id, worktree)
+	cwd, whose, unwritten, err := a.conversationOf(id, "", worktree)
 	if err != nil {
 		return err
 	}
@@ -349,13 +377,14 @@ func (a *App) FollowConversation(id, worktree string, after int, stop <-chan str
 }
 
 // conversationOf is where ConversationIn reads a conversation: of the copy
-// in a worktree, its folder and agent, and with none, any. unwritten is
-// what it is that no agent has it: nothing, when a window has it open and
-// nothing of it is written yet.
-func (a *App) conversationOf(id, worktree string) (cwd, whose string, unwritten func() error, err error) {
+// in a worktree, its folder and agent, and with none, any; of an agent's
+// when one is named. unwritten is what it is that no agent has it:
+// nothing, when a window has it open and nothing of it is written yet.
+func (a *App) conversationOf(id, agent, worktree string) (cwd, whose string, unwritten func() error, err error) {
 	var heads []Head
+	whose = agent
 	if worktree != "" {
-		heads, _ = a.Conversations(Wanted{Worktree: worktree})
+		heads, _ = a.Conversations(Wanted{Worktree: worktree, Agent: agent})
 		at := slices.IndexFunc(heads, func(h Head) bool { return h.ID == id })
 		if at < 0 {
 			return "", "", nil, fmt.Errorf("no conversation %s in %s — `mia api conversations --worktree %s` lists what is", id, worktree, worktree)
@@ -364,7 +393,7 @@ func (a *App) conversationOf(id, worktree string) (cwd, whose string, unwritten 
 	}
 	return cwd, whose, func() error {
 		if worktree == "" {
-			heads, _ = a.Conversations(Wanted{})
+			heads, _ = a.Conversations(Wanted{Agent: agent})
 		}
 		if slices.ContainsFunc(heads, func(h Head) bool { return h.ID == id && h.Running }) {
 			return nil

@@ -2150,7 +2150,7 @@ func (r *chatRun) parts(of, from app.Talk) []chatPart {
 	read := map[app.Talk][]app.Turn{}
 	turns := func(of app.Talk) []app.Turn {
 		if _, done := read[of]; !done {
-			read[of], _ = r.a.ConversationIn(of.ID, r.record.Name, 0)
+			read[of], _ = r.a.TalkIn(of, r.record.Name)
 		}
 		return read[of]
 	}
@@ -2637,6 +2637,9 @@ func (r *chatRun) applies(deed chatDeed) bool {
 	if !went.went {
 		r.note(went.text, went.tone)
 		return false
+	}
+	if window != "" {
+		go func() { _ = r.a.Remember() }() // without the window closed, as the chat goes on
 	}
 	done := went.done
 	to := r.nowAt(done.To.Window)

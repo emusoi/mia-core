@@ -191,7 +191,7 @@ func (a *App) SayOnceReady(record model.Record, window, text string) error {
 	if err != nil {
 		return err
 	}
-	if said, ended := settle(host, record.Name, window); ended {
+	if said, ended := settle(host, record.Name, window, settleReady); ended {
 		return fmt.Errorf("window %s ended as soon as it started, saying:\n%s", window, said)
 	}
 	return say(host, record.Name, window, a.agentOfWindow(host, record.Name, window), "mia window press "+record.Name+" "+window+" --", text)

@@ -395,9 +395,9 @@ func launched(command string) string {
 // tmux may name only what launched the agent: node or bun, or the shell
 // mia starts an agent's window by. Of those front, the command line in
 // front in each terminal, is asked, when there is one to ask.
-func agentBehind(table []Agent, command, title string, kind session.Kind, pid int, front func() map[int]string) string {
+func agentBehind(table []Agent, command, title string, kind session.Kind, pid int, front func(pid int) string) string {
 	if (command == "node" || command == "bun" || (kind == session.KindAgent && shells[command])) && front != nil {
-		command = launched(front()[pid])
+		command = launched(front(pid))
 	}
 	return agentIn(table, command, title)
 }

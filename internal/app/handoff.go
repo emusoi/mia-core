@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/session"
 )
 
@@ -118,17 +119,24 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 	if !known {
 		return Continued{}, fmt.Errorf("mia knows no agent %s — `mia api agents` lists those it does", want.With)
 	}
-	heads, problems := a.Conversations(Wanted{})
+	var heads []Head
+	var problems []string
 	var head Head
 	if want.ID == "" {
 		here, err := a.RecordOrHere(want.Worktree)
 		if err != nil {
 			return Continued{}, err
 		}
+		heads, problems = a.Conversations(Wanted{Worktree: here.Name}) // a window's is its worktree's, and what it went on from
 		if head, err = headIn(heads, here.Name, want.Window); err != nil {
 			return Continued{}, err
 		}
 	} else {
+		// of one worktree, only its conversations: what this one went on from is there too
+		heads, problems = a.Conversations(Wanted{Worktree: want.Worktree})
+		if want.Worktree != "" && !slices.ContainsFunc(heads, func(h Head) bool { return h.ID == want.ID }) {
+			heads, problems = a.Conversations(Wanted{}) // to say where it is
+		}
 		var in []string // the worktrees it is in: one copied to another is in both
 		for _, h := range heads {
 			if h.ID == want.ID && (want.Worktree == "" || h.Worktree == want.Worktree) && !slices.Contains(in, h.Worktree) {
@@ -255,9 +263,16 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 			return done, err
 		}
 	}
-	if done.To.Window.Name, err = a.NewWindow(in, window, session.What{Kind: session.KindAgent, Label: agent.Name}, argv); err != nil {
+	if done.To.Window.Name, err = a.newWindow(in, window, session.What{Kind: session.KindAgent, Label: agent.Name}, argv); err != nil {
 		return done, err
 	}
+	// as NewWindow remembers the sessions, while the agent comes up
+	remembered := make(chan struct{})
+	go func() {
+		defer close(remembered)
+		_ = a.Remember()
+	}()
+	defer func() { <-remembered }()
 	for _, w := range host.WindowsOf(in.Name) {
 		if w.Name == done.To.Window.Name {
 			done.To.Window.Index = w.Index
@@ -269,7 +284,11 @@ func (a *App) ContinueConversation(want Continue) (Continued, error) {
 		return done, fmt.Errorf("%s: window %s opened, and that it goes on from %s's %s is not kept: %w", in.Name, done.To.Window.Name, head.Agent, head.ID, err)
 	}
 	// an agent that ended as it started leaves no window, the shell it left closed with it, and is not kept as used here
-	if said, ended := settle(host, in.Name, done.To.Window.Name); ended {
+	still := settleReady // before it is told to read the handoff
+	if want.Quiet {
+		still = settleDrawn
+	}
+	if said, ended := settle(host, in.Name, done.To.Window.Name, still); ended {
 		done.Problem = fmt.Sprintf("%s ended as soon as it started, saying:\n%s", agent.Name, said)
 		return done, nil
 	}
@@ -524,19 +543,14 @@ func begunBy(heads []Head, one handedOn, first func(Head) string) string {
 
 // runsNothing reports whether the shell a window was started with has
 // nothing running under it: the agent started there has ended, and what is
-// typed now is typed into a shell. False when ps does not say.
+// typed now is typed into a shell. False when pgrep does not say.
 func runsNothing(host session.Host, worktree, window string) bool {
-	all := processes()
 	for _, w := range host.WindowsOf(worktree) {
-		if all == nil || w.Name != window {
+		if w.Name != window {
 			continue
 		}
-		for _, one := range all {
-			if one.parent == w.PID {
-				return false
-			}
-		}
-		return true
+		code, _ := run.Local("pgrep").Status("-P", strconv.Itoa(w.PID))
+		return code == 1 // it lists none
 	}
 	return false
 }

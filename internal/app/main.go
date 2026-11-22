@@ -280,7 +280,7 @@ func (a *App) mainAccount(agent Agent, account string) (string, error) {
 // left as it is. Named, the agent is that one of the table for this
 // start, whatever [main] says.
 func (a *App) StartMain(name, model, effort, account string) (MainState, error) {
-	return a.startMain(name, model, effort, account, false, "", false)
+	return a.startMain(name, model, effort, account, false, "", false, false)
 }
 
 // StartMainNew starts the main agent with a new conversation: it goes on
@@ -290,7 +290,7 @@ func (a *App) StartMain(name, model, effort, account string) (MainState, error) 
 // agent it was, with the model, the effort and the account it had, where
 // none is given. Another agent named takes none of them.
 func (a *App) StartMainNew(name, model, effort, account string, restart bool) (MainState, error) {
-	return a.startMain(name, model, effort, account, true, "", restart)
+	return a.startMain(name, model, effort, account, true, "", restart, false)
 }
 
 // StartMainResuming starts the main agent going on with one of its
@@ -299,7 +299,7 @@ func (a *App) StartMainNew(name, model, effort, account string, restart bool) (M
 // that runs is refused as for a new conversation, unless restart says to
 // end it; the conversation it had stays where its agent keeps them.
 func (a *App) StartMainResuming(id, name, model, effort, account string, restart bool) (MainState, error) {
-	return a.startMain(name, model, effort, account, false, id, restart)
+	return a.startMain(name, model, effort, account, false, id, restart, false)
 }
 
 // endRefused is why a main agent that runs is not given another
@@ -369,7 +369,7 @@ func (a *App) resumeOf(id, name, account string) (agent Agent, on, command strin
 	return agent, cmp.Or(account, head.Account), command, nil
 }
 
-func (a *App) startMain(name, model, effort, account string, fresh bool, resume string, restart bool) (MainState, error) {
+func (a *App) startMain(name, model, effort, account string, fresh bool, resume string, restart, quiet bool) (MainState, error) {
 	host := a.mainHost()
 	restarting := false
 	flag, then, resumed := "--new", "starts a fresh one", ""
@@ -485,7 +485,11 @@ func (a *App) startMain(name, model, effort, account string, fresh bool, resume 
 	if err := host.StartWindowWith(a.chatEnv(), a.chatSession(), a.Root, agent.Name, session.What{Kind: session.KindAgent, Label: agent.Name}, []string{shell, "-lc", command}); err != nil {
 		return MainState{}, err
 	}
-	said, ended := settle(host, a.chatSession(), agent.Name)
+	still := settleReady
+	if quiet {
+		still = settleDrawn
+	}
+	said, ended := settle(host, a.chatSession(), agent.Name, still)
 	_, pane, running := a.mainWindow(host)
 	if ended || !running {
 		if said != "" {
@@ -570,7 +574,7 @@ func (a *App) PressInMain(keys string) error {
 		return err
 	}
 	// a chat's first words wait on what it asked first: said once it is ready
-	settle(host, a.chatSession(), window.Name)
+	settle(host, a.chatSession(), window.Name, settleReady)
 	_, err := a.SayWaiting()
 	return err
 }

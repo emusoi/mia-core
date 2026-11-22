@@ -357,9 +357,9 @@ func (a *App) SwitchWindow(record model.Record, window, model, effort string) (C
 			command = one.Command // claude's binary named for its version is claude
 		}
 	}
-	var front func() map[int]string
+	var front func(int) string
 	if host.SSH == "" {
-		front = foreground
+		front = foregroundOf
 	}
 	name := agentBehind(a.agents(), command, pane.Title, pane.Kind, pane.PID, front)
 	if name == "" {
