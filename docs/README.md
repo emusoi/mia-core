@@ -10,6 +10,7 @@
 | [Stacks](stacks.md) | several branches in one worktree |
 | [Environments](environments.md) | containers, other machines, `<name>.mia` |
 | [The main agent](main.md) | the one agent you talk to, which runs the others |
+| [Chats](chats.md) | plain conversations with any agent, each a main agent of its own |
 | [mia in tmux](tmux.md) | the status line, the radar, the menu, a new worktree, signals |
 | [Configuration](configuration.md) | every setting |
 | [Commands](commands.md) | every command |

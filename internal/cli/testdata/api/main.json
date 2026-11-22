@@ -66,6 +66,9 @@
         "type": "string",
         "optional": true
       },
+      "name": {
+        "type": "string"
+      },
       "running": {
         "type": "boolean"
       },

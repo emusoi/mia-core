@@ -17,6 +17,9 @@ rest are about one repository and are run from inside it, as
     mia window send <worktree> <window> -- <text>   say something to it, Enter after
     mia window press <worktree> <window> -- 1       press a key with no Enter: pick a numbered option
     mia move <worktree> <machine>                   take it to another machine, `local` to bring it back
+    mia api chats                                   the person's chats, plain conversations with an agent in no repository, the main agent first as main
+    mia chats new --agent <agent> -- <words>        a chat of its own with an agent, told the words; the first word it prints is its name
+    mia chats say <name> -- <text>                  say something to a chat, Enter after
 
 An entry of `mia api standing` has what the others take: `root` is the
 repository to `cd` to, `worktree` and the `window`'s `name` say where the

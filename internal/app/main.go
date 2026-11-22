@@ -38,7 +38,12 @@ var mainNotes string
 // knows the machines, the repositories and the main agent, and nothing one
 // repository keeps.
 func AtMain() (*App, error) {
-	home := paths.In(mainName)
+	return atChat("", paths.In(mainName))
+}
+
+// atChat is mia at a chat's folder, the main agent's for "": what its
+// verbs do they do to that chat's agent.
+func atChat(chat, home string) (*App, error) {
 	if home == "" {
 		return nil, errors.New("cannot find a home directory to keep the main agent in")
 	}
@@ -58,12 +63,15 @@ func AtMain() (*App, error) {
 		Store:    store.Store{Dir: state},
 		Names:    nameStore,
 		Runtimes: runtime.Store{Path: config.RuntimesPath()},
+		chat:     chat,
 	}, nil
 }
 
-// MainState is the main agent as an app shows it.
+// MainState is the main agent as an app shows it, or a chat.
 type MainState struct {
-	Running bool `json:"running"`
+	// Name is the chat's, main for the main agent.
+	Name    string `json:"name"`
+	Running bool   `json:"running"`
 	// Agent is the one that runs, or the configured one when none does.
 	Agent   string `json:"agent"`
 	Machine string `json:"machine"`
@@ -143,23 +151,24 @@ func (a *App) mainHost() session.Host {
 	return host
 }
 
-// mainAgent is the agent the config names as the main one, from the table.
+// mainAgent is the agent the config names as the main one, from the table,
+// or the one the chat goes on with.
 func (a *App) mainAgent() (Agent, error) {
-	name := a.Config.Main.Agent
-	if name == "" {
-		name = "claude"
-	}
+	name := a.chatOwn().Agent
 	agent, known := agentNamed(a.agents(), name)
-	if !known {
+	switch {
+	case known:
+		return agent, nil
+	case a.chat == "" && name == cmp.Or(a.Config.Main.Agent, "claude"):
 		return Agent{}, fmt.Errorf("[main] agent = %q, and mia knows no agent of that name — a plugin that adds it has to be enabled", name)
 	}
-	return agent, nil
+	return Agent{}, fmt.Errorf("%s goes on with %q, and mia knows no agent of that name — a plugin that adds it has to be enabled", a.chatWho(), name)
 }
 
 // mainWindow is the window of its session an agent was started in: each is
 // named for its agent, and goes when the agent ends.
 func (a *App) mainWindow(host session.Host) (session.Window, session.Pane, bool) {
-	panes := host.Panes(mainName)
+	panes := host.Panes(a.chatSession())
 	for _, window := range session.WindowsFrom(panes) {
 		if _, known := agentNamed(a.agents(), window.Name); !known {
 			continue
@@ -183,11 +192,11 @@ func (a *App) Main() MainState {
 // mainNow is Main, and what the agent itself says it has open, when it says.
 func (a *App) mainNow() (MainState, holds) {
 	host := a.mainHost()
-	state := MainState{Machine: runtime.Local, Home: a.Root, Session: session.Name(mainName)}
+	state := MainState{Name: cmp.Or(a.chat, mainName), Machine: runtime.Local, Home: a.Root, Session: session.Name(a.chatSession())}
 	agent, _ := a.mainAgent()
 	state.Agent = agent.Name
 	if state.Agent == "" {
-		state.Agent = a.Config.Main.Agent
+		state.Agent = a.chatOwn().Agent
 	}
 	window, pane, running := a.mainWindow(host)
 	var fresh time.Time
@@ -196,14 +205,14 @@ func (a *App) mainNow() (MainState, holds) {
 		agent, _ = agentNamed(a.agents(), window.Name)
 		state.Running, state.Agent = true, agent.Name
 		state.Window = &WindowRef{Index: window.Index, Name: window.Name}
-		state.Since = host.Created(mainName).UTC()
+		state.Since = host.Created(a.chatSession()).UTC()
 		// claude says it in its pane's title; of another, writing is the sign
 		state.Working = session.Spinning(pane.Title) ||
 			(session.AgentTitle(pane.Title) == "" && !pane.Activity.IsZero() && time.Since(pane.Activity) < workingFor)
-		if asks, on := askingIn(host, mainName, window.Name); on {
+		if asks, on := askingIn(host, a.chatSession(), window.Name); on {
 			state.Asks, state.Working = &asks, false
 		}
-		kept := a.chosen()[chosenKey(session.Name(mainName), pane.PID)]
+		kept := a.chosen()[chosenKey(session.Name(a.chatSession()), pane.PID)]
 		state.Model, state.Effort, fresh, resumed = kept.Model, kept.Effort, kept.Fresh, kept.Resumed
 		if agent.AccountEnv != "" {
 			state.Account = cmp.Or(kept.Account, DefaultAccount)
@@ -243,12 +252,12 @@ func (a *App) mainConversation(agent Agent, account string, fresh time.Time, res
 }
 
 // mainSet is what the main agent is started with when nothing else is
-// said: [main]'s, and failing that its agent's own. Started as another
-// agent than [main] names, only that agent's own.
+// said: [main]'s, or a chat's own, and failing that its agent's own.
+// Started as another agent than that, only that agent's own.
 func (a *App) mainSet(agent Agent) []config.Agent {
 	set := []config.Agent{a.Config.Agents[agent.Name]}
-	if configured, err := a.mainAgent(); err == nil && configured.Name == agent.Name {
-		set = slices.Insert(set, 0, config.Agent{Model: a.Config.Main.Model, Effort: a.Config.Main.Effort})
+	if own := a.chatOwn(); own.Agent == agent.Name {
+		set = slices.Insert(set, 0, config.Agent{Model: own.Model, Effort: own.Effort})
 	}
 	return set
 }
@@ -258,8 +267,8 @@ func (a *App) mainSet(agent Agent) []config.Agent {
 // agent's own in [agents]; "" for the default.
 func (a *App) mainAccount(agent Agent, account string) (string, error) {
 	set := []string{a.Config.Agents[agent.Name].Account}
-	if configured, err := a.mainAgent(); err == nil && configured.Name == agent.Name {
-		set = slices.Insert(set, 0, a.Config.Main.Account)
+	if own := a.chatOwn(); own.Agent == agent.Name {
+		set = slices.Insert(set, 0, own.Account)
 	}
 	return a.account(agent, account, set...)
 }
@@ -378,7 +387,7 @@ func (a *App) startMain(name, model, effort, account string, fresh bool, resume 
 		}
 		restarting = true
 		if name == "" || name == window.Name {
-			was := a.chosen()[chosenKey(session.Name(mainName), pane.PID)]
+			was := a.chosen()[chosenKey(session.Name(a.chatSession()), pane.PID)]
 			name, model, effort, account = window.Name, cmp.Or(model, was.Model), cmp.Or(effort, was.Effort), cmp.Or(account, was.Account)
 		}
 	}
@@ -401,36 +410,35 @@ func (a *App) startMain(name, model, effort, account string, fresh bool, resume 
 		return MainState{}, err
 	}
 	if !host.Available() {
-		return MainState{}, errors.New("tmux not found — the main agent runs in a session: https://github.com/tmux/tmux/wiki/Installing")
+		return MainState{}, fmt.Errorf("tmux not found — %s runs in a session: https://github.com/tmux/tmux/wiki/Installing", a.chatWho())
 	}
 	if window, _, running := a.mainWindow(host); running && name != "" && resume == "" && !restarting {
-		return MainState{}, fmt.Errorf("the main agent runs already, as %s — `mia main stop` first", window.Name)
+		return MainState{}, fmt.Errorf("%s runs already, as %s — `%s` first", a.chatWho(), window.Name, a.chatVerb("stop"))
 	}
-	home := paths.In(mainName)
-	if err := os.MkdirAll(home, 0o755); err != nil {
+	if err := os.MkdirAll(a.Root, 0o755); err != nil {
 		return MainState{}, err
 	}
-	a.Root = git.Resolve(home) // there now, so as an agent's transcript says it
-	if err := a.Names.Claim(mainName, a.Root); err != nil {
-		return MainState{}, fmt.Errorf("the main agent's session is mia-%s: %w", mainName, err)
+	a.Root = git.Resolve(a.Root) // there now, so as an agent's transcript says it
+	if err := a.Names.Claim(cmp.Or(a.chat, mainName), a.Root); err != nil {
+		return MainState{}, fmt.Errorf("%s's session is %s: %w", a.chatWho(), session.Name(a.chatSession()), err)
 	}
-	notes := filepath.Join(a.Root, agent.notesFile())
-	if was, _ := os.ReadFile(notes); string(was) != mainNotes {
-		if err := os.WriteFile(notes, []byte(mainNotes), 0o644); err != nil {
+	notes, said := filepath.Join(a.Root, agent.notesFile()), a.chatNotes()
+	if was, _ := os.ReadFile(notes); string(was) != said {
+		if err := os.WriteFile(notes, []byte(said), 0o644); err != nil {
 			return MainState{}, err
 		}
 	}
 	if _, _, running := a.mainWindow(host); running && restarting {
 		// asked for in so many words, and everything it is started with is known to be good
-		if err := host.Kill(mainName); err != nil {
+		if err := host.Kill(a.chatSession()); err != nil {
 			return MainState{}, err
 		}
 	} else if running {
 		if model != "" || effort != "" {
-			return MainState{}, errors.New("the main agent runs already — `mia main model <model>` switches it")
+			return MainState{}, fmt.Errorf("%s runs already — `%s` switches it", a.chatWho(), a.chatVerb("model", "<model>"))
 		}
 		if given != "" {
-			return MainState{}, errors.New("the main agent runs already, and takes its account when it starts — `mia main stop` first")
+			return MainState{}, fmt.Errorf("%s runs already, and takes its account when it starts — `%s` first", a.chatWho(), a.chatVerb("stop"))
 		}
 		return a.Main(), nil
 	}
@@ -460,7 +468,7 @@ func (a *App) startMain(name, model, effort, account string, fresh bool, resume 
 		kept.Fresh, kept.Resumed = time.Now(), resume
 	}
 	command = withAccount(agent, account, command)
-	if err := host.Ensure(mainName, a.Root); err != nil {
+	if err := host.Ensure(a.chatSession(), a.Root); err != nil {
 		return MainState{}, err
 	}
 	shell := a.Config.Dotfiles.Shell
@@ -472,11 +480,12 @@ func (a *App) startMain(name, model, effort, account string, fresh bool, resume 
 	}
 	// by a login shell, for its PATH, and with nothing after: the window is
 	// the agent, and goes when it ends. It is told it is the main agent's by
-	// MIA_MAIN, and has no MIA_WORKTREE: it is no worktree's.
-	if err := host.StartWindowWith("MIA_MAIN=1", mainName, a.Root, agent.Name, session.What{Kind: session.KindAgent, Label: agent.Name}, []string{shell, "-lc", command}); err != nil {
+	// MIA_MAIN, or which chat's by MIA_CHAT, and has no MIA_WORKTREE: it is
+	// no worktree's.
+	if err := host.StartWindowWith(a.chatEnv(), a.chatSession(), a.Root, agent.Name, session.What{Kind: session.KindAgent, Label: agent.Name}, []string{shell, "-lc", command}); err != nil {
 		return MainState{}, err
 	}
-	said, ended := settle(host, mainName, agent.Name)
+	said, ended := settle(host, a.chatSession(), agent.Name)
 	_, pane, running := a.mainWindow(host)
 	if ended || !running {
 		if said != "" {
@@ -485,10 +494,10 @@ func (a *App) startMain(name, model, effort, account string, fresh bool, resume 
 		return MainState{}, fmt.Errorf("%s ended as soon as it started — `%s` in %s shows why", agent.Name, command, a.Root)
 	}
 	if kept != (Chosen{}) {
-		if err := a.keep(host, mainName, pane.PID, kept); err != nil {
+		if err := a.keep(host, a.chatSession(), pane.PID, kept); err != nil {
 			return MainState{}, err
 		}
-		if err := a.used(agent.Name, mainName, runtime.Local, chosen); err != nil {
+		if err := a.used(agent.Name, cmp.Or(a.chat, mainName), runtime.Local, chosen); err != nil {
 			return MainState{}, err
 		}
 	}
@@ -497,10 +506,13 @@ func (a *App) startMain(name, model, effort, account string, fresh bool, resume 
 
 // StopMain ends the main agent's session. Its folder and conversations stay.
 func (a *App) StopMain() error {
-	return a.mainHost().Kill(mainName)
+	return a.mainHost().Kill(a.chatSession())
 }
 
-var errMainDown = errors.New("the main agent is not running — `mia main start`")
+// down is why nothing is typed into an agent that is not running.
+func (a *App) down() error {
+	return fmt.Errorf("%s is not running — `%s`", a.chatWho(), a.chatVerb("start"))
+}
 
 // SayToMain types text into the main agent as one message and submits it:
 // pasted, so a line break in it is not an Enter, and Enter after. While it
@@ -509,9 +521,9 @@ func (a *App) SayToMain(text string) error {
 	host := a.mainHost()
 	window, _, running := a.mainWindow(host)
 	if !running {
-		return errMainDown
+		return a.down()
 	}
-	return a.mainGone(host, say(host, mainName, window.Name, window.Name, "mia main press", text))
+	return a.mainGone(host, say(host, a.chatSession(), window.Name, window.Name, a.chatVerb("press"), text))
 }
 
 // say types text into an agent's window as one message and submits it:
@@ -528,11 +540,11 @@ func say(host session.Host, worktree, window, agent, press, text string) error {
 	return host.Keys(worktree, window, []string{"Enter"})
 }
 
-// mainGone is err, or errMainDown when the agent ended as it was typed
+// mainGone is err, or down when the agent ended as it was typed
 // into: a window that is gone is not to be pasted into.
 func (a *App) mainGone(host session.Host, err error) error {
 	if _, _, running := a.mainWindow(host); err != nil && !running {
-		return errMainDown
+		return a.down()
 	}
 	return err
 }
@@ -545,9 +557,15 @@ func (a *App) PressInMain(keys string) error {
 	host := a.mainHost()
 	window, _, running := a.mainWindow(host)
 	if !running {
-		return errMainDown
+		return a.down()
 	}
-	return pressAnswer(host, mainName, window.Name, keys)
+	if err := pressAnswer(host, a.chatSession(), window.Name, keys); err != nil || a.chatRead().Waiting == "" {
+		return err
+	}
+	// a chat's first words wait on what it asked first: said once it is ready
+	settle(host, a.chatSession(), window.Name)
+	_, err := a.SayWaiting()
+	return err
 }
 
 // SwitchMain switches the main agent to another model, and effort when
@@ -556,21 +574,21 @@ func (a *App) SwitchMain(model, effort string) (Chosen, error) {
 	host := a.mainHost()
 	window, pane, running := a.mainWindow(host)
 	if !running {
-		return Chosen{}, errMainDown
+		return Chosen{}, a.down()
 	}
-	if asks, on := askingIn(host, mainName, window.Name); on {
-		return Chosen{}, askedFirst(window.Name, asks, "mia main press")
+	if asks, on := askingIn(host, a.chatSession(), window.Name); on {
+		return Chosen{}, askedFirst(window.Name, asks, a.chatVerb("press"))
 	}
 	agent, _ := agentNamed(a.agents(), window.Name)
-	was := a.chosen()[chosenKey(session.Name(mainName), pane.PID)]
-	chosen, err := switchTo(host, mainName, window.Name, agent, model, effort, was, a.mainSet(agent)...)
+	was := a.chosen()[chosenKey(session.Name(a.chatSession()), pane.PID)]
+	chosen, err := switchTo(host, a.chatSession(), window.Name, agent, model, effort, was, a.mainSet(agent)...)
 	if err != nil {
 		return Chosen{}, a.mainGone(host, err)
 	}
-	if err := a.keep(host, mainName, pane.PID, chosen); err != nil {
+	if err := a.keep(host, a.chatSession(), pane.PID, chosen); err != nil {
 		return chosen, err
 	}
-	return chosen, a.used(agent.Name, mainName, runtime.Local, chosen)
+	return chosen, a.used(agent.Name, cmp.Or(a.chat, mainName), runtime.Local, chosen)
 }
 
 // InterruptMain presses the key that stops the main agent mid-work.
@@ -578,10 +596,10 @@ func (a *App) InterruptMain() error {
 	host := a.mainHost()
 	window, _, running := a.mainWindow(host)
 	if !running {
-		return errMainDown
+		return a.down()
 	}
 	agent, _ := agentNamed(a.agents(), window.Name)
-	return host.Keys(mainName, window.Name, []string{agent.stopKey()})
+	return host.Keys(a.chatSession(), window.Name, []string{agent.stopKey()})
 }
 
 // MainTurns is one of the main agent's conversations as turns, those

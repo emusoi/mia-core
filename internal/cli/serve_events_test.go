@@ -265,3 +265,74 @@ func TestAListenerFollowsAConversationAsItIsWritten(t *testing.T) {
 		t.Errorf("following a conversation there is not = %+v", one)
 	}
 }
+
+// A chat is told as the main agent is: tmux says when its agent's pane
+// changes, and a listener to the chats hears it go to work, with nothing
+// looked at in between.
+func TestAListenerHearsAChatGoToWorkAsTmuxSaysIt(t *testing.T) {
+	isolateServe(t)
+	socket, err := os.MkdirTemp("/tmp", "mia-serve-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(socket) })
+	t.Setenv("TMUX_TMPDIR", socket)
+	t.Cleanup(func() { exec.Command("tmux", "kill-server").Run() })
+	t.Chdir(t.TempDir())
+	main, err := app.AtMain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := main.NewChat("claude", "", "", "look at the logs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := c.Main().Name
+	// claude's title at rest, and at work once told to: set by the agent, as claude sets it
+	gone := filepath.Join(t.TempDir(), "go")
+	agent := `printf '\033]2;✳ Claude Code\033\\'; while [ ! -f ` + gone + ` ]; do sleep 0.05; done; printf '\033]2;⠂ Looking at the logs\033\\'; sleep 600`
+	if out, err := exec.Command("tmux", "new-session", "-d", "-s", "mia-chat-"+name, "-n", "claude", "sh", "-c", agent).CombinedOutput(); err != nil {
+		t.Fatalf("tmux new-session: %s", out)
+	}
+	time.Sleep(4 * time.Second) // what it last wrote is no sign it works
+	serveIn(t, func(s *server) { s.tick, s.backstop, s.retry = time.Hour, time.Hour, 50*time.Millisecond })
+	events := listen(t, q("chats", ""), q("chat", "", name))
+	chat := func(one event) app.ChatState {
+		t.Helper()
+		var chats []app.ChatState
+		if err := json.Unmarshal(one.Result, &chats); err != nil || len(chats) != 2 {
+			t.Fatalf("chats = %s: %v", one.Result, err)
+		}
+		return chats[1]
+	}
+	for range 2 {
+		one := told(t, events)
+		if one.Q == q("chats", "") {
+			if got := chat(one); got.Name != name || !got.Running || got.Working || got.Title != "look at the logs" {
+				t.Fatalf("first = %+v", got)
+			}
+		}
+	}
+	for range 200 {
+		out, _ := exec.Command("tmux", "list-sessions", "-F", "#{session_name}").Output()
+		if strings.Contains(string(out), "_mia-serve-") {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	time.Sleep(1500 * time.Millisecond) // its subscription asked for, and said once as it is
+	if err := os.WriteFile(gone, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	heard := map[string]bool{}
+	for !heard["chats"] || !heard["chat"] {
+		one := told(t, events)
+		if one.Q == q("chats", "") && chat(one).Working {
+			heard["chats"] = true
+		}
+		var state app.MainState
+		if one.Q == q("chat", "", name) && json.Unmarshal(one.Result, &state) == nil && state.Working {
+			heard["chat"] = true
+		}
+	}
+}

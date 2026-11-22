@@ -90,6 +90,8 @@ func answerAPI(who asker, rest []string) int {
 		switch rest[0] {
 		case "main", "standing": // the person's, from anywhere
 			return cmdAPIMain(who, rest)
+		case "chats", "chat": // the person's, from anywhere
+			return cmdAPIChats(who, rest)
 		case "agents": // every agent, from anywhere: a repository's config too, when in one
 			if len(rest) > 1 {
 				return who.usage("mia api agents")
@@ -349,7 +351,7 @@ func statusIn(dir string) (worktreeStatus, error) {
 		Staged: files(s.Staged), Changed: files(s.Changed), Untracked: files(s.Untracked), Stashes: bytes.Count(stashes, []byte("\n"))}, nil
 }
 
-var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base", "conversations", "conversation", "main", "standing", "agents", "setups", "accounts", "apps", "status", "window"}
+var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base", "conversations", "conversation", "main", "chats", "chat", "standing", "agents", "setups", "accounts", "apps", "status", "window"}
 
 const (
 	setupsUsage        = "mia api setups [--repository <name> | --all]"
@@ -418,7 +420,7 @@ func apiCapabilities() capabilities {
 		Queries: apiQueryList,
 		Features: []string{
 			"direct-http", "project-config", "doctor", "environment-readiness", "environment-drift",
-			"local-sessions", "conversations", "main-agent", "standing", "remote-sync-preview", "sync-conflicts", "safe-cleanup", "stack-sync", "merged-gc", "compose-environments", "agent-models", "setups", "resume-model", "main-start-agent", "accounts", "main-asks", "main-start-new", "main-conversations", "machine-reach", "roles", "account-login", "account-user-default", "account-signals", "conversation-continue", "conversation-thread", "apps", "conversation-follow", "chat", "git-app", "files-app", "review-app", "agent-again",
+			"local-sessions", "conversations", "main-agent", "standing", "remote-sync-preview", "sync-conflicts", "safe-cleanup", "stack-sync", "merged-gc", "compose-environments", "agent-models", "setups", "resume-model", "main-start-agent", "accounts", "main-asks", "main-start-new", "main-conversations", "machine-reach", "roles", "account-login", "account-user-default", "account-signals", "conversation-continue", "conversation-thread", "apps", "conversation-follow", "chat", "git-app", "files-app", "review-app", "agent-again", "chats",
 		},
 	}
 }

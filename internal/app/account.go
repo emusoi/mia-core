@@ -276,6 +276,10 @@ func (a *App) keptIn() []string {
 	if main := paths.In(mainName); main != "" {
 		add(filepath.Join(main, ".mia"))
 	}
+	chats, _ := filepath.Glob(filepath.Join(chatsDir(), "*", ".mia"))
+	for _, chat := range chats {
+		add(chat)
+	}
 	add(accountsDir()) // the windows signing in to one
 	return dirs
 }

@@ -423,6 +423,42 @@ only reads — `mia api …`, `mia ls`, `mia window read` — one with
 `--dry-run`, and one typed in a way its usage does not have.
 `mia api conversation <id>` gives the same conversation with no `did` in it.
 
+## Chats
+
+`mia api chats` is every [chat](chats.md), the main agent first as the
+chat named `main`, then the others, the last said in first. It answers
+from any folder, and starts and writes nothing.
+
+```json
+[{"name":"main","main":true,"agent":"claude","model":"opus","effort":"high",
+  "title":"mia","last":"goba is on it","at":"2026-11-02T10:00:04Z",
+  "asks":false,"working":false,"running":true,"machine":"local"},
+ {"name":"kilwa","main":false,"agent":"codex","model":"","effort":"",
+  "title":"what changed in mia-desk this week?","last":"Three things…",
+  "at":"2026-11-01T18:20:00Z","asks":false,"working":false,"running":false,"machine":"local"}]
+```
+
+| field | is |
+|---|---|
+| `name` | its name, `main` for the main agent; what `mia chats …` and `mia api chat` take |
+| `main` | it is the main agent |
+| `agent`, `model`, `effort` | the agent it goes on with, and the model and effort it runs on, or is started with when it is not running; empty when mia chose none |
+| `title` | the first thing asked in it, on a line — the first words `mia chats new` was given — and `mia` for the main agent |
+| `last`, `at` | the last thing said in its last conversation, and when that was written; of one with none yet, empty, and when it was made |
+| `asks`, `working`, `running` | as `mia api main` says them: it asks something, it is at work, it runs |
+| `machine` | where it lives: `local`, or the machine `[main] machine` names, whose mia answered |
+
+`mia api chat <name>` is where one stands, as [`mia api main`](#the-main-agent)
+says it, with its `name`; `mia api chat main` is `mia api main`. A name
+that is no chat's is refused, exit 1.
+
+`mia api chat turns <name> [--after <n>] [--follow]` is its conversation
+as `mia api main turns` gives it, `did` turns and all; of `main` it is
+`mia api main turns`. `--follow` reads chats on this machine only.
+
+A mia has these when its capabilities have `chats`, and `mia serve`
+answers them and [says when they change](serve.md#get-events).
+
 ## Agents
 
 `mia api agents` is every agent mia knows, one a plugin adds too, with

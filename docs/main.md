@@ -20,6 +20,9 @@ mia main interrupt    # stop it mid-work
 mia main stop         # end its session; its folder and conversations stay
 ```
 
+It is the chat named `main` among the [chats](chats.md): plain
+conversations with any agent, each a main agent of its own.
+
 Each answers from any folder. `mia main start` twice starts one: an agent
 that already runs is left as it is. Stopped and started again, it goes on
 with its last conversation, unless [`--new`](#a-new-conversation) says

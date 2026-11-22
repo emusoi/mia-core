@@ -206,21 +206,23 @@ done: nothing waits on a slow one. The server asks again:
   session or a window came, went, was renamed or put in front — it hears
   this as a control-mode client on a session of its own,
   `_mia-serve-<pid>`, and starts no tmux server to hear it;
-- `main`, at once, when tmux tells that client the main agent's panes
-  changed — a pane's title, where claude says it is at work, or when its
-  window last wrote, at most once a second — and once more four seconds
-  after it last told it: an agent that gives its pane no title is at
-  work only while it writes;
+- `main`, `chats` and `chat`, at once, when tmux tells that client the
+  main agent's panes or a chat's changed — a pane's title, where claude
+  says it is at work, or when its window last wrote, at most once a
+  second — and once more four seconds after it last told it: an agent
+  that gives its pane no title is at work only while it writes;
 - every question, at once, after a [`POST /run`](#post-run);
 - a repository's questions, and those of no repository but `here` and
   `machines`, when its records, its configuration, or a worktree's
   `HEAD` or index were written, or when one of its signals goes at the
   time it was set to, looked at each second; every question when the
-  person's configuration or the main agent's records were written, or
-  one of the main agent's signals goes;
-- `conversations` and `main conversations` when a transcript they are
-  read from was written to — each written to in the last day, and every
-  folder transcripts are in, which a conversation begun adds one to —
+  person's configuration or the main agent's records were written, a
+  chat was made or taken or what mia keeps of one written, or one of the
+  main agent's signals goes;
+- `conversations`, `main conversations`, `chats` and `chat` when a
+  transcript they are read from was written to — each written to in the
+  last day, and every folder transcripts are in, which a conversation
+  begun adds one to —
   and `accounts` when the folder of an account, or the file in it that
   is there once someone signed in, came, went or was written: by their
   stamps alone, looked at each second, never by what is in them;
@@ -248,7 +250,7 @@ look for themselves again. `mia review` looks every two seconds as it
 did: what it looks at, sawa's file, is no question of `mia api`.
 
 A question with `--follow` — `conversation <id> --follow`,
-`main turns --follow` — is the stream `mia api … --follow` prints, an
+`main turns --follow`, `chat turns <name> --follow` — is the stream `mia api … --follow` prints, an
 event for each line, its `result` the turns that are new or grew.
 
 A listener that does not read as fast as it is told is let go: the stream

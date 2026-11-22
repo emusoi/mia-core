@@ -482,6 +482,27 @@ func (s *server) beyond(q question) []string {
 			return nil
 		}
 		return a.ConversationsWritten()
+	case q.args[0] == "chats":
+		a, err := app.AtMain()
+		if err != nil {
+			return nil
+		}
+		return a.ChatsWritten()
+	case q.args[0] == "chat":
+		// chat [turns] <name> [--after <n>]
+		rest := slices.Clone(q.args[1:])
+		if len(rest) > 0 && rest[0] == "turns" {
+			rest = rest[1:]
+		}
+		takeValue(&rest, "--after")
+		if len(rest) != 1 {
+			return nil
+		}
+		a, err := app.AtChat(rest[0])
+		if err != nil {
+			return nil
+		}
+		return a.ConversationsWritten()
 	case q.args[0] == "accounts":
 		a, err := app.AtMain()
 		if err != nil {

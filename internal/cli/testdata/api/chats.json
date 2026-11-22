@@ -1,0 +1,50 @@
+{
+  "query": "chats",
+  "usage": "mia api chats",
+  "inputs": [],
+  "output": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "fields": {
+        "agent": {
+          "type": "string"
+        },
+        "asks": {
+          "type": "boolean"
+        },
+        "at": {
+          "type": "time",
+          "optional": true
+        },
+        "effort": {
+          "type": "string"
+        },
+        "last": {
+          "type": "string"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "main": {
+          "type": "boolean"
+        },
+        "model": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "title": {
+          "type": "string"
+        },
+        "working": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

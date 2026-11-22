@@ -120,6 +120,8 @@ func Run(args []string) int {
 		return cmdDoctor(rest, asJSON)
 	case "main":
 		return cmdMain(rest)
+	case "chats":
+		return cmdChats(rest)
 	case "account", "accounts":
 		return cmdAccount(rest, asJSON)
 	case "role", "roles":
@@ -443,7 +445,7 @@ func Run(args []string) int {
 
 func passesArgumentsThrough(verb string) bool {
 	switch verb {
-	case "run", "env", "main":
+	case "run", "env", "main", "chats":
 		return true
 	case "help", "-h", "--help", "version", "--version", "__complete", "list", "remove", "windows", "plugins":
 		return false

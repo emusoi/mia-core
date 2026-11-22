@@ -60,6 +60,9 @@ type App struct {
 	agentTable []Agent
 	appsOnce   sync.Once
 	appTable   session.Apps
+	// chat is the chat AtChat opened mia at, whose agent the main agent's
+	// verbs are about; "" for the main agent's own.
+	chat string
 }
 
 type Event struct {

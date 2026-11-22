@@ -77,7 +77,7 @@ type hub struct {
 	}
 	kick   chan struct{} // a verb was run: everything is asked again
 	tmux   chan struct{} // tmux says a session or a window changed
-	main   chan struct{} // tmux says the main agent's panes changed
+	main   chan struct{} // tmux says the main agent's panes changed, or a chat's
 	lanes  chan struct{} // what is asked at once
 	asking sync.WaitGroup
 }
@@ -155,6 +155,10 @@ var eachLook = []string{"status", "window"}
 // clock of; tmux saying something, or another repository written, does not.
 var ofMachines = []string{"here", "machines"}
 
+// ofChats are the queries answered from the main agent's panes and the
+// chats': asked again each time tmux says those changed.
+var ofChats = []string{"main", "chats", "chat"}
+
 // join adds a listener to a question, and gives it the answer as it is now.
 func (h *hub) join(q string, asked question, sub *subscriber) *topic {
 	h.start.Do(func() {
@@ -220,7 +224,7 @@ func (h *hub) run() {
 	defer tick.Stop()
 	defer backstop.Stop()
 	everything := func(*topic) bool { return true }
-	var heard time.Time // when tmux last said the main agent's panes changed
+	var heard time.Time // when tmux last said the main agent's panes changed, or a chat's
 	for {
 		select {
 		case <-h.s.ctx.Done():
@@ -233,7 +237,7 @@ func (h *hub) run() {
 			h.round(func(t *topic) bool { return !slices.Contains(ofMachines, t.question.args[0]) })
 		case <-h.main:
 			heard = time.Now()
-			h.round(func(t *topic) bool { return t.question.args[0] == "main" })
+			h.round(func(t *topic) bool { return slices.Contains(ofChats, t.question.args[0]) })
 		case <-backstop.C:
 			h.round(everything)
 		case <-tick.C:
@@ -253,7 +257,7 @@ func (h *hub) run() {
 				t.stale = false
 				return stale || changed[""] || changed[t.common] ||
 					t.common == "" && len(changed) > 0 && !slices.Contains(ofMachines, t.question.args[0]) || // answered from every repository
-					slices.Contains(eachLook, t.question.args[0]) || quiet && t.question.args[0] == "main"
+					slices.Contains(eachLook, t.question.args[0]) || quiet && slices.Contains(ofChats, t.question.args[0])
 			})
 		}
 	}
@@ -342,13 +346,16 @@ func (h *hub) repositories() []app.Repository {
 
 // writtenIn is when the files a repository's answers change with were
 // written: mia's own records and each worktree's HEAD and index; for "",
-// the person's: mia's config folder and the main agent's records.
+// the person's: mia's config folder, the main agent's records and each
+// chat's, and the folder chats are made in and taken from.
 func writtenIn(common string) string {
 	if common == "" {
 		return written(
 			filepath.Join(config.Dir(), "*.json"),
 			filepath.Join(config.Dir(), "*.toml"),
 			filepath.Join(signalsOf(""), "*.json"),
+			filepath.Join(config.Dir(), "chats"),
+			filepath.Join(config.Dir(), "chats", "*", ".mia", "*.json"),
 		)
 	}
 	files := []string{
@@ -430,11 +437,12 @@ func (h *hub) askAgain(t *topic) {
 // renamed or put in front.
 var tmuxSays = []string{"%sessions-changed", "%session-renamed", "%session-window-changed", "%window-pane-changed", "%layout-change", "%window-add", "%window-close", "%window-renamed", "%unlinked-window-add", "%unlinked-window-close", "%unlinked-window-renamed"}
 
-// mainPanes is what tmux is asked to say of the main agent's panes each
-// time it changes, at most once a second: each pane's title, where claude
-// says it is at work, and when its window last wrote, which is how another
-// agent is. Its loops carry no comma, which would end them.
-var mainPanes = "#{S:#{?#{==:#{session_name}," + session.Name("main") + "},#{W:#{P:#{pane_id} #{window_activity} #{pane_title};}},}}"
+// mainPanes is what tmux is asked to say of the main agent's panes and
+// each chat's each time it changes, at most once a second: each pane's
+// title, where claude says it is at work, and when its window last wrote,
+// which is how another agent is. Its loops carry no comma, which would end
+// them.
+var mainPanes = "#{S:#{?#{||:#{==:#{session_name}," + session.Name("main") + "},#{m:" + session.Name("chat-") + "*,#{session_name}}},#{W:#{P:#{pane_id} #{window_activity} #{pane_title};}},}}"
 
 // watchTmux listens to the tmux server as a control-mode client on a
 // session of its own: everything but how busy a machine is is asked again

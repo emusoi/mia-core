@@ -172,6 +172,7 @@ func TestTheServerAnswersEveryQueryAsTheCommandLineDoes(t *testing.T) {
 		{"conversations"}, {"conversations", "--worktree", "longido", "--limit", "2"}, {"conversations", "--limit", "x"},
 		{"conversation", "c1"}, {"conversation"}, {"conversation", "c1", "--follow"},
 		{"main"}, {"main", "conversations"}, {"main", "turns"}, {"main", "turns", "--after", "x"},
+		{"chats"}, {"chats", "x"}, {"chat", "main"}, {"chat", "turns", "main", "--after", "1"}, {"chat", "nobody"}, {"chat"},
 		{"standing"}, {"standing", "--here"}, {"agents"}, {"agents", "x"}, {"setups"}, {"setups", "--all"},
 		{"accounts"}, {"accounts", "--projects"}, {"apps"}, {"status"}, {"status", "x"},
 		{"window", "0"}, {"window", "0", "--worktree", "longido"}, {"window"}, {"window", "x"}, {"nosuchquery"},
