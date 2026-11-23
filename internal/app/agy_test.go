@@ -162,3 +162,32 @@ func TestTheLastLineIsReadFromTheEnd(t *testing.T) {
 		t.Error("a file that is not there has a line")
 	}
 }
+
+// What an agent says its models are is the machine's: asked of mia in no
+// repository, as `mia api agents` is, it is kept in mia's own folder and
+// agy is asked once however often the agents are listed.
+func TestTheModelsAreKeptForMiaInNoRepositoryToo(t *testing.T) {
+	gittest.Isolate(t)
+	store := fakeAgy(t)
+	if err := os.WriteFile(filepath.Join(store, "models"), []byte("gemini-4-flash\tGemini 4 Flash\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for range 3 {
+		var its AgentModels
+		for _, one := range Outside().AgentModels() {
+			if one.Name == "agy" {
+				its = one
+			}
+		}
+		if len(its.Models) != 1 || its.Models[0].ID != "gemini-4-flash" {
+			t.Fatalf("agy = %+v", its)
+		}
+	}
+	data, _ := os.ReadFile(filepath.Join(store, "asked"))
+	if n := strings.Count(string(data), "models\n"); n != 1 {
+		t.Errorf("agy was asked for its models %d times", n)
+	}
+	if _, err := os.Stat(filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "cache", "models", "agy.json")); err != nil {
+		t.Errorf("not kept in mia's folder: %v", err)
+	}
+}

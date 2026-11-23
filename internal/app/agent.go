@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/emusoi/mia-core/internal/config"
 	"github.com/emusoi/mia-core/internal/plugin"
 	"github.com/emusoi/mia-core/internal/session"
 )
@@ -298,7 +299,19 @@ func (a *App) agents() []Agent {
 	}
 	a.agentsOnce.Do(func() {
 		a.agentTable = slices.Clone(builtin)
+		// what an agent says its models are is the machine's, in a repository
+		// or none: kept once for all, in mia's own config folder
+		models := ""
+		if dir := config.Dir(); dir != "" {
+			models = filepath.Join(dir, "cache", "models")
+		}
 		for i := range a.agentTable {
+			switch a.agentTable[i].Name {
+			case "opencode":
+				a.agentTable[i].lists = opencodeModels{cache: models}.models
+			case "agy":
+				a.agentTable[i].lists = agyModels{cache: models}.models
+			}
 			if a.MiaDir == "" {
 				continue
 			}
@@ -310,10 +323,6 @@ func (a *App) agents() []Agent {
 			case opencodeTalks:
 				t.cache = cache
 				a.agentTable[i].talks = t
-				a.agentTable[i].lists = opencodeModels{cache: filepath.Join(a.MiaDir, "cache", "models")}.models
-			}
-			if a.agentTable[i].Name == "agy" {
-				a.agentTable[i].lists = agyModels{cache: filepath.Join(a.MiaDir, "cache", "models")}.models
 			}
 		}
 		for _, one := range a.pluginAgents() {
