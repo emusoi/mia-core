@@ -147,6 +147,11 @@ func muiKeys(stop <-chan struct{}) <-chan string {
 	return keys
 }
 
+// muiThroughTmux, set, says a UI is drawn through a pane of tmux it does
+// not run in: of this machine's, when it runs on another over ssh. It is
+// framed for tmux as one run in tmux is.
+const muiThroughTmux = "MIA_MUI_TMUX"
+
 // muiOpen makes the terminal one a UI is said through: in raw mode, what
 // the window types a bracketed paste, the pane coming into sight
 // reported, and line on the plain terminal under the UI. say writes
@@ -169,7 +174,7 @@ func muiOpen(pane, line string) (say func(messages ...[]byte), shut func(), err 
 			_ = syscall.Close(fd)
 		}
 	}
-	tmux := os.Getenv("TMUX") != ""
+	tmux := os.Getenv("TMUX") != "" || os.Getenv(muiThroughTmux) != ""
 	say = func(messages ...[]byte) {
 		for _, message := range messages {
 			_, _ = os.Stdout.Write(framed(message, tmux))

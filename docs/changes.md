@@ -9,6 +9,17 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **A chat of mia's is drawn as a window's chat is.** `mia chat --chat
+  <name>`, `main` the main agent, is the same chat as `mia chat --window`
+  over a chat of mia's, from any folder: its thread followed, each switch
+  the band its own turn says; what is sent, chosen and stopped done as
+  `mia chats say`, `press` and `interrupt` do it, the agent at work at
+  once after a send; Models switching its model as `mia chats model` does
+  and going on with another agent as `mia chats switch` does; Earlier its
+  own conversations. With `[main] machine` another machine's, it runs
+  there over ssh with this terminal as its own. See
+  [Chats](chats.md#shown-as-a-chat).
+
 - **`mia serve`, a server of this machine's.** It answers every query of
   `mia api` over a unix socket of the person's alone,
   `~/.config/mia/serve/serve.sock`, as `GET /api/<query>`; tells whoever

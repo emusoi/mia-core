@@ -13,6 +13,7 @@ import (
 	"unsafe"
 
 	"github.com/emusoi/mia-core/internal/gittest"
+	"github.com/emusoi/mia-core/internal/runtime"
 )
 
 // openPty is a new pty: its master, and the path of its slave.
@@ -108,6 +109,57 @@ func TestAUIEndsWithThePtyItWasStartedIn(t *testing.T) {
 					t.Fatalf("mia %s still runs after its pty was let go; it said %q", command, strings.TrimSpace(string(out)))
 				}
 			})
+		}
+	}
+}
+
+// A chat of mia's lives where the main agent does: from another machine
+// mia chat --chat is that machine's mia's, run there over ssh with this
+// terminal as its own, told the pane of this machine's tmux it is drawn
+// through, so that what it says reaches mia desk here as a UI run here
+// does.
+func TestAChatOnAnotherMachineIsDrawnFromThere(t *testing.T) {
+	gittest.Isolate(t)
+	t.Chdir(t.TempDir())
+	t.Setenv("MIA_MAIN_HERE", "")
+	t.Setenv("TMUX", "/tmp/tmux-test/default,1,0")
+	t.Setenv("TMUX_PANE", "%7")
+	bin := t.TempDir()
+	log := filepath.Join(bin, "asked")
+	ssh := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + log + "\n"
+	if err := os.WriteFile(filepath.Join(bin, "ssh"), []byte(ssh), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	machines := runtime.Store{Path: filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "runtimes.json")}
+	if err := machines.Add(runtime.Machine{Name: "fedora", SSH: "fedora.invalid"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "mia", "config.toml"), []byte("[main]\nmachine = \"fedora\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	master, path := openPty(t)
+	defer master.Close()
+	slave, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer slave.Close()
+	stdin := os.Stdin
+	os.Stdin = slave
+	defer func() { os.Stdin = stdin }()
+	if code := Run([]string{"chat", "--chat", "goba"}); code != exitOK {
+		t.Fatalf("chat --chat goba exited %d", code)
+	}
+	data, _ := os.ReadFile(log)
+	for _, want := range []string{"-t fedora.invalid", "MIA_MAIN_HERE=1", `$HOME/.local/bin/mia chat --chat "$name"`, "'goba' 'TMUX_PANE=%7' 'MIA_MUI_TMUX=1'"} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("fedora was not asked %s:\n%s", want, data)
+		}
+	}
+	for _, bad := range [][]string{{"chat", "--chat"}, {"chat", "--chat", "goba", "--window", "1"}, {"chat", "--chat", "goba", "extra"}} {
+		if code := Run(bad); code != exitUsage {
+			t.Errorf("%v exited %d, want %d", bad, code, exitUsage)
 		}
 	}
 }

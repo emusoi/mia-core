@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
@@ -26,7 +27,7 @@ import (
 	"github.com/emusoi/mia-core/internal/session"
 )
 
-const chatUsage = "mia chat [--window <index>] [--conversation <id>]"
+const chatUsage = "mia chat [--window <index>] [--conversation <id>] | --chat <name>"
 
 // chatTurns is how many turns the view said whole has at most: under what
 // the window takes, so that turns can be added to it by patches before it
@@ -741,6 +742,17 @@ func (t *talk) heard(turns []app.Turn) [][]byte {
 	passed := false // a turn came that is none of what was sent from here
 	for _, turn := range turns {
 		t.last = max(t.last, turn.N)
+		if turn.Kind == "switch" {
+			// a chat of mia's says in its own turns where it went from agent to agent: the band, at its place
+			one := banded(chatBand{N: t.at(turn.N), Kind: "switch", From: turn.From, To: turn.To, Note: turn.Note, Tone: turn.Tone})
+			if at, found := t.find(one.n); found {
+				t.turns[at] = one
+			} else {
+				t.turns = slices.Insert(t.turns, at, one)
+			}
+			changed = append(changed, one)
+			continue
+		}
 		if !drawn(turn) {
 			continue
 		}
@@ -1023,6 +1035,11 @@ type chatView struct {
 	talk     *talk
 	mode     chatMode
 	worktree string
+	// chat is the chat of mia's this is, by its name — main for the main
+	// agent — and "" for a worktree's window's: its turns are its own
+	// thread's, and what is sent, chosen, stopped and switched is done as
+	// mia chats does it. window is then its name.
+	chat string
 	// window is the window typed into, by its number; "" when none has the
 	// conversation open. runs is what it runs.
 	window string
@@ -1124,6 +1141,15 @@ func typedFor(kept carrying, record model.Record, window, words string, read fun
 		return "Read " + was.File + ": the conversation so far, with " + was.From + ".\n\n" + chatRule + "\n\n" + words, back
 	}
 	return app.CarriedText(was.From, string(transcript), cmp.Or(was.Full, was.File), words, chatCarry), back
+}
+
+// holder is what holds the chat's agent, as a line says it: its window,
+// or the chat of mia's it is.
+func (v *chatView) holder() string {
+	if v.chat != "" {
+		return "chat"
+	}
+	return "window"
 }
 
 // agent is the agent that answers in this chat.
@@ -1322,15 +1348,18 @@ func (v *chatView) models(placed bool) json.RawMessage {
 		case !mine:
 			item.About = []string{"goes on in " + row.agent + " with what was said and each thing done, not what " + v.agent() + " thought or its tools gave back",
 				v.agent() + "'s window is closed once " + row.agent + " runs"}
+			if v.chat != "" {
+				item.About[1] = v.agent() + " is stopped once " + row.agent + " runs"
+			}
 		case row.model == "" && !row.used:
 			item.Does = "nothing"
 			item.About = []string{row.agent, "mia starts it with no model: pick one in its terminal"}
 		case agent.Live:
 			item.Does = "switch"
-			item.About = []string{chatAbout(app.Runs{Agent: row.agent, Account: v.runs.Account}), "switches this window now"}
+			item.About = []string{chatAbout(app.Runs{Agent: row.agent, Account: v.runs.Account}), "switches this " + v.holder() + " now"}
 		case agent.Again:
 			item.Does = "switch"
-			item.About = []string{chatAbout(app.Runs{Agent: row.agent, Account: v.runs.Account}), "starts it again in this window, on this conversation"}
+			item.About = []string{chatAbout(app.Runs{Agent: row.agent, Account: v.runs.Account}), "starts it again in this " + v.holder() + ", on this conversation"}
 		default:
 			item.Does = "nothing"
 			item.About = []string{row.agent, "cannot be switched while it runs"}
@@ -1387,7 +1416,7 @@ func (v *chatView) models(placed bool) json.RawMessage {
 	title := "Model"
 	if v.fork > 0 {
 		title = "Continue from reply " + strconv.Itoa(v.fork)
-	} else {
+	} else if v.chat == "" { // (a chat of mia's has no worktree to send from)
 		// (the one key the search line lets through that types nothing)
 		inside = append(inside, encode(chatBox{T: "divider"}), encode(chatButton{T: "button", ID: "mark", Label: "Mark, to send your next message to several agents", Key: "⇧⏎", Quiet: true}))
 	}
@@ -1486,7 +1515,7 @@ func (v *chatView) does() (line json.RawMessage, tab string) {
 		now := app.Runs{Model: cmp.Or(deed.model, v.runs.Model), Effort: cmp.Or(deed.effort, v.runs.Effort)}
 		how := "· Switches in place. Nothing is re-sent."
 		if at := slices.IndexFunc(v.agents, func(one app.AgentModels) bool { return one.Name == v.agent() }); at >= 0 && !v.agents[at].Live {
-			how = "· Starts again in this window, on this conversation. Nothing is re-sent."
+			how = "· Starts again in this " + v.holder() + ", on this conversation. Nothing is re-sent."
 		}
 		if band, changes := modelled(v.runs, now); changes {
 			lines = append(lines, row(said(band.From+" → "+band.To, "strong"), said(how, "dim")))
@@ -1562,7 +1591,7 @@ func (v *chatView) earlier(placed bool) json.RawMessage {
 		if running {
 			item.Does, item.Menu[0].Title = "back to it", "Go to it"
 		}
-		if head.Agent != v.agent() {
+		if head.Agent != v.agent() && v.chat == "" { // (a chat of mia's goes on with the conversation it has open)
 			item.Keys = []chatKey{{Key: "c", Label: "continue", ID: "continue"}}
 			item.Menu = append(item.Menu, chatItem{ID: "continue", Title: "Continue with " + v.agent()})
 		}
@@ -1821,7 +1850,7 @@ func (v *chatView) deed(event chatEvent) chatDeed {
 		case event.Sub == "copy":
 			return chatDeed{do: chatCopy, id: head.ID}
 		case event.Sub == "continue":
-			if head.Agent != v.agent() {
+			if head.Agent != v.agent() && v.chat == "" {
 				return chatDeed{do: chatContinue, id: head.ID}
 			}
 		case head.Running && head.Window != nil:
@@ -1832,7 +1861,7 @@ func (v *chatView) deed(event chatEvent) chatDeed {
 	case v.mode == looking && event.E == "press" && event.ID == "continue":
 		head, there := v.headOf(event.Item)
 		switch {
-		case !there || head.Agent == v.agent():
+		case !there || head.Agent == v.agent() || v.chat != "":
 		case v.armed == head.ID:
 			return chatDeed{do: chatContinue, id: head.ID}
 		default:
@@ -1879,7 +1908,7 @@ func (v *chatView) comes(deed chatDeed) bool {
 func (v *chatView) marking(id string) chatDeed {
 	row, ok := chatModelOf(id)
 	switch {
-	case !ok:
+	case !ok || v.chat != "":
 		return chatDeed{}
 	case v.talk.waits != nil:
 		return chatDeed{do: chatSay, text: "what " + v.agent() + " goes on from has still to be sent with your next message: send that first, then mark"}
@@ -1908,7 +1937,7 @@ func (v *chatView) picked(event chatEvent) chatDeed {
 	switch {
 	case v.fork > 0:
 		return chatDeed{do: chatFork, agent: row.agent, model: row.model, effort: effort, whole: v.whole}
-	case row.agent != v.agent() && v.id == "":
+	case row.agent != v.agent() && v.id == "" && v.chat == "": // (a chat of mia's goes on with another agent all the same)
 		return chatDeed{do: chatSay, text: "nothing is said here that mia can read yet: there is nothing for " + row.agent + " to go on with"}
 	case row.agent != v.agent():
 		return chatDeed{do: chatHand, agent: row.agent, model: row.model, effort: effort, whole: v.whole}
@@ -2080,7 +2109,7 @@ func (r *chatRun) aim(head app.Head, window string, known *chatWindow) {
 		nth = v.talk.nth + 1
 	}
 	v.mode, v.fork, v.told, v.tabbed, v.next, v.window, v.id = chatting, 0, nil, "", nil, window, head.ID
-	if head.ID != "" {
+	if head.ID != "" || v.chat != "" { // (a chat of mia's has its thread, of a conversation or none yet)
 		r.follow(head) // read while the window is asked of: what it reads is heard once all this is done
 	}
 	if r.hangUp != nil {
@@ -2117,7 +2146,9 @@ func (r *chatRun) aim(head app.Head, window string, known *chatWindow) {
 	if seen.on {
 		from = app.Talk{Agent: seen.carried.From, ID: seen.carried.ID}
 	}
-	v.talk.lays(r.parts(app.Talk{Agent: v.runs.Agent, ID: head.ID}, from))
+	if v.chat == "" { // a chat of mia's says its switches in its own turns
+		v.talk.lays(r.parts(app.Talk{Agent: v.runs.Agent, ID: head.ID}, from))
+	}
 	v.came = nil
 	for _, handed := range r.a.Handings(v.runs.Agent, head.ID, from) {
 		v.came = append(v.came, handed.From.Agent)
@@ -2162,10 +2193,14 @@ func (r *chatRun) listen(window string) {
 	if r.gone {
 		return
 	}
-	of, quit, got := r.of, r.quit, make(chan chatListen, 1)
+	of, quit, got, chat := r.of, r.quit, make(chan chatListen, 1), r.view.chat
 	r.listening = got
 	go func() {
-		told, hangUp := listenServer(asked("window", r.record.Path, window, "--worktree", r.record.Name))
+		question := asked("window", r.record.Path, window, "--worktree", r.record.Name)
+		if chat != "" {
+			question = asked("chat", r.a.Root, chat)
+		}
+		told, hangUp := listenServer(question)
 		select {
 		case <-quit: // another chat was aimed at meanwhile
 			hangUp()
@@ -2273,10 +2308,151 @@ func (r *chatRun) index() int {
 	return index
 }
 
+// atWork reports whether the chat's agent is at work, as its window shows.
+func (r *chatRun) atWork() bool {
+	if r.view.chat != "" {
+		return r.a.Main().Working
+	}
+	return r.a.AtWork(r.record, r.index())
+}
+
+// press presses keys in the chat's agent's window, as mia window press or
+// mia chats press does: an answer to what it asks.
+func (r *chatRun) press(keys string) error {
+	if r.view.chat != "" {
+		return r.a.PressInMain(keys)
+	}
+	return r.a.PressInWindow(r.record, r.view.window, keys)
+}
+
+// interrupt stops the chat's agent mid-work.
+func (r *chatRun) interrupt() error {
+	if r.view.chat != "" {
+		return r.a.InterruptMain()
+	}
+	return r.a.StopInWindow(r.record, r.view.window)
+}
+
+// switches switches the chat's agent to a model and an effort, in place
+// or started again on its conversation, as its agent can.
+func (r *chatRun) switches(model, effort string) (app.Chosen, error) {
+	if r.view.chat != "" {
+		return r.a.SwitchMain(model, effort)
+	}
+	return r.a.SwitchWindow(r.record, r.view.window, model, effort)
+}
+
+// toolsOf is turns as the window reads them: each of mia's verbs a chat's
+// agent ran, which its thread says as what it did, the tool it is.
+func toolsOf(turns []app.Turn) []app.Turn {
+	for i := range turns {
+		if turns[i].Kind == "did" {
+			turns[i].Kind = "tool"
+		}
+	}
+	return turns
+}
+
+// aimAtChat makes the chat the one of mia's chat as it stands now: its
+// thread followed from its first turn, and what its agent runs on and
+// whether it works as mia chats says them.
+func (r *chatRun) aimAtChat() {
+	state := r.a.Main()
+	runs := app.Runs{Agent: state.Agent, Model: state.Model, Effort: state.Effort, Account: state.Account, Reads: true}
+	r.aim(app.Head{ID: state.Conversation, Agent: state.Agent, Model: state.Model, Effort: state.Effort, Account: state.Account},
+		r.view.chat, &chatWindow{runs: runs, working: state.Working})
+}
+
+// looksAtChat is what a second brings to a chat of mia's, or mia serve
+// tells of it: another agent it went on with elsewhere, said whole; a
+// conversation it opened since — the first written to by an agent it went
+// on with — followed in place, its thread numbered as before; whether it
+// works, and what it asks.
+func (r *chatRun) looksAtChat() {
+	v := r.view
+	state := r.a.Main()
+	switch {
+	case state.Agent != v.runs.Agent:
+		r.aimAtChat()
+		r.say(v.talk.said()...)
+		return
+	case state.Conversation != v.id:
+		v.id = state.Conversation
+		r.refollow()
+	}
+	r.say(v.talk.seen(state.Working, time.Now())...)
+	if !v.talk.working {
+		r.rests()
+	}
+	if r.owed = time.Since(r.pressed) < 2*time.Second; r.owed {
+		return
+	}
+	r.say(v.talk.asked(state.Asks)...)
+}
+
+// refollow follows a chat of mia's thread again from its first turn, the
+// chat as it is: each turn heard again under its number, the switch that
+// waited on what went with the first thing sent to its agent said as it
+// now is. What listened for the chat before listens again.
+func (r *chatRun) refollow() {
+	close(r.quit)
+	r.of, r.quit = r.of+1, make(chan struct{})
+	r.follow(app.Head{})
+	if r.hangUp != nil {
+		r.hangUp()
+	}
+	select {
+	case heard := <-r.listening:
+		heard.hangUp()
+	default:
+	}
+	r.told, r.hangUp, r.listening = nil, nil, nil
+	r.listen(r.view.window)
+}
+
+// takes has a chat of mia's go on with another agent as mia chats switch
+// does — its conversation written out and carried in front of the first
+// thing said to the other, the agent it was with stopped — and the chat
+// is that agent's from then on, the switch among its thread's turns.
+func (r *chatRun) takes(deed chatDeed) bool {
+	v := r.view
+	from := v.agent()
+	r.say(v.shut(v.talk.stands(&muiStatus{Text: cutTo("handing this conversation to "+deed.agent+"…", chatSaid)}))...)
+	done, err := r.a.SwitchChat(deed.agent, deed.model, deed.effort)
+	if err != nil {
+		r.note(err.Error(), "bad")
+		return false
+	}
+	r.aimAtChat()
+	text := from + " stopped · " + done.To + " goes on with this conversation"
+	if done.Resumes != "" {
+		text = from + " stopped · " + done.To + " takes its own conversation up again, with what was said since"
+	}
+	r.shows(text, "ok")
+	return true
+}
+
+// resumes has a chat of mia's agent go on with another of its
+// conversations, as mia main start --resume --restart does: the agent it
+// runs ended and started again on it. One at work or asking is left be.
+func (r *chatRun) resumes(id string) {
+	head, _ := r.view.headOf(id)
+	if state := r.a.Main(); state.Working || state.Asks != nil {
+		r.tell(fmt.Errorf("%s is at work or asks something: stop or answer it first, then go on with another conversation", state.Agent))
+		return
+	}
+	if _, err := r.a.StartMainResuming(id, "", "", "", "", true); err != nil {
+		r.tell(err)
+		return
+	}
+	r.aimAtChat()
+	r.shows(head.Agent+" goes on with it", "ok")
+}
+
 // follow reads a conversation as it is written, for the run to hear: one
 // a window has open where the window's agent says it is.
 func (r *chatRun) follow(head app.Head) {
-	of, quit := r.of, r.quit
+	of, quit, chat := r.of, r.quit, r.view.chat
 	go func() {
 		say := func(turns []app.Turn) error {
 			select {
@@ -2287,9 +2463,12 @@ func (r *chatRun) follow(head app.Head) {
 			}
 		}
 		var err error
-		if head.Running && head.Window != nil {
+		switch {
+		case chat != "": // its thread: the conversation it has open, after those it went on from
+			err = r.a.FollowMain("", 0, quit, func(turns []app.Turn) error { return say(toolsOf(turns)) })
+		case head.Running && head.Window != nil:
 			err = r.a.FollowOpen(head, enough, quit, say)
-		} else {
+		default:
 			err = r.a.FollowConversation(head.ID, r.record.Name, 0, quit, say)
 		}
 		select {
@@ -2305,6 +2484,10 @@ func (r *chatRun) follow(head app.Head) {
 // work; and what its window's screen asks.
 func (r *chatRun) looks() {
 	v := r.view
+	if v.chat != "" {
+		r.looksAtChat()
+		return
+	}
 	if v.window == "" {
 		return
 	}
@@ -2347,7 +2530,7 @@ func (r *chatRun) act(deed chatDeed) {
 			return
 		}
 		// what was picked to come next and is not done yet, the turn just over: first, so the words go to who was picked
-		if v.next != nil && !r.a.AtWork(r.record, r.index()) {
+		if v.next != nil && !r.atWork() {
 			r.say(v.talk.atWork(false)...)
 			if !r.rests() {
 				words := []rune(deed.text)
@@ -2381,7 +2564,7 @@ func (r *chatRun) act(deed chatDeed) {
 		r.say(v.fanned(rows)...)
 	case chatChoose:
 		r.note("", "")
-		if err := r.a.PressInWindow(r.record, v.window, strconv.Itoa(deed.option+1)); err != nil {
+		if err := r.press(strconv.Itoa(deed.option + 1)); err != nil {
 			r.say(v.talk.reopened(deed.question, err)...)
 			return
 		}
@@ -2389,7 +2572,7 @@ func (r *chatRun) act(deed chatDeed) {
 		r.pressed = time.Now()
 		r.say(v.talk.asked(nil)...)
 	case chatStop:
-		if err := r.a.StopInWindow(r.record, v.window); err != nil {
+		if err := r.interrupt(); err != nil {
 			r.note(err.Error(), "bad")
 			return
 		}
@@ -2399,6 +2582,10 @@ func (r *chatRun) act(deed chatDeed) {
 			r.say(v.talk.patch(encode(chatOp{Op: "copy", Text: words}), v.talk.went("copied", "ok"))...)
 		}
 	case chatModelsUp, chatForkUp:
+		if deed.do == chatForkUp && v.chat != "" {
+			r.note("a chat of mia's is not forked: go on with another agent from the models", "warn")
+			return
+		}
 		v.fork = 0
 		if deed.do == chatForkUp {
 			if v.fork, _, _ = v.talk.replied(deed.question); v.fork == 0 {
@@ -2417,7 +2604,12 @@ func (r *chatRun) act(deed chatDeed) {
 		r.weighs()
 		r.say(v.up(picking)...)
 	case chatEarlier:
-		heads, _ := r.a.Conversations(app.Wanted{Worktree: r.record.Name})
+		var heads []app.Head
+		if v.chat != "" {
+			heads, _ = r.a.MainConversations() // its own, the one it has open marked
+		} else {
+			heads, _ = r.a.Conversations(app.Wanted{Worktree: r.record.Name})
+		}
 		v.listed(heads, time.Now())
 		r.read(v.on)
 		r.say(v.up(looking)...)
@@ -2477,7 +2669,7 @@ func (r *chatRun) act(deed chatDeed) {
 		r.say(v.talk.patch(v.lined())...)
 		r.say(v.again()...)
 	case chatNow:
-		if err := r.a.StopInWindow(r.record, v.window); err != nil {
+		if err := r.interrupt(); err != nil {
 			r.tell(err)
 			return
 		}
@@ -2487,13 +2679,17 @@ func (r *chatRun) act(deed chatDeed) {
 		r.say(v.again()...)
 	case chatShow:
 		head, _ := v.headOf(deed.id)
-		if head.ID == v.id && strconv.Itoa(head.Window.Index) == v.window {
+		if v.chat != "" || head.ID == v.id && strconv.Itoa(head.Window.Index) == v.window { // (of a chat of mia's, the one it has open)
 			r.say(v.shut()...)
 			return
 		}
 		r.aim(head, strconv.Itoa(head.Window.Index), nil)
 		r.say(v.talk.said()...)
 	case chatGoOn:
+		if v.chat != "" {
+			r.resumes(deed.id)
+			return
+		}
 		done, err := r.a.ResumeConversation(deed.id, r.record.Name, r.record.Name, "", "", "")
 		if err != nil {
 			r.tell(err)
@@ -2530,19 +2726,27 @@ func (r *chatRun) act(deed chatDeed) {
 func (r *chatRun) types(text string) bool {
 	v := r.view
 	r.say(v.talk.sends(text)...)
-	send := r.a.SendToWindow
-	words, back := typedFor(r.a, r.record, v.window, text, os.ReadFile)
-	if strings.Contains(words, "\n") {
-		send = r.a.SayToWindow // pasted: a line break in it is not an Enter
-	}
-	if err := send(r.record, v.window, words); err != nil {
-		back()
-		r.say(v.talk.refused(err)...)
-		return false
-	}
 	var changes []json.RawMessage
-	if words != text {
-		changes = v.talk.handed() // what the agent goes on from went with it
+	if v.chat != "" {
+		// said as mia chats say says it, with what its agent goes on from in front of the first
+		if err := r.a.SayToMain(text); err != nil {
+			r.say(v.talk.refused(err)...)
+			return false
+		}
+	} else {
+		send := r.a.SendToWindow
+		words, back := typedFor(r.a, r.record, v.window, text, os.ReadFile)
+		if strings.Contains(words, "\n") {
+			send = r.a.SayToWindow // pasted: a line break in it is not an Enter
+		}
+		if err := send(r.record, v.window, words); err != nil {
+			back()
+			r.say(v.talk.refused(err)...)
+			return false
+		}
+		if words != text {
+			changes = v.talk.handed() // what the agent goes on from went with it
+		}
 	}
 	if change := v.talk.awaiting(time.Now()); change != nil {
 		changes = append(changes, change)
@@ -2662,7 +2866,7 @@ func (r *chatRun) fan(one chatMake, text, head string) (there bool, err error) {
 func (r *chatRun) applies(deed chatDeed) bool {
 	v := r.view
 	if deed.do == chatSwitch {
-		now, err := r.a.SwitchWindow(r.record, v.window, deed.model, deed.effort)
+		now, err := r.switches(deed.model, deed.effort)
 		if err != nil {
 			r.tell(err)
 			return false
@@ -2682,6 +2886,9 @@ func (r *chatRun) applies(deed chatDeed) bool {
 		}
 		r.say(v.shut(changes...)...)
 		return true
+	}
+	if v.chat != "" {
+		return r.takes(deed)
 	}
 	from, window := v.agent(), v.window
 	if r.a.WindowHasPane(r.record, window, v.talk.pane) {
@@ -2737,7 +2944,7 @@ func (r *chatRun) rests() bool {
 func (r *chatRun) weighs() {
 	v := r.view
 	row, ok := chatModelOf(v.under)
-	if _, looked := v.would[row.agent]; !ok || looked || row.agent == v.agent() && v.fork == 0 || v.id == "" {
+	if _, looked := v.would[row.agent]; !ok || looked || row.agent == v.agent() && v.fork == 0 || v.id == "" || v.chat != "" {
 		return
 	}
 	done, err := r.a.ContinueConversation(app.Continue{ID: v.id, Worktree: r.record.Name, With: row.agent, DryRun: true, Upto: v.fork})
@@ -2772,11 +2979,17 @@ func (r *chatRun) read(id string) {
 	if r.view.told = nil; id == "" {
 		return
 	}
-	turns, err := r.a.ConversationIn(id, r.record.Name, 0)
+	var turns []app.Turn
+	var err error
+	if r.view.chat != "" {
+		turns, err = r.a.MainTurns(id, 0) // one of its own, read alone
+	} else {
+		turns, err = r.a.ConversationIn(id, r.record.Name, 0)
+	}
 	if err != nil {
 		r.view.told = &muiStatus{Text: err.Error(), Tone: "bad"}
 	}
-	r.view.reads(id, turns)
+	r.view.reads(id, toolsOf(turns))
 }
 
 // cmdChat shows a conversation of the worktree it is run in as a chat
@@ -2828,6 +3041,13 @@ func cmdChat(a *app.App, args []string) int {
 	defer close(stop)
 	run := &chatRun{a: a, record: record, view: &chatView{worktree: record.Name}, done: stop, batches: make(chan chatBatch), ended: make(chan chatEnd)}
 	run.aim(head, window, seen)
+	return run.shown(stop, record.Name)
+}
+
+// shown has mia desk draw a chat aimed at over the pane, and does what is
+// done in it, until it is left or what it follows ends: of says what it is
+// of, on the plain terminal under it.
+func (run *chatRun) shown(stop chan struct{}, of string) int {
 	defer func() {
 		if run.hangUp != nil {
 			run.hangUp()
@@ -2838,7 +3058,7 @@ func cmdChat(a *app.App, args []string) int {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer signal.Stop(signals)
 
-	say, shut, err := muiOpen(run.view.talk.pane, "mia chat: the plain terminal. In mia desk "+run.view.talk.agent+" · "+record.Name+" is drawn over it as a chat; q or ⌃C leaves.")
+	say, shut, err := muiOpen(run.view.talk.pane, "mia chat: the plain terminal. In mia desk "+run.view.talk.agent+" · "+of+" is drawn over it as a chat; q or ⌃C leaves.")
 	if err != nil {
 		return fail(err)
 	}
@@ -2909,4 +3129,51 @@ func cmdChat(a *app.App, args []string) int {
 			}
 		}
 	}
+}
+
+// cmdChatOfChat is mia chat --chat: a chat of mia's, main for the main
+// agent, shown as a window's conversation is, from any folder. What is
+// sent, chosen, stopped and switched there is done as mia chats does it.
+// The chats live where the main agent does: with [main] machine naming
+// another machine, it is that machine's mia that shows it, run there over
+// ssh with this terminal as its own, so that what it draws is drawn here.
+func cmdChatOfChat(args []string) int {
+	name := takeValue(&args, "--chat")
+	if name == "" || len(args) > 0 {
+		return usageErr(chatUsage)
+	}
+	if !term.IsTerminal(os.Stdin.Fd()) {
+		return fail(errors.New("chat reads what you do from a terminal: run it in a pane of mia desk"))
+	}
+	main, err := atMain()
+	if err != nil {
+		return fail(err)
+	}
+	if machine, elsewhere, err := main.MainElsewhere(); err != nil {
+		return fail(err)
+	} else if elsewhere {
+		var env []string // drawn through this machine's tmux pane, when it is in one
+		if pane := os.Getenv("TMUX_PANE"); pane != "" {
+			env = append(env, "TMUX_PANE="+pane)
+		}
+		if os.Getenv("TMUX") != "" {
+			env = append(env, muiThroughTmux+"=1")
+		}
+		var exit *exec.ExitError
+		if err := main.ChatOnMainMachine(machine, name, env...); errors.As(err, &exit) {
+			return exit.ExitCode() // the machine's mia has said why
+		} else if err != nil {
+			return fail(err)
+		}
+		return exitOK
+	}
+	c, err := atChat(name)
+	if err != nil {
+		return fail(err)
+	}
+	stop := make(chan struct{})
+	defer close(stop)
+	run := &chatRun{a: c, record: model.Record{Name: name}, view: &chatView{worktree: name, chat: name}, done: stop, batches: make(chan chatBatch), ended: make(chan chatEnd)}
+	run.aimAtChat()
+	return run.shown(stop, "chat "+name)
 }

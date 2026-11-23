@@ -506,6 +506,9 @@ func TestChatRefusesWhatIsNotATerminal(t *testing.T) {
 	if code := Run([]string{"chat"}); code != exitFailed {
 		t.Errorf("chat exited %d, want %d", code, exitFailed)
 	}
+	if code := Run([]string{"chat", "--chat", "main"}); code != exitFailed {
+		t.Errorf("chat --chat main exited %d, want %d", code, exitFailed)
+	}
 	for _, args := range [][]string{{"chat", "--window", "claude"}, {"chat", "monduli"}} {
 		if code := Run(args); code != exitUsage {
 			t.Errorf("%v exited %d, want %d", args, code, exitUsage)
@@ -2616,5 +2619,201 @@ func TestAFanOutThatFailsLeavesWhatWasMadeAndSendsNothingFurther(t *testing.T) {
 	}
 	if draft != "try it your way" || len(v.fans) != 1 || v.fans[0].model != "soft" || v.talk.hint != "Say something to 2 agents" || v.talk.about != "claude · fan-out: echo · soft" {
 		t.Errorf("after it: draft %q, %+v, %q, %q", draft, v.fans, v.talk.hint, v.talk.about)
+	}
+}
+
+// A chat of mia's is the chat a window's is, over the chat: its thread
+// followed, what is sent typed to its agent as mia chats say types it and
+// said at once, the agent at work from then until its window rests, a
+// model of its agent switched in place, and another agent gone on with as
+// mia chats switch does it, the band of that switch read from the chat's
+// own turns, once, waiting until the first thing sent to the other and
+// then saying what was handed over. Earlier is the chat's own
+// conversations, the one it has open marked, and one of them gone on with.
+func TestAChatOfMiasIsTheChatAWindowsIs(t *testing.T) {
+	roleLab(t)
+	claude := filepath.Join(os.Getenv("HOME"), ".claude")
+	t.Setenv("CLAUDE_CONFIG_DIR", claude)
+	t.Setenv("CODEX_HOME", "")
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\necho \"claude $*\"\nexec cat\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	main, err := app.AtMain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	main.Plugins = pluginHost(config.Config{})
+	c, err := main.NewChat("echo", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Plugins = main.Plugins
+	state, err := c.StartMain("", "", "", "")
+	if err != nil || state.Conversation != "e2" {
+		t.Fatalf("started: %+v, %v", state, err)
+	}
+	name := state.Name
+	screen := func(window, want string) {
+		t.Helper()
+		var got string
+		for range 250 {
+			if got, _ = session.Here().Capture("chat-"+name, window, false); strings.Contains(got, want) {
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		t.Fatalf("%s's window never showed %q: %q", window, want, got)
+	}
+	var messages [][]byte
+	run := &chatRun{a: c, record: model.Record{Name: name}, view: &chatView{worktree: name, chat: name},
+		say: func(said ...[]byte) { messages = append(messages, said...) }, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
+	t.Cleanup(func() { close(run.quit) })
+	hears := func() {
+		t.Helper()
+		for {
+			select {
+			case batch := <-run.batches:
+				if batch.of == run.of {
+					run.say(run.view.talk.heard(batch.turns)...)
+					return
+				}
+			case end := <-run.ended:
+				if end.of == run.of {
+					t.Fatalf("the thread's follower ended: %v", end.err)
+				}
+			case <-time.After(10 * time.Second):
+				t.Fatal("the thread was not heard")
+			}
+		}
+	}
+	shown := func() (view *shownPiece, all []string) {
+		t.Helper()
+		view = read(t, run.view.talk.whole()).View
+		for _, turn := range view.Turns {
+			if turn.Kind == "switch" {
+				all = append(all, strings.TrimSpace(fmt.Sprintf("switch: %s > %s | %s | %s", turn.From, turn.To, turn.Note, turn.Tone)))
+				continue
+			}
+			all = append(all, turn.Kind+": "+cmp.Or(turn.Text, turn.From+" > "+turn.To))
+		}
+		return view, all
+	}
+	rests := func() { // what was typed is no work: the window at rest again
+		t.Helper()
+		run.looks()
+		time.Sleep(3200 * time.Millisecond)
+		run.looks()
+		if run.view.talk.working {
+			t.Fatal("still at work once its window rests")
+		}
+	}
+
+	run.aimAtChat()
+	hears()
+	view, all := shown()
+	if view.Agent != "echo" || !view.Reply || view.Model != "echo" || !slices.Equal(all, []string{"asked: say it back", "said: say it back"}) {
+		t.Fatalf("the chat of its thread: %+v %q", view, all)
+	}
+	if got := len(view.Buttons); got != 3 || view.Buttons[0].ID != "open-models" || view.Buttons[2].ID != "open-earlier" {
+		t.Errorf("its composer's buttons: %+v", view.Buttons)
+	}
+
+	// a model of its own agent: switched in place, and the line that says so
+	rests()
+	run.act(run.view.deed(chatEvent{E: "press", ID: "open-models"}))
+	modal := read(t, messages[len(messages)-1]).Patch[0].Node
+	if modal == nil || modal.Title != "Model" || strings.Contains(wordsOf(*modal), "mark") {
+		t.Fatalf("the models over a chat of mia's: %+v", modal)
+	}
+	run.act(run.view.deed(chatEvent{E: "pick", List: "models", ID: "a|echo|soft"}))
+	screen("echo", "/model soft")
+	if _, all = shown(); !slices.Equal(all, []string{"asked: say it back", "said: say it back", "model: default > soft"}) || run.view.runs.Model != "soft" {
+		t.Errorf("switched to soft: %q, %+v", all, run.view.runs)
+	}
+
+	// what is sent shows at once, and the agent works from then until its window rests
+	messages = nil
+	run.act(run.view.deed(chatEvent{E: "send", Text: "hello there"}))
+	screen("echo", "hello there")
+	if _, all = shown(); all[len(all)-1] != "asked: hello there" || !run.view.talk.working {
+		t.Errorf("sent: %q, working %v", all, run.view.talk.working)
+	}
+	if !slices.ContainsFunc(messages, func(m []byte) bool {
+		return strings.Contains(string(m), `"op":"working"`) && strings.Contains(string(m), `"on":true`)
+	}) {
+		t.Errorf("no patch said it works: %s", messages)
+	}
+	rests()
+
+	// another agent: gone on with as mia chats switch does it, its band the thread's own switch turn, once
+	var row chatModel
+	for _, one := range chatModels(run.view.agents, nil, "echo", "") {
+		if one.agent == "claude" {
+			row = one
+			break
+		}
+	}
+	if row.agent == "" {
+		t.Fatal("claude is not among the models")
+	}
+	run.act(run.view.deed(chatEvent{E: "press", ID: "open-models"}))
+	run.act(run.view.deed(chatEvent{E: "pick", List: "models", ID: row.id()}))
+	if status := run.view.talk.status; status != nil {
+		t.Fatalf("handed to claude: %+v", status)
+	}
+	hears()
+	view, all = shown()
+	waits := []string{"asked: say it back", "said: say it back", "switch: echo > claude | " + app.CarriedWaits + " | warn"}
+	if view.Agent != "claude" || run.view.mode != chatting || !slices.Equal(all, waits) {
+		t.Fatalf("gone on with claude: %s, %q", view.Agent, all)
+	}
+	screen("claude", "claude")
+	run.act(run.view.deed(chatEvent{E: "send", Text: "go on"}))
+	screen("claude", app.CarriedOpens("echo"))
+	handoff := filepath.Join(c.MiaDir, "handoffs", name)
+	files, _ := filepath.Glob(filepath.Join(handoff, "echo-e2*.md"))
+	if len(files) != 1 {
+		t.Fatalf("the handoff: %v", files)
+	}
+	written, _ := os.ReadFile(files[0])
+	now := time.Now().UTC()
+	line := func(kind, content string, at time.Time) string {
+		root, _ := json.Marshal(c.Root)
+		return `{"parentUuid":"p","type":"` + kind + `","cwd":` + string(root) + `,"timestamp":"` + at.Format(time.RFC3339Nano) + `","message":{"content":` + content + `}}`
+	}
+	carried, _ := json.Marshal(app.CarriedText("echo", string(written), files[0], "go on", app.CarriedMost))
+	project := filepath.Join(claude, "projects", regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(c.Root, "-"))
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(project, "c9.jsonl"), []byte(line("user", string(carried), now)+"\n"+line("assistant", `[{"type":"text","text":"on it"}]`, now.Add(time.Second))+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run.looks() // the conversation claude opened, followed in place
+	hears()
+	if _, all = shown(); !slices.Equal(all, []string{"asked: say it back", "said: say it back", "switch: echo > claude | context handed over · 2 turns |", "asked: go on", "said: on it"}) || run.view.id != "c9" {
+		t.Errorf("once claude was said to: %q, following %q", all, run.view.id)
+	}
+
+	// Earlier: the chat's own conversations, the one it has open marked, none continued from another agent
+	rests()
+	run.act(run.view.deed(chatEvent{E: "press", ID: "open-earlier"}))
+	items := read(t, messages[len(messages)-1]).Patch[0].Node.find("list").Items
+	ids := []string{}
+	for _, item := range items {
+		ids = append(ids, item.ID)
+		if len(item.Keys) > 0 || slices.ContainsFunc(item.Menu, func(m chatItem) bool { return m.ID == "continue" }) {
+			t.Errorf("%s is offered to continue with", item.ID)
+		}
+	}
+	if !slices.Equal(ids, []string{"c9", "e2", "e1"}) || !*items[0].Running || *items[1].Running {
+		t.Fatalf("earlier: %+v", items)
+	}
+	run.act(run.view.deed(chatEvent{E: "pick", List: "earlier", ID: "e1"}))
+	screen("echo", "echo-agent e1")
+	if run.view.mode != chatting || run.view.runs.Agent != "echo" || run.view.id != "e1" {
+		t.Errorf("gone on with e1: mode %v, %+v, %q", run.view.mode, run.view.runs, run.view.id)
 	}
 }

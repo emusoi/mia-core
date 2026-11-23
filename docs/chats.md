@@ -75,6 +75,48 @@ handed the conversation in front of the first thing said to it. It is
 that agent from then on, and its turns hold a `switch` turn where it
 went on.
 
+## Shown as a chat
+
+`mia chat --chat <name>` is a chat, `main` the main agent, drawn by mia
+desk over the pane it is run in as [`mia chat --window`](api.md#conversations)
+draws a worktree's window's conversation: the same program, the same
+view and the same messages, the composer with Models, Fork and Earlier.
+It runs from any folder. What it follows is the chat's thread, as
+`mia api chat turns <name> --follow` gives it: the conversation its
+agent has open after those it went on from, each switch among them as
+the band its `switch` turn says — waiting while what was handed over has
+still to be sent, then what was handed over. When its agent opens
+another conversation — the first written to by an agent it went on
+with — the thread is followed again in place, each turn under its number.
+
+What is sent, chosen and stopped is done as `mia chats say`, `press`
+and `interrupt` do it; what was sent shows at once, and the agent is at
+work from then until a reply comes and the conversation is still, its
+window rests, or 90 s pass. In Models a model of its own agent is
+switched as `mia chats model` switches it, and another agent is gone on
+with as `mia chats switch` (`mia main switch`) does it, the conversation
+carried over and the chat that agent's from then on; with nothing said
+yet the other agent is only started. Earlier lists the chat's own
+conversations, the one its agent has open marked; one read back, or
+gone on with as `mia main start --resume <id> --restart` does — its agent
+ended and started again on it, unless it is at work or asks something.
+
+What a chat does not do that a window's chat does: Fork, and a reply's
+*Continue from here with…*, say so and do nothing yet; marking models to
+send the next message to several agents makes a worktree for each, and
+a chat has no repository, so it is not offered; continuing one of
+Earlier's conversations of another agent with this chat's agent (`c`)
+is not offered either; carrying the whole conversation to another agent
+in place of its latest turns, and the count of turns that go, are a
+worktree's: a chat carries what `mia chats switch` carries.
+
+It lives where the chat does: with `[main] machine` naming another
+machine it is that machine's mia that runs it, over `ssh -t` with this
+terminal as its own, told the pane of this machine's tmux it is drawn
+through (`TMUX_PANE`, and `MIA_MUI_TMUX=1` for its messages to go through
+tmux's passthrough as one run in tmux does), so what it draws reaches
+mia desk here.
+
 ## For an app
 
 `mia api chats` is every chat, the main agent first and the others the

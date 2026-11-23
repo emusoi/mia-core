@@ -122,6 +122,10 @@ func Run(args []string) int {
 		return cmdMain(rest)
 	case "chats":
 		return cmdChats(rest)
+	case "chat":
+		if slices.Contains(rest, "--chat") { // a chat of mia's: from any folder
+			return cmdChatOfChat(rest)
+		}
 	case "account", "accounts":
 		return cmdAccount(rest, asJSON)
 	case "role", "roles":

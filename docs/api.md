@@ -204,7 +204,8 @@ exit 0 when stdin ends, when a line cannot be written because its reader
 has gone, or on SIGINT or SIGTERM: a view keeps stdin open as long as it
 reads. `mia api capabilities` lists `conversation-follow`.
 
-`mia chat [--window <index>] [--conversation <id>]` is that, shown: run
+`mia chat [--window <index>] [--conversation <id>]` is that, shown (and
+`mia chat --chat <name>` the same of a [chat](chats.md#shown-as-a-chat)): run
 in a pane of a worktree's session, it follows a conversation of the
 worktree and has mia desk draw it as a chat over the pane, by desk's UI
 protocol — the whole view once, the last turns that fit a message, then

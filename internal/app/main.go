@@ -145,6 +145,16 @@ func (a *App) OnMainMachine(machine runtime.Machine, polled bool, args ...string
 	return "", fmt.Errorf(unanswered, machine.Name, detail)
 }
 
+// ChatOnMainMachine runs mia chat --chat of a chat on the machine the
+// main agent lives on, where it is, with this terminal as its own, so that
+// what it draws is drawn here and what is done here is done there. env is
+// set there for it, each NAME=value: what it is to know of the terminal it
+// is drawn through.
+func (a *App) ChatOnMainMachine(machine runtime.Machine, name string, env ...string) error {
+	script := utf8 + `name=$1 && shift && exec env ` + mainHere + `=1 "$@" ` + remoteMia + ` chat --chat "$name"`
+	return runtime.Interactive(machine.SSH, append([]string{"sh", "-c", script, "sh", name}, env...)...).Run()
+}
+
 func (a *App) mainHost() session.Host {
 	host := session.Here()
 	host.Shell = a.Config.Dotfiles.Shell
