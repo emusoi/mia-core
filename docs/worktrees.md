@@ -80,8 +80,7 @@ as it starts — as its minimal interface, `opencode mini --model
 starts it again in the same pane on the conversation it has open, with
 `--session <id>`: the window stays. One with no conversation yet is
 refused. Its models are those `opencode models` lists; it has no effort
-mia can choose. gemini has those the config names, started with
-`--model`. Any other agent that cannot be switched while it runs is
+mia can choose. Any other agent that cannot be switched while it runs is
 refused: restart it with `--model`. mia does not restart it. What mia
 says a window runs is what it started it with or last switched it to,
 not what the agent says: switched by hand in the agent, mia does not
@@ -327,7 +326,7 @@ session's windows, and each pane a window is split into: their folders and
 what runs in them. When tmux or the
 computer goes down, `mia resurrect` opens each one again, its programs
 started anew and each claude resuming the very conversation it had; codex,
-pi, opencode, gemini and cursor-agent go on with their folder's last. Each
+pi, opencode and cursor-agent go on with their folder's last. Each
 starts on the account it ran on, or the default one when that account was
 removed since. An
 agent that ended before tmux did comes back too: its window, back at a

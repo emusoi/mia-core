@@ -214,7 +214,7 @@ an agent mia does not know how to take up again by an id:
 mia: no conversation 5f0c of the main agent's — `mia api main conversations` lists them
 mia: conversation 5f0c is claude's, not codex's — it is gone on with as claude
 mia: conversation 5f0c is kept on claude's account default, not work — it is gone on with there
-mia: mia does not know how gemini takes a conversation up again by its id
+mia: mia does not know how cursor-agent takes a conversation up again by its id
 ```
 
 One that runs is refused as for a new conversation, and `--restart` ends

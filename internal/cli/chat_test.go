@@ -1318,7 +1318,7 @@ func TestAnotherAgentsModelHandsTheConversationOverAndClosesTheOldWindowLast(t *
 		{Name: "claude", Models: []plugin.Model{{ID: "opus"}}, Efforts: []string{"high"}, Live: true, Installed: true},
 		{Name: "codex", Models: []plugin.Model{{ID: "gpt-6-luna"}}, Efforts: []string{"high"}, Live: true, Installed: true},
 		{Name: "pi", Models: []plugin.Model{{ID: "anthropic/claude-opus-5"}}, Efforts: []string{"high"}, Live: true, Installed: true},
-		{Name: "opencode", Installed: true}, {Name: "gemini", Installed: true}, {Name: "cursor-agent", Installed: true},
+		{Name: "opencode", Installed: true}, {Name: "cursor-agent", Installed: true},
 	}
 	for _, from := range agents {
 		for _, to := range agents {
@@ -1362,11 +1362,11 @@ func TestAnotherAgentsModelHandsTheConversationOverAndClosesTheOldWindowLast(t *
 	}
 
 	// with nothing mia can read there is nothing to hand over
-	view := &chatView{talk: &talk{agent: "gemini", reply: true}, mode: picking, worktree: "monduli", window: "2", runs: app.Runs{Agent: "gemini"}, agents: agents}
+	view := &chatView{talk: &talk{agent: "cursor-agent", reply: true}, mode: picking, worktree: "monduli", window: "2", runs: app.Runs{Agent: "cursor-agent"}, agents: agents}
 	if deed := view.deed(chatEvent{E: "pick", List: "models", ID: "a|codex|gpt-6-luna"}); deed.do != chatSay || !strings.Contains(deed.text, "nothing for codex to go on with") {
 		t.Errorf("with no conversation asks %+v", deed)
 	}
-	if deed := view.deed(chatEvent{E: "pick", List: "models", ID: "a|gemini|"}); deed.do != chatSay || !strings.Contains(deed.text, "takes none from mia") {
+	if deed := view.deed(chatEvent{E: "pick", List: "models", ID: "a|cursor-agent|"}); deed.do != chatSay || !strings.Contains(deed.text, "takes none from mia") {
 		t.Errorf("its own agent, which takes no model, asks %+v", deed)
 	}
 }

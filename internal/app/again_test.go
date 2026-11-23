@@ -18,8 +18,6 @@ func TestAnAgentContinuesItsConversation(t *testing.T) {
 		"pi":                                 "pi --continue",
 		"pi --session 23f9":                  "pi --session 23f9",
 		"opencode":                           "opencode --continue",
-		"node /usr/local/bin/gemini":         "gemini --resume latest",
-		"gemini --resume latest":             "gemini --resume latest",
 		"/usr/local/bin/cursor-agent --use-system-ca /opt/cursor-agent/index.js": "cursor-agent --continue",
 		"": "",
 	} {
@@ -37,7 +35,7 @@ func TestAnAgentContinuesItsConversation(t *testing.T) {
 		}
 	}
 	// what again gives, given again, stays as it is
-	for _, in := range []string{"claude", "codex", "pi", "opencode", "gemini", "cursor-agent"} {
+	for _, in := range []string{"claude", "codex", "pi", "opencode", "cursor-agent"} {
 		if once := again(builtin, in, ""); again(builtin, once, "") != once {
 			t.Errorf("again(%q) twice = %q, want %q", in, again(builtin, once, ""), once)
 		}
@@ -47,7 +45,7 @@ func TestAnAgentContinuesItsConversation(t *testing.T) {
 func TestWhatStaysIsKeptAndWhatFinishesIsNot(t *testing.T) {
 	for in, want := range map[string]string{
 		"claude --model opus":        "claude",
-		"node /usr/local/bin/gemini": "gemini",
+		"node /usr/local/bin/cursor-agent": "cursor-agent",
 		"nvim main.go":               "nvim",
 		"/opt/homebrew/bin/nvim":     "nvim",
 		"npm run dev":                "npm",

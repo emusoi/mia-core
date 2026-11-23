@@ -102,9 +102,9 @@ func TestOpencodesModelsAreAskedOnceAndKept(t *testing.T) {
 
 // opencode has the models it lists and is started on one as its minimal
 // interface, which has a word for one; it has no word for an effort.
-// Switched, it is started so again on its conversation. gemini has a word
-// for a model and lists none: it has those the config names.
-func TestOpencodeAndGeminiAreStartedWithAModel(t *testing.T) {
+// Switched, it is started so again on its conversation. An agent with a
+// word for a model that lists none has those the config names.
+func TestOpencodeAndAnAgentThatListsNoneAreStartedWithAModel(t *testing.T) {
 	opencode, _ := agentNamed(builtin, "opencode")
 	opencode.lists = func() []plugin.Model { return opencodeListed("openai/gpt-5\nollama/qwen3:4b\n") }
 	with, chosen, err := choose(opencode, "opencode --session ses_1", "ollama/qwen3:4b", "", config.Agent{Effort: "high"})
@@ -148,15 +148,15 @@ func TestOpencodeAndGeminiAreStartedWithAModel(t *testing.T) {
 		t.Errorf("when it cannot list them: %v", err)
 	}
 
-	gemini, _ := agentNamed(builtin, "gemini")
-	if with, chosen, err := choose(gemini, "gemini", "", "", config.Agent{Model: "gemini-3-pro"}); err != nil || !slices.Equal(with, []string{"--model", "gemini-3-pro"}) || chosen != (Chosen{Model: "gemini-3-pro"}) {
-		t.Errorf("gemini with the config's: %v, %+v, %v", with, chosen, err)
+	unlisted := Agent{Name: "unlisted", with: words([]string{"--model", "%s"}, nil)}
+	if with, chosen, err := choose(unlisted, "unlisted", "", "", config.Agent{Model: "big-3"}); err != nil || !slices.Equal(with, []string{"--model", "big-3"}) || chosen != (Chosen{Model: "big-3"}) {
+		t.Errorf("with the config's: %v, %+v, %v", with, chosen, err)
 	}
-	if _, _, err := choose(gemini, "gemini", "gemini-3-pro", "", config.Agent{Model: "gemini-3-pro"}); err != nil {
-		t.Errorf("gemini with one the config names: %v", err)
+	if _, _, err := choose(unlisted, "unlisted", "big-3", "", config.Agent{Model: "big-3"}); err != nil {
+		t.Errorf("with one the config names: %v", err)
 	}
-	if _, _, err := choose(gemini, "gemini", "gemini-3-pro", ""); err == nil || err.Error() != "mia knows no models of gemini" {
-		t.Errorf("gemini with one no config names: %v", err)
+	if _, _, err := choose(unlisted, "unlisted", "big-3", ""); err == nil || err.Error() != "mia knows no models of unlisted" {
+		t.Errorf("with one no config names: %v", err)
 	}
 }
 

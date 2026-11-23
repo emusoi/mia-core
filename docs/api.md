@@ -237,7 +237,7 @@ The chat's field types every letter, so `tab` goes from it to the
 buttons, where `m` and `e` (or `⏎`) press them. A window named by
 `--window` that has no conversation mia can read yet is a chat all the
 same, and its conversation is looked for each second; of an agent mia
-reads no conversations of (gemini, cursor-agent) the status says once
+reads no conversations of (cursor-agent) the status says once
 that its replies are in its terminal. When a [mia serve](serve.md) of
 its build answers, the chat does not look each second: it listens to
 `mia api window` for its window and looks when the server says the agent
@@ -546,10 +546,6 @@ effort as `agy --model <id> --effort <level>`, its efforts `low` to
 <id>`, and nothing typed into it is known to switch it, so it is
 switched as opencode is, started again in its pane as `agy --model <id>
 --effort <level> --conversation <id>`.
-
-gemini has a word for a model, `--model`, and neither lists its models
-nor names any in its help: its `models` are those the config names,
-`[agents.gemini] model = "…"`, which it is then started with.
 
 A model the config names that the list has not is in the list too.
 Start one with `mia window new <worktree> <agent> --model <id> --effort
@@ -1034,7 +1030,7 @@ what the config starts agents with, `[main]` and `[agents.<name>]`, that
 were not used there, with `uses` 0: someone who has chosen nothing yet
 still has those. One of them with no model is there for its effort; one
 that says neither, or names an agent mia does not start with what it
-says — cursor-agent, an effort of opencode's or gemini's, or one no
+says — cursor-agent, an effort of opencode's, or one no
 enabled plugin adds — is left out.
 
 Last come the roles, by name, each with `uses` 0: the agent, model and

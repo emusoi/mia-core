@@ -82,7 +82,7 @@ on GitHub; a tag without its section is not released.
   that goes by itself, not a status that stays. See
   [conversations](api.md#conversations).
 
-- **opencode has models, and gemini a word for one.** opencode's models
+- **opencode has models.** opencode's models
   are those of the providers it is signed in to, so mia asks it —
   `opencode models`, a `provider/model` a line — and keeps what it said
   for an hour: `mia api agents` lists them, each labelled by what comes
@@ -101,9 +101,8 @@ on GitHub; a tag without its section is not released.
   conversation over to it on that model. A conversation of opencode's
   says the model opencode says it runs on, as `model` in
   `mia api conversations` and over its chat, until mia chooses one for
-  its window. It has no effort mia can choose. gemini's help has
-  `--model` and names no model: it is started with the one
-  `[agents.gemini]` names. mia reads neither's sign-in nor config.
+  its window. It has no effort mia can choose. mia reads neither its
+  sign-in nor its config.
   See [Agents](api.md#agents).
 
 - **How a worktree stands in git is an app mia desk draws.** `mia git`,
@@ -699,10 +698,16 @@ on GitHub; a tag without its section is not released.
   session came back as a bare shell. What it opens it now says: `brought
   back <worktree>: …`.
 - **Every agent goes on where it was, not only claude.** codex (`resume
-  --last`), pi, opencode and cursor-agent (`--continue`) and gemini
-  (`--resume latest`) each continue their folder's last conversation, are
-  known behind node or by a version's path as `ps` shows them, and are kept
+  --last`), pi, opencode and cursor-agent (`--continue`) each continue
+  their folder's last conversation, are known behind node or by a version's path as `ps` shows them, and are kept
   by a window back at its shell as a claude is.
+### Removed
+
+- **gemini is no longer an agent mia knows.** Gemini CLI is gone; Google's
+  agent is now agy, which mia starts, reads and switches as before. A
+  `[agents.gemini]` in a config is an agent mia does not know, as any
+  other name is.
+
 
 ## v0.1.0 — 2026-11-09
 

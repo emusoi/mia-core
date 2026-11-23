@@ -290,9 +290,6 @@ done`,
 		talks:   transcripts{agent: "agy", files: agyFiles, find: agyFind, id: agyID, decode: agyLine, cwd: agyCwd},
 		Efforts: []string{"low", "medium", "high", "xhigh", "max"},
 		with:    words([]string{"--model", "%s"}, []string{"--effort", "%s"}), lists: agyModels{}.models, again: true},
-	// its help has a word for a model and names none: it has those the config names
-	{Name: "gemini", goOn: "--resume latest", has: []string{"-r", "--resume"},
-		with: words([]string{"--model", "%s"}, nil)},
 	{Name: "cursor-agent", goOn: "--continue", has: []string{"--continue", "--resume", "resume"}},
 }
 
