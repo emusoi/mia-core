@@ -258,6 +258,8 @@ type server struct {
 	ctx     context.Context // done when the server is told to stop
 	// how often it looks, while anyone listens, and whether mia was rebuilt
 	tick, backstop, settle, retry, rebuilt, quiet time.Duration
+	// how long what GET /api read is kept once it was last read
+	linger time.Duration
 }
 
 // kept is a repository held open, asked one question at a time.
@@ -270,8 +272,8 @@ type kept struct {
 
 func newServer() *server {
 	s := &server{build: gateway.Build(), kept: map[string]*kept{}, outside: app.Outside(),
-		tick: serveTick, backstop: serveBackstop, settle: serveSettle, retry: serveRetry, rebuilt: serveRebuilt, quiet: serveQuiet}
-	s.hub = &hub{s: s, topics: map[string]*topic{}, seen: map[string]stamp{}, changed: map[string]bool{},
+		tick: serveTick, backstop: serveBackstop, settle: serveSettle, retry: serveRetry, rebuilt: serveRebuilt, quiet: serveQuiet, linger: serveLinger}
+	s.hub = &hub{s: s, topics: map[string]*topic{}, seen: map[string]stamp{},
 		kick: make(chan struct{}, 1), tmux: make(chan struct{}, 1), main: make(chan struct{}, 1), lanes: make(chan struct{}, 4)}
 	return s
 }
@@ -436,16 +438,93 @@ func written(patterns ...string) string {
 	var all strings.Builder
 	for _, pattern := range patterns {
 		files := []string{pattern}
-		if strings.ContainsAny(pattern, `*?[\`) {
-			files, _ = filepath.Glob(pattern)
+		if wild(pattern) {
+			files = globbed(pattern)
 		}
 		for _, file := range files {
+			if othersIn(file) {
+				continue
+			}
 			if info, err := os.Stat(file); err == nil {
 				fmt.Fprintf(&all, "%s %d %d\n", file, info.ModTime().UnixNano(), info.Size())
 			}
 		}
 	}
 	return all.String()
+}
+
+// othersIn is whether a file in mia's own folder is one another program
+// keeps there, which nothing mia answers is read from: mia desk's state and
+// settings, written as it is used.
+func othersIn(file string) bool {
+	return filepath.Dir(file) == config.Dir() && strings.HasPrefix(filepath.Base(file), "desk")
+}
+
+func wild(pattern string) bool { return strings.ContainsAny(pattern, `*?[\`) }
+
+// globbed is filepath.Glob of a pattern, each folder it reads read again
+// only once it has been written since: what is in a folder comes, goes or
+// is renamed only as its own time of writing changes. One written in the
+// last moments is read again all the same, as a time can be coarser than
+// two writes apart.
+func globbed(pattern string) []string {
+	dir, name := filepath.Split(pattern)
+	dir = filepath.Clean(dir)
+	dirs := []string{dir}
+	if wild(dir) {
+		dirs = globbed(dir)
+	}
+	var matches []string
+	for _, dir := range dirs {
+		for _, entry := range entriesOf(dir) {
+			if matched, _ := filepath.Match(name, entry); matched {
+				matches = append(matches, filepath.Join(dir, entry))
+			}
+		}
+	}
+	return matches
+}
+
+// folders is what is in each folder globbed read, by the folder, and when
+// the folder was written as it was read.
+var folders struct {
+	sync.Mutex
+	read map[string]folderRead
+}
+
+type folderRead struct {
+	written time.Time
+	names   []string
+}
+
+// entriesOf is the names in a folder, in order; none of a folder that is
+// not there or is no folder.
+func entriesOf(dir string) []string {
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		return nil
+	}
+	recent := time.Since(info.ModTime()) < 2*time.Second
+	folders.Lock()
+	was, ok := folders.read[dir]
+	folders.Unlock()
+	if ok && !recent && was.written.Equal(info.ModTime()) {
+		return was.names
+	}
+	file, err := os.Open(dir)
+	if err != nil {
+		return nil
+	}
+	names, _ := file.Readdirnames(-1)
+	file.Close()
+	slices.Sort(names)
+	folders.Lock()
+	if folders.read == nil {
+		folders.read = map[string]folderRead{}
+	}
+	folders.read[dir] = folderRead{written: info.ModTime(), names: names}
+	folders.Unlock()
+	return names
 }
 
 // stamped is when each of the paths was last written and how long it is,
@@ -514,9 +593,10 @@ func (s *server) beyond(q question) []string {
 }
 
 // read is GET /api/<query>: the bytes `mia api <query>` prints as the body,
-// its exit code and what it said beside them in headers.
+// its exit code and what it said beside them in headers; kept, and asked
+// again once what it is answered from changed, as a listener's answer is.
 func (s *server) read(w http.ResponseWriter, r *http.Request) {
-	said := s.ask(questionOf(r.PathValue("query"), r.URL.Query()))
+	said := s.hub.read(questionOf(r.PathValue("query"), r.URL.Query()))
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Mia-Exit", strconv.Itoa(said.code))
 	if said.errs.Len() > 0 {

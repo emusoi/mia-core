@@ -21,10 +21,11 @@ Each repository it is asked about is kept open between questions, and
 opened again when its configuration, the person's configuration or what
 another mia cached was written since, or after a minute. What a question
 costs is mostly the git and tmux it asks — `mia api worktrees` runs git
-in each worktree every time — so one question asked of the server costs
-about what it costs `mia api` alone. What the server saves is the asking
-again: [events](#get-events) ask once for every listener, and again only
-when something an answer is read from changed.
+in each worktree — so the first asking of a question costs about what it
+costs `mia api` alone. What the server saves is the asking again: a
+[read](#get-apiquery) is kept and given again, and [events](#get-events)
+ask once for every listener, until something an answer is read from
+changed.
 
 ## The socket
 
@@ -152,6 +153,17 @@ Mia-Stderr: mia%3A+no+worktree+called+%22nowhere%22+%E2%80%94+%60mia+ls%60+shows
 
 A query with `--follow` is `400`, saying that `GET /events` has it.
 
+An answer is kept, as a listener's is, for a minute after it was last
+read, and the same question read again is given what is kept — the same
+bytes, words and exit code — until the server sees something it is
+answered from change, as it sees it for [events](#get-events): it looks
+at once when it is read, so a record of mia's written, a worktree's `HEAD`
+or index, or a verb run by [`POST /run`](#post-run) just before is
+answered from; what tmux says is heard as it says it. What no file says
+is as fresh as it is for a listener, at most thirty seconds old; `status`
+and `window`, which no file says, are asked each time they are read. A
+question nobody listens to is not asked again until it is read again.
+
 ### GET /events
 
 ```
@@ -212,13 +224,16 @@ done: nothing waits on a slow one. The server asks again:
   second — and once more four seconds after it last told it: an agent
   that gives its pane no title is at work only while it writes;
 - every question, at once, after a [`POST /run`](#post-run);
-- a repository's questions, and those of no repository but `here` and
-  `machines`, when its records, its configuration, or a worktree's
-  `HEAD` or index were written, or when one of its signals goes at the
-  time it was set to, looked at each second; every question when the
-  person's configuration or the main agent's records were written, a
-  chat was made or taken or what mia keeps of one written, or one of the
-  main agent's signals goes;
+- a repository's questions when its records or its configuration were
+  written, or when one of its signals goes at the time it was set to, and
+  those but `here` and `machines` when a worktree's `HEAD` or index was
+  written, looked at each second; those of no repository but `here` and
+  `machines` when any repository's records or configuration were written
+  — none of them is read from git; every question when the person's
+  configuration, an app's manifest or the main agent's records were
+  written, a chat was made or taken or what mia keeps of one written, or
+  one of the main agent's signals goes — what mia desk keeps in mia's
+  folder, `desk*`, is none of it;
 - `conversations`, `main conversations`, `chats` and `chat` when a
   transcript they are read from was written to — each written to in the
   last day, and every folder transcripts are in, which a conversation
@@ -230,7 +245,7 @@ done: nothing waits on a slow one. The server asks again:
   says when a worktree's files, a window's screen or whether its agent
   is at work changed — only who listens is told, and only when the
   answer is another;
-- every question every thirty seconds: what no file says — how busy a
+- every question every thirty seconds, for its listeners: what no file says — how busy a
   machine is, what another machine says, whether a worktree's files are
   changed as `worktrees` says it, an agent's title in a list of its
   windows, a transcript older than a day taken up again — is as fresh

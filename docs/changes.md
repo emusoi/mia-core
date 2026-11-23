@@ -516,6 +516,17 @@ on GitHub; a tag without its section is not released.
   -f"]` in the config names more. What finishes — a build, a push — is
   never run again.
 
+### Changed
+
+- **`mia serve` keeps what it was read.** `GET /api/<query>` gives a
+  question read again what it answered, until something it is answered
+  from changed as the server sees it for its listeners — looked at once
+  when it is read, so what was just written or run is answered from — so
+  a read again is a few milliseconds where it was the whole asking; a
+  question of no repository is asked again when a repository's records
+  are written, not its git, and mia desk's files in mia's folder change
+  nothing. See [mia serve](serve.md#get-apiquery).
+
 ### Fixed
 
 - **A window mia started is its agent's.** A conversation taken up

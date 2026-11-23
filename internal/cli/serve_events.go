@@ -31,6 +31,9 @@ const (
 	serveSettle   = 150 * time.Millisecond
 	serveRetry    = 5 * time.Second // for a tmux server to watch, while none runs
 	serveRebuilt  = 2 * time.Second // at whether mia was rebuilt
+	// how long a question read by GET /api is kept, its answer asked again
+	// as a listener's is, once it was last read
+	serveLinger = time.Minute
 	// at the main agent once more, after tmux last said its panes changed:
 	// one that gives its pane no title stops working 3 seconds after it
 	// last wrote, and nothing says so
@@ -70,11 +73,11 @@ type hub struct {
 	mu      sync.Mutex
 	topics  map[string]*topic
 	seen    map[string]stamp // by git folder, "" the person's own
-	changed map[string]bool  // the repositories seen to change since the questions were last asked for it, "" the person's
 	repos   struct {         // the repositories, as Repositories said them when the registry was last written
 		registry string
 		all      []app.Repository
 	}
+	looked time.Time     // when the last look began, under the hub's lock
 	kick   chan struct{} // a verb was run: everything is asked again
 	tmux   chan struct{} // tmux says a session or a window changed
 	main   chan struct{} // tmux says the main agent's panes changed, or a chat's
@@ -83,25 +86,29 @@ type hub struct {
 }
 
 // stamp is what was seen of a repository's files, or of the person's: when
-// they were written, and when the next of its signals goes by itself.
+// mia's records and git's were written, and when the next of its signals
+// goes by itself.
 type stamp struct {
-	written string
-	expires time.Time // zero when none will
+	records, git string
+	expires      time.Time // zero when none will
 }
 
-// topic is one question and who listens to it.
+// topic is one question and who listens to it, or reads it.
 type topic struct {
 	q        string
 	question question
 	common   string     // the git folder of its repository, "" when it is asked of none
 	mu       sync.Mutex // held while it is asked
-	last     []byte
+	said     *answer    // as it was last asked
+	last     []byte     // the same, as an event
+	held     time.Time  // under the hub's lock: when GET /api last read it; zero when only listened to
 	// under the hub's lock: what its answer is read from beyond its
 	// repository's files, and when those were written as it was asked
 	read  []string
 	stamp string
 	// under the hub's lock: whether it is to be asked again for what it
-	// was read from, whether it is being asked, and again once that is done
+	// is answered from changed, whether it is being asked, and again once
+	// that is done
 	stale, asking, again bool
 	subs                 map[*subscriber]struct{} // under the hub's lock
 }
@@ -159,25 +166,37 @@ var ofMachines = []string{"here", "machines"}
 // chats': asked again each time tmux says those changed.
 var ofChats = []string{"main", "chats", "chat"}
 
-// join adds a listener to a question, and gives it the answer as it is now.
-func (h *hub) join(q string, asked question, sub *subscriber) *topic {
+// topicOf is the topic of a question, made when there is none, with
+// what is done to it under the hub's lock.
+func (h *hub) topicOf(q string, asked question, with func(*topic)) *topic {
 	h.start.Do(func() {
 		go h.run()
 		go h.watchTmux()
 	})
-	common := ""
-	if slices.Contains(ofARepository, asked.args[0]) && asked.dir != "" {
-		_, common, _ = git.Repository(asked.dir)
-	}
 	h.mu.Lock()
 	t := h.topics[q]
 	if t == nil {
-		t = &topic{q: q, question: asked, common: common, subs: map[*subscriber]struct{}{}}
-		h.topics[q] = t
+		h.mu.Unlock()
+		common := ""
+		if slices.Contains(ofARepository, asked.args[0]) && asked.dir != "" {
+			_, common, _ = git.Repository(asked.dir)
+		}
+		h.mu.Lock()
+		if t = h.topics[q]; t == nil {
+			t = &topic{q: q, question: asked, common: common, subs: map[*subscriber]struct{}{}}
+			h.topics[q] = t
+		}
 	}
-	t.subs[sub] = struct{}{}
+	with(t)
+	now := time.Now() // a look begun from now looks at what it is answered from
 	h.mu.Unlock()
-	h.look() // from now, a change to what it is answered from is seen
+	h.lookSince(now) // from now, a change to what it is answered from is seen
+	return t
+}
+
+// join adds a listener to a question, and gives it the answer as it is now.
+func (h *hub) join(q string, asked question, sub *subscriber) *topic {
+	t := h.topicOf(q, asked, func(t *topic) { t.subs[sub] = struct{}{} })
 	t.mu.Lock()
 	if t.last == nil {
 		h.answer(t)
@@ -192,10 +211,41 @@ func (h *hub) leave(t *topic, sub *subscriber) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	delete(t.subs, sub)
-	if len(t.subs) == 0 {
+	if h.unheld(t, time.Now()) && h.topics[t.q] == t {
 		delete(h.topics, t.q)
 	}
 }
+
+// unheld is whether nobody holds a topic: none listens to it, and GET
+// /api has not read it a while. Under the hub's lock.
+func (h *hub) unheld(t *topic, now time.Time) bool {
+	return len(t.subs) == 0 && now.Sub(t.held) >= h.s.linger
+}
+
+// read is a question as GET /api asks it: answered once and kept as a
+// listener's is, asked again as soon as something it is answered from
+// says it changed, and given from what is kept until then. What changes
+// it by itself each time the server looks, a worktree's files or a
+// window's screen, is asked each time, as is a stream.
+func (h *hub) read(asked question) *answer {
+	if slices.Contains(eachLook, asked.args[0]) || slices.Contains(asked.args, "--follow") {
+		return h.s.ask(asked)
+	}
+	t := h.topicOf(questionKey(asked), asked, func(t *topic) { t.held = time.Now() })
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	h.mu.Lock()
+	due := t.said == nil || t.stale
+	t.stale = false
+	h.mu.Unlock()
+	if due {
+		h.answer(t)
+	}
+	return t.said
+}
+
+// questionKey is a question as GET /events takes it, as mia itself writes one.
+func questionKey(q question) string { return asked(q.args[0], q.dir, q.args[1:]...) }
 
 // answer asks a question, its lock held, and tells each listener whose
 // answer it is not. What it is read from beyond its repository is stamped
@@ -203,7 +253,8 @@ func (h *hub) leave(t *topic, sub *subscriber) {
 func (h *hub) answer(t *topic) {
 	read := h.s.beyond(t.question)
 	stamp := stamped(read)
-	t.last = eventOf(t.q, h.s.ask(t.question))
+	t.said = h.s.ask(t.question)
+	t.last = eventOf(t.q, t.said)
 	h.mu.Lock()
 	t.read, t.stamp = read, stamp
 	subs := make([]*subscriber, 0, len(t.subs))
@@ -234,10 +285,10 @@ func (h *hub) run() {
 			h.round(everything)
 		case <-h.tmux:
 			h.settle(h.tmux)
-			h.round(func(t *topic) bool { return !slices.Contains(ofMachines, t.question.args[0]) })
+			h.round(notOfMachines)
 		case <-h.main:
 			heard = time.Now()
-			h.round(func(t *topic) bool { return slices.Contains(ofChats, t.question.args[0]) })
+			h.round(ofTheChats)
 		case <-backstop.C:
 			h.round(everything)
 		case <-tick.C:
@@ -248,17 +299,24 @@ func (h *hub) run() {
 			if quiet {
 				heard = time.Time{}
 			}
-			h.mu.Lock()
-			changed := h.changed
-			h.changed = map[string]bool{}
-			h.mu.Unlock()
 			h.round(func(t *topic) bool {
-				stale := t.stale
-				t.stale = false
-				return stale || changed[""] || changed[t.common] ||
-					t.common == "" && len(changed) > 0 && !slices.Contains(ofMachines, t.question.args[0]) || // answered from every repository
-					slices.Contains(eachLook, t.question.args[0]) || quiet && slices.Contains(ofChats, t.question.args[0])
+				return t.stale || slices.Contains(eachLook, t.question.args[0]) || quiet && ofTheChats(t)
 			})
+		}
+	}
+}
+
+func ofTheChats(t *topic) bool    { return slices.Contains(ofChats, t.question.args[0]) }
+func notOfMachines(t *topic) bool { return !slices.Contains(ofMachines, t.question.args[0]) }
+
+// mark has the topics due asked again: at the next round, and by GET /api
+// at once.
+func (h *hub) mark(due func(*topic) bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, t := range h.topics {
+		if due(t) {
+			t.stale = true
 		}
 	}
 }
@@ -275,8 +333,11 @@ func (h *hub) settle(burst chan struct{}) {
 	}
 }
 
-// again has every question asked again, soon.
-func (h *hub) again() { wake(h.kick) }
+// again has every question asked again, soon, and at once of GET /api.
+func (h *hub) again() {
+	h.mark(func(*topic) bool { return true })
+	wake(h.kick)
+}
 
 func wake(one chan struct{}) {
 	select {
@@ -287,14 +348,28 @@ func wake(one chan struct{}) {
 
 // look notes each repository whose files were written since it last
 // looked, or one of whose signals has gone by itself since, "" when the
-// person's own were, and each question whose answer was read from files
-// written since: they are asked again at the next tick. A repository
-// looked at for the first time is only noted.
-func (h *hub) look() {
+// person's own were, and has each question answered from one of them, or
+// from files written since, asked again: at the next tick, and by GET
+// /api at once. A repository looked at for the first time is only noted.
+// A topic nobody holds any more goes.
+func (h *hub) look() { h.lookSince(time.Now()) }
+
+// lookSince looks, unless a look begun since then was done already: many
+// asking at once are looked for once.
+func (h *hub) lookSince(then time.Time) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if !h.looked.Before(then) {
+		return
+	}
+	now := time.Now()
+	h.looked = now
 	watched := map[string]bool{}
-	for _, t := range h.topics {
+	for q, t := range h.topics {
+		if h.unheld(t, now) {
+			delete(h.topics, q)
+			continue
+		}
 		watched[t.common] = true
 	}
 	if len(watched) == 0 {
@@ -312,19 +387,30 @@ func (h *hub) look() {
 			delete(h.seen, common)
 		}
 	}
-	now := time.Now()
+	records, gits := map[string]bool{}, map[string]bool{} // what changed, of each
 	for common := range watched {
 		was, looked := h.seen[common]
-		is := stamp{written: writtenIn(common), expires: was.expires}
-		if !looked || is.written != was.written || !was.expires.IsZero() && !now.Before(was.expires) {
-			if looked {
-				h.changed[common] = true
-			}
+		is := stamp{expires: was.expires}
+		is.records, is.git = writtenIn(common)
+		if expired := !was.expires.IsZero() && !now.Before(was.expires); !looked || is.records != was.records || expired {
+			records[common] = looked
 			is.expires = nextGoes(common)
 		}
+		gits[common] = looked && is.git != was.git
 		h.seen[common] = is
 	}
+	for common, changed := range records {
+		if !changed {
+			delete(records, common)
+		}
+	}
 	for _, t := range h.topics {
+		// a question of no repository is answered from mia's records in
+		// every one, and of none's git; how busy a machine is, of none's
+		if records[""] || records[t.common] || t.common == "" && len(records) > 0 && notOfMachines(t) ||
+			t.common != "" && gits[t.common] && notOfMachines(t) {
+			t.stale = true
+		}
 		if t.read == nil {
 			continue
 		}
@@ -345,31 +431,30 @@ func (h *hub) repositories() []app.Repository {
 }
 
 // writtenIn is when the files a repository's answers change with were
-// written: mia's own records and each worktree's HEAD and index; for "",
-// the person's: mia's config folder, the main agent's records and each
-// chat's, and the folder chats are made in and taken from.
-func writtenIn(common string) string {
+// written: mia's own records, and git's, each worktree's HEAD and index;
+// for "", the person's records: mia's config folder, the apps in it, the
+// main agent's records and each chat's, and the folder chats are made in
+// and taken from.
+func writtenIn(common string) (records, git string) {
 	if common == "" {
 		return written(
 			filepath.Join(config.Dir(), "*.json"),
 			filepath.Join(config.Dir(), "*.toml"),
+			filepath.Join(config.Dir(), "apps", "*", "app.toml"),
 			filepath.Join(signalsOf(""), "*.json"),
 			filepath.Join(config.Dir(), "chats"),
 			filepath.Join(config.Dir(), "chats", "*", ".mia", "*.json"),
-		)
+		), ""
 	}
-	files := []string{
+	files := []string{filepath.Join(common, "HEAD"), filepath.Join(common, "index")}
+	for _, worktree := range globbed(filepath.Join(common, "worktrees", "*")) {
+		files = append(files, filepath.Join(worktree, "HEAD"), filepath.Join(worktree, "index"))
+	}
+	return written(
 		filepath.Join(signalsOf(common), "*.json"),
 		filepath.Join(common, "mia", "config.toml"),
 		filepath.Join(filepath.Dir(common), ".mia.toml"),
-		filepath.Join(common, "HEAD"),
-		filepath.Join(common, "index"),
-	}
-	worktrees, _ := filepath.Glob(filepath.Join(common, "worktrees", "*"))
-	for _, worktree := range worktrees {
-		files = append(files, filepath.Join(worktree, "HEAD"), filepath.Join(worktree, "index"))
-	}
-	return written(files...)
+	), written(files...)
 }
 
 // signalsOf is the folder a repository keeps its records and signals in,
@@ -396,7 +481,8 @@ func nextGoes(common string) time.Time {
 
 // round has the questions due asked again, each that is not being asked
 // already, which is asked once more when it is done; what is due is told
-// under the hub's lock. It does not wait for them.
+// under the hub's lock. It does not wait for them. One nobody listens to,
+// only read by GET /api, is not asked until it is read again.
 func (h *hub) round(due func(*topic) bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -405,6 +491,9 @@ func (h *hub) round(due func(*topic) bool) {
 	}
 	for _, t := range h.topics {
 		if !due(t) {
+			continue
+		}
+		if t.stale = len(t.subs) == 0; t.stale {
 			continue
 		}
 		if t.asking {
@@ -466,8 +555,10 @@ func (h *hub) watchTmux() {
 				}
 				switch {
 				case strings.HasPrefix(line, "%subscription-changed main "):
+					h.mark(ofTheChats)
 					wake(h.main)
 				case slices.ContainsFunc(tmuxSays, func(says string) bool { return strings.HasPrefix(line, says) }):
+					h.mark(notOfMachines)
 					wake(h.tmux)
 				}
 			}

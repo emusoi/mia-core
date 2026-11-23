@@ -198,7 +198,7 @@ func Remove(dir, path string, force bool) error {
 }
 
 func Dirty(dir string) (bool, error) {
-	out, err := run(dir, "status", "--porcelain")
+	out, err := run(dir, "--no-optional-locks", "status", "--porcelain") // only read: the index is not written
 	if err != nil {
 		return false, err
 	}
@@ -215,7 +215,7 @@ func Changes(dir string) int {
 }
 
 func DirtyTracked(dir string) (bool, error) {
-	out, err := run(dir, "status", "--porcelain", "-uno")
+	out, err := run(dir, "--no-optional-locks", "status", "--porcelain", "-uno")
 	if err != nil {
 		return false, err
 	}
