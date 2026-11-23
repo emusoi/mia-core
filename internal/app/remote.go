@@ -156,6 +156,11 @@ type MachineState struct {
 
 const worktreesMark = "@@worktrees"
 
+// machineFetchWithin is how long fetching a machine's branches may take
+// while its state is asked: one that hangs past it is let go, the state
+// said without it, rather than holding every question waiting on it.
+const machineFetchWithin = 30 * time.Second
+
 // Machines is this computer and every added machine, asked at once. A
 // machine linked to this repository also reports its worktrees, and its
 // branches are fetched. One that does not answer keeps the worktrees it
@@ -252,7 +257,7 @@ func (a *App) askMachine(machine runtime.Machine, dir string, linked bool) Machi
 		if err := os.MkdirAll(filepath.Dir(cache), 0o755); err == nil {
 			_ = os.WriteFile(cache, []byte(worktrees), 0o644)
 		}
-		_ = git.Fetch(a.Root, machine.Name)
+		_ = git.Fetch(a.Root, machine.Name, machineFetchWithin)
 		state.Worktrees = cachedWorktrees(cache, machine.Name, true)
 	}
 	return state

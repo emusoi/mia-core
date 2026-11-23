@@ -258,6 +258,8 @@ type server struct {
 	ctx     context.Context // done when the server is told to stop
 	// how often it looks, while anyone listens, and whether mia was rebuilt
 	tick, backstop, settle, retry, rebuilt, quiet time.Duration
+	// how long, as it ends, it waits for what is being asked again
+	letGo time.Duration
 	// how long what GET /api read is kept once it was last read
 	linger time.Duration
 }
@@ -272,7 +274,7 @@ type kept struct {
 
 func newServer() *server {
 	s := &server{build: gateway.Build(), kept: map[string]*kept{}, outside: app.Outside(),
-		tick: serveTick, backstop: serveBackstop, settle: serveSettle, retry: serveRetry, rebuilt: serveRebuilt, quiet: serveQuiet, linger: serveLinger}
+		tick: serveTick, backstop: serveBackstop, settle: serveSettle, retry: serveRetry, rebuilt: serveRebuilt, letGo: serveLetGo, quiet: serveQuiet, linger: serveLinger}
 	s.hub = &hub{s: s, topics: map[string]*topic{}, seen: map[string]stamp{},
 		kick: make(chan struct{}, 1), tmux: make(chan struct{}, 1), main: make(chan struct{}, 1), lanes: make(chan struct{}, 4)}
 	return s
@@ -325,10 +327,21 @@ func (s *server) serve(ctx context.Context, listener net.Listener) error {
 	err := web.Serve(listener)
 	stop()
 	// what is being asked again is done before what it reads may go; once
-	// the hub's lock is had, the context done, no round starts another
-	s.hub.mu.Lock()
-	s.hub.mu.Unlock()
-	s.hub.asking.Wait()
+	// the hub's lock is had, the context done, no round starts another. One
+	// that hangs (a machine that answered ssh, then not) is let go: the
+	// server ends all the same, for the new build or the service to serve.
+	asked := make(chan struct{})
+	go func() {
+		s.hub.mu.Lock()
+		s.hub.mu.Unlock()
+		s.hub.asking.Wait()
+		close(asked)
+	}()
+	select {
+	case <-asked:
+	case <-time.After(s.letGo):
+		fmt.Fprintln(os.Stderr, "mia serve: what was still being asked is let go")
+	}
 	if err != nil && err != http.ErrServerClosed {
 		return err
 	}

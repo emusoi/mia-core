@@ -431,9 +431,15 @@ func Upstream(dir, branch string) string {
 	return strings.TrimSpace(out)
 }
 
-func Fetch(dir, remote string) error {
-	_, err := run(dir, "fetch", "--quiet", remote)
-	return err
+// Fetch fetches remote's branches; within, when not 0, is how long it may
+// take before it is killed (a machine that answered ssh can still hang).
+func Fetch(dir, remote string, within time.Duration) error {
+	tool := gitIn(dir)
+	tool.Within = within
+	if _, err := tool.Capture("fetch", "--quiet", remote); err != nil {
+		return fmt.Errorf("git fetch --quiet %s: %s", remote, err)
+	}
+	return nil
 }
 
 type FileStat struct {

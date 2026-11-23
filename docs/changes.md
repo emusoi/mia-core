@@ -543,6 +543,13 @@ on GitHub; a tag without its section is not released.
 
 ### Fixed
 
+- **mia serve no longer stays stuck after `make install`.** A rebuilt
+  server waited for every question it was asking again before it ended,
+  and a fetch of a machine's branches that hung after ssh answered (no
+  time limit) held it for good: nothing answered on the socket and every
+  client fell back to starting mia. That fetch now gives up after 30 s,
+  and an ending server lets go of what is still being asked after 5 s.
+
 - **A window mia started is its agent's.** A conversation taken up
   again, handed over or continued is started by the session's shell,
   which is what tmux names in front of it: such a window was no agent's

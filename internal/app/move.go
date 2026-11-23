@@ -478,7 +478,7 @@ func (a *App) sideOf(where string) (side, error) {
 // fetched from one and moved forward here, never over work only here.
 func (a *App) carryBranch(src, dst side, branch string) error {
 	if dst.here() {
-		if err := git.Fetch(a.Root, src.machine.Name); err != nil {
+		if err := git.Fetch(a.Root, src.machine.Name, 0); err != nil {
 			return err
 		}
 		theirs := git.RevParse(a.Root, "refs/remotes/"+src.machine.Name+"/"+branch)

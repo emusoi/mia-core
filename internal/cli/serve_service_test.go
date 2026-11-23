@@ -234,3 +234,26 @@ func TestAServerEndsWhenMiaIsRebuilt(t *testing.T) {
 		t.Fatal("a server of another build than its program's still serves")
 	}
 }
+
+// One ends so even while a question it asks again never finishes, as a
+// fetch from a machine that answered ssh and then hung once held it.
+func TestAServerEndsWhenMiaIsRebuiltWhileAQuestionHangs(t *testing.T) {
+	isolateServe(t)
+	listener, err := listenServe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := newServer()
+	s.build, s.rebuilt, s.letGo = "an older build", 20*time.Millisecond, 50*time.Millisecond
+	s.hub.asking.Add(1) // never done
+	done := make(chan error, 1)
+	go func() { done <- s.serve(context.Background(), listener) }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("it ended with %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("a question that hangs keeps a server of another build serving")
+	}
+}

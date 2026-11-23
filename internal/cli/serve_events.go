@@ -31,6 +31,7 @@ const (
 	serveSettle   = 150 * time.Millisecond
 	serveRetry    = 5 * time.Second // for a tmux server to watch, while none runs
 	serveRebuilt  = 2 * time.Second // at whether mia was rebuilt
+	serveLetGo    = 5 * time.Second // for what is being asked again, as the server ends
 	// how long a question read by GET /api is kept, its answer asked again
 	// as a listener's is, once it was last read
 	serveLinger = time.Minute
