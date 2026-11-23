@@ -146,14 +146,7 @@ func (a *App) markRunning(heads []Head, records []model.Record, wanted string) [
 	}
 	table := a.agents()
 	chosen := a.chosen()
-	// every process of a Mac takes ps a tenth of a second: asked only for a
-	// pane whose program tmux knows by its launcher's name, and of one
-	// worktree's few windows of each terminal alone
-	all := sync.OnceValue(foreground)
-	behind := func(pid int) string { return all()[pid] }
-	if wanted != "" {
-		behind = foregroundOf
-	}
+	behind := fronts() // asked only for a pane whose program tmux knows by its launcher's name
 	for _, record := range records {
 		if a.sessionOf(record).SSH != "" || wanted != "" && record.Name != wanted {
 			continue // its windows are on a machine, and its conversations with them; or not wanted
@@ -299,6 +292,26 @@ func foregroundOf(pid int) string {
 	args, _ := run.Local("ps").Capture("-o", "args=", "-p", strings.TrimSpace(group))
 	return args
 }
+
+// fronts is foreground as a list asks it, one terminal at a time: of each
+// of the first few by itself, two quick ps, and of the rest from one ps of
+// every process, which takes a Mac a tenth of a second. It is asked of one
+// list, not of many at once.
+func fronts() func(pid int) string {
+	asked := 0
+	all := sync.OnceValue(foreground)
+	return func(pid int) string {
+		if asked < frontsAlone {
+			asked++
+			return foregroundOf(pid)
+		}
+		return all()[pid]
+	}
+}
+
+// frontsAlone is how many terminals fronts asks of by themselves: past it,
+// the ps of every process costs less.
+const frontsAlone = 4
 
 // foreground is the command line in front in each terminal, by the process
 // the terminal was started with: what a pane runs, whatever shell is

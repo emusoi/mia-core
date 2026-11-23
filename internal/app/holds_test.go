@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -71,5 +72,63 @@ func written(t *testing.T, file, text string) {
 	}
 	if err := os.WriteFile(file, []byte(text), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// The program in front of a few terminals is asked of each by itself, two
+// quick ps; of more, the rest are answered from one ps of every process,
+// which says the same.
+func TestTheFrontOfAFewTerminalsIsAskedOfEach(t *testing.T) {
+	bin := t.TempDir()
+	said := filepath.Join(bin, "said")
+	script := `#!/bin/sh
+echo "$*" >> "` + said + `"
+case "$*" in
+"-o tpgid= -p "*) echo " $4" ;;
+"-o args= -p "*) echo "agent-$4 --flag" ;;
+"-axo pid=,tpgid=,args=") for p in 1 2 3 4 5 6 7 8; do echo "$p $p agent-$p --flag"; done ;;
+esac
+`
+	written(t, filepath.Join(bin, "ps"), script)
+	if err := os.Chmod(filepath.Join(bin, "ps"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	front := fronts()
+	for pid := 1; pid <= 7; pid++ {
+		if got, want := front(pid), "agent-"+strconv.Itoa(pid)+" --flag"; got != want {
+			t.Errorf("front of %d = %q, want %q", pid, got, want)
+		}
+	}
+	data, _ := os.ReadFile(said)
+	if all, each := strings.Count(string(data), "-axo"), strings.Count(string(data), "-o tpgid="); all != 1 || each != frontsAlone {
+		t.Errorf("ps of every process %d times, of one %d times:\n%s", all, each, data)
+	}
+}
+
+// What opencode says its conversations are is asked of it again only once
+// its database has been written since.
+func TestOpencodesListIsAskedAgainOnlyOnceItsDatabaseIsWritten(t *testing.T) {
+	gittest.Isolate(t)
+	store := fakeOpencode(t)
+	written(t, filepath.Join(store, "sessions.json"), `{"data":[{"id":"ses_1","location":{"directory":"/w"}}]}`)
+	db := filepath.Join(os.Getenv("HOME"), ".local", "share", "opencode", "opencode.db")
+	written(t, db, "one")
+	lists := func() int {
+		data, _ := os.ReadFile(filepath.Join(store, "asked"))
+		return strings.Count(string(data), "api GET")
+	}
+	for range 2 {
+		if all, err := (opencodeTalks{}).allSessions(); err != nil || len(all) != 1 || all[0].ID != "ses_1" {
+			t.Fatalf("sessions = %+v, %v", all, err)
+		}
+	}
+	if n := lists(); n != 1 {
+		t.Errorf("listed %d times with its database as it was", n)
+	}
+	written(t, filepath.Join(store, "sessions.json"), `{"data":[{"id":"ses_1","location":{"directory":"/w"}},{"id":"ses_2","location":{"directory":"/w"}}]}`)
+	written(t, db+"-wal", "written to")
+	if all, _ := (opencodeTalks{}).allSessions(); len(all) != 2 || lists() != 2 {
+		t.Errorf("its database written, and not asked again: %+v", all)
 	}
 }

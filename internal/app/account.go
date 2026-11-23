@@ -14,7 +14,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/emusoi/mia-core/internal/config"
 	"github.com/emusoi/mia-core/internal/git"
@@ -294,8 +293,7 @@ func (a *App) accountWindows() map[string][]string {
 		maps.Copy(kept, chosenIn(dir))
 	}
 	table := a.agents()
-	all := sync.OnceValue(foreground)
-	behind := func(pid int) string { return all()[pid] }
+	behind := fronts()
 	using := map[string][]string{}
 	for _, name := range slices.Sorted(maps.Keys(panes)) {
 		worktree, ours := strings.CutPrefix(name, "mia-")

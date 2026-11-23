@@ -204,7 +204,48 @@ func (o opencodeTalks) sessions(in folders) ([]opencodeSession, error) {
 	if !o.there() {
 		return nil, nil
 	}
+	all, err := o.allSessions()
+	if err != nil {
+		return nil, err
+	}
 	var its []opencodeSession
+	for _, s := range all {
+		if s.ID != "" && s.ParentID == "" && in.holds(s.Location.Directory) {
+			its = append(its, s)
+		}
+	}
+	return its, nil
+}
+
+// opencodeAsked is every conversation opencode last said it has, and when
+// its database was written as it was asked.
+var opencodeAsked struct {
+	sync.Mutex
+	written string
+	all     []opencodeSession
+}
+
+// allSessions is every conversation opencode has, asked of it again only
+// once its database has been written since it was last: it is the
+// database's, and a list asks it each time. With no database to say so,
+// it is asked each time.
+func (o opencodeTalks) allSessions() ([]opencodeSession, error) {
+	var written strings.Builder
+	databases := 0
+	for i, path := range o.written(folders{}) {
+		if info, err := os.Stat(path); err == nil {
+			fmt.Fprintf(&written, "%s %d %d\n", path, info.ModTime().UnixNano(), info.Size())
+			databases += min(i, 1) // the first is its folder
+		} else {
+			fmt.Fprintf(&written, "%s -\n", path)
+		}
+	}
+	opencodeAsked.Lock()
+	defer opencodeAsked.Unlock()
+	if databases > 0 && written.String() == opencodeAsked.written {
+		return opencodeAsked.all, nil
+	}
+	var all []opencodeSession
 	for cursor := ""; ; {
 		path := fmt.Sprintf("/api/session?order=desc&limit=%d", opencodePage)
 		if cursor != "" {
@@ -218,13 +259,12 @@ func (o opencodeTalks) sessions(in folders) ([]opencodeSession, error) {
 		if err := json.Unmarshal([]byte(out), &page); err != nil {
 			return nil, fmt.Errorf("its sessions are not the JSON mia knows: %w", err)
 		}
-		for _, s := range page.Data {
-			if s.ID != "" && s.ParentID == "" && in.holds(s.Location.Directory) {
-				its = append(its, s)
-			}
-		}
+		all = append(all, page.Data...)
 		if len(page.Data) < opencodePage || page.Cursor.Next == "" || page.Cursor.Next == cursor {
-			return its, nil
+			if databases > 0 {
+				opencodeAsked.written, opencodeAsked.all = written.String(), all
+			}
+			return all, nil
 		}
 		cursor = page.Cursor.Next
 	}
