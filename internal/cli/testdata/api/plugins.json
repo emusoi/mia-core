@@ -1,0 +1,139 @@
+{
+  "query": "plugins",
+  "usage": "mia api plugins",
+  "inputs": [],
+  "output": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "fields": {
+        "by_config": {
+          "type": "boolean",
+          "optional": true
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "manifest": {
+          "type": "object",
+          "fields": {
+            "agent": {
+              "type": "object",
+              "optional": true,
+              "nullable": true,
+              "fields": {
+                "account_env": {
+                  "type": "string",
+                  "optional": true
+                },
+                "commands": {
+                  "type": "array",
+                  "optional": true,
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "efforts": {
+                  "type": "array",
+                  "optional": true,
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "models": {
+                  "type": "array",
+                  "optional": true,
+                  "items": {
+                    "type": "object",
+                    "fields": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "name": {
+                  "type": "string"
+                },
+                "switch_effort": {
+                  "type": "string",
+                  "optional": true
+                },
+                "switch_model": {
+                  "type": "string",
+                  "optional": true
+                },
+                "title": {
+                  "type": "string",
+                  "optional": true
+                },
+                "with_effort": {
+                  "type": "array",
+                  "optional": true,
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "with_model": {
+                  "type": "array",
+                  "optional": true,
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "events": {
+              "type": "array",
+              "optional": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "help": {
+              "type": "string",
+              "optional": true
+            },
+            "protocol": {
+              "type": "integer"
+            },
+            "verbs": {
+              "type": "array",
+              "optional": true,
+              "items": {
+                "type": "object",
+                "fields": {
+                  "help": {
+                    "type": "string",
+                    "optional": true
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "usage": {
+                    "type": "string",
+                    "optional": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string",
+          "optional": true
+        },
+        "problem": {
+          "type": "string",
+          "optional": true
+        }
+      }
+    }
+  }
+}

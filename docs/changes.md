@@ -9,6 +9,12 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **`mia api sessions`, `signals` and `plugins`.** What `mia resurrect
+  --list --json`, `mia signal ls --json` and `mia plugin ls --json`
+  print is a query of `mia api`, and so of [mia serve](serve.md#get-apiquery),
+  which keeps it as it keeps any: mia desk asks the server for them and
+  starts no mia. See [Automation](api.md#json-commands).
+
 - **A chat of mia's is drawn as a window's chat is.** `mia chat --chat
   <name>`, `main` the main agent, is the same chat as `mia chat --window`
   over a chat of mia's, from any folder: its thread followed, each switch

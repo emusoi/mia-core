@@ -1,0 +1,119 @@
+{
+  "query": "sessions",
+  "usage": "mia api sessions",
+  "inputs": [],
+  "output": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "fields": {
+        "name": {
+          "type": "string"
+        },
+        "seen": {
+          "type": "time",
+          "optional": true
+        },
+        "state": {
+          "type": "string"
+        },
+        "windows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "fields": {
+              "Account": {
+                "type": "string",
+                "optional": true
+              },
+              "Auto": {
+                "type": "boolean",
+                "optional": true
+              },
+              "Command": {
+                "type": "string"
+              },
+              "Conversation": {
+                "type": "string",
+                "optional": true
+              },
+              "Dir": {
+                "type": "string"
+              },
+              "ID": {
+                "type": "string",
+                "optional": true
+              },
+              "Kind": {
+                "type": "string",
+                "optional": true,
+                "enum": [
+                  "agent",
+                  "shell",
+                  "editor",
+                  "server",
+                  "tests",
+                  "logs"
+                ]
+              },
+              "Label": {
+                "type": "string",
+                "optional": true
+              },
+              "Layout": {
+                "type": "string",
+                "optional": true
+              },
+              "Name": {
+                "type": "string"
+              },
+              "Splits": {
+                "type": "array",
+                "optional": true,
+                "items": {
+                  "type": "object",
+                  "fields": {
+                    "Account": {
+                      "type": "string",
+                      "optional": true
+                    },
+                    "Command": {
+                      "type": "string"
+                    },
+                    "Conversation": {
+                      "type": "string",
+                      "optional": true
+                    },
+                    "Dir": {
+                      "type": "string"
+                    },
+                    "ID": {
+                      "type": "string",
+                      "optional": true
+                    },
+                    "Kind": {
+                      "type": "string",
+                      "optional": true,
+                      "enum": [
+                        "agent",
+                        "shell",
+                        "editor",
+                        "server",
+                        "tests",
+                        "logs"
+                      ]
+                    },
+                    "Label": {
+                      "type": "string",
+                      "optional": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

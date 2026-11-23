@@ -153,6 +153,13 @@ Mia-Stderr: mia%3A+no+worktree+called+%22nowhere%22+%E2%80%94+%60mia+ls%60+shows
 
 A query with `--follow` is `400`, saying that `GET /events` has it.
 
+What a client would start a verb of mia's to read is a query too:
+`sessions` is what `mia resurrect --list --json` prints, `signals` what
+`mia signal ls --json` prints and `plugins` what `mia plugin ls --json`
+prints, so a client that has the server need start no mia. A server of
+an older mia knows none of them: it answers `404`, `Mia-Exit: 3`, `no
+such query`, and the client runs the verb as it did.
+
 An answer is kept, as a listener's is, for a minute after it was last
 read, and the same question read again is given what is kept — the same
 bytes, words and exit code — until the server sees something it is

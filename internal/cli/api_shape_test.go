@@ -16,7 +16,9 @@ import (
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/env"
+	"github.com/emusoi/mia-core/internal/plugin"
 	"github.com/emusoi/mia-core/internal/session"
+	"github.com/emusoi/mia-core/internal/signal"
 	"github.com/emusoi/mia-core/internal/stack"
 )
 
@@ -54,6 +56,9 @@ var apiShapes = []struct {
 	{"apps", "mia api apps", reflect.TypeFor[[]app.Manifest]()},
 	{"status", "mia api status", reflect.TypeFor[worktreeStatus]()},
 	{"window", windowQueryUsage, reflect.TypeFor[windowStanding]()},
+	{"sessions", "mia api sessions", reflect.TypeFor[[]app.Session]()},
+	{"signals", "mia api signals", reflect.TypeFor[[]signal.Signal]()},
+	{"plugins", "mia api plugins", reflect.TypeFor[[]plugin.Plugin]()},
 }
 
 // closedSets are the string types whose values are all there are.

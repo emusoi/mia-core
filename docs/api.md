@@ -25,7 +25,7 @@ introduced by newer builds:
 
 The actual answer includes every query and feature, not this shortened list.
 `capabilities`, `machines`, `here`, `repos`, `main`, `standing`,
-`agents` and `apps` answer from any folder; the other queries are about a repository and need one. Check capabilities before using a feature. Existing response shapes are not
+`agents`, `apps` and `plugins` answer from any folder; the other queries are about a repository and need one. Check capabilities before using a feature. Existing response shapes are not
 wrapped in a version envelope.
 
 What the apps read is kept: `internal/cli/testdata/api` holds the shape of
@@ -42,7 +42,7 @@ flag that is added passes and says to keep it with
 
 | command | returns |
 |---|---|
-| `mia api <query>` | worktrees, machines, here, repositories, environments, stacks, base, conversations, the main agent, standing, agents, apps, a worktree's git status and a window's agent |
+| `mia api <query>` | worktrees, machines, here, repositories, environments, stacks, base, conversations, the main agent, standing, agents, apps, a worktree's git status, a window's agent, and the sessions, signals and plugins mia keeps |
 | `mia config show --json` | effective global, project and local configuration |
 | `mia doctor --json` | every check and an overall `ok`; failures still exit non-zero |
 | `mia gateway status --json` | `running`, `address`, `pac`, `ca`, `trust`, `differentBuild`, `routes` |
@@ -105,6 +105,13 @@ the repository keeps. It is git's own folder, no repository of mia's.
 {"branch":"feature","head":"5d1c…","upstream":"origin/feature","gone":false,"to_push":1,"to_pull":0,
  "staged":[],"changed":[{"path":"main.go","size":2048,"written":"2026-11-21T18:00:26-05:00"}],"untracked":[],"stashes":0}
 ```
+
+`mia api sessions`, `mia api signals` and `mia api plugins` are what
+`mia resurrect --list --json`, `mia signal ls --json` and `mia plugin ls
+--json` print, the same bytes: the sessions the repository remembers, the
+signals of its worktrees whose setter is still there, and the plugins
+there are, enabled or not. A client asks them of [mia serve](serve.md) as
+it asks any query, where it would have started those verbs.
 
 `mia api window <index> [--worktree <name>]` is a window of the worktree
 the folder is in, or of the one named: whether its agent is `working`, as

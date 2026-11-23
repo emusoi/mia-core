@@ -112,6 +112,15 @@ func answerAPI(who asker, rest []string) int {
 				fmt.Fprintln(who.errs, "mia:", problem) // the others are listed all the same
 			}
 			return who.emit(apps)
+		case "plugins": // as `mia plugin ls --json` says them, from anywhere: a repository's config too, when in one
+			if len(rest) > 1 {
+				return who.usage("mia api plugins")
+			}
+			plugins, err := pluginHost(configAt(who.dir, who.errs)).List()
+			if err != nil {
+				return who.fail(err)
+			}
+			return who.emit(plugins)
 		case "accounts": // the person's, from anywhere
 			projects := take(&rest, "--projects")
 			if len(rest) > 1 {
@@ -181,6 +190,22 @@ func cmdAPI(who asker, a *app.App, args []string) int {
 
 	case "machines":
 		return who.emit(a.Machines())
+
+	case "sessions": // as `mia resurrect --list --json` says them
+		if len(args) > 1 {
+			return who.usage("mia api sessions")
+		}
+		return who.emit(a.Sessions())
+
+	case "signals": // as `mia signal ls --json` says them
+		if len(args) > 1 {
+			return who.usage("mia api signals")
+		}
+		signals, err := a.StandingSignals()
+		if err != nil {
+			return who.fail(err)
+		}
+		return who.emit(signals)
 
 	case "here":
 		return who.emit(a.Here())
@@ -351,7 +376,7 @@ func statusIn(dir string) (worktreeStatus, error) {
 		Staged: files(s.Staged), Changed: files(s.Changed), Untracked: files(s.Untracked), Stashes: bytes.Count(stashes, []byte("\n"))}, nil
 }
 
-var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base", "conversations", "conversation", "main", "chats", "chat", "standing", "agents", "setups", "accounts", "apps", "status", "window"}
+var apiQueryList = []string{"capabilities", "worktrees", "machines", "here", "repos", "env", "stack", "base", "conversations", "conversation", "main", "chats", "chat", "standing", "agents", "setups", "accounts", "apps", "status", "window", "sessions", "signals", "plugins"}
 
 const (
 	setupsUsage        = "mia api setups [--repository <name> | --all]"

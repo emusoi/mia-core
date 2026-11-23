@@ -1,0 +1,60 @@
+{
+  "query": "signals",
+  "usage": "mia api signals",
+  "inputs": [],
+  "output": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "fields": {
+        "at": {
+          "type": "time"
+        },
+        "from": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "pane": {
+          "type": "string",
+          "optional": true
+        },
+        "pid": {
+          "type": "integer",
+          "optional": true
+        },
+        "rank": {
+          "type": "integer"
+        },
+        "started": {
+          "type": "time",
+          "optional": true
+        },
+        "style": {
+          "type": "string",
+          "optional": true
+        },
+        "text": {
+          "type": "string",
+          "optional": true
+        },
+        "until": {
+          "type": "time",
+          "optional": true
+        },
+        "until_seen": {
+          "type": "boolean",
+          "optional": true
+        },
+        "worktree": {
+          "type": "string"
+        },
+        "yes": {
+          "type": "string",
+          "optional": true
+        }
+      }
+    }
+  }
+}

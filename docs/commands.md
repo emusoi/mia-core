@@ -89,6 +89,7 @@
 | `mia doctor` | check tools, config, gateway, machines, plugins and environment drift; of a machine that does not answer, what is wrong and the fix |
 | `mia api <query>` | state as JSON |
 | `mia api capabilities` | API version, queries and feature markers |
+| `mia api sessions` · `signals` · `plugins` | what `mia resurrect --list --json`, `mia signal ls --json` and `mia plugin ls --json` print |
 | `mia serve` | the [server](serve.md) of this machine, in the foreground: `mia api` over a socket, events when an answer changes, verbs run for whoever asks; `mia api` asks it when it runs, unless `MIA_NO_SERVE` is set |
 | `mia serve install\|uninstall\|start\|stop\|status` | the server as a [service](serve.md#as-a-service) of launchd or systemd, with the environment of the shell it is installed from; one that sees mia rebuilt ends, and the service starts the new build |
 | `mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]` | the agent conversations of the repository and its worktrees, the last written to first |

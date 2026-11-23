@@ -149,7 +149,7 @@ func parseQ(q string) (question, error) {
 
 // ofARepository are the queries answered from the repository they are
 // asked in; the others are answered from them all, or from none.
-var ofARepository = []string{"worktrees", "machines", "here", "env", "stack", "base", "conversations", "conversation", "status", "window"}
+var ofARepository = []string{"worktrees", "machines", "here", "env", "stack", "base", "conversations", "conversation", "status", "window", "sessions", "signals"}
 
 // eachLook are the queries asked again each time the server looks, as no
 // file says when what they are answered from changed: a worktree's files,
