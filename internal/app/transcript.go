@@ -71,6 +71,38 @@ type mark struct {
 	Offset int64          `json:"offset"`
 	N      int            `json:"n"`
 	Open   map[string]int `json:"open,omitempty"` // a question's ref → its turn
+	// running is each call of a tool read that nothing it gave back has
+	// been read of yet, by its id: the tool's turn. It is of what was
+	// read, and not kept: a place read from a file has none, and a tool
+	// begun before it says no status.
+	running map[string]Turn
+}
+
+// finished is the turn of the tool a result is of, given again with the
+// status it now has, and whether there is one: a turn of several calls is
+// ok once each is, and an error once one is. A result of a call not
+// running is of none.
+func (m *mark) finished(result Turn) (Turn, bool) {
+	tool, ok := m.running[result.ref]
+	if !ok {
+		return Turn{}, false
+	}
+	delete(m.running, result.ref)
+	others := false
+	for call, other := range m.running {
+		if other.N == tool.N {
+			others = true
+			if result.Status == statusError {
+				other.Status = statusError // given now: the rest change nothing
+				m.running[call] = other
+			}
+		}
+	}
+	if tool.Status != "" || result.Status == "" || (others && result.Status != statusError) {
+		return Turn{}, false
+	}
+	tool.Status = result.Status
+	return tool, true
 }
 
 // scan is what is kept of a transcript between runs, so that a list reads
@@ -118,7 +150,7 @@ func (t transcripts) stepping(path string, from mark, about *about, each func(Tu
 	if _, err := f.Seek(from.Offset, io.SeekStart); err != nil {
 		return from, err
 	}
-	at := mark{Offset: from.Offset, N: from.N, Open: maps.Clone(from.Open)}
+	at := mark{Offset: from.Offset, N: from.N, Open: maps.Clone(from.Open), running: maps.Clone(from.running)}
 	// a line at a time: a transcript runs to hundreds of megabytes
 	r := bufio.NewReaderSize(f, 1<<20)
 	var long []byte // a line longer than the reader holds, put together here
@@ -138,6 +170,12 @@ func (t transcripts) stepping(path string, from mark, about *about, each func(Tu
 		at.Offset += int64(len(line))
 		before := at.N
 		for _, turn := range t.decode(line, about) {
+			if turn.Kind == turnResult {
+				if tool, ok := at.finished(turn); ok {
+					each(tool) // again, under its n
+				}
+				continue
+			}
 			at.N++
 			turn.N = at.N
 			switch {
@@ -149,6 +187,13 @@ func (t transcripts) stepping(path string, from mark, about *about, each func(Tu
 			case turn.Kind == turnAnswer:
 				turn.Question = at.Open[turn.ref]
 				delete(at.Open, turn.ref)
+			case turn.Kind == turnTool && turn.Status == "":
+				for _, call := range turn.calls {
+					if at.running == nil {
+						at.running = map[string]Turn{}
+					}
+					at.running[call] = turn
+				}
 			}
 			each(turn)
 		}
@@ -303,7 +348,7 @@ func (t transcripts) overlaid(file string, s scan, each func(Turn)) scan {
 		return s
 	}
 	written := s.end()
-	end, err := t.read(live, mark{Offset: from, N: written.N, Open: written.Open}, &s.about, func(turn Turn) {
+	end, err := t.read(live, mark{Offset: from, N: written.N, Open: written.Open, running: written.running}, &s.about, func(turn Turn) {
 		s.heard(turn)
 		if each != nil {
 			each(turn)
@@ -478,12 +523,14 @@ func (t transcripts) onFrom(at *placed, after int, first func() ([]Turn, bool, e
 				delete(shown, n) // written: given as it is in the transcript
 			}
 		}
-		t.overlaid(at.file, scan{Marks: []mark{at.end}}, func(turn Turn) {
+		var live []Turn // as it is now: a tool and how it went may both be in it
+		t.overlaid(at.file, scan{Marks: []mark{at.end}}, func(turn Turn) { give(&live, turn) })
+		for _, turn := range live {
 			if was, ok := shown[turn.N]; turn.N > after && (!ok || !reflect.DeepEqual(was, turn)) {
 				shown[turn.N] = turn
-				turns = append(turns, turn)
+				give(&turns, turn)
 			}
-		})
+		}
 		return turns
 	}
 	return func() ([]Turn, bool, error) {
@@ -560,8 +607,9 @@ func (t transcripts) tail(in folders, id, cwd string, enough func([]Turn) bool) 
 				upto = marks[from].N
 			}
 			var turns []Turn
-			got, err := t.stepping(file, start, &about{}, func(turn Turn) { turns = append(turns, turn) },
-				func() bool { return upto >= 0 && len(turns) > 0 && turns[len(turns)-1].N >= upto },
+			last := 0 // the highest n read: a tool given again has one lower
+			got, err := t.stepping(file, start, &about{}, func(turn Turn) { turns, last = append(turns, turn), max(last, turn.N) },
+				func() bool { return upto >= 0 && last >= upto },
 				func(m mark) { passed = append(passed, m) })
 			if err != nil {
 				return nil, true, err
@@ -628,7 +676,8 @@ func (t transcripts) found(in folders, id, cwd string) (string, os.FileInfo) {
 }
 
 // collecting gathers the turns after after into turns, an answer given to
-// the question it answers when that is among them.
+// the question it answers when that is among them, and a turn given again
+// in place of the one it was.
 func collecting(after int, turns *[]Turn) func(Turn) {
 	return func(turn Turn) {
 		if turn.Kind == turnAnswer {
@@ -639,8 +688,23 @@ func collecting(after int, turns *[]Turn) func(Turn) {
 			}
 		}
 		if turn.N > after {
-			*turns = append(*turns, turn)
+			give(turns, turn)
 		}
+	}
+}
+
+// give puts a turn among turns, which are in order of n, in place of the
+// one given under its n before.
+func give(turns *[]Turn, turn Turn) {
+	if last := len(*turns) - 1; last < 0 || (*turns)[last].N < turn.N {
+		*turns = append(*turns, turn)
+		return
+	}
+	at, found := slices.BinarySearchFunc(*turns, turn.N, func(one Turn, n int) int { return cmp.Compare(one.N, n) })
+	if found {
+		(*turns)[at] = turn
+	} else {
+		*turns = slices.Insert(*turns, at, turn)
 	}
 }
 
@@ -689,6 +753,7 @@ func (t transcripts) locate(in folders, id, cwd string, after int, at *placed) (
 		if !in.holds(seen.Cwd) || (cwd != "" && seen.Cwd != cwd) {
 			continue
 		}
+		end := s.end()
 		if after < from.N {
 			// further back than the last read: from the latest place at or before it
 			start := mark{}
@@ -699,8 +764,12 @@ func (t transcripts) locate(in folders, id, cwd string, after int, at *placed) (
 			}
 			turns = nil
 			var steps []mark
-			if _, err := t.stepping(file, start, &about{}, collect, nil, func(m mark) { steps = append(steps, m) }); err != nil {
+			got, err := t.stepping(file, start, &about{}, collect, nil, func(m mark) { steps = append(steps, m) })
+			if err != nil {
 				return nil, true, err
+			}
+			if got.Offset == end.Offset {
+				end = got // read on from with the tools still running in it
 			}
 			if start.Offset == 0 && len(steps) > 0 {
 				t.keepSteps(file, steps) // read whole: a chat reads only its end from them
@@ -710,7 +779,7 @@ func (t transcripts) locate(in folders, id, cwd string, after int, at *placed) (
 			collect(turn)
 		}
 		if at != nil {
-			*at = placed{file: file, end: s.end(), size: s.Size, modified: s.Modified}
+			*at = placed{file: file, end: end, size: s.Size, modified: s.Modified}
 		}
 		return turns, true, nil
 	}

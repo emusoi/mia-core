@@ -9,6 +9,17 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **A tool's turn says how it went.** A `tool` turn of
+  `mia api conversation`, `mia api main turns` and a chat has `status`
+  once the agent's transcript says: `ok`, or `error` when it failed —
+  claude's `is_error`, pi's `isError`, opencode's part state, the code a
+  codex command exited with or how its script ended, and what agy says of
+  a command. Followed, the tool comes again under its `n` with it once
+  what it gave back is written. It is left out while the tool runs and
+  where the transcript says nothing of it, so a reader that knows no
+  `status` reads every turn as before. See
+  [Conversations](api.md#conversations).
+
 - **`mia api sessions`, `signals` and `plugins`.** What `mia resurrect
   --list --json`, `mia signal ls --json` and `mia plugin ls --json`
   print is a query of `mia api`, and so of [mia serve](serve.md#get-apiquery),

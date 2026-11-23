@@ -10,7 +10,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -173,6 +175,10 @@ func agyFolders(home string) map[string]string {
 // agyStep is one line of a transcript: what the person sent, the agent's
 // reply with the tools it calls, what a tool gave back, or agy's own.
 type agyStep struct {
+	// StepIndex is its place among the steps, from 0: what a tool gave
+	// back is the step after the reply that called it, one for each call
+	// in order, and is told by its place alone.
+	StepIndex int       `json:"step_index"`
 	Source    string    `json:"source"`
 	Type      string    `json:"type"`
 	CreatedAt time.Time `json:"created_at"`
@@ -206,14 +212,39 @@ func agyLine(line []byte, about *about) []Turn {
 		if strings.TrimSpace(s.Content) != "" {
 			turns = append(turns, Turn{Kind: turnSaid, At: s.CreatedAt, Text: s.Content})
 		}
-		for _, call := range s.ToolCalls {
-			turns = append(turns, call.turn(s.CreatedAt))
+		for i, call := range s.ToolCalls {
+			turn := call.turn(s.CreatedAt)
+			if s.StepIndex > 0 {
+				turn.calls = []string{strconv.Itoa(s.StepIndex + 1 + i)}
+			}
+			turns = append(turns, turn)
 		}
 		return readsTogether(turns)
 	case s.Source == "MODEL": // what a tool gave back
-		return commitTurns(s.Content, s.CreatedAt)
+		turns := commitTurns(s.Content, s.CreatedAt)
+		if s.StepIndex > 0 {
+			turns = append([]Turn{{Kind: turnResult, ref: strconv.Itoa(s.StepIndex), Status: agyStatus(s.Content)}}, turns...)
+		}
+		return turns
 	}
 	return nil
+}
+
+// agySays is how agy begins what a command gave back, after when it was
+// begun and done and that its output was cut: the code it exited with, or
+// that it succeeded.
+var agySays = regexp.MustCompile(`\A(?:(?:Created At|Completed At|The tool's output was truncated)[^\n]*\n|[ \t]*\n)*[ \t]*(?:Command exited with code (-?\d+)|The command completed successfully)`)
+
+// agyStatus is how a tool went, as what it gave back says: of a command,
+// what agy says before its output; "" of any other, which says nothing of it.
+func agyStatus(content string) string {
+	switch m := agySays.FindStringSubmatch(content); {
+	case m == nil:
+		return ""
+	case m[1] == "" || m[1] == "0":
+		return statusOK
+	}
+	return statusError
 }
 
 // agyRequest is what the person sent, of a step of theirs: agy puts it

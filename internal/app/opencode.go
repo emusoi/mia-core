@@ -118,7 +118,8 @@ type opencodePart struct {
 		Completed int64 `json:"completed"`
 	} `json:"time"`
 	State struct {
-		Input    json.RawMessage `json:"input"` // an object, and a string until the tool runs
+		Status   string          `json:"status"` // streaming, running, completed or error
+		Input    json.RawMessage `json:"input"`  // an object, and a string until the tool runs
 		Content  []opencodeText  `json:"content"`
 		Metadata json.RawMessage `json:"metadata"` // each tool's own
 	} `json:"state"`
@@ -683,6 +684,12 @@ func opencodeTool(part opencodePart, at time.Time) []Turn {
 			OldString: in.OldString, NewString: in.NewString, Content: in.Content}, at)
 	}
 	turn.Name = part.Name
+	switch part.State.Status {
+	case "completed":
+		turn.Status = statusOK
+	case "error":
+		turn.Status = statusError
+	}
 	return []Turn{turn}
 }
 

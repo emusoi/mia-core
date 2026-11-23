@@ -313,7 +313,7 @@ window or conversation is another piece (`chat`, `chat-1`, …).
 [{"n":1,"kind":"asked","at":"2026-11-02T10:00:00Z","text":"make the list faster"},
  {"n":2,"kind":"thought","at":"2026-11-02T10:00:02Z","text":"Where does the time go? The sort runs on every keypress.","seconds":2},
  {"n":3,"kind":"said","at":"2026-11-02T10:00:04Z","text":"I will **look** at where the time goes."},
- {"n":4,"kind":"tool","at":"2026-11-02T10:00:05Z","text":"Edited view.lua +12 −3","name":"Edit","file":"/Users/user/src/app.monduli/view.lua"},
+ {"n":4,"kind":"tool","at":"2026-11-02T10:00:05Z","text":"Edited view.lua +12 −3","name":"Edit","file":"/Users/user/src/app.monduli/view.lua","status":"ok"},
  {"n":5,"kind":"question","at":"2026-11-02T10:00:09Z","text":"Which one?","options":["Fast","Small"],"answer":"Fast"},
  {"n":6,"kind":"answer","at":"2026-11-02T10:00:30Z","text":"Fast","question":5},
  {"n":7,"kind":"commit","at":"2026-11-02T10:01:00Z","hash":"abc1234","subject":"The list is faster"}]
@@ -324,12 +324,12 @@ window or conversation is another piece (`chat`, `chat-1`, …).
 | `asked` | what the person said: `text` |
 | `said` | what the agent said: `text`, markdown as written |
 | `thought` | what the agent thought, as its transcript keeps it: `text`, and `seconds`, how long it thought, where the transcript says (opencode's does). Claude's thinking, codex's reasoning summary, and what pi, opencode and agy write of it; thinking that is redacted or encrypted, and its signatures, are never given |
-| `tool` | what the agent did, in a line — `Ran go test ./...`, `Read 3 files` — with the tool's `name`, and `file` when it is one file's |
+| `tool` | what the agent did, in a line — `Ran go test ./...`, `Read 3 files` — with the tool's `name`, `file` when it is one file's, and `status`, how it went, once the transcript says: `ok`, or `error` when it failed — of files read together, an error once one of them is and ok once each is. Left out while it runs and where the transcript does not say: claude's and pi's say of every tool, opencode's of each tool's part, codex's of a command by the code it exited with and of a script by how it ended, and agy's of a command alone. Followed, a tool comes again under its `n` with its `status` once what it gave back is written; one begun before where a view began to read says none |
 | `question` | the agent asked the person to choose: `text`, `options`, and `answer` once it is given |
 | `answer` | the person chose: `text`, and `question`, the `n` of the turn it answers — so a view that already has the question learns of it |
 | `commit` | the agent made a commit: `hash` and `subject` |
 
-What its tools gave back and what the system told it are left out, and a
+What its tools gave back, but for how it went, and what the system told it are left out, and a
 handoff leaves out what the agent thought. `mia recall <text…> --json` gives each conversation that
 mentions the text with its `agent`, its `worktree` and `n`, the turn to
 open it at; `n` is 0 for words that were a subagent's. A conversation that

@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -28,6 +30,38 @@ var claudeOwn, claudeUser, claudeAssistant = []byte(`{"type":"`), []byte(`{"type
 
 // A key as claude writes it: inside a string its quotes would be escaped.
 var claudeResult, claudeAnswers = []byte(`"toolUseResult":`), []byte(`"answers":`)
+
+var claudeUseID, claudeFailed = []byte(`"tool_use_id":"`), []byte(`"is_error":true}`)
+
+// claudeDone is a result for each tool a line gives back what it gave of,
+// read from its message without decoding it: what a tool gave back is
+// most of a long transcript, and toolUseResult, at end, says it again.
+// Each is the id of the use it answers, and an error where claude ends
+// what it says of it with is_error.
+func claudeDone(line []byte, end int) []Turn {
+	line = line[:end]
+	var done []Turn
+	at := bytes.Index(line, claudeUseID)
+	for at >= 0 {
+		id, rest, ok := bytes.Cut(line[at+len(claudeUseID):], []byte(`"`))
+		if !ok {
+			break
+		}
+		block := rest // the last, up to where the message's content ends
+		if close := bytes.LastIndex(rest, []byte("}]")); close >= 0 {
+			block = rest[:close+1]
+		}
+		if at = bytes.Index(rest, claudeUseID); at >= 0 {
+			block, line = bytes.TrimSuffix(rest[:at], []byte(",{")), rest
+		}
+		status := statusOK
+		if bytes.HasSuffix(block, claudeFailed) {
+			status = statusError
+		}
+		done = append(done, Turn{Kind: turnResult, ref: string(id), Status: status})
+	}
+	return done
+}
 
 // mayShowCommit reports whether text has what git commit prints in it, as
 // far as a quick look can tell: seven or more hex digits after a space
@@ -63,10 +97,10 @@ func claudeLine(line []byte, about *about) []Turn {
 	if bytes.HasPrefix(line, claudeOwn) && !bytes.HasPrefix(line, claudeUser) && !bytes.HasPrefix(line, claudeAssistant) {
 		return nil
 	}
-	// what a tool gave back is the rest of it, and says something only when
-	// it is an answer or shows a commit made
-	if bytes.Contains(line, claudeResult) && !bytes.Contains(line, claudeAnswers) && !mayShowCommit(line) {
-		return nil
+	// what a tool gave back is the rest of it, and says something more than
+	// how it went only when it is an answer or shows a commit made
+	if result := bytes.Index(line, claudeResult); result >= 0 && !bytes.Contains(line, claudeAnswers) && !mayShowCommit(line) {
+		return claudeDone(line, result)
 	}
 	var e entry
 	if json.Unmarshal(line, &e) != nil || e.IsSidechain || (e.Type != "user" && e.Type != "assistant") {
@@ -89,6 +123,11 @@ func claudeLine(line []byte, about *about) []Turn {
 			if b.Type != "tool_result" {
 				continue
 			}
+			result := Turn{Kind: turnResult, ref: b.ToolUseID, Status: statusOK}
+			if b.IsError {
+				result.Status = statusError
+			}
+			turns = append(turns, result)
 			var asked asking
 			if json.Unmarshal(e.ToolUseResult, &asked) == nil {
 				for i, q := range asked.Questions {
@@ -126,7 +165,7 @@ func claudeLine(line []byte, about *about) []Turn {
 				continue
 			}
 			turn := toolTurn(b.Name, input, e.Timestamp)
-			turn.cwd = e.Cwd
+			turn.cwd, turn.calls = e.Cwd, []string{b.ID}
 			turns = append(turns, turn)
 		}
 	}
@@ -177,6 +216,7 @@ type codexEntry struct {
 		Arguments string          `json:"arguments"` // a function's, as JSON in a string
 		Input     string          `json:"input"`     // a custom tool's, as it is
 		Output    json.RawMessage `json:"output"`
+		CallID    string          `json:"call_id"` // a call's, and its output's
 	} `json:"payload"`
 }
 
@@ -229,6 +269,27 @@ func codexLine(line []byte, about *about) []Turn {
 		if thought := strings.TrimSpace(strings.Join(parts, "\n\n")); thought != "" {
 			return []Turn{{Kind: turnThought, At: e.Timestamp, Text: thought}}
 		}
+	case "function_call", "local_shell_call", "custom_tool_call":
+		turn := codexTool(e)
+		if p.CallID != "" {
+			turn.calls = []string{p.CallID}
+		}
+		return []Turn{turn}
+	case "function_call_output", "custom_tool_call_output":
+		output, exit := codexOutput(p.Output)
+		turns := commitTurns(output, e.Timestamp)
+		if p.CallID != "" {
+			turns = append([]Turn{{Kind: turnResult, ref: p.CallID, Status: codexStatus(output, exit)}}, turns...)
+		}
+		return turns
+	}
+	return nil
+}
+
+// codexTool is a call of a tool in a line.
+func codexTool(e codexEntry) Turn {
+	p := e.Payload
+	switch p.Type {
 	case "function_call", "local_shell_call":
 		var call codexCall
 		_ = json.Unmarshal([]byte(p.Arguments), &call)
@@ -240,39 +301,83 @@ func codexLine(line []byte, about *about) []Turn {
 				command = argv[2]
 			}
 			if argv[0] == "apply_patch" && len(argv) > 1 {
-				return []Turn{patchTurn(argv[1], e.Timestamp)}
+				return patchTurn(argv[1], e.Timestamp)
 			}
 		} else if command == "" {
 			_ = json.Unmarshal(call.Command, &command)
 		}
 		if p.Name == "apply_patch" {
-			return []Turn{patchTurn(call.Input, e.Timestamp)}
+			return patchTurn(call.Input, e.Timestamp)
 		}
 		if command != "" {
-			return []Turn{toolTurn("shell", toolInput{Command: command}, e.Timestamp)}
+			return toolTurn("shell", toolInput{Command: command}, e.Timestamp)
 		}
-		return []Turn{toolTurn(p.Name, toolInput{}, e.Timestamp)}
 	case "custom_tool_call":
 		if p.Name == "apply_patch" {
-			return []Turn{patchTurn(p.Input, e.Timestamp)}
+			return patchTurn(p.Input, e.Timestamp)
 		}
-		return []Turn{toolTurn(p.Name, toolInput{}, e.Timestamp)}
-	case "function_call_output", "custom_tool_call_output":
-		// a string, or JSON in a string with the output inside
-		output := string(p.Output)
-		var text string
-		if json.Unmarshal(p.Output, &text) == nil {
-			output = text
-			var inner struct {
-				Output string `json:"output"`
-			}
-			if json.Unmarshal([]byte(text), &inner) == nil && inner.Output != "" {
+	}
+	return toolTurn(p.Name, toolInput{}, e.Timestamp)
+}
+
+// codexOutput is what a tool gave back: a string, JSON in a string with
+// the output inside and the code it exited with beside it, or a list of
+// texts. exit is nil where it says none.
+func codexOutput(raw json.RawMessage) (output string, exit *int) {
+	output = string(raw)
+	var text string
+	var texts []struct {
+		Text string `json:"text"`
+	}
+	switch {
+	case json.Unmarshal(raw, &text) == nil:
+		output = text
+		var inner struct {
+			Output   string `json:"output"`
+			Metadata struct {
+				ExitCode *int `json:"exit_code"`
+			} `json:"metadata"`
+		}
+		if json.Unmarshal([]byte(text), &inner) == nil {
+			if inner.Output != "" {
 				output = inner.Output
 			}
+			exit = inner.Metadata.ExitCode
 		}
-		return commitTurns(output, e.Timestamp)
+	case json.Unmarshal(raw, &texts) == nil:
+		var all strings.Builder
+		for _, t := range texts {
+			all.WriteString(t.Text)
+		}
+		output = all.String()
 	}
-	return nil
+	return output, exit
+}
+
+// codexSays is how codex begins what a tool gave back where it says how
+// it went: the code a command exited with, or how a script ended.
+var codexSays = regexp.MustCompile(`\A(?:(?:[^\n]*\n){0,4}?(?:Process exited with code|Exit code:) (-?\d+)\b|(Script completed|Script failed|aborted by user)\b)`)
+
+// codexStatus is how a tool went, as what it gave back says: "" where it
+// says nothing of it, or is still running.
+func codexStatus(output string, exit *int) string {
+	code := -1
+	switch m := codexSays.FindStringSubmatch(output); {
+	case exit != nil:
+		code = *exit
+	case m == nil:
+		return ""
+	case m[2] == "Script completed":
+		return statusOK
+	case m[2] != "":
+		return statusError
+	default:
+		code, _ = strconv.Atoi(m[1])
+	}
+	if code == 0 {
+		return statusOK
+	}
+	return statusError
 }
 
 // patchTurn says a codex patch in a line: the file it changes, or how many.
@@ -354,6 +459,9 @@ type piEntry struct {
 	Message struct {
 		Role    string          `json:"role"`
 		Content json.RawMessage `json:"content"`
+		// of a tool's result: the call it is of, and whether it failed
+		ToolCallID string `json:"toolCallId"`
+		IsError    *bool  `json:"isError"`
 	} `json:"message"`
 }
 
@@ -364,6 +472,7 @@ type piBlock struct {
 	Redacted  bool            `json:"redacted"` // its thinking is then a stand-in, what was encrypted in its signature
 	Name      string          `json:"name"`
 	Arguments json.RawMessage `json:"arguments"`
+	ID        string          `json:"id"` // a tool call's
 }
 
 // piLine is a line's turns in the order of what they are made of, what it
@@ -404,13 +513,19 @@ func piLine(line []byte, about *about) []Turn {
 				turns = append(turns, Turn{Kind: turnThought, At: e.Timestamp, Text: b.Thinking})
 			}
 		case "toolCall":
+			var calls []string
+			if b.ID != "" {
+				calls = []string{b.ID}
+			}
 			if args := bytes.TrimSpace(b.Arguments); e.Live && (len(args) == 0 || bytes.Equal(args, []byte("{}"))) {
-				turns = append(turns, Turn{Kind: turnTool, At: e.Timestamp, Name: b.Name, Text: "Using " + b.Name}) // begun, nothing it is handed written yet
+				turns = append(turns, Turn{Kind: turnTool, At: e.Timestamp, Name: b.Name, Text: "Using " + b.Name, calls: calls}) // begun, nothing it is handed written yet
 				continue
 			}
 			var in toolInput
 			_ = json.Unmarshal(b.Arguments, &in)
-			turns = append(turns, toolTurn(b.Name, in, e.Timestamp))
+			turn := toolTurn(b.Name, in, e.Timestamp)
+			turn.calls = calls
+			turns = append(turns, turn)
 		}
 	}
 	text = strings.TrimSpace(said.String())
@@ -425,7 +540,19 @@ func piLine(line []byte, about *about) []Turn {
 		}
 		return readsTogether(turns)
 	case "toolResult":
-		return commitTurns(text, e.Timestamp)
+		turns := commitTurns(text, e.Timestamp)
+		if id := e.Message.ToolCallID; id != "" {
+			result := Turn{Kind: turnResult, ref: id}
+			switch failed := e.Message.IsError; {
+			case failed == nil: // it does not say
+			case *failed:
+				result.Status = statusError
+			default:
+				result.Status = statusOK
+			}
+			turns = append([]Turn{result}, turns...)
+		}
+		return turns
 	}
 	return nil
 }
@@ -546,7 +673,8 @@ func changed(before, after string) (added, removed int) {
 }
 
 // readsTogether makes one turn of files read one after another in the same
-// message: "Read 3 files".
+// message: "Read 3 files", each read's call its own, ok once each is and
+// an error once one is.
 func readsTogether(turns []Turn) []Turn {
 	var out []Turn
 	run := 0
@@ -555,6 +683,13 @@ func readsTogether(turns []Turn) []Turn {
 			if run++; run > 1 {
 				last := &out[len(out)-1]
 				last.File, last.Text = "", fmt.Sprintf("Read %d files", run)
+				last.calls = append(slices.Clip(last.calls), turn.calls...)
+				switch {
+				case last.Status == statusError || turn.Status == statusError:
+					last.Status = statusError
+				case turn.Status != statusOK:
+					last.Status = ""
+				}
 				continue
 			}
 		} else {

@@ -494,7 +494,8 @@ type WindowRef struct {
 //	said     what the agent said: text, markdown as written
 //	thought  what the agent thought, of an agent whose transcript keeps it:
 //	         text, and seconds, how long, when the transcript says
-//	tool     what the agent did, in a line: text, name, and file when it is one file's
+//	tool     what the agent did, in a line: text, name, and file when it is one file's;
+//	         status, ok or error, once the agent's transcript says how it went
 //	question the agent asked the person to choose: text, options, and answer once given
 //	answer   what the person chose, when they did: text, and question, the turn it answers
 //	commit   a commit the agent made: hash and subject
@@ -516,6 +517,11 @@ type Turn struct {
 	Subject  string    `json:"subject,omitempty"`
 	Seconds  int       `json:"seconds,omitempty"`
 
+	// Status is how a tool went, once the agent's transcript says: ok, or
+	// error when it failed; "" while it runs, and of an agent that does
+	// not say.
+	Status string `json:"status,omitempty"`
+
 	Verb       string `json:"verb,omitempty"`
 	Repository string `json:"repository,omitempty"`
 	Worktree   string `json:"worktree,omitempty"`
@@ -528,8 +534,12 @@ type Turn struct {
 	Tone string `json:"tone,omitempty"`
 
 	// ref ties a question to its answer while a transcript is read: the id
-	// the agent gave the asking.
+	// the agent gave the asking. Of a result, the call it is the result of.
 	ref string
+	// calls is the ids the agent gave the uses of tools a tool turn says —
+	// one, or each of the files read together — which what each gave back
+	// names.
+	calls []string
 	// command is the whole of what a shell tool ran, and cwd the folder the
 	// agent was in then, when its transcript says: what a did is read from.
 	command, cwd string
@@ -545,6 +555,14 @@ const (
 	turnCommit   = "commit"
 	turnDid      = "did"
 	turnSwitch   = "switch"
+
+	// turnResult is no turn of its own: what a tool gave back, as a
+	// decoder hands it to reading to put on the tool's turn — ref the call
+	// it is the result of, and Status how it went, "" when it does not say.
+	turnResult = "result"
+
+	statusOK    = "ok"
+	statusError = "error"
 )
 
 // TurnKinds is every kind a turn is.

@@ -294,11 +294,11 @@ func TestAnOpencodeReplyIsHeardAsItIsWritten(t *testing.T) {
 			[]string{"4 tool Read total.go"}},
 		{[]string{asked, reply("", thought, said, tool("t1", "read", `{"status":"completed","input":{"path":"cart/total.go"},"content":[{"type":"text","text":"package cart"}]}`),
 			tool("t2", "shell", `{"status":"running","input":{"command":"git commit -am cart"}}`))},
-			[]string{"5 tool Ran git commit -am cart"}},
+			[]string{"4 tool Read total.go ok", "5 tool Ran git commit -am cart"}},
 		{[]string{asked, reply(`,"finish":"tool-calls"`, thought, said, tool("t1", "read", `{"status":"completed","input":{"path":"cart/total.go"}}`),
 			tool("t2", "shell", `{"status":"completed","input":{"command":"git commit -am cart"},"content":[{"type":"text","text":"[main 0123abc] The cart total adds up"}]}`)),
 			`{"type":"assistant","id":"m3","time":{"created":1793613609000},"content":[{"type":"text","text":"It adds up."}],"finish":"stop"}`},
-			[]string{"6 commit 0123abc", "7 said It adds up."}},
+			[]string{"5 tool Ran git commit -am cart ok", "6 commit 0123abc", "7 said It adds up."}},
 	}
 	write := func(messages []string) {
 		t.Helper()
@@ -331,7 +331,7 @@ func TestAnOpencodeReplyIsHeardAsItIsWritten(t *testing.T) {
 		case turns := <-heard:
 			var got []string
 			for _, turn := range turns {
-				got = append(got, fmt.Sprintf("%d %s %s%s", turn.N, turn.Kind, turn.Text, turn.Hash))
+				got = append(got, strings.TrimSpace(fmt.Sprintf("%d %s %s%s %s", turn.N, turn.Kind, turn.Text, turn.Hash, turn.Status)))
 			}
 			if strings.Join(got, "|") != strings.Join(stage.want, "|") {
 				t.Fatalf("stage %d heard\n%s\nwant\n%s", i, strings.Join(got, "\n"), strings.Join(stage.want, "\n"))

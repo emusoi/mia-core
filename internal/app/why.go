@@ -162,6 +162,7 @@ type block struct {
 	Name      string          `json:"name"`
 	Input     json.RawMessage `json:"input"`
 	ToolUseID string          `json:"tool_use_id"`
+	IsError   bool            `json:"is_error"` // of a tool's result: it failed
 }
 
 // claudePaste is the two lines claude keeps what was pasted into a message
