@@ -101,8 +101,15 @@ conversations, the one its agent has open marked; one read back, or
 gone on with as `mia main start --resume <id> --restart` does — its agent
 ended and started again on it, unless it is at work or asks something.
 
-What a chat does not do that a window's chat does: Fork, and a reply's
-*Continue from here with…*, say so and do nothing yet; marking models to
+Fork, or a reply's *Continue from here with…*, puts the models up and
+makes a chat of its own for the agent picked, as a fork of a window's
+conversation goes on in a window of its own: the new chat made as
+`mia chats new` makes one, its agent started and told nothing, the
+thread up to that reply written out as a handoff in its folder and said
+in front of the first thing said to it, its turns saying where it went
+on from; the toast names it, and the chat forked from stays as it is.
+
+What a chat does not do that a window's chat does: marking models to
 send the next message to several agents makes a worktree for each, and
 a chat has no repository, so it is not offered; continuing one of
 Earlier's conversations of another agent with this chat's agent (`c`)

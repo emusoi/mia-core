@@ -520,6 +520,23 @@ func (a *App) SwitchChat(to, modelID, effort string) (Switched, error) {
 		return done, nil
 	}
 
+	file, left, err := a.handOn(head, turns, agent.Name, done.Resumes, 0)
+	done.Handoff, done.Turns, done.LeftOut = file, len(turns), left
+	if err != nil || done.Resumes != "" && len(turns) == 0 {
+		return done, err // (nothing was said since: it is told nothing)
+	}
+	done.State = a.Main()
+	return done, nil
+}
+
+// handOn writes turns of a conversation out as a handoff in the chat's
+// folder, for the agent it goes on with to go on from, keeps which went on
+// as which for its turns to say, and carries the handoff in front of the
+// first thing said to that agent's window: nothing, where it took its own
+// conversation up again, resumes, and nothing was said since. Of a fork,
+// upto is the turn it was made from. file is the handoff's, and left how
+// many turns it leaves out, written or not.
+func (a *App) handOn(head Head, turns []Turn, to, resumes string, upto int) (file string, left int, err error) {
 	now := time.Now()
 	named := filepath.Join(a.MiaDir, "handoffs", head.Worktree, notInName.ReplaceAllString(head.Agent+"-"+head.ID, "-"))
 	file, full := named+".md", named+"-full.md"
@@ -527,33 +544,65 @@ func (a *App) SwitchChat(to, modelID, effort string) (Switched, error) {
 	if left == 0 {
 		full = ""
 	}
-	done.Handoff, done.Turns, done.LeftOut = file, len(turns), left
 	// the person's words and the agent's: theirs alone to read
 	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
-		return done, err
+		return file, left, err
 	}
 	if err := os.WriteFile(file, []byte(text), 0o600); err != nil {
-		return done, err
+		return file, left, err
 	}
 	if full != "" {
 		whole, _ := handoff(head, turns, now, 0, "")
 		if err := os.WriteFile(full, []byte(whole), 0o600); err != nil {
-			return done, err
+			return file, left, err
 		}
 	}
 	// which went on as which is kept, for its turns to say
-	one := handedOn{From: ContinuedFrom{Agent: head.Agent, ID: head.ID, Worktree: head.Worktree}, To: ContinuedTo{Agent: agent.Name, Window: WindowRef{Name: agent.Name}, ID: done.Resumes},
-		Handoff: file, At: instant(now), Turns: len(turns), LeftOut: left, Resumes: done.Resumes}
+	one := handedOn{From: ContinuedFrom{Agent: head.Agent, ID: head.ID, Worktree: head.Worktree}, To: ContinuedTo{Agent: to, Window: WindowRef{Name: to}, ID: resumes},
+		Handoff: file, At: instant(now), Turns: len(turns), LeftOut: left, Resumes: resumes, Upto: upto}
 	if err := writeHandedOn(fmt.Sprintf("%s.%d.json", named, now.UnixMilli()), one); err != nil {
-		return done, fmt.Errorf("%s goes on with %s, and that it goes on from %s's %s is not kept: %w", a.chatWho(), agent.Name, head.Agent, head.ID, err)
+		return file, left, fmt.Errorf("%s goes on with %s, and that it goes on from %s's %s is not kept: %w", a.chatWho(), to, head.Agent, head.ID, err)
 	}
-	if done.Resumes != "" && len(turns) == 0 {
-		return done, nil // nothing was said since: it is told nothing
+	if resumes != "" && len(turns) == 0 {
+		return file, left, nil // nothing was said since: it is told nothing
 	}
-	carried := Carried{From: head.Agent, ID: head.ID, File: file, Full: full, Resumed: done.Resumes != ""}
-	if err := a.CarryInWindow(model.Record{Name: a.chatSession()}, agent.Name, carried); err != nil {
-		return done, fmt.Errorf("%s goes on with %s, and what it goes on from is not kept for it: %w", a.chatWho(), agent.Name, err)
+	carried := Carried{From: head.Agent, ID: head.ID, File: file, Full: full, Resumed: resumes != ""}
+	if err := a.CarryInWindow(model.Record{Name: a.chatSession()}, to, carried); err != nil {
+		return file, left, fmt.Errorf("%s goes on with %s, and what it goes on from is not kept for it: %w", a.chatWho(), to, err)
 	}
-	done.State = a.Main()
-	return done, nil
+	return file, left, nil
+}
+
+// ForkChat makes a chat that goes on from this one's thread up to turn
+// upto of it, as a fork of a window's conversation goes on in a window of
+// its own: a new chat with an agent on a model and an effort, started and
+// told nothing, the thread up to that turn written out as a handoff in its
+// folder and said in front of the first thing said to it, and its turns
+// saying it was forked from that turn. This chat stays as it is. The new
+// chat is given back once it is made, also when what came after failed.
+func (a *App) ForkChat(upto int, agentName, modelID, effort string) (*App, error) {
+	state := a.Main()
+	turns, err := a.MainTurns("", 0)
+	if err != nil {
+		return nil, err
+	}
+	turns = slices.DeleteFunc(turns, func(t Turn) bool { return t.N > upto || t.Kind == turnSwitch || thought(t) })
+	if state.Conversation == "" || len(turns) == 0 {
+		return nil, fmt.Errorf("nothing is said in %s that mia can read up to turn %d: there is nothing to fork", a.chatWho(), upto)
+	}
+	head := Head{Agent: state.Agent, ID: state.Conversation, Account: state.Account, Worktree: filepath.Base(a.Root), Cwd: a.Root}
+	heads, _ := a.Conversations(Wanted{Agent: state.Agent})
+	if at := slices.IndexFunc(heads, func(h Head) bool { return h.ID == state.Conversation }); at >= 0 {
+		head = heads[at]
+	}
+	c, err := a.NewChat(agentName, modelID, effort, "")
+	if err != nil {
+		return nil, err
+	}
+	c.Plugins = a.Plugins
+	if _, err := c.startMain(agentName, modelID, effort, "", true, "", false, true); err != nil { // told nothing until the next thing said to it
+		return c, fmt.Errorf("chat %s is made, and %s did not start in it: %w — `%s` starts it", c.chat, agentName, err, c.chatVerb("start"))
+	}
+	_, _, err = c.handOn(head, turns, agentName, "", upto)
+	return c, err
 }

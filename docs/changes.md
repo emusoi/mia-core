@@ -15,8 +15,9 @@ on GitHub; a tag without its section is not released.
   the band its own turn says; what is sent, chosen and stopped done as
   `mia chats say`, `press` and `interrupt` do it, the agent at work at
   once after a send; Models switching its model as `mia chats model` does
-  and going on with another agent as `mia chats switch` does; Earlier its
-  own conversations. With `[main] machine` another machine's, it runs
+  and going on with another agent as `mia chats switch` does; Fork making
+  a chat of its own that goes on from a reply; Earlier its own
+  conversations. With `[main] machine` another machine's, it runs
   there over ssh with this terminal as its own. See
   [Chats](chats.md#shown-as-a-chat).
 

@@ -1366,7 +1366,7 @@ func (v *chatView) models(placed bool) json.RawMessage {
 		}
 		if v.fork > 0 {
 			item.Does = "continue in " + row.agent
-			item.About = []string{"starts " + row.agent + " in a window of its own, with the conversation up to that reply", "this chat stays as it is, and " + v.agent() + " with it"}
+			item.About = []string{"starts " + row.agent + " in a " + v.holder() + " of its own, with the conversation up to that reply", "this chat stays as it is, and " + v.agent() + " with it"}
 		}
 		if row.model == "" && !row.used {
 			item.Note = "its model is chosen inside it"
@@ -1484,9 +1484,11 @@ func (v *chatView) does() (line json.RawMessage, tab string) {
 		// where it goes: with the person's next message here, or of a fork in the window it opens
 		sent := "Sent with your next message."
 		if deed.do == chatFork {
-			sent = "In a new window; this chat stays." // (which reply, the modal's title says)
+			sent = "In a new " + v.holder() + "; this chat stays." // (which reply, the modal's title says)
 		}
 		switch {
+		case !looked && v.chat != "": // (what a chat of mia's carries is what mia chats switch carries)
+			lines = append(lines, row(lead, said("· "+sent, "dim")))
 		case !looked:
 			lines = append(lines, row(lead))
 		case would.err != nil:
@@ -2582,10 +2584,6 @@ func (r *chatRun) act(deed chatDeed) {
 			r.say(v.talk.patch(encode(chatOp{Op: "copy", Text: words}), v.talk.went("copied", "ok"))...)
 		}
 	case chatModelsUp, chatForkUp:
-		if deed.do == chatForkUp && v.chat != "" {
-			r.note("a chat of mia's is not forked: go on with another agent from the models", "warn")
-			return
-		}
 		v.fork = 0
 		if deed.do == chatForkUp {
 			if v.fork, _, _ = v.talk.replied(deed.question); v.fork == 0 {
@@ -2649,6 +2647,18 @@ func (r *chatRun) act(deed chatDeed) {
 	case chatFork:
 		from, reply := v.agent(), v.fork
 		r.say(v.shut(v.talk.stands(&muiStatus{Text: cutTo(fmt.Sprintf("forking this conversation from reply %d, for %s…", reply, deed.agent), chatSaid)}))...)
+		if v.chat != "" { // a chat of its own, as mia chats makes one
+			made, err := r.a.ForkChat(reply, deed.agent, deed.model, deed.effort)
+			text, tone := "", "ok"
+			if made != nil {
+				text = fmt.Sprintf("%s goes on from reply %d in chat %s · this chat stays as it is", deed.agent, reply, made.Main().Name)
+			}
+			if err != nil {
+				text, tone = strings.TrimPrefix(text+" · "+err.Error(), " · "), "bad"
+			}
+			r.say(v.talk.patch(v.talk.stands(nil), v.talk.went(text, tone))...)
+			return
+		}
 		done, err := r.a.ContinueConversation(app.Continue{ID: v.id, Worktree: r.record.Name, With: deed.agent, Model: deed.model, Effort: deed.effort, Quiet: true, Whole: deed.whole, Upto: reply})
 		switch {
 		case err != nil:

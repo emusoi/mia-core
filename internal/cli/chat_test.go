@@ -2817,3 +2817,111 @@ func TestAChatOfMiasIsTheChatAWindowsIs(t *testing.T) {
 		t.Errorf("gone on with e1: mode %v, %+v, %q", run.view.mode, run.view.runs, run.view.id)
 	}
 }
+
+// A chat of mia's forked from a reply goes on in a chat of its own, as a
+// window's goes on in a window of its own: a new chat with the agent
+// picked, started and told nothing, the thread up to that reply written
+// out in its folder and said in front of the first thing said to it, and
+// its turns saying where it went on from. The chat forked from stays as
+// it is.
+func TestAChatOfMiasForkedGoesOnInAChatOfItsOwn(t *testing.T) {
+	roleLab(t)
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(os.Getenv("HOME"), ".claude"))
+	t.Setenv("CODEX_HOME", "")
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\necho \"claude $*\"\nexec cat\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	main, err := app.AtMain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	main.Plugins = pluginHost(config.Config{})
+	c, err := main.NewChat("echo", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Plugins = main.Plugins
+	state, err := c.StartMain("", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var messages [][]byte
+	run := &chatRun{a: c, record: model.Record{Name: state.Name}, view: &chatView{worktree: state.Name, chat: state.Name},
+		say: func(said ...[]byte) { messages = append(messages, said...) }, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
+	t.Cleanup(func() { close(run.quit) })
+	run.aimAtChat()
+	select {
+	case batch := <-run.batches:
+		run.say(run.view.talk.heard(batch.turns)...)
+	case <-time.After(10 * time.Second):
+		t.Fatal("the thread was not heard")
+	}
+
+	run.act(run.view.deed(chatEvent{E: "pick", List: run.view.talk.id(), ID: "2", Sub: "fork"}))
+	if run.view.mode != picking || run.view.fork != 2 {
+		t.Fatalf("forked from reply 2: mode %v, fork %d, %+v", run.view.mode, run.view.fork, run.view.talk.status)
+	}
+	var row chatModel
+	for _, one := range chatModels(run.view.agents, nil, "echo", "") {
+		if one.agent == "claude" {
+			row = one
+			break
+		}
+	}
+	run.view.under = row.id()
+	if line, _ := run.view.does(); !strings.Contains(string(line), "In a new chat; this chat stays.") {
+		t.Errorf("what the pick does: %s", line)
+	}
+	messages = nil
+	run.act(run.view.deed(chatEvent{E: "pick", List: "models", ID: row.id()}))
+	toast := ""
+	for _, message := range messages {
+		for _, op := range read(t, message).Patch {
+			if op.Op == "toast" || op.Op == "status" && op.Text != "" {
+				toast = op.Op + ": " + op.Text
+			}
+		}
+	}
+	made := regexp.MustCompile(`^toast: claude goes on from reply 2 in chat (\S+) · this chat stays as it is$`).FindStringSubmatch(toast)
+	if made == nil {
+		t.Fatalf("how the fork went: %q", toast)
+	}
+	if run.view.mode != chatting || run.view.runs.Agent != "echo" || len(run.view.talk.turns) != 2 {
+		t.Errorf("the chat forked from: mode %v, %+v, %d turns", run.view.mode, run.view.runs, len(run.view.talk.turns))
+	}
+	fork, err := app.AtChat(made[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	fork.Plugins = main.Plugins
+	if now := fork.Main(); !now.Running || now.Agent != "claude" {
+		t.Fatalf("the fork: %+v", now)
+	}
+	// (what came before the switch is what the fork's folder finds of it: the echo plugin finds any)
+	turns, err := fork.MainTurns("", 0)
+	if last := len(turns) - 1; err != nil || last < 0 || turns[last].Kind != "switch" || turns[last].From != "echo" || turns[last].To != "claude" || turns[last].Note != app.CarriedWaits {
+		t.Fatalf("the fork's thread: %+v, %v", turns, err)
+	}
+	handoffs, _ := filepath.Glob(filepath.Join(fork.MiaDir, "handoffs", "*", "echo-e2.md"))
+	if len(handoffs) != 1 {
+		t.Fatalf("the fork's handoff: %v", handoffs)
+	}
+	if written, _ := os.ReadFile(handoffs[0]); !strings.Contains(string(written), "say it back") {
+		t.Errorf("the handoff: %s", written)
+	}
+	if err := fork.SayToMain("go on"); err != nil {
+		t.Fatal(err)
+	}
+	var screen string
+	for range 250 {
+		if screen, _ = session.Here().Capture("chat-"+made[1], "claude", false); strings.Contains(screen, app.CarriedOpens("echo")) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !strings.Contains(screen, app.CarriedOpens("echo")) {
+		t.Errorf("the first thing said to the fork did not carry the thread: %q", screen)
+	}
+}
