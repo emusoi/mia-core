@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/emusoi/mia-core/internal/model"
@@ -89,7 +91,38 @@ func agyID(path string) string { return filepath.Base(filepath.Dir(filepath.Dir(
 // keeps it.
 func agyCwd(path string) string {
 	home := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(path)))))
-	return agyFolders(home)[agyID(path)]
+	return agyFoldersNow(home)[agyID(path)]
+}
+
+// agyFoldersRead is the files agyFolders reads, in agy's folder.
+var agyFoldersRead = []string{"history.jsonl", filepath.Join("cache", "last_conversations.json"), filepath.Join("cache", "conversation_metadata.json")}
+
+// agyFoldersKept is agyFolders of each agy folder as it was last read, by
+// the folder, with when its files were written then.
+var agyFoldersKept sync.Map
+
+type agyFoldersAt struct {
+	written string
+	folders map[string]string
+}
+
+// agyFoldersNow is agyFolders, read again only once one of its files has
+// been written since it was last: a list asks it of each transcript.
+func agyFoldersNow(home string) map[string]string {
+	var written strings.Builder
+	for _, name := range agyFoldersRead {
+		if info, err := os.Stat(filepath.Join(home, name)); err == nil {
+			fmt.Fprintf(&written, "%d %d\n", info.ModTime().UnixNano(), info.Size())
+		} else {
+			written.WriteString("-\n")
+		}
+	}
+	if kept, ok := agyFoldersKept.Load(home); ok && kept.(agyFoldersAt).written == written.String() {
+		return kept.(agyFoldersAt).folders
+	}
+	folders := agyFolders(home)
+	agyFoldersKept.Store(home, agyFoldersAt{written: written.String(), folders: folders})
+	return folders
 }
 
 // agyFolders is the folder each conversation was made in, by its id, as

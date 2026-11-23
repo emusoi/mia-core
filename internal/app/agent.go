@@ -40,8 +40,12 @@ type Agent struct {
 	carrier string
 	// held is a shell script that prints, for a pane's process id, what the
 	// agent itself wrote about the conversation it has open: JSON with a
-	// sessionId. Empty for an agent that does not say.
+	// sessionId, as a machine over ssh is asked it. Empty for an agent that
+	// does not say.
 	held string
+	// holds is the same read on this machine, by mia itself; nil for an
+	// agent that does not say.
+	holds func(pane int) holds
 	// talks is its conversations; nil for an agent mia cannot read them of.
 	talks talks
 	// notes is the file in its folder it reads its instructions from;
@@ -235,6 +239,7 @@ home="${CLAUDE_CONFIG_DIR:-}"; case "$home" in "" | "${XDG_CONFIG_HOME:-$HOME/.c
 for h in "$home" "${XDG_CONFIG_HOME:-$HOME/.config}/mia/accounts/claude/"*; do
 	[ -f "$h/sessions/$pid.json" ] && exec cat "$h/sessions/$pid.json"
 done`,
+		holds: claudeHolds,
 		talks: transcripts{agent: "claude", files: claudeFiles, find: claudeFind, id: claudeID, decode: claudeLine},
 		// the aliases it takes for the latest of each, and /model and /effort in it
 		Models:  []plugin.Model{{ID: "opus", Label: "Opus"}, {ID: "sonnet", Label: "Sonnet"}, {ID: "haiku", Label: "Haiku"}, {ID: "fable", Label: "Fable"}},

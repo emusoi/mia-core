@@ -232,11 +232,42 @@ type holds struct {
 // holding is what the agent says the program in front in a pane has open;
 // nothing for an agent that does not say.
 func (a Agent) holding(pid int) holds {
-	if a.held == "" || pid <= 0 {
+	if a.holds == nil || pid <= 0 {
 		return holds{}
 	}
-	out, _ := run.Local("sh").Capture("-c", a.held, "sh", strconv.Itoa(pid))
-	return heldIn(out)
+	return a.holds(pid)
+}
+
+// claudeHolds is what claude wrote of the conversation the claude a pane
+// was started with runs has open: sessions/<pid>.json in the folder of the
+// account it runs on, its own or one of mia's, as its held script reads it
+// over ssh. Of each such file, the one of a process that leads a group of
+// the pane's session, as a program a shell runs in front does: read, and
+// nothing run or written.
+func claudeHolds(pane int) holds {
+	home := os.Getenv("CLAUDE_CONFIG_DIR")
+	if home == "" || strings.HasPrefix(home, accountsDir()+string(filepath.Separator)) {
+		user, err := os.UserHomeDir()
+		if err != nil {
+			return holds{}
+		}
+		home = filepath.Join(user, ".claude")
+	}
+	accounts, _ := filepath.Glob(filepath.Join(accountsDir(), "claude", "*"))
+	for _, dir := range append([]string{home}, accounts...) {
+		files, _ := os.ReadDir(filepath.Join(dir, "sessions"))
+		for _, file := range files {
+			id, isJSON := strings.CutSuffix(file.Name(), ".json")
+			pid, err := strconv.Atoi(id)
+			if !isJSON || err != nil || !leadsIn(pid, pane) {
+				continue
+			}
+			if written, err := os.ReadFile(filepath.Join(dir, "sessions", file.Name())); err == nil {
+				return heldIn(string(written))
+			}
+		}
+	}
+	return holds{}
 }
 
 // inWorktree reports whether a folder is a worktree's own or in it, and no
