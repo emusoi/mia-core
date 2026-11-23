@@ -128,6 +128,41 @@ type dirtiness struct {
 	At             time.Time `json:"at"`
 	Untracked      time.Time `json:"untracked"`
 	UntrackedDirty bool      `json:"untracked_dirty"`
+	// Git is when the worktree's HEAD and index were written, and the
+	// commit it was at, as git status was asked: another is asked again.
+	Git string `json:"git,omitempty"`
+}
+
+// How long what git status said of a worktree is trusted while its HEAD,
+// index and commit stay as they were: one whose agent wrote in the last ten
+// minutes changes by the second, one with a session may, and one with none
+// changes only as someone works in it outside mia — staged or committed, its
+// index or HEAD says so at once. Asked again by mia serve's backstop every
+// thirty seconds, a worktree with no session is asked git status every five
+// minutes, not every minute.
+const (
+	dirtyActive    = 8 * time.Second
+	dirtySession   = 30 * time.Second
+	dirtyNoSession = 5 * time.Minute
+)
+
+// gitStamp is when a worktree's HEAD and index were last written and how
+// long they are, and the commit it is at; "" when its folder of git's is
+// not known, when only the time it is trusted says.
+func gitStamp(tree git.Worktree) string {
+	if tree.GitDir == "" {
+		return ""
+	}
+	var stamp strings.Builder
+	stamp.WriteString(tree.Head)
+	for _, name := range []string{"HEAD", "index"} {
+		if info, err := os.Stat(filepath.Join(tree.GitDir, name)); err == nil {
+			fmt.Fprintf(&stamp, " %d %d", info.ModTime().UnixNano(), info.Size())
+		} else {
+			stamp.WriteString(" -")
+		}
+	}
+	return stamp.String()
 }
 
 // dirtyPath keeps what git status said of each worktree between processes: every caller of
@@ -146,7 +181,7 @@ func (a *App) loadDirtiness() {
 			return
 		}
 		for path, d := range known {
-			if time.Since(d.At) < time.Minute {
+			if time.Since(d.At) < dirtyNoSession {
 				a.dirtiness.LoadOrStore(path, d)
 			}
 		}
@@ -159,7 +194,7 @@ func (a *App) saveDirtiness() {
 	}
 	known := map[string]dirtiness{}
 	a.dirtiness.Range(func(path, d any) bool {
-		if time.Since(d.(dirtiness).At) < time.Minute {
+		if time.Since(d.(dirtiness).At) < dirtyNoSession {
 			known[path.(string)] = d.(dirtiness)
 		}
 		return true
@@ -175,31 +210,31 @@ func (a *App) saveDirtiness() {
 	a.dirtySeen.Store(false)
 }
 
-func (a *App) dirtyOf(path string, worked bool) bool {
+// dirtyOf is whether a worktree has changes, as git status said it within
+// trust and since its HEAD, index and commit were last as they are.
+func (a *App) dirtyOf(tree git.Worktree, trust time.Duration) bool {
 	a.loadDirtiness()
-	ttl := 30 * time.Second
-	if worked {
-		ttl = 8 * time.Second
-	}
+	path, stamp := tree.Path, gitStamp(tree)
 	var d dirtiness
 	if got, ok := a.dirtiness.Load(path); ok {
 		d = got.(dirtiness)
-		if time.Since(d.At) < ttl {
+		if time.Since(d.At) < trust && d.Git == stamp {
 			return d.Dirty
 		}
 	}
 	var dirty bool
-	if time.Since(d.Untracked) > 30*time.Second {
+	if time.Since(d.Untracked) > 30*time.Second || d.Git != stamp {
 		// the full status answers tracked and untracked at once: a listing
 		// with nothing cached — the radar opening — runs it alone, not after
-		// a tracked-only one
+		// a tracked-only one; what was staged or committed since may have
+		// been untracked
 		dirty, _ = git.Dirty(path)
 		d.UntrackedDirty, d.Untracked = dirty, time.Now()
 	} else {
 		dirty, _ = git.DirtyTracked(path)
 		dirty = dirty || d.UntrackedDirty
 	}
-	d.Dirty, d.At = dirty, time.Now()
+	d.Dirty, d.At, d.Git = dirty, time.Now(), stamp
 	a.dirtiness.Store(path, d)
 	a.dirtySeen.Store(true)
 	return dirty
@@ -788,13 +823,16 @@ func (a *App) listOne(ctx *listing, tree git.Worktree) Listing {
 		name = filepath.Base(tree.Path)
 	}
 	worked := adopted && a.sessionKnown(record, ctx.panes)
-	active := false
+	trust := dirtyNoSession
 	if worked {
+		trust = dirtySession
 		for _, pane := range ctx.panes[session.Name(record.Name)] {
-			active = active || time.Since(pane.Activity) < 10*time.Minute
+			if time.Since(pane.Activity) < 10*time.Minute {
+				trust = dirtyActive
+			}
 		}
 	}
-	dirty := a.dirtyOf(tree.Path, active)
+	dirty := a.dirtyOf(tree, trust)
 	l := Listing{
 		Name:    name,
 		Path:    tree.Path,

@@ -524,6 +524,15 @@ on GitHub; a tag without its section is not released.
 
 ### Changed
 
+- **A worktree with no session is asked `git status` every five
+  minutes.** Whether a listing says it is `dirty` is asked of git again
+  after thirty seconds for a worktree with a session (eight while its
+  agent writes) and after five minutes for one with none, and at once
+  for any whose index, `HEAD` or commit changed since: at rest, mia
+  serve's look at everything every thirty seconds runs 60 `git status` a
+  minute where it ran 148 over 118 worktrees, 30 with a session. See
+  [mia serve](serve.md#get-events).
+
 - **`mia serve` keeps what it was read.** `GET /api/<query>` gives a
   question read again what it answered, until something it is answered
   from changed as the server sees it for its listeners — looked at once

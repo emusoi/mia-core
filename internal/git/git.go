@@ -66,6 +66,9 @@ type Worktree struct {
 	Branch string
 	Head   string
 	Main   bool
+	// GitDir is its own folder of git's, where its HEAD and index are; ""
+	// when it was listed by git, which does not say it.
+	GitDir string
 }
 
 func Worktrees(dir string) ([]Worktree, error) {
@@ -148,7 +151,7 @@ func WorktreesAt(root, common string, heads map[string]string) ([]Worktree, erro
 	if !ok {
 		return nil, fmt.Errorf("no HEAD in %s", common)
 	}
-	main.Path, main.Main = Resolve(root), true
+	main.Path, main.Main, main.GitDir = Resolve(root), true, common
 	list := []Worktree{main}
 	entries, _ := os.ReadDir(filepath.Join(common, "worktrees"))
 	for _, entry := range entries {
@@ -165,7 +168,7 @@ func WorktreesAt(root, common string, heads map[string]string) ([]Worktree, erro
 		if !ok {
 			continue
 		}
-		tree.Path = Resolve(path)
+		tree.Path, tree.GitDir = Resolve(path), gitdir
 		list = append(list, tree)
 	}
 	return list, nil

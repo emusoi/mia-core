@@ -256,7 +256,10 @@ done: nothing waits on a slow one. The server asks again:
   machine is, what another machine says, whether a worktree's files are
   changed as `worktrees` says it, an agent's title in a list of its
   windows, a transcript older than a day taken up again — is as fresh
-  as this.
+  as this. Of a worktree with no session, whether its files are changed
+  is asked of git every five minutes, not each time: nobody works in it
+  through mia, and what is staged or committed in it writes its index or
+  `HEAD`, which is answered from at once.
 
 How busy this machine is, what `here` and `machines` say of it, is
 measured once in ten seconds for every question that asks it, the disk
