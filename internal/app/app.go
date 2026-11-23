@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -641,7 +642,9 @@ func (a *App) List(names ...string) ([]Listing, error) {
 	}
 	listings := make([]Listing, len(trees))
 	var wg sync.WaitGroup
-	lanes := make(chan struct{}, 4)
+	// each worktree is mostly a git status, waiting on the disk: as many at
+	// once as there are processors, and at least four
+	lanes := make(chan struct{}, max(4, goruntime.NumCPU()))
 	for i, tree := range trees {
 		wg.Add(1)
 		go func(i int, tree git.Worktree) {
