@@ -1416,7 +1416,7 @@ func (v *chatView) models(placed bool) json.RawMessage {
 	title := "Model"
 	if v.fork > 0 {
 		title = "Continue from reply " + strconv.Itoa(v.fork)
-	} else if v.chat == "" { // (a chat of mia's has no worktree to send from)
+	} else {
 		// (the one key the search line lets through that types nothing)
 		inside = append(inside, encode(chatBox{T: "divider"}), encode(chatButton{T: "button", ID: "mark", Label: "Mark, to send your next message to several agents", Key: "⇧⏎", Quiet: true}))
 	}
@@ -1640,7 +1640,11 @@ func (v *chatView) modal(placed bool) json.RawMessage {
 func (v *chatView) confirm() json.RawMessage {
 	var inside []json.RawMessage
 	for _, one := range v.plan.makes {
-		inside = append(inside, encode(chatWords{T: "text", Text: "worktree " + one.name + " on branch " + one.branch + " · " + chatAbout(app.Runs{Agent: one.row.agent, Model: one.row.model})}))
+		where := "worktree " + one.name + " on branch " + one.branch
+		if v.chat != "" {
+			where = "a chat of its own" // (named as it is made)
+		}
+		inside = append(inside, encode(chatWords{T: "text", Text: where + " · " + chatAbout(app.Runs{Agent: one.row.agent, Model: one.row.model})}))
 	}
 	if v.plan.dirty {
 		inside = append(inside, encode(chatWords{T: "text", Text: "Uncommitted changes here are not copied.", Style: "dim"}))
@@ -1910,7 +1914,7 @@ func (v *chatView) comes(deed chatDeed) bool {
 func (v *chatView) marking(id string) chatDeed {
 	row, ok := chatModelOf(id)
 	switch {
-	case !ok || v.chat != "":
+	case !ok:
 		return chatDeed{}
 	case v.talk.waits != nil:
 		return chatDeed{do: chatSay, text: "what " + v.agent() + " goes on from has still to be sent with your next message: send that first, then mark"}
@@ -2772,6 +2776,14 @@ func (r *chatRun) types(text string) bool {
 func (r *chatRun) plans(text string) {
 	v := r.view
 	plan := &chatPlan{text: text}
+	if v.chat != "" { // a chat of mia's: a chat of its own for each, and no worktree
+		for _, row := range v.fans {
+			plan.makes = append(plan.makes, chatMake{row: row})
+		}
+		v.plan = plan
+		r.say(v.up(confirming)...)
+		return
+	}
 	plan.dirty, _ = git.Dirty(r.record.Path)
 	var named []string
 	for _, row := range v.fans {
@@ -2794,14 +2806,30 @@ func (r *chatRun) plans(text string) {
 func (r *chatRun) fansOut() {
 	v := r.view
 	plan := *v.plan
-	r.say(v.shut(v.talk.stands(&muiStatus{Text: "making " + counted(len(plan.makes), "worktree") + "…"}))...)
-	head := git.Head(r.record.Path) // what is committed here: not what is only in its files
+	making, head := "worktree", ""
+	if v.chat != "" {
+		making = "chat"
+	} else {
+		head = git.Head(r.record.Path) // what is committed here: not what is only in its files
+	}
+	r.say(v.shut(v.talk.stands(&muiStatus{Text: "making " + counted(len(plan.makes), making) + "…"}))...)
 	var made []string
 	for i, one := range plan.makes {
-		there, err := r.fan(one, plan.text, head)
+		var there bool
+		var err error
+		if v.chat != "" {
+			one.name, err = r.fanChat(one, plan.text)
+			there = one.name != ""
+		} else {
+			there, err = r.fan(one, plan.text, head)
+		}
 		if err != nil {
 			if there {
-				made = append(made, "worktree "+one.name)
+				where := "worktree " + one.name
+				if v.chat != "" {
+					where = one.name // (a chat, by its name)
+				}
+				made = append(made, where)
 			}
 			v.talk.stands(&muiStatus{Text: cutTo(fmt.Sprintf("stopped at %s: nothing sent to %s · made: %s · %v", one.row.agent, v.agent(), cmp.Or(strings.Join(made, ", "), "nothing"), err), chatSaid), Tone: "bad"})
 			r.say(v.fanned(v.fans[i:])...)
@@ -2868,6 +2896,35 @@ func (r *chatRun) fan(one chatMake, text, head string) (there bool, err error) {
 		return true, err
 	}
 	return true, r.a.SayToWindow(record, done.To.Window.Name, app.CarriedText(v.agent(), string(transcript), cmp.Or(done.Full, done.Handoff), text, chatCarry))
+}
+
+// fanChat makes the chat of one agent of a fan-out from a chat of mia's
+// and says the words to it: a fork of this chat's thread up to its last
+// turn, the words with the thread in front of them, or with nothing said
+// here yet a chat with the words as its first, as mia chats new makes
+// one. name is the chat's as a line says it, once it is made.
+func (r *chatRun) fanChat(one chatMake, text string) (name string, err error) {
+	if r.view.id == "" {
+		c, err := r.a.NewChat(one.row.agent, one.row.model, one.row.effort, text)
+		if err != nil {
+			return "", err
+		}
+		c.Plugins = r.a.Plugins
+		name = "chat " + c.Main().Name
+		if _, err := c.StartMain("", "", "", ""); err != nil {
+			return name, err
+		}
+		_, err = c.SayWaiting()
+		return name, err
+	}
+	c, err := r.a.ForkChat(r.view.talk.last, one.row.agent, one.row.model, one.row.effort)
+	if c != nil {
+		name = "chat " + c.Main().Name
+	}
+	if err != nil {
+		return name, err
+	}
+	return name, c.SayToMain(text)
 }
 
 // applies switches this window's agent to a model and an effort, or hands

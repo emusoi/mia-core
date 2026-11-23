@@ -2724,7 +2724,7 @@ func TestAChatOfMiasIsTheChatAWindowsIs(t *testing.T) {
 	rests()
 	run.act(run.view.deed(chatEvent{E: "press", ID: "open-models"}))
 	modal := read(t, messages[len(messages)-1]).Patch[0].Node
-	if modal == nil || modal.Title != "Model" || strings.Contains(wordsOf(*modal), "mark") {
+	if modal == nil || modal.Title != "Model" {
 		t.Fatalf("the models over a chat of mia's: %+v", modal)
 	}
 	run.act(run.view.deed(chatEvent{E: "pick", List: "models", ID: "a|echo|soft"}))
@@ -2923,5 +2923,100 @@ func TestAChatOfMiasForkedGoesOnInAChatOfItsOwn(t *testing.T) {
 	}
 	if !strings.Contains(screen, app.CarriedOpens("echo")) {
 		t.Errorf("the first thing said to the fork did not carry the thread: %q", screen)
+	}
+}
+
+// Rows marked in a chat of mia's models send the next message to each
+// agent in a chat of its own as well, once confirmed: each a fork of this
+// chat's thread up to its last turn, sent the words with the thread in
+// front of them; then this chat's own agent is sent them, and a band of
+// the chat's own says who else they went to and where.
+func TestRowsMarkedInAChatOfMiasSendTheNextMessageToAChatEach(t *testing.T) {
+	roleLab(t)
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(os.Getenv("HOME"), ".claude"))
+	t.Setenv("CODEX_HOME", "")
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\necho \"claude $*\"\nexec cat\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	main, err := app.AtMain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	main.Plugins = pluginHost(config.Config{})
+	c, err := main.NewChat("echo", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Plugins = main.Plugins
+	state, err := c.StartMain("", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var messages [][]byte
+	run := &chatRun{a: c, record: model.Record{Name: state.Name}, view: &chatView{worktree: state.Name, chat: state.Name},
+		say: func(said ...[]byte) { messages = append(messages, said...) }, done: make(chan struct{}), batches: make(chan chatBatch, 100), ended: make(chan chatEnd, 100)}
+	t.Cleanup(func() { close(run.quit) })
+	run.aimAtChat()
+	select {
+	case batch := <-run.batches:
+		run.say(run.view.talk.heard(batch.turns)...)
+	case <-time.After(10 * time.Second):
+		t.Fatal("the thread was not heard")
+	}
+	run.act(run.view.deed(chatEvent{E: "press", ID: "open-models"}))
+	var claudes chatModel
+	for _, one := range chatModels(run.view.agents, nil, "echo", "") {
+		if one.agent == "claude" {
+			claudes = one
+			break
+		}
+	}
+	if modal := read(t, messages[len(messages)-1]).Patch[0].Node; !strings.Contains(wordsOf(*modal), "<⇧⏎ mark>") {
+		t.Errorf("no mark in a chat of mia's models: %s", wordsOf(*modal))
+	}
+	for _, id := range []string{claudes.id(), "a|echo|loud"} {
+		run.act(run.view.deed(chatEvent{E: "press", ID: "mark", Item: id}))
+	}
+	run.act(run.view.deed(chatEvent{E: "pick", List: "models", ID: "a|echo|loud"}))
+	run.act(run.view.deed(chatEvent{E: "send", Text: "try it"}))
+	if run.view.mode != confirming {
+		t.Fatalf("not put up to be confirmed: %v", run.view.mode)
+	}
+	if words := wordsOf(*pieceOf(t, run.view.confirm())); !strings.Contains(words, "a chat of its own · claude") || !strings.Contains(words, "a chat of its own · echo · loud") || strings.Contains(words, "Uncommitted") {
+		t.Errorf("what is made: %s", words)
+	}
+	run.act(run.view.deed(chatEvent{E: "press", ID: "create"}))
+	all := read(t, run.view.talk.whole()).View.Turns
+	var band shownTurn // the band, before what was sent here, which shows until its agent writes it
+	if at := slices.IndexFunc(all, func(turn shownTurn) bool { return turn.Kind == "switch" }); at >= 0 {
+		band = all[at]
+	}
+	made := regexp.MustCompile(`^claude in chat (\S+) · echo in chat (\S+)$`).FindStringSubmatch(band.Note)
+	if band.Kind != "switch" || band.From != "sent to 3 agents" || made == nil || run.view.talk.status != nil {
+		t.Fatalf("after the fan-out: %+v, %+v", band, run.view.talk.status)
+	}
+	for i, window := range []string{"claude", "echo"} {
+		var screen string
+		for range 250 {
+			if screen, _ = session.Here().Capture("chat-"+made[i+1], window, false); strings.Contains(screen, "try it") && strings.Contains(screen, app.CarriedOpens("echo")) {
+				break
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		if !strings.Contains(screen, "try it") || !strings.Contains(screen, app.CarriedOpens("echo")) {
+			t.Errorf("chat %s was not sent the thread and the words: %q", made[i+1], screen)
+		}
+	}
+	var own string
+	for range 250 {
+		if own, _ = session.Here().Capture("chat-"+state.Name, "echo", false); strings.Contains(own, "try it") {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !strings.Contains(own, "try it") || strings.Contains(own, app.CarriedOpens("echo")) {
+		t.Errorf("this chat's own agent: %q", own)
 	}
 }

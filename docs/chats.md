@@ -109,13 +109,23 @@ thread up to that reply written out as a handoff in its folder and said
 in front of the first thing said to it, its turns saying where it went
 on from; the toast names it, and the chat forked from stays as it is.
 
-What a chat does not do that a window's chat does: marking models to
-send the next message to several agents makes a worktree for each, and
-a chat has no repository, so it is not offered; continuing one of
+Models marked (`⇧⏎`) send the next message to each of their agents as
+well, once confirmed, each in a chat of its own: a fork of this chat's
+thread up to its last turn, sent the words with the thread in front of
+them — with nothing said yet, a new chat with the words as its first, as
+`mia chats new` makes one — then this chat's own agent is sent them,
+and a band of the chat's own says who else they went to and in which
+chat.
+
+What a chat does not do that a window's chat does: continuing one of
 Earlier's conversations of another agent with this chat's agent (`c`)
-is not offered either; carrying the whole conversation to another agent
+is not offered; carrying the whole conversation to another agent
 in place of its latest turns, and the count of turns that go, are a
-worktree's: a chat carries what `mia chats switch` carries.
+worktree's: a chat carries what `mia chats switch` carries. A fork's
+chat, or a fan-out's, opens on the band that says where it went on
+from: the turns before it are the other chat's, kept where its agent
+keeps that chat's conversations, which the new chat's folder does not
+look in.
 
 It lives where the chat does: with `[main] machine` naming another
 machine it is that machine's mia that runs it, over `ssh -t` with this
