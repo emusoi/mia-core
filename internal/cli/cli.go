@@ -130,6 +130,8 @@ func Run(args []string) int {
 		return cmdAccount(rest, asJSON)
 	case "role", "roles":
 		return cmdRole(rest, asJSON)
+	case "project", "prj", "p": // a project's worktrees: the one here, or one named from anywhere
+		return cmdProject(rest, asJSON)
 	case "git": // from any folder: one in no repository is shown as that
 		return cmdGit(rest)
 	case "files": // from any folder too: one in no repository is its own tree
@@ -151,6 +153,17 @@ func Run(args []string) int {
 	if err != nil {
 		if verb == "tmux" { // prefix m, where a printed error is seen by no one
 			return tmuxSay(rest[1:], err)
+		}
+		// In no repository: the projects mia knows, and the way to one by its name.
+		if errors.Is(err, git.ErrNotARepository) {
+			switch {
+			case verb == "ls" || verb == "list":
+				return cmdProjects(asJSON)
+			case (verb == "path" || verb == "switch") && len(rest) == 1:
+				return cmdPathAnywhere(nil, rest)
+			case verb == "__complete" && len(rest) == 1 && rest[0] == "names":
+				return completeProjects()
+			}
 		}
 		return fail(err)
 	}
@@ -410,6 +423,9 @@ func Run(args []string) int {
 	case "ls", "list":
 		return cmdList(a, asJSON)
 	case "path", "switch":
+		if len(rest) == 1 { // a worktree here, else a project, loosely by name
+			return cmdPathAnywhere(a, rest)
+		}
 		return cmdPath(a, rest)
 	case "__complete":
 		return cmdComplete(a, rest)

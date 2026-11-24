@@ -13,7 +13,7 @@ type Verb struct {
 var Groups = []string{"Worktrees", "Working", "Environments", "Records"}
 
 var groupOf = map[string]string{
-	"new": "Worktrees", "ls": "Worktrees", "path": "Worktrees", "adopt": "Worktrees", "rm": "Worktrees", "gc": "Worktrees",
+	"new": "Worktrees", "ls": "Worktrees", "project": "Worktrees", "path": "Worktrees", "adopt": "Worktrees", "rm": "Worktrees", "gc": "Worktrees",
 	"star": "Worktrees", "open": "Worktrees", "shell": "Worktrees", "window": "Worktrees", "chat": "Worktrees", "git": "Worktrees", "files": "Worktrees", "review": "Worktrees", "rename": "Worktrees", "run": "Worktrees", "setup": "Worktrees", "switch": "Worktrees", "shell-init": "Worktrees", "shell-integration": "Working",
 	"dash": "Working", "stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working",
@@ -23,10 +23,11 @@ var groupOf = map[string]string{
 
 var verbs = []Verb{
 	{"new", "mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--from <ref>] [--name <name>] [--bg] [--shell] <branch> | --pr <number> [--remote <remote>]", "create a worktree and name it, or one at a pull request's head", false, ""},
-	{"ls", "mia ls", "what exists", true, ""},
+	{"ls", "mia ls", "what exists: the worktrees of the repository here, or in no repository the projects mia knows", true, ""},
+	{"project", "mia project ls [project] | cd <worktree>", "a project's worktrees, here or by name, and the way into one; also `mia prj`, `mia p`", true, ""},
 	{"setup", "mia setup [worktree]", "run the configured setup in a worktree again", false, ""},
-	{"path", "mia path [worktree|stack]", "print a worktree's path, for scripts; no argument is the main checkout", true, ""},
-	{"switch", "mia switch <worktree|stack>", "cd there — with `eval \"$(mia shell-init zsh)\"` in your rc", true, ""},
+	{"path", "mia path [worktree|stack|project|project/worktree]", "print a worktree's path, for scripts, matched loosely by name: one of the repository here, else a project; no argument is the main checkout", true, ""},
+	{"switch", "mia switch <worktree|stack|project|project/worktree>", "cd there, from any folder (also `mia cd`) — with `eval \"$(mia shell-init zsh)\"` in your rc", true, ""},
 	{"shell-init", "mia shell-init <zsh|bash|fish>", "the shell function that makes `mia switch` change directory, and completion", true, ""},
 	{"shell-integration", shellIntegrationUsage, "marks each prompt and each command's output, so tmux's previous-prompt and next-prompt jump between commands, and says the folder; mia prints it, your zshrc runs it", true, ""},
 	{"gc", "mia gc [--merged] [--apply] [--days N] | --others [--apply] [path...]", "worktrees nobody has touched: clean, no session, not starred, quiet for N days; --merged: those whose branch is merged; --others: clean ones mia did not make", false, ""},

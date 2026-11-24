@@ -13,6 +13,11 @@ const zshInit = `mia() {
     switch|sw|cd)
       local __mia_dir
       __mia_dir="$(command mia path "${@:2}")" && cd "$__mia_dir" ;;
+    project|prj|p)
+      if [ "$2" = cd ]; then
+        local __mia_dir
+        __mia_dir="$(command mia project cd "${@:3}")" && cd "$__mia_dir"
+      else command mia "$@"; fi ;;
     *) command mia "$@" ;;
   esac
 }
@@ -34,6 +39,11 @@ const bashInit = `mia() {
     switch|sw|cd)
       local dir
       dir="$(command mia path "${@:2}")" && cd "$dir" ;;
+    project|prj|p)
+      if [ "$2" = cd ]; then
+        local dir
+        dir="$(command mia project cd "${@:3}")" && cd "$dir"
+      else command mia "$@"; fi ;;
     *) command mia "$@" ;;
   esac
 }
@@ -52,6 +62,12 @@ const fishInit = `function mia
   switch "$argv[1]"
     case switch sw cd
       set -l dir (command mia path $argv[2..-1]); and cd $dir
+    case project prj p
+      if test "$argv[2]" = cd
+        set -l dir (command mia project cd $argv[3..-1]); and cd $dir
+      else
+        command mia $argv
+      end
     case '*'
       command mia $argv
   end
@@ -102,7 +118,19 @@ func cmdComplete(a *app.App, args []string) int {
 				fmt.Println(l.Branch)
 			}
 		}
-		return exitOK
+		return completeProjects()
 	}
 	return exitUsage
+}
+
+// completeProjects prints the projects mia knows, a name a line.
+func completeProjects() int {
+	repos, err := app.Repositories()
+	if err != nil {
+		return fail(err)
+	}
+	for _, repo := range repos {
+		fmt.Println(repo.Name)
+	}
+	return exitOK
 }
