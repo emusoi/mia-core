@@ -98,14 +98,25 @@ func worktreeIn(root, words string) (string, error) {
 }
 
 func worktreeOf(a *app.App, words string) (string, error) {
-	path, err := a.Locate(words)
+	path, err := nameOf(a, words)
 	var missing resolve.NotFound
 	if err == nil || !errors.As(err, &missing) {
 		return path, err
 	}
-	resolver, rerr := a.Resolver()
-	if rerr != nil {
-		return "", rerr
+	return a.Locate(words) // a stack, or a layer no worktree has out: every worktree's stack is read
+}
+
+// nameOf is worktreeOf without the stacks, which cost a git for each worktree: what a worktree
+// is called exactly (its name, its branch, its folder), else loosely by name.
+func nameOf(a *app.App, words string) (string, error) {
+	resolver, err := a.Resolver()
+	if err != nil {
+		return "", err
+	}
+	path, err := resolver.Worktree(words)
+	var missing resolve.NotFound
+	if err == nil || !errors.As(err, &missing) {
+		return path, err
 	}
 	names := make([]string, len(resolver.Records))
 	for i, record := range resolver.Records {
@@ -139,9 +150,9 @@ func projectOf(words string, repos []app.Repository) (app.Repository, error) {
 // the repository here, else a project's main checkout, and `<project>/<worktree>` a worktree
 // of that project.
 func whereTo(here *app.App, words string, repos []app.Repository) (string, error) {
+	var missing resolve.NotFound
 	if here != nil {
-		path, err := worktreeOf(here, words)
-		var missing resolve.NotFound
+		path, err := nameOf(here, words)
 		if err == nil || !errors.As(err, &missing) {
 			return path, err
 		}
@@ -149,6 +160,12 @@ func whereTo(here *app.App, words string, repos []app.Repository) (string, error
 	project, worktree, both := strings.Cut(words, "/")
 	repo, err := projectOf(project, repos)
 	if err != nil {
+		// (No worktree by that name and no project: a stack of the repository here, last.)
+		if here != nil {
+			if path, serr := here.Locate(words); serr == nil {
+				return path, nil
+			}
+		}
 		return "", err
 	}
 	if !both || worktree == "" {
