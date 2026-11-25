@@ -153,7 +153,7 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		root := m.root
 		return m, func() tea.Msg {
-			found, _ := recalled("", text, 6)
+			found, _ := recalled("", text, 6, otherMachines()...)
 			if root != "" && !slices.ContainsFunc(found, func(t thread) bool { return t.Root == root }) {
 				here, _ := recalled(root, text, 6) // the repository here, when it is no project mia knows yet
 				found = append(here, found...)
@@ -314,7 +314,14 @@ func (m listModel) rows() []listRow {
 				if t.Yours {
 					who = "you"
 				}
-				rows = append(rows, listRow{mark: "↺", words: who + ": " + t.Line, right: t.Project + " · " + t.Agent + " · " + t.At.Local().Format("Jan 2"), do: func(l listed) error {
+				whose := t.Agent
+				if t.Machine != "" {
+					whose += " on " + t.Machine
+				}
+				rows = append(rows, listRow{mark: "↺", words: who + ": " + t.Line, right: t.Project + " · " + whose + " · " + t.At.Local().Format("Jan 2"), do: func(l listed) error {
+					if t.Machine != "" { // on a machine: its worktree's session there, in a window here
+						return l.open(run.ShellJoin([]string{l.self, "machine", "attach", t.Worktree + "@" + t.Machine}))
+					}
 					if err := l.goTo(t.Root, t.Cwd); err != nil {
 						return err
 					}

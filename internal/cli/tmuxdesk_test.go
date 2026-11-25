@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/runtime"
 )
 
 // A shell at rest is brought to where the popup was opened: zsh keeps what was typed (pushed
@@ -182,5 +183,25 @@ func TestMCPListsItsToolsAndAnswersACall(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
 	if len(lines) != 3 || !strings.Contains(lines[0], `"protocolVersion":"2025-06-18"`) || !strings.Contains(lines[1], `"name":"recall"`) || !strings.Contains(lines[1], `"name":"conversation"`) || !strings.Contains(lines[2], `"isError":true`) {
 		t.Fatalf("what mcp answered: %q", lines)
+	}
+}
+
+// A machine's conversations are found with this one's, each said to be there, the newest
+// first whichever it is on; a machine with none to offer holds nothing up.
+func TestRecallAsksTheMachinesToo(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	was := elsewhere
+	defer func() { elsewhere = was }()
+	elsewhere = func(machine runtime.Machine, text string, limit int) []thread {
+		if machine.Name == "off" {
+			return nil
+		}
+		there := thread{Project: "demo", Machine: machine.Name}
+		there.Session, there.Line = "s1", "said "+text+" there"
+		return []thread{there}
+	}
+	found, err := recalled("", "flag", 5, runtime.Machine{Name: "fedora", SSH: "fedora"}, runtime.Machine{Name: "off", SSH: "off"})
+	if err != nil || len(found) != 1 || found[0].Machine != "fedora" || found[0].Line != "said flag there" {
+		t.Fatalf("what the machines had: %+v %v", found, err)
 	}
 }

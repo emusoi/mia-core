@@ -50,7 +50,7 @@ func mcpCall(name string, args map[string]any) (string, error) {
 		if limit <= 0 {
 			limit = 10
 		}
-		found, err := recalled("", text, limit)
+		found, err := recalled("", text, limit, otherMachines()...)
 		if err != nil {
 			return "", err
 		}
@@ -62,6 +62,10 @@ func mcpCall(name string, args map[string]any) (string, error) {
 			who := r.Agent
 			if r.Yours {
 				who = "the person"
+			}
+			if r.Machine != "" { // read there, not from here
+				fmt.Fprintf(&b, "%s  %s  with %s, on the machine %s\n  %s said: %s\n\n", r.At.Local().Format("2006-01-02 15:04"), r.Project, r.Agent, r.Machine, who, r.Line)
+				continue
 			}
 			fmt.Fprintf(&b, "%s  %s  with %s\n  %s said: %s\n  root %s  id %s  turn %d\n\n", r.At.Local().Format("2006-01-02 15:04"), r.Project, r.Agent, who, r.Line, r.Root, r.Session, r.N)
 		}
