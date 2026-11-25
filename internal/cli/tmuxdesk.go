@@ -111,10 +111,20 @@ func cmdGo(args []string) int {
 // (no program run in it) it is brought to the folder the popup was opened in; then this
 // process becomes tmux attached to it.
 func cmdTmuxShell(args []string) int {
+	popup := take(&args, "--popup")
 	if len(args) < 1 || len(args) > 2 {
-		return usageErr("mia tmux shell <client> [folder]")
+		return usageErr("mia tmux shell [--popup] <client> [folder]")
 	}
 	tmux := run.Local("tmux")
+	if popup { // (The key runs this through run-shell: display-popup does not fill #{…} in its command.)
+		self, err := os.Executable()
+		if err != nil {
+			return fail(err)
+		}
+		// (What it answers is how the popup ended, shut by `mia cd` among them: nothing to say.)
+		_, _ = tmux.Combined(append([]string{"display-popup", "-c", args[0], "-E", "-w", "84", "-h", "18", "-T", " mia ", self, "tmux", "shell"}, args...)...)
+		return exitOK
+	}
 	target := "=" + popupSession + ":"
 	if _, err := tmux.Combined("has-session", "-t", "="+popupSession); err != nil {
 		home, _ := os.UserHomeDir()

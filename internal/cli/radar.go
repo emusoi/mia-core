@@ -178,7 +178,7 @@ type tmuxKey struct{ prefix, cmd, name, does string }
 // only added to, so a terminal app's config keeps meaning what it meant.
 func tmuxKeys(mia, in string) []tmuxKey {
 	keys := []tmuxKey{
-		{"k", "cmd+k", "the popup terminal", `display-popup -E -w 84 -h 18 -T " mia " "` + mia + ` tmux shell '#{client_name}' '#{pane_current_path}'"`},
+		{"k", "cmd+k", "the popup terminal", `run-shell -b "` + mia + ` tmux shell --popup '#{client_name}' '#{pane_current_path}'"`},
 		{"Space", "cmd+shift+j", "who needs you", `display-popup -E -d "#{pane_current_path}" -w 72 -h 60% -T " mia " "` + mia + ` radar"`},
 		{"n", "cmd+n", "a new worktree", `display-popup -E -d "#{pane_current_path}" -w 110 -h 14 -T " new worktree " "` + mia + ` radar --new"`},
 		{"m", "", "mia's menu", `run-shell -b "` + in + ` tmux menu '#{client_name}'"`},
