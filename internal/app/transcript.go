@@ -786,6 +786,37 @@ func (t transcripts) locate(in folders, id, cwd string, after int, at *placed) (
 	return nil, false, nil
 }
 
+// asides is the transcripts of the subagents sent in the folders' conversations, and when each
+// was written: what was said in one is its parent's conversation, and recall keeps it too.
+func (t transcripts) asides(in folders) map[string]time.Time {
+	files, _ := t.all(in, true)
+	found := map[string]time.Time{}
+	for _, file := range files {
+		if filepath.Base(filepath.Dir(file)) != "subagents" {
+			continue
+		}
+		if info, err := os.Stat(file); err == nil {
+			found[file] = info.ModTime()
+		}
+	}
+	return found
+}
+
+// aside is what was asked and said in a subagent's transcript, the folder it was in, and the
+// conversation that sent it.
+func (t transcripts) aside(file string) (session, cwd string, said []spoke) {
+	var is about
+	if t.cwd != nil {
+		is.Cwd = t.cwd(file)
+	}
+	_, _ = t.read(file, mark{}, &is, func(turn Turn) {
+		if (turn.Kind == turnAsked || turn.Kind == turnSaid) && turn.Text != "" {
+			said = append(said, spoke{At: turn.At, Text: turn.Text}) // no turn of the conversation itself, and the agent's words
+		}
+	}, nil)
+	return filepath.Base(filepath.Dir(filepath.Dir(file))), is.Cwd, said
+}
+
 func (t transcripts) search(in folders, text string, limit int) ([]Recalled, error) {
 	needle := strings.ToLower(text)
 	files, accounts := t.all(in, true)
