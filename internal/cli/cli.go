@@ -114,6 +114,8 @@ func Run(args []string) int {
 			switch rest[0] { // what tmux's keys run, from any folder
 			case "shell":
 				return cmdTmuxShell(rest[1:])
+			case "list":
+				return cmdTmuxList(rest[1:])
 			case "agents":
 				return cmdTmuxAgents(rest[1:])
 			case "act":
@@ -129,6 +131,8 @@ func Run(args []string) int {
 		}
 	case "go": // the tmux client to a worktree's session, by its name, from any folder
 		return cmdGo(rest)
+	case "recall": // the conversations that mention it: here, or in every project
+		return cmdRecall(rest, asJSON)
 	case "asks": // who waits on you, in every project
 		return cmdAsks(rest, asJSON)
 	case "machine", "machines", "runtime":
@@ -262,28 +266,6 @@ func Run(args []string) int {
 			return fail(err)
 		}
 		fmt.Printf("%s is back at %s\n", record.Name, record.Path)
-		return exitOK
-	case "recall":
-		if len(rest) == 0 {
-			return usageErr("mia recall <text…>")
-		}
-		found := a.Recall(strings.Join(rest, " "), 10)
-		if asJSON {
-			return emit(found)
-		}
-		if len(found) == 0 {
-			fmt.Println("no conversation here mentions it")
-		}
-		for i, r := range found {
-			if i > 0 {
-				fmt.Println()
-			}
-			who := r.Agent
-			if r.Yours {
-				who = "you"
-			}
-			fmt.Printf("%s  %s\n  %s: %s\n  cd %s && %s\n", r.At.Local().Format("2006-01-02 15:04"), filepath.Base(r.Cwd), who, r.Line, r.Cwd, a.ResumeCommand(r.Agent, r.Session))
-		}
 		return exitOK
 	case "conversation", "conversations":
 		return cmdConversation(a, rest, asJSON)
@@ -1407,6 +1389,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 	}
 	model, effort, account := takeValue(&args, "--model"), takeValue(&args, "--effort"), takeValue(&args, "--account")
 	role, kind := takeValue(&args, "--role"), takeValue(&args, "--kind")
+	task := takeValue(&args, "--task") // of new: what the agent started is told, once it is ready
 	sub, record, args, err := subject(a, args, "ls", "ls", "open", "select", "new", "close", "read", "send", "press", "key", "model", "account")
 	if err != nil {
 		return fail(err)
@@ -1520,6 +1503,11 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 				fmt.Fprintf(os.Stderr, "mia: %s: window %s opened, and what it was started with is not kept: %v\n", record.Name, name, err)
 			}
 		}
+		if task != "" {
+			if err := a.SayOnceReady(record, name, task); err != nil {
+				return fail(fmt.Errorf("%s: window %s opened, and it was not told its task: %w", record.Name, name, err))
+			}
+		}
 		fmt.Printf("%s: window %s opened\n", record.Name, name)
 		if body != "" {
 			err := a.SayOnceReady(record, name, body)
@@ -1596,7 +1584,7 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 	return usageErr(windowUsage)
 }
 
-const windowUsage = "mia window [ls|open|select|new|close|read|send|press|key|model|account] [worktree[@machine]] [window] [--editor] [--model <model>] [--effort <effort>] [--account <account>] [--role <role>] [--kind <kind>] [-- command|text|keys]"
+const windowUsage = "mia window [ls|open|select|new|close|read|send|press|key|model|account] [worktree[@machine]] [window] [--editor] [--model <model>] [--effort <effort>] [--account <account>] [--role <role>] [--kind <kind>] [--task <text>] [-- command|text|keys]"
 
 // said is a model and an effort as a line says them: sonnet, effort high.
 func said(chosen app.Chosen) string {

@@ -154,6 +154,14 @@ func (a *App) Recall(text string, limit int) []Recalled {
 		}
 	}
 	sort.SliceStable(found, func(i, j int) bool { return found[i].At.After(found[j].At) })
+	// (A conversation an agent lists more than once, one for each account's folder it is in, is one.)
+	listed := map[string]bool{}
+	found = slices.DeleteFunc(found, func(r Recalled) bool {
+		key := r.Agent + "\x00" + r.Session + "\x00" + r.Cwd
+		was := listed[key]
+		listed[key] = true
+		return was
+	})
 	if limit > 0 && len(found) > limit {
 		found = found[:limit]
 	}

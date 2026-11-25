@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/emusoi/mia-core/internal/app"
 )
 
 // A shell at rest is brought to where the popup was opened: zsh keeps what was typed (pushed
@@ -119,12 +121,44 @@ func TestTmuxReadsWhatInstallAdds(t *testing.T) {
 		t.Fatalf("tmux refused mia's block: %s %v", out, err)
 	}
 	keys, _ := tmux("list-keys")
-	for _, want := range []string{"tmux shell --popup '#{client_name}'", "tmux act", "agents '#{client_name}' hand", "tmux walk", "User40", "User62"} {
+	for _, want := range []string{"tmux shell --popup '#{client_name}'", "tmux act", "tmux list --popup '#{client_name}' '#{window_index}'", "tmux walk", "User40", "User61"} {
 		if !strings.Contains(keys, want) {
 			t.Errorf("no key bound for %q", want)
 		}
 	}
 	if hooks, _ := tmux("show-hooks", "-g"); !strings.Contains(hooks, "tmux seen") {
 		t.Errorf("no hook for where a client has been: %s", hooks)
+	}
+}
+
+// What is typed in the one list says what Enter does: nothing, who waits and the worktrees
+// here; a name, the places it means; an agent and words, it started on them; > and an agent,
+// the conversation handed on; a number, that answer to whoever waits.
+func TestWhatIsTypedInTheListSaysWhatEnterDoes(t *testing.T) {
+	m := listModel{here: "demo",
+		places: []place{{name: "kijenge", project: "demo", branch: "feat-one"}, {name: "sinza", project: "other"}},
+		agents: []agentKnown{{Name: "pi", Installed: true}, {Name: "codex", Installed: true}}}
+	m.stand.Waiting = []app.Stand{{Worktree: "sinza", Repository: "other", Line: "Run it now?", Options: []string{"yes", "no"}}}
+	says := func(typed string) string {
+		m.query = typed
+		var words []string
+		for _, r := range m.rows() {
+			words = append(words, r.words)
+		}
+		return strings.Join(words, " | ")
+	}
+	for typed, want := range map[string]string{
+		"":             "sinza  Run it now? | kijenge  feat-one",
+		"sin":          "sinza  ",
+		"pi fix a bug": "start pi here on: fix a bug",
+		"pi":           "",
+		"> co":         "move this conversation to codex",
+		">":            "move this conversation to pi | move this conversation to codex",
+		"2":            "answer sinza: no",
+		"3":            "",
+	} {
+		if got := says(typed); got != want {
+			t.Errorf("typed %q: %q, want %q", typed, got, want)
+		}
 	}
 }

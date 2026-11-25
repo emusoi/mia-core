@@ -178,14 +178,13 @@ type tmuxKey struct{ prefix, cmd, name, does string }
 // only added to, so a terminal app's config keeps meaning what it meant.
 func tmuxKeys(mia, in string) []tmuxKey {
 	keys := []tmuxKey{
-		{"k", "cmd+k", "the popup terminal", `run-shell -b "` + mia + ` tmux shell --popup '#{client_name}' '#{pane_current_path}'"`},
+		{"k", "cmd+k", "the one list: go somewhere, start an agent, hand on, answer, resume", `run-shell -b "` + mia + ` tmux list --popup '#{client_name}' '#{window_index}' '#{pane_current_path}'"`},
+		{"K", "cmd+o", "the popup terminal", `run-shell -b "` + mia + ` tmux shell --popup '#{client_name}' '#{pane_current_path}'"`},
 		{"Space", "cmd+shift+j", "who needs you", `display-popup -E -d "#{pane_current_path}" -w 72 -h 60% -T " mia " "` + mia + ` radar"`},
 		{"n", "cmd+n", "a new worktree", `display-popup -E -d "#{pane_current_path}" -w 110 -h 14 -T " new worktree " "` + mia + ` radar --new"`},
 		{"m", "", "mia's menu", `run-shell -b "` + in + ` tmux menu '#{client_name}'"`},
 		{"a", "cmd+j", "the next that needs you", `run-shell -b "` + in + ` tmux next '#{client_name}'"`},
 		{"e", "cmd+.", "what is done to this window", `run-shell -b "` + mia + ` tmux act '#{client_name}' '#{window_index}'"`},
-		{"A", "cmd+shift+a", "move this conversation to another agent", `run-shell -b "` + mia + ` tmux agents '#{client_name}' hand '#{window_index}'"`},
-		{"N", "cmd+shift+t", "a new agent window", `run-shell -b "` + mia + ` tmux agents '#{client_name}' new '#{window_index}'"`},
 		{"b", "cmd+[", "back through where you have been", `run-shell -b "` + mia + ` tmux walk '#{client_name}' back"`},
 		{"B", "cmd+]", "forward again", `run-shell -b "` + mia + ` tmux walk '#{client_name}' forward"`},
 		{"", "cmd+t", "a new shell window", `new-window -c "#{pane_current_path}"`},
@@ -299,7 +298,7 @@ func cmdTmux(args []string) int {
 		if out, err := run.Local("tmux").Combined("source-file", conf); err != nil {
 			return fail(fmt.Errorf("tmux source-file %s: %s", conf, strings.TrimSpace(out)))
 		}
-		fmt.Println("tmux has read it: prefix k the popup terminal, space who needs you, a the next of them, e this window's menu, A its conversation to another agent, N a new agent window, n a new worktree, m mia's menu, b and B back and forward; `mia tmux keys kitty` prints the ⌘ keys for your terminal app")
+		fmt.Println("tmux has read it: prefix k the one list (somewhere to go, `pi fix it` to start an agent on it, `> codex` to hand this conversation on, a number to answer, words to find a past conversation), K the popup terminal, space who needs you, a the next of them, e this window's menu, n a new worktree, m mia's menu, b and B back and forward; `mia tmux keys kitty` prints the ⌘ keys for your terminal app")
 	}
 	return exitOK
 }
