@@ -140,10 +140,13 @@ func TestWhatIsTypedInTheListSaysWhatEnterDoes(t *testing.T) {
 	m := listModel{here: "demo",
 		places: []place{{name: "kijenge", project: "demo", branch: "feat-one", path: "/d.kijenge", root: "/d"}, {name: "demo", project: "project", path: "/d", root: "/d"},
 			{name: "sinza", project: "other", path: "/o.sinza", root: "/o"}, {name: "other", project: "project", path: "/o", root: "/o"}},
-		root:   "/d",
-		away:   []awayTree{{"sanawari", "held", "fedora"}},
-		stack:  []layer{{Branch: "feat-one", Current: true, Ahead: 2}, {Branch: "feat-two", NeedsRestack: true}},
-		agents: []agentKnown{{Name: "pi", Installed: true}, {Name: "codex", Installed: true}}, tree: "kijenge", machines: []string{"fedora", "box"}}
+		root:  "/d",
+		away:  []awayTree{{"sanawari", "held", "fedora"}},
+		stack: []layer{{Branch: "feat-one", Current: true, Ahead: 2}, {Branch: "feat-two", NeedsRestack: true}},
+		agents: []agentKnown{{Name: "pi", Installed: true}, {Name: "codex", Installed: true, Models: []struct {
+			ID    string `json:"id"`
+			Label string `json:"label"`
+		}{{ID: "gpt-5"}, {ID: "gpt-5-mini"}, {ID: "o4"}}}}, tree: "kijenge", machines: []string{"fedora", "box"}}
 	m.stand.Waiting = []app.Stand{{Worktree: "sinza", Repository: "other", Line: "Run it now?", Options: []string{"yes", "no"}}}
 	says := func(typed string) string {
 		m.query = typed
@@ -165,6 +168,9 @@ func TestWhatIsTypedInTheListSaysWhatEnterDoes(t *testing.T) {
 		"pi fix a bug": "start pi here on: fix a bug",
 		"pi":           "",
 		"> co":         "move this conversation to codex",
+		"> co mini":    "move this conversation to codex, on gpt-5-mini",
+		"> co gpt":     "move this conversation to codex, on gpt-5 | move this conversation to codex, on gpt-5-mini",
+		"> co zzz":     "",
 		">":            "move this conversation to pi | move this conversation to codex",
 		"2":            "answer sinza: no",
 		"3":            "",

@@ -335,7 +335,7 @@ func (m listModel) rows() []listRow {
 	switch {
 	case q == "?": // what can be typed here, said in the list itself and nowhere else
 		for _, h := range [][2]string{{"a name", "go to that worktree or project"}, {"pi fix the test", "start that agent here on it"},
-			{"> codex", "hand this conversation to that agent"}, {"1", "give that answer to whoever waits"},
+			{"> codex gpt", "hand this conversation to that agent, on that model"}, {"1", "give that answer to whoever waits"},
 			{"words said before", "find the conversation, and resume it"}, {"nvim · lazygit · shell", "open it in a new window"}, {"@ fedora", "move this worktree to that machine, or bring one back"},
 			{"new a-branch", "a new worktree on that branch, in the project here"}, {"rm a-name", "remove that worktree, its session and its name"},
 			{"stack", "the layers of the stack this worktree is on, to go to one"}} {
@@ -428,7 +428,9 @@ func (m listModel) rows() []listRow {
 		for i, a := range m.agents {
 			names[i] = a.Name
 		}
-		want, at := strings.TrimSpace(q[1:]), []int{}
+		// (`> agent` and then some of a model's name: that agent on each model the words mean.)
+		want, model, _ := strings.Cut(strings.TrimSpace(q[1:]), " ")
+		at := []int{}
 		for i := range names {
 			at = append(at, i)
 		}
@@ -437,6 +439,19 @@ func (m listModel) rows() []listRow {
 		}
 		for _, i := range at {
 			name := names[i]
+			if model = strings.TrimSpace(model); model != "" {
+				ids := make([]string, len(m.agents[i].Models))
+				for j, known := range m.agents[i].Models {
+					ids[j] = known.ID
+				}
+				found := closest(model, ids)
+				for _, j := range found[:min(len(found), 8)] {
+					rows = append(rows, listRow{mark: "→", words: "move this conversation to " + name + ", on " + ids[j], do: func(l listed) error {
+						return l.beside(l.folder, "hand", "--window", l.window, name, "--model", ids[j])
+					}})
+				}
+				continue
+			}
 			rows = append(rows, listRow{mark: "→", words: "move this conversation to " + name, do: func(l listed) error {
 				return l.beside(l.folder, "hand", "--window", l.window, name)
 			}})
