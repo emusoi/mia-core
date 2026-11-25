@@ -574,6 +574,15 @@ func (s side) windows(table []Agent, name, path string, kept map[string]Chosen) 
 					p.Conversation = s.conversationOf(agent.held, f[5])
 				}
 			}
+		} else if args, err := s.sh(`ps -o args= -p "$(pgrep -P "$1" | head -1)" 2>/dev/null`, f[5]); err == nil {
+			// An agent mia started runs under a shell that waits for it (`zsh -lc "pi; exec zsh"`),
+			// and tmux names the pane for that shell: what the shell runs is the agent all the same.
+			if program, _ := agentOf(table, strings.TrimSpace(args)); program != "" {
+				p.Command = strings.TrimSpace(args)
+				if agent, ok := agentNamed(table, program); ok && agent.held != "" {
+					p.Conversation = s.conversationOf(agent.held, f[5])
+				}
+			}
 		}
 		if f[0] != window {
 			window = f[0]
