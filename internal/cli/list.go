@@ -413,7 +413,14 @@ func (m listModel) rows() []listRow {
 				if p.root == m.root && p.name == m.tree {
 					l.leave()
 				}
-				return l.apart(p.root, "remove "+p.name, "rm", p.name)
+				// (A session of shells alone goes with it — every worktree gone to has one; one
+				// an agent runs in is refused, as `mia rm` refuses it, for the person to stop.)
+				windows := exec.Command(l.self, "window", "ls", p.name, "--json")
+				windows.Dir = p.root
+				if out, _ := windows.Output(); strings.Contains(string(out), `"kind": "agent"`) {
+					return l.apart(p.root, "remove "+p.name+": an agent runs in it", "rm", p.name)
+				}
+				return l.apart(p.root, "remove "+p.name, "rm", "--stop-running", p.name)
 			}})
 		}
 	case strings.HasPrefix(q, ">"):
@@ -638,17 +645,13 @@ func (l listed) script(dir, doing, line string, why ...string) error {
 }
 
 // beside runs this mia in dir and lets it go on by itself (an agent takes seconds to come up,
-// and the list is gone by then), and puts the client in the window it opens: the first the
-// client's session has within three seconds that it did not have.
+// and the list is gone by then), and puts the client in the window it opens: the first there
+// is within three seconds that there was not, in whichever session (the worktree's own, when
+// the client is in one mia did not make).
 func (l listed) beside(dir string, verb ...string) error {
 	tmux := run.Local("tmux")
-	session, err := tmux.Capture("display-message", "-p", "-c", l.client, "#{session_id}")
-	if err != nil {
-		return err
-	}
-	session = strings.TrimSpace(session)
 	windows := func() []string {
-		out, _ := tmux.Capture("list-windows", "-t", session, "-F", "#{window_id}")
+		out, _ := tmux.Capture("list-windows", "-a", "-F", "#{window_id}")
 		return strings.Fields(out)
 	}
 	before := windows()
@@ -661,7 +664,7 @@ func (l listed) beside(dir string, verb ...string) error {
 		time.Sleep(100 * time.Millisecond)
 		for _, w := range windows() {
 			if !slices.Contains(before, w) {
-				_, err := tmux.Combined("select-window", "-t", w)
+				_, err := tmux.Combined("switch-client", "-c", l.client, "-t", w)
 				return err
 			}
 		}
