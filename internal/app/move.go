@@ -181,7 +181,12 @@ func (a *App) Move(name, from, to string, dry bool, say io.Writer) (Moved, error
 	if err := a.carryBranch(src, dst, branch); err != nil {
 		return Moved{}, err
 	}
-	out, err := dst.sh(`cd "$1" && `+dst.mia+` new "$2"`, dst.repo, branch)
+	// (Made by its name, its folder named for it too; and when that name is another's there,
+	// or the mia there is too old to take a name, by whatever name is free.)
+	out, err := dst.sh(`cd "$1" && `+dst.mia+` new --name "$3" "$2"`, dst.repo, branch, name)
+	if err != nil {
+		out, err = dst.sh(`cd "$1" && `+dst.mia+` new "$2"`, dst.repo, branch)
+	}
 	if err != nil {
 		return Moved{}, fmt.Errorf("make the worktree: %w", err)
 	}

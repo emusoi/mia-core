@@ -26,6 +26,7 @@ type thread struct {
 	Root    string `json:"root"`              // its repository's main checkout: where resuming it is run
 	Resume  string `json:"resume"`            // the command that goes on with it, in its folder
 	Machine string `json:"machine,omitempty"` // the machine it is on, when not this one
+	Gone    bool   `json:"gone,omitempty"`    // its folder is there no more (a worktree removed, or moved to a machine): read, not resumed
 }
 
 // elsewhere asks a machine's mia for the conversations there that mention text, given
@@ -73,12 +74,20 @@ func recalled(here, text string, limit int, machines ...runtime.Machine) ([]thre
 				return // a project whose folder is gone has nothing to resume
 			}
 			for _, r := range a.Recall(text, limit) {
-				found[i] = append(found[i], thread{Recalled: r, Project: repo.Name, Root: a.Root, Resume: a.ResumeCommand(r.Agent, r.Session)})
+				_, err := os.Stat(r.Cwd)
+				found[i] = append(found[i], thread{Recalled: r, Project: repo.Name, Root: a.Root, Resume: a.ResumeCommand(r.Agent, r.Session), Gone: err != nil})
 			}
 		}()
 	}
 	wg.Wait()
 	all := slices.Concat(found...)
+	// (A conversation that went with its worktree to a machine is found twice, where it is now
+	// and where its folder was: the one that can be gone on with is the one to offer.)
+	kept := map[string]bool{}
+	for _, t := range all {
+		kept[t.Agent+"\x00"+t.Session] = kept[t.Agent+"\x00"+t.Session] || !t.Gone
+	}
+	all = slices.DeleteFunc(all, func(t thread) bool { return t.Gone && kept[t.Agent+"\x00"+t.Session] })
 	slices.SortStableFunc(all, func(x, y thread) int { return y.At.Compare(x.At) })
 	if limit > 0 && len(all) > limit {
 		all = all[:limit]
@@ -128,6 +137,10 @@ func cmdRecall(args []string, asJSON bool) int {
 		where := filepath.Base(r.Cwd)
 		if r.Machine != "" {
 			where += " on " + r.Machine
+		}
+		if r.Gone { // nowhere to go on with it: its agent resumes a conversation only in its folder
+			fmt.Printf("%s  %s\n  %s: %s\n  its folder %s is there no more\n", r.At.Local().Format("2006-01-02 15:04"), where, who, r.Line, r.Cwd)
+			continue
 		}
 		fmt.Printf("%s  %s\n  %s: %s\n  cd %s && %s\n", r.At.Local().Format("2006-01-02 15:04"), where, who, r.Line, r.Cwd, r.Resume)
 	}

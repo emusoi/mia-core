@@ -370,7 +370,7 @@ func (m listModel) rows() []listRow {
 			for _, t := range m.away {
 				if strings.TrimSpace(within) == "" || len(closest(strings.TrimSpace(within), []string{t.name + " " + t.branch})) > 0 {
 					rows = append(rows, listRow{mark: "⇄", words: t.name + "  " + t.branch, right: "on " + t.machine, do: func(l listed) error {
-						return l.openIn(m.root, run.ShellJoin([]string{l.self, "machine", "attach", t.name + "@" + t.machine}))
+						return l.openIn(m.root, run.ShellJoin([]string{l.self, "machine", "attach", t.name + "@" + t.machine}), t.name+"@"+t.machine)
 					}})
 				}
 			}
@@ -484,13 +484,23 @@ func (m listModel) rows() []listRow {
 				if t.Machine != "" {
 					whose += " on " + t.Machine
 				}
-				rows = append(rows, listRow{mark: "↺", words: who + ": " + t.Line, right: t.Project + " · " + whose + " · " + t.At.Local().Format("Jan 2"), do: func(l listed) error {
+				in := t.Project
+				if t.Worktree != "" && t.Worktree != t.Project {
+					in += "/" + t.Worktree
+				}
+				if t.Gone {
+					whose += " · removed"
+				}
+				rows = append(rows, listRow{mark: "↺", words: who + ": " + t.Line, right: in + " · " + whose + " · " + t.At.Local().Format("Jan 2"), do: func(l listed) error {
+					if t.Gone {
+						return fmt.Errorf("its worktree is there no more, and %s resumes a conversation only in its folder: `mia recall` prints it", t.Agent)
+					}
 					if t.Machine != "" { // on a machine: its worktree's session there, in a window here
 						at := slices.IndexFunc(m.places, func(p place) bool { return p.project == "project" && p.name == t.Project })
 						if at < 0 {
 							return fmt.Errorf("%s is on %s, and no project here is called that to reach it from", t.Project, t.Machine)
 						}
-						return l.openIn(m.places[at].root, run.ShellJoin([]string{l.self, "machine", "attach", t.Worktree + "@" + t.Machine}))
+						return l.openIn(m.places[at].root, run.ShellJoin([]string{l.self, "machine", "attach", t.Worktree + "@" + t.Machine}), t.Worktree+"@"+t.Machine)
 					}
 					if err := l.goTo(t.Root, t.Cwd); err != nil {
 						return err
@@ -576,16 +586,20 @@ func (l listed) goTo(root, worktree string) error {
 
 // open opens a window in the client's session, in the folder the list was opened in, running
 // runs ("" a shell).
-func (l listed) open(runs string) error { return l.openIn(l.folder, runs) }
+func (l listed) open(runs string) error { return l.openIn(l.folder, runs, "") }
 
-// openIn is open in another folder.
-func (l listed) openIn(dir, runs string) error {
+// openIn is open in another folder, the window called name when one is given (a session on a
+// machine, which tmux would call `mia` after what attaches to it).
+func (l listed) openIn(dir, runs, name string) error {
 	tmux := run.Local("tmux")
 	session, err := tmux.Capture("display-message", "-p", "-c", l.client, "#{session_id}")
 	if err != nil {
 		return err
 	}
 	argv := []string{"new-window", "-t", strings.TrimSpace(session) + ":", "-c", dir}
+	if name != "" {
+		argv = append(argv, "-n", name)
+	}
 	if runs != "" {
 		argv = append(argv, runs)
 	}

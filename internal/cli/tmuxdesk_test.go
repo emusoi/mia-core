@@ -210,10 +210,14 @@ func TestRecallAsksTheMachinesToo(t *testing.T) {
 		}
 		there := thread{Project: "demo", Machine: machine.Name}
 		there.Session, there.Line = "s1", "said "+text+" there"
-		return []thread{there}
+		// (And the copy of it where its worktree was before it moved, and one of a worktree removed.)
+		left, removed := there, there
+		left.Gone, left.Line = true, "left behind"
+		removed.Gone, removed.Session, removed.Line = true, "s2", "removed"
+		return []thread{left, there, removed}
 	}
 	found, err := recalled("", "flag", 5, runtime.Machine{Name: "fedora", SSH: "fedora"}, runtime.Machine{Name: "off", SSH: "off"})
-	if err != nil || len(found) != 1 || found[0].Machine != "fedora" || found[0].Line != "said flag there" {
+	if err != nil || len(found) != 2 || found[0].Line != "said flag there" || found[0].Machine != "fedora" || found[1].Line != "removed" {
 		t.Fatalf("what the machines had: %+v %v", found, err)
 	}
 }
