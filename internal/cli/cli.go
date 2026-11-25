@@ -1448,6 +1448,9 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 		// called pi is what nobody asked for.)
 		if !launched && len(argv) == 0 && !editor && (model != "" || effort != "" || account != "" || (name != "" && a.AgentOf(name) == name)) {
 			command, launched = a.AgentCommand(name), true // the window is named for the agent it runs
+			if a.AgentOf(name) == name {
+				name = a.FreeWindow(record, name) // a second of it beside the first: pi-2
+			}
 		}
 		if role != "" && a.AgentOf(command) != agent {
 			command, launched = a.AgentCommand(agent), true

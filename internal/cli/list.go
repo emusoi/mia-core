@@ -45,25 +45,28 @@ type listed struct {
 type place struct{ name, project, branch, path string }
 
 type listModel struct {
-	at      listed
-	here    string // the project the folder is in, "" in none
-	root    string // and its main checkout
-	query   string
-	cursor  int
-	width   int
-	places  []place
-	stand   app.Standing
-	agents  []agentKnown
-	threads []thread
-	asked   string // what threads answers
-	chosen  *listRow
+	at       listed
+	here     string   // the project the folder is in, "" in none
+	root     string   // and its main checkout
+	tree     string   // the worktree the folder is, by its name
+	machines []string // the machines mia knows other than this one
+	query    string
+	cursor   int
+	width    int
+	places   []place
+	stand    app.Standing
+	agents   []agentKnown
+	threads  []thread
+	asked    string // what threads answers
+	chosen   *listRow
 }
 
 type (
-	placesMsg  []place
-	standMsg   app.Standing
-	agentsMsg  []agentKnown
-	threadsMsg struct {
+	placesMsg   []place
+	standMsg    app.Standing
+	agentsMsg   []agentKnown
+	machinesMsg []string
+	threadsMsg  struct {
 		text  string
 		found []thread
 	}
@@ -84,6 +87,20 @@ func (m listModel) Init() tea.Cmd {
 			var agents []agentKnown
 			_ = apiSaid(self, &agents, "agents")
 			return agentsMsg(slices.DeleteFunc(agents, func(a agentKnown) bool { return !a.Installed }))
+		},
+		func() tea.Msg {
+			var machines []struct {
+				Name string `json:"name"`
+				SSH  string `json:"ssh"`
+			}
+			_ = apiSaid(self, &machines, "machines")
+			var names []string
+			for _, machine := range machines {
+				if machine.SSH != "" {
+					names = append(names, machine.Name)
+				}
+			}
+			return machinesMsg(names)
 		},
 	)
 }
@@ -123,6 +140,8 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.stand = app.Standing(msg)
 	case agentsMsg:
 		m.agents = msg
+	case machinesMsg:
+		m.machines = msg
 	case threadsMsg:
 		if msg.text == m.words() {
 			m.threads, m.asked = msg.found, msg.text
@@ -174,7 +193,7 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // hand-over or an agent's task.
 func (m listModel) words() string {
 	q := strings.TrimSpace(m.query)
-	if strings.HasPrefix(q, ">") || m.answer(q) != nil || m.task(q) != nil {
+	if strings.HasPrefix(q, ">") || strings.HasPrefix(q, "@") || q == "?" || m.answer(q) != nil || m.task(q) != nil {
 		return ""
 	}
 	return q
@@ -220,6 +239,12 @@ func (m listModel) rows() []listRow {
 		}
 	}
 	switch {
+	case q == "?": // what can be typed here, said in the list itself and nowhere else
+		for _, h := range [][2]string{{"a name", "go to that worktree or project"}, {"pi fix the test", "start that agent here on it"},
+			{"> codex", "hand this conversation to that agent"}, {"1", "give that answer to whoever waits"},
+			{"words said before", "find the conversation, and resume it"}, {"nvim · lazygit · shell", "open it in a new window"}, {"@ fedora", "move this worktree to that machine, @ local back"}} {
+			rows = append(rows, listRow{mark: " ", words: h[0], right: h[1]})
+		}
 	case q == "":
 		stands(m.stand.Waiting, "●", true)
 		stands(m.stand.Working, "◌", false)
@@ -242,6 +267,26 @@ func (m listModel) rows() []listRow {
 				return l.beside(l.folder, "hand", "--window", l.window, name)
 			}})
 		}
+	case strings.HasPrefix(q, "@"): // the worktree here to a machine, or back to this one
+		names := append(slices.Clone(m.machines), "local")
+		at := closest(strings.TrimSpace(q[1:]), names)
+		if strings.TrimSpace(q[1:]) == "" {
+			at = at[:0]
+			for i := range names {
+				at = append(at, i)
+			}
+		}
+		for _, i := range at {
+			to, words := names[i], "move "+m.tree+" to "+names[i]
+			if to == "local" {
+				words = "bring " + m.tree + " back to this computer"
+			}
+			if m.tree != "" {
+				rows = append(rows, listRow{mark: "⇄", words: words, right: "branch, uncommitted work, windows", do: func(l listed) error {
+					return l.apart(m.root, words, "move", m.tree, to)
+				}})
+			}
+		}
 	case m.answer(q) != nil:
 		rows = append(rows, *m.answer(q))
 	case m.task(q) != nil:
@@ -258,6 +303,11 @@ func (m listModel) rows() []listRow {
 			}
 		}
 		places(found)
+		for _, d := range listDoes {
+			if len(q) >= 2 && slices.ContainsFunc(d.names, func(name string) bool { return strings.HasPrefix(name, strings.ToLower(q)) }) {
+				rows = append(rows, listRow{mark: "+", words: d.words, right: "new window", do: func(l listed) error { return l.open(d.runs) }})
+			}
+		}
 		if m.asked == q {
 			for _, t := range m.threads {
 				who := t.Agent
@@ -274,6 +324,18 @@ func (m listModel) rows() []listRow {
 		}
 	}
 	return rows
+}
+
+// listDoes is what is opened in a window of its own by its name: what it is called, the row,
+// and the command ("" a shell).
+var listDoes = []struct {
+	names []string
+	words string
+	runs  string
+}{
+	{[]string{"nvim", "vim", "editor", "edit"}, "open the editor here", "${EDITOR:-nvim} ."},
+	{[]string{"lazygit", "git"}, "open lazygit here", "lazygit"},
+	{[]string{"shell", "zsh", "terminal"}, "open a shell here", ""},
 }
 
 var (
@@ -319,6 +381,35 @@ func (l listed) goTo(root, worktree string) error {
 		return err
 	}
 	return a.SwitchClient(worktree, l.client)
+}
+
+// open opens a window in the client's session, in the folder the list was opened in, running
+// runs ("" a shell).
+func (l listed) open(runs string) error {
+	tmux := run.Local("tmux")
+	session, err := tmux.Capture("display-message", "-p", "-c", l.client, "#{session_id}")
+	if err != nil {
+		return err
+	}
+	argv := []string{"new-window", "-t", strings.TrimSpace(session) + ":", "-c", l.folder}
+	if runs != "" {
+		argv = append(argv, runs)
+	}
+	if out, err := tmux.Combined(argv...); err != nil {
+		return fmt.Errorf("tmux new-window: %s", strings.TrimSpace(out))
+	}
+	return nil
+}
+
+// apart runs this mia in dir and lets it go on by itself, as beside does, where it opens no
+// window to go to: how it ended is said on the client's status line.
+func (l listed) apart(dir, doing string, verb ...string) error {
+	said := "tmux display-message -c " + run.ShellJoin([]string{l.client}) + " "
+	script := run.ShellJoin(append([]string{l.self}, verb...)) + " >/dev/null 2>&1 && " + said + run.ShellJoin([]string{"mia: done: " + doing}) +
+		" || " + said + run.ShellJoin([]string{"mia: could not " + doing + " — `mia " + strings.Join(verb, " ") + "` in a shell says why"})
+	cmd := exec.Command("sh", "-c", script)
+	cmd.Dir, cmd.SysProcAttr = dir, &syscall.SysProcAttr{Setsid: true}
+	return cmd.Start()
 }
 
 // beside runs this mia in dir and lets it go on by itself (an agent takes seconds to come up,
@@ -371,6 +462,13 @@ func cmdTmuxList(args []string) int {
 	m := listModel{at: listed{self: self, client: args[0], window: args[1], folder: args[2]}}
 	if a, err := app.Open(args[2]); err == nil {
 		m.root, m.here = a.Root, filepath.Base(a.Root)
+		if resolver, err := a.Resolver(); err == nil {
+			for _, r := range resolver.Records {
+				if r.Path == args[2] || strings.HasPrefix(args[2], r.Path+string(filepath.Separator)) {
+					m.tree = r.Name
+				}
+			}
+		}
 		repos, _ := app.Repositories()
 		for _, repo := range repos {
 			if repo.Path == a.Root {
@@ -382,7 +480,7 @@ func cmdTmuxList(args []string) int {
 	if err != nil {
 		return tmuxSay(args[:1], err)
 	}
-	if row := final.(listModel).chosen; row != nil {
+	if row := final.(listModel).chosen; row != nil && row.do != nil {
 		if err := row.do(m.at); err != nil {
 			return tmuxSay(args[:1], err)
 		}

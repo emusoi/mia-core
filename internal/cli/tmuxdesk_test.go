@@ -137,7 +137,7 @@ func TestTmuxReadsWhatInstallAdds(t *testing.T) {
 func TestWhatIsTypedInTheListSaysWhatEnterDoes(t *testing.T) {
 	m := listModel{here: "demo",
 		places: []place{{name: "kijenge", project: "demo", branch: "feat-one"}, {name: "sinza", project: "other"}},
-		agents: []agentKnown{{Name: "pi", Installed: true}, {Name: "codex", Installed: true}}}
+		agents: []agentKnown{{Name: "pi", Installed: true}, {Name: "codex", Installed: true}}, tree: "kijenge", machines: []string{"fedora", "box"}}
 	m.stand.Waiting = []app.Stand{{Worktree: "sinza", Repository: "other", Line: "Run it now?", Options: []string{"yes", "no"}}}
 	says := func(typed string) string {
 		m.query = typed
@@ -156,6 +156,10 @@ func TestWhatIsTypedInTheListSaysWhatEnterDoes(t *testing.T) {
 		">":            "move this conversation to pi | move this conversation to codex",
 		"2":            "answer sinza: no",
 		"3":            "",
+		"@":            "move kijenge to fedora | move kijenge to box | bring kijenge back to this computer",
+		"@ fed":        "move kijenge to fedora",
+		"nvim":         "open the editor here",
+		"git":          "open lazygit here",
 	} {
 		if got := says(typed); got != want {
 			t.Errorf("typed %q: %q, want %q", typed, got, want)

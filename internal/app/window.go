@@ -66,6 +66,12 @@ func (a *App) NewWindow(record model.Record, window string, what session.What, a
 	return name, err
 }
 
+// FreeWindow is the name a new window of the worktree's session takes when it wants window:
+// that, or with the first number after it that no window there has (pi, pi-2).
+func (a *App) FreeWindow(record model.Record, window string) string {
+	return freeWindow(a.sessionOf(record), record.Name, window)
+}
+
 func (a *App) newWindow(record model.Record, window string, what session.What, argv []string) (string, error) {
 	dir, err := a.SessionDir(record)
 	if err != nil {
