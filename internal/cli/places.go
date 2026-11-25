@@ -139,7 +139,7 @@ func projectOf(words string, repos []app.Repository) (app.Repository, error) {
 	if err != nil {
 		var missing resolve.NotFound
 		if errors.As(err, &missing) {
-			return app.Repository{}, fmt.Errorf("no worktree here and no project called %q — `mia ls` outside a project shows them", words)
+			return app.Repository{}, fmt.Errorf("no worktree or project called %q", words)
 		}
 		return app.Repository{}, err
 	}
@@ -160,7 +160,11 @@ func whereTo(here *app.App, words string, repos []app.Repository) (string, error
 	project, worktree, both := strings.Cut(words, "/")
 	repo, err := projectOf(project, repos)
 	if err != nil {
-		// (No worktree by that name and no project: a stack of the repository here, last.)
+		// (No worktree here by that name and no project: a worktree of any project, by its
+		// name or its branch; then a stack of the repository here, last.)
+		if path, aerr := anywhere(words, repos); aerr == nil || !errors.As(aerr, &missing) {
+			return path, aerr
+		}
 		if here != nil {
 			if path, serr := here.Locate(words); serr == nil {
 				return path, nil
@@ -266,4 +270,69 @@ func cmdProject(args []string, asJSON bool) int {
 		return exitOK
 	}
 	return usageErr(form)
+}
+
+// anywhere is the worktree the words mean of every project mia knows: by its name, else by
+// the branch it has out. Several as good are named `project/worktree`, for the person to say
+// which.
+func anywhere(words string, repos []app.Repository) (string, error) {
+	var names, labels, paths []string
+	for _, repo := range repos {
+		a, err := app.Open(repo.Path)
+		if err != nil {
+			continue
+		}
+		resolver, err := a.Resolver()
+		if err != nil {
+			continue
+		}
+		for _, record := range resolver.Records {
+			names = append(names, record.Name)
+			labels = append(labels, repo.Name+"/"+record.Name)
+			paths = append(paths, record.Path)
+		}
+	}
+	found := closest(words, names)
+	if len(found) == 0 { // (Its branch, read from its HEAD: a git for each is most of a second.)
+		branches := make([]string, len(paths))
+		for i, path := range paths {
+			branches[i] = headBranch(path)
+		}
+		found = closest(words, branches)
+	}
+	switch len(found) {
+	case 0:
+		return "", resolve.NotFound{Query: words}
+	case 1:
+		return paths[found[0]], nil
+	}
+	all := make([]string, len(found))
+	for i, at := range found {
+		all[i] = labels[at]
+	}
+	return "", several{words: words, names: all}
+}
+
+// headBranch is the branch a worktree has out, read from its files (its `.git`, a folder or a
+// line naming one, then HEAD): none when it is detached or cannot be read.
+func headBranch(worktree string) string {
+	dir := filepath.Join(worktree, ".git")
+	if line, err := os.ReadFile(dir); err == nil {
+		named, is := strings.CutPrefix(strings.TrimSpace(string(line)), "gitdir: ")
+		if !is {
+			return ""
+		}
+		if dir = named; !filepath.IsAbs(dir) {
+			dir = filepath.Join(worktree, dir)
+		}
+	}
+	head, err := os.ReadFile(filepath.Join(dir, "HEAD"))
+	if err != nil {
+		return ""
+	}
+	branch, _ := strings.CutPrefix(strings.TrimSpace(string(head)), "ref: refs/heads/")
+	if strings.HasPrefix(strings.TrimSpace(string(head)), "ref: refs/heads/") {
+		return branch
+	}
+	return ""
 }

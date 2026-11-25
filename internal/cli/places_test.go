@@ -65,6 +65,13 @@ func TestWhereToIsAWorktreeHereThenAProject(t *testing.T) {
 	if _, err := whereTo(nil, "mia", repos); !errors.As(err, &many) || len(many.names) != 2 {
 		t.Fatalf("two projects as good: %v", err)
 	}
+	// From no repository, a worktree of any project by its name, or by the branch it has out.
+	if path, err := whereTo(nil, goba.Name, repos[:2]); err != nil || path != goba.Path {
+		t.Fatalf("a worktree of some project, from no repository = %q, %v", path, err)
+	}
+	if path, err := whereTo(nil, "gob", repos[:2]); err != nil || path != goba.Path {
+		t.Fatalf("a worktree by its branch, from no repository = %q, %v", path, err)
+	}
 	if _, err := whereTo(nil, "nosuch", repos); err == nil {
 		t.Fatal("a name nothing has was found")
 	}
