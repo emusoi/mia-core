@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"os/exec"
@@ -34,6 +35,7 @@ type listRow struct {
 	words string
 	right string
 	do    func(l listed) error
+	into  string // what Enter types in place of doing anything: a project opened to its worktrees
 }
 
 // listed is what the list was opened over: the tmux client, its window, and the folder there.
@@ -42,7 +44,15 @@ type listed struct {
 }
 
 // place is a worktree or a project to go to.
-type place struct{ name, project, branch, path string }
+type place struct{ name, project, branch, path, root string }
+
+// layer is one branch of the stack the worktree here is on.
+type layer struct {
+	Branch       string `json:"branch"`
+	Current      bool   `json:"current"`
+	Ahead        int    `json:"ahead"`
+	NeedsRestack bool   `json:"needs_restack"`
+}
 
 type listModel struct {
 	at       listed
@@ -53,6 +63,8 @@ type listModel struct {
 	query    string
 	cursor   int
 	width    int
+	height   int
+	stack    []layer
 	places   []place
 	stand    app.Standing
 	agents   []agentKnown
@@ -66,6 +78,7 @@ type (
 	standMsg    app.Standing
 	agentsMsg   []agentKnown
 	machinesMsg []string
+	stackMsg    []layer
 	threadsMsg  struct {
 		text  string
 		found []thread
@@ -102,6 +115,11 @@ func (m listModel) Init() tea.Cmd {
 			}
 			return machinesMsg(names)
 		},
+		func() tea.Msg {
+			var layers []layer
+			_ = apiSaid(self, &layers, "stack")
+			return stackMsg(layers)
+		},
 	)
 }
 
@@ -123,9 +141,9 @@ func everyPlace(root string) []place {
 			continue
 		}
 		for _, r := range resolver.Records {
-			places = append(places, place{name: r.Name, project: repo.Name, branch: headBranch(r.Path), path: r.Path})
+			places = append(places, place{name: r.Name, project: repo.Name, branch: headBranch(r.Path), path: r.Path, root: repo.Path})
 		}
-		places = append(places, place{name: repo.Name, project: "project", path: repo.Path})
+		places = append(places, place{name: repo.Name, project: "project", path: repo.Path, root: repo.Path})
 	}
 	return places
 }
@@ -133,7 +151,7 @@ func everyPlace(root string) []place {
 func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
+		m.width, m.height = msg.Width, msg.Height
 	case placesMsg:
 		m.places = msg
 	case standMsg:
@@ -142,6 +160,8 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.agents = msg
 	case machinesMsg:
 		m.machines = msg
+	case stackMsg:
+		m.stack = msg
 	case threadsMsg:
 		if msg.text == m.words() {
 			m.threads, m.asked = msg.found, msg.text
@@ -165,7 +185,12 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEsc, tea.KeyCtrlC:
 			return m, tea.Quit
 		case tea.KeyEnter:
-			if rows := m.rows(); m.cursor < len(rows) {
+			rows := m.rows()
+			if m.cursor < len(rows) && rows[m.cursor].into != "" {
+				m.query, m.cursor = rows[m.cursor].into, 0
+				return m, nil
+			}
+			if m.cursor < len(rows) {
 				m.chosen = &rows[m.cursor]
 			}
 			return m, tea.Quit
@@ -193,6 +218,9 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // hand-over or an agent's task.
 func (m listModel) words() string {
 	q := strings.TrimSpace(m.query)
+	if verb, _, _ := strings.Cut(q, " "); verb == "rm" || verb == "new" || verb == "stack" || strings.Contains(q, "/") {
+		return ""
+	}
 	if strings.HasPrefix(q, ">") || strings.HasPrefix(q, "@") || q == "?" || m.answer(q) != nil || m.task(q) != nil {
 		return ""
 	}
@@ -227,28 +255,113 @@ func (m listModel) rows() []listRow {
 	q := strings.TrimSpace(m.query)
 	var rows []listRow
 	stands := func(stands []app.Stand, mark string, asks bool) {
-		for _, w := range stands {
+		for i, w := range stands {
 			rows = append(rows, listRow{mark: mark, asks: asks, words: w.Worktree + "  " + w.Line, right: w.Repository, do: func(l listed) error {
 				return l.goTo(w.Root, w.Worktree)
 			}})
+			for n, option := range w.Options { // its answers under it, each given by Enter
+				if asks {
+					rows = append(rows, listRow{mark: " ", words: fmt.Sprintf("    %d  %s", n+1, option), do: func(l listed) error {
+						return exec.Command(l.self, "asks", strconv.Itoa(i+1), strconv.Itoa(n+1)).Run()
+					}})
+				}
+			}
 		}
 	}
 	places := func(found []place) {
 		for _, p := range found {
+			if p.project == "project" { // opened to its worktrees
+				mark, count := " ", 0
+				if p.name == m.here {
+					mark = "▸"
+				}
+				for _, other := range m.places {
+					if other.project == p.name {
+						count++
+					}
+				}
+				rows = append(rows, listRow{mark: mark, words: p.name, right: fmt.Sprintf("%d worktrees", count), into: p.name + "/"})
+				continue
+			}
 			rows = append(rows, listRow{mark: " ", words: p.name + "  " + p.branch, right: p.project, do: func(l listed) error { return l.goTo(p.path, p.path) }})
 		}
 	}
+	verb, rest, _ := strings.Cut(q, " ")
+	rest = strings.TrimSpace(rest)
+	project, within, drilled := strings.Cut(q, "/")
+	drilled = drilled && slices.ContainsFunc(m.places, func(p place) bool { return p.project == "project" && p.name == project })
 	switch {
 	case q == "?": // what can be typed here, said in the list itself and nowhere else
 		for _, h := range [][2]string{{"a name", "go to that worktree or project"}, {"pi fix the test", "start that agent here on it"},
 			{"> codex", "hand this conversation to that agent"}, {"1", "give that answer to whoever waits"},
-			{"words said before", "find the conversation, and resume it"}, {"nvim · lazygit · shell", "open it in a new window"}, {"@ fedora", "move this worktree to that machine, @ local back"}} {
+			{"words said before", "find the conversation, and resume it"}, {"nvim · lazygit · shell", "open it in a new window"}, {"@ fedora", "move this worktree to that machine, @ local back"},
+			{"new a-branch", "a new worktree on that branch, in the project here"}, {"rm a-name", "remove that worktree, its session and its name"},
+			{"stack", "the layers of the stack this worktree is on, to go to one"}} {
 			rows = append(rows, listRow{mark: " ", words: h[0], right: h[1]})
 		}
 	case q == "":
 		stands(m.stand.Waiting, "●", true)
 		stands(m.stand.Working, "◌", false)
-		places(slices.DeleteFunc(slices.Clone(m.places), func(p place) bool { return p.project != m.here }))
+		// (The projects, the one here first: Enter opens one to its worktrees.)
+		projects := slices.DeleteFunc(slices.Clone(m.places), func(p place) bool { return p.project != "project" })
+		slices.SortStableFunc(projects, func(x, y place) int {
+			return cmp.Compare(btoi(y.name == m.here), btoi(x.name == m.here))
+		})
+		places(projects)
+	case drilled: // a project's worktrees, narrowed by what is typed after the /
+		var its []place
+		names := []string{}
+		for _, p := range m.places {
+			if p.project == project {
+				its, names = append(its, p), append(names, p.name+" "+p.branch)
+			}
+		}
+		if strings.TrimSpace(within) != "" {
+			var narrowed []place
+			for _, i := range closest(strings.TrimSpace(within), names) {
+				narrowed = append(narrowed, its[i])
+			}
+			its = narrowed
+		}
+		places(its)
+	case verb == "stack":
+		for _, layer := range m.stack {
+			mark, right := " ", fmt.Sprintf("%d ahead", layer.Ahead)
+			if layer.Current {
+				mark = "▸"
+			}
+			if layer.NeedsRestack {
+				right = "needs restack"
+			}
+			rows = append(rows, listRow{mark: mark, words: layer.Branch, right: right, do: func(l listed) error {
+				to := exec.Command(l.self, "stack", "go", layer.Branch)
+				to.Dir = l.folder
+				if out, err := to.CombinedOutput(); err != nil {
+					return fmt.Errorf("%s", strings.TrimSpace(string(out)))
+				}
+				return nil
+			}})
+		}
+	case verb == "new" && rest != "" && m.root != "":
+		branch := strings.ReplaceAll(rest, " ", "-")
+		rows = append(rows, listRow{mark: "+", words: "new worktree on " + branch + " in " + m.here, right: "and go there", do: func(l listed) error {
+			return l.script(m.root, "make a worktree on "+branch,
+				`p=$(`+run.ShellJoin([]string{l.self, "new", branch})+` 2>/dev/null | tail -1) && [ -d "$p" ] && `+run.ShellJoin([]string{l.self, "tmux", "go", l.client})+` "$p"`)
+		}})
+	case verb == "rm" && rest != "":
+		var trees []place
+		names := []string{}
+		for _, p := range m.places {
+			if p.project != "project" && p.path != p.root {
+				trees, names = append(trees, p), append(names, p.name)
+			}
+		}
+		for _, i := range closest(rest, names) {
+			p := trees[i]
+			rows = append(rows, listRow{mark: "−", words: "remove worktree " + p.name + "  " + p.branch, right: p.project, do: func(l listed) error {
+				return l.apart(p.root, "remove "+p.name, "rm", p.name)
+			}})
+		}
 	case strings.HasPrefix(q, ">"):
 		names := make([]string, len(m.agents))
 		for i, a := range m.agents {
@@ -354,12 +467,24 @@ var (
 func (m listModel) View() string {
 	width := max(m.width, 40)
 	var b strings.Builder
-	b.WriteString(" " + listDim.Render("❯ ") + m.query + listOn.Render(" ") + "\n\n")
+	where := m.here
+	if m.tree != "" && m.tree != m.here {
+		where += " / " + m.tree
+	}
+	typed := " " + listDim.Render("❯ ") + m.query + listOn.Render(" ")
+	b.WriteString(typed + strings.Repeat(" ", max(width-lipgloss.Width(typed)-lipgloss.Width(where)-1, 1)) + listDim.Render(where) + "\n\n")
 	rows := m.rows()
+	// (As many rows as there is room for, the chosen one kept among them.)
+	fits, first := max(m.height-2, 3), 0
+	if m.cursor >= fits {
+		first = m.cursor - fits + 1
+	}
+	shown := rows[min(first, len(rows)):min(first+fits, len(rows))]
 	if len(rows) == 0 && strings.TrimSpace(m.query) != "" {
 		b.WriteString(" " + listDim.Render("nothing by that name"))
 	}
-	for i, r := range rows {
+	for i, r := range shown {
+		i += first
 		room := width - 4 - lipgloss.Width(r.right) - 2
 		words := []rune(r.words)
 		if len(words) > room {
@@ -375,7 +500,9 @@ func (m listModel) View() string {
 			}
 			b.WriteString(" " + mark + " " + string(words) + pad + listDim.Render(r.right) + " ")
 		}
-		b.WriteString("\n")
+		if i < first+len(shown)-1 {
+			b.WriteString("\n")
+		}
 	}
 	return b.String()
 }
@@ -411,9 +538,17 @@ func (l listed) open(runs string) error {
 // apart runs this mia in dir and lets it go on by itself, as beside does, where it opens no
 // window to go to: how it ended is said on the client's status line.
 func (l listed) apart(dir, doing string, verb ...string) error {
-	said := "tmux display-message -c " + run.ShellJoin([]string{l.client}) + " "
-	script := run.ShellJoin(append([]string{l.self}, verb...)) + " >/dev/null 2>&1 && " + said + run.ShellJoin([]string{"mia: done: " + doing}) +
-		" || " + said + run.ShellJoin([]string{"mia: could not " + doing + " — `mia " + strings.Join(verb, " ") + "` in a shell says why"})
+	return l.script(dir, doing, run.ShellJoin(append([]string{l.self}, verb...))+" >/dev/null 2>&1", "`mia "+strings.Join(verb, " ")+"` in a shell says why")
+}
+
+// script is apart of a line of shell: why is how to learn what went wrong, when there is one.
+func (l listed) script(dir, doing, line string, why ...string) error {
+	said := "tmux display-message -d 4000 -c " + run.ShellJoin([]string{l.client}) + " " // four seconds: long enough to be read
+	failed := "mia: could not " + doing
+	if len(why) > 0 {
+		failed += " — " + why[0]
+	}
+	script := "{ " + line + "; } && " + said + run.ShellJoin([]string{"mia: done: " + doing}) + " || " + said + run.ShellJoin([]string{failed})
 	cmd := exec.Command("sh", "-c", script)
 	cmd.Dir, cmd.SysProcAttr = dir, &syscall.SysProcAttr{Setsid: true}
 	return cmd.Start()
@@ -466,6 +601,7 @@ func cmdTmuxList(args []string) int {
 		_, _ = run.Local("tmux").Combined(append([]string{"display-popup", "-c", args[0], "-E", "-w", "88", "-h", "20", "-T", " mia ", self, "tmux", "list"}, args...)...)
 		return exitOK
 	}
+	_ = os.Chdir(args[2]) // what is asked of mia is asked of the worktree there
 	m := listModel{at: listed{self: self, client: args[0], window: args[1], folder: args[2]}}
 	if a, err := app.Open(args[2]); err == nil {
 		m.root, m.here = a.Root, filepath.Base(a.Root)
@@ -491,6 +627,29 @@ func cmdTmuxList(args []string) int {
 		if err := row.do(m.at); err != nil {
 			return tmuxSay(args[:1], err)
 		}
+	}
+	return exitOK
+}
+
+func btoi(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// cmdTmuxGo is mia tmux go <client> <folder>: the client to the session of the worktree at the
+// folder, started if it is not up; for what runs with no terminal.
+func cmdTmuxGo(args []string) int {
+	if len(args) != 2 {
+		return usageErr("mia tmux go <client> <folder>")
+	}
+	a, err := app.Open(args[1])
+	if err != nil {
+		return tmuxSay(args[:1], err)
+	}
+	if err := a.SwitchClient(args[1], args[0]); err != nil {
+		return tmuxSay(args[:1], err)
 	}
 	return exitOK
 }

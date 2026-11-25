@@ -116,6 +116,8 @@ func Run(args []string) int {
 				return cmdTmuxShell(rest[1:])
 			case "list":
 				return cmdTmuxList(rest[1:])
+			case "go":
+				return cmdTmuxGo(rest[1:])
 			case "agents":
 				return cmdTmuxAgents(rest[1:])
 			case "act":

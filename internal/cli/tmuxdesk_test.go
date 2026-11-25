@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -137,7 +138,10 @@ func TestTmuxReadsWhatInstallAdds(t *testing.T) {
 // the conversation handed on; a number, that answer to whoever waits.
 func TestWhatIsTypedInTheListSaysWhatEnterDoes(t *testing.T) {
 	m := listModel{here: "demo",
-		places: []place{{name: "kijenge", project: "demo", branch: "feat-one"}, {name: "sinza", project: "other"}},
+		places: []place{{name: "kijenge", project: "demo", branch: "feat-one", path: "/d.kijenge", root: "/d"}, {name: "demo", project: "project", path: "/d", root: "/d"},
+			{name: "sinza", project: "other", path: "/o.sinza", root: "/o"}, {name: "other", project: "project", path: "/o", root: "/o"}},
+		root:   "/d",
+		stack:  []layer{{Branch: "feat-one", Current: true, Ahead: 2}, {Branch: "feat-two", NeedsRestack: true}},
 		agents: []agentKnown{{Name: "pi", Installed: true}, {Name: "codex", Installed: true}}, tree: "kijenge", machines: []string{"fedora", "box"}}
 	m.stand.Waiting = []app.Stand{{Worktree: "sinza", Repository: "other", Line: "Run it now?", Options: []string{"yes", "no"}}}
 	says := func(typed string) string {
@@ -149,7 +153,13 @@ func TestWhatIsTypedInTheListSaysWhatEnterDoes(t *testing.T) {
 		return strings.Join(words, " | ")
 	}
 	for typed, want := range map[string]string{
-		"":             "sinza  Run it now? | kijenge  feat-one",
+		"":             "sinza  Run it now? |     1  yes |     2  no | demo | other",
+		"other/":       "sinza  ",
+		"demo/kij":     "kijenge  feat-one",
+		"oth":          "other",
+		"rm sin":       "remove worktree sinza  ",
+		"new fix cart": "new worktree on fix-cart in demo",
+		"stack":        "feat-one | feat-two",
 		"sin":          "sinza  ",
 		"pi fix a bug": "start pi here on: fix a bug",
 		"pi":           "",
@@ -203,5 +213,19 @@ func TestRecallAsksTheMachinesToo(t *testing.T) {
 	found, err := recalled("", "flag", 5, runtime.Machine{Name: "fedora", SSH: "fedora"}, runtime.Machine{Name: "off", SSH: "off"})
 	if err != nil || len(found) != 1 || found[0].Machine != "fedora" || found[0].Line != "said flag there" {
 		t.Fatalf("what the machines had: %+v %v", found, err)
+	}
+}
+
+// A list longer than its popup shows as many rows as fit under what is typed, the chosen one
+// among them: the line typed on never scrolls away.
+func TestTheListKeepsWhatIsTypedAndTheChosenRowInView(t *testing.T) {
+	m := listModel{here: "demo", width: 60, height: 8, query: "demo/", places: []place{{name: "demo", project: "project"}}}
+	for i := range 30 {
+		m.places = append(m.places, place{name: fmt.Sprintf("tree%02d", i), project: "demo"})
+	}
+	m.cursor = 20
+	lines := strings.Split(m.View(), "\n")
+	if len(lines) > m.height || !strings.Contains(lines[0], "demo/") || !strings.Contains(m.View(), "tree20") || strings.Contains(m.View(), "tree02") {
+		t.Fatalf("%d lines for a popup of %d, the first %q:\n%s", len(lines), m.height, lines[0], m.View())
 	}
 }
