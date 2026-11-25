@@ -62,10 +62,10 @@ func TestAgentsMenuIsALetterEachThenItsModels(t *testing.T) {
 		t.Fatalf("the agents = %q", first)
 	}
 	models := agentsMenu("mia", "c1", "hand", "3", []string{"claude"}, agents)
-	if models[2] != "as it is set" || !strings.Contains(models[4], "hand --window 3 claude'") || models[6] != "Opus" || !strings.Contains(models[8], "hand --window 3 claude --model opus") {
+	if models[2] != "as it is set" || !strings.Contains(models[4], "hand --window 3 claude >/dev/null && tmux select-window -t :{end}'") || models[6] != "Opus" || !strings.Contains(models[8], "hand --window 3 claude --model opus") {
 		t.Fatalf("claude's models = %q", models)
 	}
-	if beside := agentsMenu("mia", "c1", "new", "3", []string{"codex"}, agents); !strings.Contains(beside[4], "window new codex'") {
+	if beside := agentsMenu("mia", "c1", "new", "3", []string{"codex"}, agents); !strings.Contains(beside[4], "window new codex >/dev/null && tmux select-window -t :{end}'") {
 		t.Fatalf("a new window = %q", beside)
 	}
 }

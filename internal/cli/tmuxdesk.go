@@ -224,15 +224,18 @@ func agentsMenu(mia, client, what, window string, chosen []string, agents []agen
 		}
 		return argv
 	}
+	// (The window it makes is the session's last: you are put in it, and what the verb says of
+	// its doing is not shown over the pane, only what goes wrong.)
+	const front = ` >/dev/null && tmux select-window -t :{end}`
 	deed := func(model string) string {
 		with := ""
 		if model != "" {
 			with = " --model " + model
 		}
 		if what == "hand" {
-			return fmt.Sprintf("run-shell -b '%s hand --window %s %s%s'", here, window, chosen[0], with)
+			return fmt.Sprintf("run-shell -b '%s hand --window %s %s%s%s'", here, window, chosen[0], with, front)
 		}
-		return fmt.Sprintf("run-shell -b '%s window new %s%s'", here, chosen[0], with)
+		return fmt.Sprintf("run-shell -b '%s window new %s%s%s'", here, chosen[0], with, front)
 	}
 	argv := []string{"-T", " " + chosen[0] + " ", "as it is set", "Enter", deed("")}
 	taken := map[string]bool{}
