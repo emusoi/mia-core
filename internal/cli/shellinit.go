@@ -12,11 +12,11 @@ const zshInit = `mia() {
   case "$1" in
     switch|sw|cd)
       local __mia_dir
-      __mia_dir="$(command mia path "${@:2}")" && cd "$__mia_dir" ;;
+      __mia_dir="$(command mia path "${@:2}")" && cd "$__mia_dir" && { [ -z "$TMUX" ] || [ -z "$2" ] || command mia go --quiet "$__mia_dir"; } ;;
     project|prj|pj|p)
       if [ "$2" = cd ]; then
         local __mia_dir
-        __mia_dir="$(command mia project cd "${@:3}")" && cd "$__mia_dir"
+        __mia_dir="$(command mia project cd "${@:3}")" && cd "$__mia_dir" && { [ -z "$TMUX" ] || command mia go --quiet "$__mia_dir"; }
       else command mia "$@"; fi ;;
     *) command mia "$@" ;;
   esac
@@ -38,11 +38,11 @@ const bashInit = `mia() {
   case "$1" in
     switch|sw|cd)
       local dir
-      dir="$(command mia path "${@:2}")" && cd "$dir" ;;
+      dir="$(command mia path "${@:2}")" && cd "$dir" && { [ -z "$TMUX" ] || [ -z "$2" ] || command mia go --quiet "$dir"; } ;;
     project|prj|pj|p)
       if [ "$2" = cd ]; then
         local dir
-        dir="$(command mia project cd "${@:3}")" && cd "$dir"
+        dir="$(command mia project cd "${@:3}")" && cd "$dir" && { [ -z "$TMUX" ] || command mia go --quiet "$dir"; }
       else command mia "$@"; fi ;;
     *) command mia "$@" ;;
   esac
@@ -61,10 +61,10 @@ complete -F _mia mia
 const fishInit = `function mia
   switch "$argv[1]"
     case switch sw cd
-      set -l dir (command mia path $argv[2..-1]); and cd $dir
+      set -l dir (command mia path $argv[2..-1]); and cd $dir; and if set -q TMUX; and set -q argv[2]; command mia go --quiet $dir; end
     case project prj pj p
       if test "$argv[2]" = cd
-        set -l dir (command mia project cd $argv[3..-1]); and cd $dir
+        set -l dir (command mia project cd $argv[3..-1]); and cd $dir; and if set -q TMUX; command mia go --quiet $dir; end
       else
         command mia $argv
       end

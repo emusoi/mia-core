@@ -149,16 +149,105 @@ const tmuxMarker = "# mia: status line and popups"
 // line, refreshed every 5s, the two popups, and its menu.
 func tmuxSnippet(self string) string {
 	mia := run.ShellJoin([]string{self})
+	in := `cd \"#{pane_current_path}\" && ` + mia
+	var keys strings.Builder
+	for i, k := range tmuxKeys(mia, in) {
+		// (Each on a prefix key, and on a key of its own the terminal app can send: `mia tmux keys`.)
+		if k.prefix != "" {
+			fmt.Fprintf(&keys, "bind %s %s\n", k.prefix, k.does)
+		}
+		fmt.Fprintf(&keys, "set -s user-keys[%d] \"\\e[99;%d~\"\nbind -n User%d %s\n", userKeysFrom+i, i+1, userKeysFrom+i, k.does)
+	}
 	return tmuxMarker + ` — mia tmux uninstall removes this block
 set -g status-interval 5
 set -g status-right-length 160
 set -ga status-right ' #(` + mia + ` status-line "#{pane_current_path}") '
-bind Space display-popup -E -d "#{pane_current_path}" -w 72 -h 60% -T " mia " "` + mia + ` radar"
-bind n display-popup -E -d "#{pane_current_path}" -w 110 -h 14 -T " new worktree " "` + mia + ` radar --new"
-bind m run-shell -b "cd \"#{pane_current_path}\" && ` + mia + ` tmux menu '#{client_name}'"
-bind a run-shell -b "cd \"#{pane_current_path}\" && ` + mia + ` tmux next '#{client_name}'"
+` + keys.String() + `set-hook -g client-session-changed "run-shell -b \"` + mia + ` tmux seen '#{client_name}' '#{session_name}'\""
 # mia: end
 `
+}
+
+// userKeysFrom is the first of tmux's user keys mia takes, clear of a config's own few.
+const userKeysFrom = 40
+
+// tmuxKey is one thing mia does in tmux: its prefix key ("" for none), the key the terminal
+// app sends it by (`mia tmux keys`), what it is called, and the tmux command it runs.
+type tmuxKey struct{ prefix, cmd, name, does string }
+
+// tmuxKeys is every key mia binds, in the order their user keys are numbered: never reordered,
+// only added to, so a terminal app's config keeps meaning what it meant.
+func tmuxKeys(mia, in string) []tmuxKey {
+	keys := []tmuxKey{
+		{"k", "cmd+k", "the popup terminal", `display-popup -E -w 84 -h 18 -T " mia " "` + mia + ` tmux shell '#{client_name}' '#{pane_current_path}'"`},
+		{"Space", "cmd+shift+j", "who needs you", `display-popup -E -d "#{pane_current_path}" -w 72 -h 60% -T " mia " "` + mia + ` radar"`},
+		{"n", "cmd+n", "a new worktree", `display-popup -E -d "#{pane_current_path}" -w 110 -h 14 -T " new worktree " "` + mia + ` radar --new"`},
+		{"m", "", "mia's menu", `run-shell -b "` + in + ` tmux menu '#{client_name}'"`},
+		{"a", "cmd+j", "the next that needs you", `run-shell -b "` + in + ` tmux next '#{client_name}'"`},
+		{"e", "cmd+.", "what is done to this window", `run-shell -b "` + mia + ` tmux act '#{client_name}' '#{window_index}'"`},
+		{"A", "cmd+shift+a", "move this conversation to another agent", `run-shell -b "` + mia + ` tmux agents '#{client_name}' hand '#{window_index}'"`},
+		{"N", "cmd+shift+t", "a new agent window", `run-shell -b "` + mia + ` tmux agents '#{client_name}' new '#{window_index}'"`},
+		{"b", "cmd+[", "back through where you have been", `run-shell -b "` + mia + ` tmux walk '#{client_name}' back"`},
+		{"B", "cmd+]", "forward again", `run-shell -b "` + mia + ` tmux walk '#{client_name}' forward"`},
+		{"", "cmd+t", "a new shell window", `new-window -c "#{pane_current_path}"`},
+		{"", "cmd+w", "close this window", `confirm-before -p "close #W? (y/n)" kill-window`},
+		{"", "cmd+shift+]", "the next window", `next-window`},
+		{"", "cmd+shift+[", "the window before", `previous-window`},
+	}
+	for n := 1; n <= 9; n++ {
+		keys = append(keys, tmuxKey{"", fmt.Sprintf("cmd+%d", n), fmt.Sprintf("window %d", n), fmt.Sprintf("select-window -t :%d", n)})
+	}
+	return keys
+}
+
+// terminalKeys is the lines a terminal app's config takes so its ⌘ keys send mia's: kitty's
+// or ghostty's.
+func terminalKeys(app string) (string, error) {
+	var b strings.Builder
+	for i, k := range tmuxKeys("mia", "mia") {
+		if k.cmd == "" {
+			continue
+		}
+		switch app {
+		case "kitty":
+			fmt.Fprintf(&b, "map %s send_text all \\x1b[99;%d~\n", k.cmd, i+1)
+		case "ghostty":
+			fmt.Fprintf(&b, "keybind = %s=text:\\x1b[99;%d~\n", strings.ReplaceAll(strings.ReplaceAll(k.cmd, "[", "left_bracket"), "]", "right_bracket"), i+1)
+		default:
+			return "", fmt.Errorf("mia tmux keys <kitty|ghostty>")
+		}
+	}
+	return b.String(), nil
+}
+
+// cmdTmuxAct is mia tmux act <client> <window>: tmux's own menu of what is done to the window
+// in front, a key each, in three parts: its agent, the window, its worktree.
+func cmdTmuxAct(args []string) int {
+	if len(args) != 2 {
+		return usageErr("mia tmux act <client> <window>")
+	}
+	self, err := os.Executable()
+	if err != nil {
+		return tmuxSay(args[:1], err)
+	}
+	mia := run.ShellJoin([]string{self})
+	in := `cd "#{pane_current_path}" && ` + mia
+	argv := []string{"display-menu", "-c", args[0], "-T", " this window ",
+		"Stop the agent", "s", "send-keys Escape",
+		"Move to another agent", "a", fmt.Sprintf("run-shell -b '%s tmux agents %s hand %s'", mia, args[0], args[1]),
+		"New agent window", "n", fmt.Sprintf("run-shell -b '%s tmux agents %s new %s'", mia, args[0], args[1]),
+		"Its model", "m", fmt.Sprintf(`command-prompt -p "model" "run-shell -b '%s window model %s %%%%'"`, in, args[1]),
+		"",
+		"Rename", "r", `command-prompt -I "#W" "rename-window -- '%%'"`,
+		"Close", "x", `confirm-before -p "close #W? (y/n)" kill-window`,
+		"",
+		"Fork into a new worktree", "f", fmt.Sprintf(`command-prompt -p "branch" "run-shell -b '%s fork %%%%'"`, in),
+		"lazygit", "g", `new-window -c "#{pane_current_path}" lazygit`,
+		"Editor", "o", `new-window -c "#{pane_current_path}" "${EDITOR:-nvim} ."`,
+	}
+	if out, err := run.Local("tmux").Combined(argv...); err != nil {
+		return tmuxSay(args[:1], fmt.Errorf("tmux display-menu: %s", strings.TrimSpace(out)))
+	}
+	return exitOK
 }
 
 // cmdTmux is mia tmux [install|uninstall]: print, add or remove mia's part
@@ -167,6 +256,14 @@ func cmdTmux(args []string) int {
 	self, err := os.Executable()
 	if err != nil {
 		return fail(err)
+	}
+	if len(args) == 2 && args[0] == "keys" {
+		lines, err := terminalKeys(args[1])
+		if err != nil {
+			return usageErr(err.Error())
+		}
+		fmt.Print(lines)
+		return exitOK
 	}
 	snippet := tmuxSnippet(self)
 	if len(args) == 0 {
@@ -193,7 +290,7 @@ func cmdTmux(args []string) int {
 	case "uninstall":
 		fmt.Printf("removing mia's block from %s\n", conf)
 	default:
-		return usageErr("mia tmux [install|uninstall]")
+		return usageErr("mia tmux [install|uninstall|keys <kitty|ghostty>]")
 	}
 	if err := os.WriteFile(conf, []byte(kept), 0o644); err != nil {
 		return fail(err)
@@ -202,7 +299,7 @@ func cmdTmux(args []string) int {
 		if out, err := run.Local("tmux").Combined("source-file", conf); err != nil {
 			return fail(fmt.Errorf("tmux source-file %s: %s", conf, strings.TrimSpace(out)))
 		}
-		fmt.Println("tmux has read it: prefix space opens the radar, prefix n a new worktree, prefix m mia's menu, prefix a the next that needs you")
+		fmt.Println("tmux has read it: prefix k the popup terminal, space who needs you, a the next of them, e this window's menu, A its conversation to another agent, N a new agent window, n a new worktree, m mia's menu, b and B back and forward; `mia tmux keys kitty` prints the ⌘ keys for your terminal app")
 	}
 	return exitOK
 }

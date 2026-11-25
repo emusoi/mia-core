@@ -239,6 +239,7 @@ func cmdProjects(asJSON bool) int {
 // function to go to.
 func cmdProject(args []string, asJSON bool) int {
 	const form = "mia p ls [project]  ·  mia p cd <worktree>   (also: mia project, mia pj, mia prj)"
+	asJSON = take(&args, "--json") || asJSON
 	sub := "ls"
 	if len(args) > 0 {
 		sub, args = args[0], args[1:]

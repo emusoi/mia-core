@@ -110,9 +110,27 @@ func Run(args []string) int {
 	case "status-line":
 		return cmdStatusLine(rest)
 	case "tmux":
+		if len(rest) > 0 {
+			switch rest[0] { // what tmux's keys run, from any folder
+			case "shell":
+				return cmdTmuxShell(rest[1:])
+			case "agents":
+				return cmdTmuxAgents(rest[1:])
+			case "act":
+				return cmdTmuxAct(rest[1:])
+			case "seen":
+				return cmdTmuxSeen(rest[1:])
+			case "walk":
+				return cmdTmuxWalk(rest[1:])
+			}
+		}
 		if len(rest) == 0 || (rest[0] != "menu" && rest[0] != "next") {
 			return cmdTmux(rest)
 		}
+	case "go": // the tmux client to a worktree's session, by its name, from any folder
+		return cmdGo(rest)
+	case "asks": // who waits on you, in every project
+		return cmdAsks(rest, asJSON)
 	case "machine", "machines", "runtime":
 		if len(rest) == 0 || (rest[0] != "attach" && rest[0] != "poll" && rest[0] != "link") {
 			return cmdRuntime(rest, asJSON)
@@ -426,6 +444,8 @@ func Run(args []string) int {
 			fmt.Printf("%s unstarred\n", record.Name)
 		}
 		return exitOK
+	case "hand":
+		return cmdHand(a, rest, asJSON)
 	case "path", "switch":
 		if len(rest) == 1 { // a worktree here, else a project, loosely by name
 			return cmdPathAnywhere(a, rest)
