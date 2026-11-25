@@ -246,7 +246,9 @@ func agentsMenu(mia, client, what, window string, chosen []string, agents []agen
 		if len(a.Models) > 0 {
 			argv = append(argv, "")
 		}
-		for _, m := range a.Models {
+		// (An agent with a hundred models is more than tmux takes in one command, and more
+		// than a menu is for: the first dozen, the rest typed — `mia hand <agent> --model`.)
+		for _, m := range a.Models[:min(len(a.Models), 12)] {
 			argv = append(argv, m.Label, menuKey(m.ID, taken), deed(m.ID))
 		}
 	}

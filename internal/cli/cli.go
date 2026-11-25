@@ -1459,7 +1459,9 @@ func cmdWindow(a *app.App, args []string, asJSON bool) int {
 			agent = setup.Agent
 		}
 		command, launched := a.Config.Launch[name]
-		if !launched && len(argv) == 0 && !editor && (model != "" || effort != "" || account != "") {
+		// (A window named for an agent runs it, whether or not a model is said: a bare shell
+		// called pi is what nobody asked for.)
+		if !launched && len(argv) == 0 && !editor && (model != "" || effort != "" || account != "" || (name != "" && a.AgentOf(name) == name)) {
 			command, launched = a.AgentCommand(name), true // the window is named for the agent it runs
 		}
 		if role != "" && a.AgentOf(command) != agent {
