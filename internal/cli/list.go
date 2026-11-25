@@ -322,7 +322,7 @@ func (m listModel) rows() []listRow {
 						count++
 					}
 				}
-				rows = append(rows, listRow{mark: mark, words: p.name, right: fmt.Sprintf("%d worktrees", count), into: p.name + "/"})
+				rows = append(rows, listRow{mark: mark, words: p.name, right: strings.TrimSuffix(fmt.Sprintf("%d worktrees", count), strings.Repeat("s", btoi(count == 1))), into: p.name + "/"})
 				continue
 			}
 			rows = append(rows, listRow{mark: " ", words: p.name + "  " + p.branch, right: p.project, do: func(l listed) error { return l.goTo(p.path, p.path) }})
@@ -683,6 +683,15 @@ func cmdTmuxList(args []string) int {
 	if popup {
 		_, _ = run.Local("tmux").Combined(append([]string{"display-popup", "-c", args[0], "-E", "-w", "88", "-h", "20", "-T", " mia ", self, "tmux", "list"}, args...)...)
 		return exitOK
+	}
+	// (Where it is opened is the worktree of the session the client is in, when mia made that
+	// session: the pane in front says another folder when its shell went elsewhere, and none
+	// at all under an editor.)
+	if at, err := run.Local("tmux").Capture("display-message", "-p", "-c", args[0], "#{session_name}\t#{session_path}"); err == nil {
+		name, path, _ := strings.Cut(strings.TrimSpace(at), "\t")
+		if _, err := app.Open(path); err == nil && strings.HasPrefix(name, "mia-") && !strings.HasPrefix(args[2], path+string(filepath.Separator)) {
+			args[2] = path
+		}
 	}
 	_ = os.Chdir(args[2]) // what is asked of mia is asked of the worktree there
 	m := listModel{at: listed{self: self, client: args[0], window: args[1], folder: args[2]}}
