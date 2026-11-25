@@ -17,7 +17,7 @@ type Repo struct {
 type NotFound struct{ Query string }
 
 func (e NotFound) Error() string {
-	return fmt.Sprintf("no worktree called %q — `mia ls` shows what exists", e.Query)
+	return fmt.Sprintf("no worktree called %q — `mia p ls` shows what exists", e.Query)
 }
 
 func (r Repo) Worktree(query string) (string, error) {

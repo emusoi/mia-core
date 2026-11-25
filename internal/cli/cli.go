@@ -11,12 +11,15 @@ import (
 	"regexp"
 	"runtime/debug"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/x/term"
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/config"
@@ -130,7 +133,12 @@ func Run(args []string) int {
 		return cmdAccount(rest, asJSON)
 	case "role", "roles":
 		return cmdRole(rest, asJSON)
-	case "project", "prj", "p": // a project's worktrees: the one here, or one named from anywhere
+	case "ls", "list": // the projects mia knows, from any folder: a project's worktrees are `mia p ls`
+		if len(rest) > 0 {
+			return usageErr(usageOf(verb))
+		}
+		return cmdProjects(asJSON)
+	case "project", "prj", "pj", "p": // a project's worktrees: the one here, or one named from anywhere
 		return cmdProject(rest, asJSON)
 	case "git": // from any folder: one in no repository is shown as that
 		return cmdGit(rest)
@@ -157,8 +165,6 @@ func Run(args []string) int {
 		// In no repository: the projects mia knows, and the way to one by its name.
 		if errors.Is(err, git.ErrNotARepository) {
 			switch {
-			case verb == "ls" || verb == "list":
-				return cmdProjects(asJSON)
 			case (verb == "path" || verb == "switch") && len(rest) == 1:
 				return cmdPathAnywhere(nil, rest)
 			case verb == "__complete" && len(rest) == 1 && rest[0] == "names":
@@ -420,8 +426,6 @@ func Run(args []string) int {
 			fmt.Printf("%s unstarred\n", record.Name)
 		}
 		return exitOK
-	case "ls", "list":
-		return cmdList(a, asJSON)
 	case "path", "switch":
 		if len(rest) == 1 { // a worktree here, else a project, loosely by name
 			return cmdPathAnywhere(a, rest)
@@ -579,39 +583,52 @@ func cmdList(a *app.App, asJSON bool) int {
 	if asJSON {
 		return emit(listings)
 	}
-	width := 0
+	// One line each, cut to the terminal's width so a narrow one never wraps: whether its session
+	// runs, its name, its branch (cut to a column), then what is worth knowing of it in a word each.
+	sort.SliceStable(listings, func(i, j int) bool { return listings[i].Session && !listings[j].Session })
+	width, branchWidth := 0, 0
 	for _, l := range listings {
-		width = max(width, len(l.Name))
+		width = max(width, lipgloss.Width(l.Name))
+		branchWidth = max(branchWidth, lipgloss.Width(l.Branch))
+	}
+	branchWidth = min(max(branchWidth, len("(detached)")), 32)
+	cols := 0
+	if w, _, err := term.GetSize(os.Stdout.Fd()); err == nil {
+		cols = w
 	}
 	for _, l := range listings {
 		marks := []string{}
+		if len(l.Signals) > 0 {
+			marks = append(marks, signalMark(l.Signals[0]))
+		}
 		if l.Dirty {
 			marks = append(marks, "dirty")
-		}
-		if l.Session {
-			marks = append(marks, "session")
 		}
 		if l.Ahead > 0 || l.Behind > 0 {
 			marks = append(marks, fmt.Sprintf("+%d -%d", l.Ahead, l.Behind))
 		}
+		if l.Stack != "" {
+			marks = append(marks, "stack")
+		}
 		if !l.Adopted && !l.Main {
 			marks = append(marks, "not adopted")
-		}
-		if l.Stack != "" {
-			marks = append(marks, "in "+l.Stack)
-		}
-		if len(l.Signals) > 0 {
-			marks = append(marks, signalMark(l.Signals[0]))
 		}
 		branch := l.Branch
 		if branch == "" {
 			branch = "(detached)"
 		}
-		star := "  "
+		star, runs := " ", " "
 		if l.Starred {
-			star = "★ "
+			star = "★"
 		}
-		fmt.Printf("%s%-*s  %s %s\n", star, width, l.Name, padded(branch, 28), strings.Join(marks, " · "))
+		if l.Session {
+			runs = "●"
+		}
+		line := strings.TrimRight(fmt.Sprintf("%s%s %s  %s  %s", star, runs, padded(l.Name, width), padded(ansi.Truncate(branch, branchWidth, "…"), branchWidth), strings.Join(marks, "  ")), " ")
+		if cols > 0 {
+			line = ansi.Truncate(line, cols-1, "…")
+		}
+		fmt.Println(line)
 	}
 	return exitOK
 }

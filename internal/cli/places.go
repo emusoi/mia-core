@@ -8,13 +8,13 @@ import (
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/git"
 	"github.com/emusoi/mia-core/internal/resolve"
 )
 
-// Getting around by name, from any folder: `mia ls` outside a repository is the projects mia
-// knows, `mia cd <words>` (the shell function over `mia path`) goes to a worktree of the
+// Getting around by name, from any folder: `mia ls` is the projects mia knows, `mia cd <words>` (the shell function over `mia path`) goes to a worktree of the
 // repository here or else to a project, `<project>/<worktree>` to a worktree of another, and
-// `mia project ls|cd` (`prj`, `p`) are a project's worktrees alone. Names are matched loosely
+// `mia p ls|cd` (`project`, `pj`, `prj`) are a project's worktrees alone. Names are matched loosely
 // (`closest`): whoever matches best, and when several do as well, they are listed and none is
 // guessed.
 
@@ -195,8 +195,8 @@ func cmdPathAnywhere(here *app.App, args []string) int {
 	return exitOK
 }
 
-// cmdProjects is `mia ls` in no repository: the projects mia knows, each with its folder and
-// how many worktrees mia has named in it.
+// cmdProjects is `mia ls`: the projects mia knows, each with its folder, the one you are in
+// marked.
 func cmdProjects(asJSON bool) int {
 	repos, err := app.Repositories()
 	if err != nil {
@@ -214,12 +214,22 @@ func cmdProjects(asJSON bool) int {
 		width = max(width, len(repo.Name))
 	}
 	home, _ := os.UserHomeDir()
+	here := ""
+	if dir, err := os.Getwd(); err == nil {
+		if top, err := git.Toplevel(dir); err == nil {
+			here = top
+		}
+	}
 	for _, repo := range repos {
 		path := repo.Path
 		if rel, err := filepath.Rel(home, path); home != "" && err == nil && !strings.HasPrefix(rel, "..") {
 			path = filepath.Join("~", rel)
 		}
-		fmt.Printf("%-*s  %s\n", width, repo.Name, path)
+		mark := "  "
+		if here != "" && (here == repo.Path || strings.HasPrefix(here, repo.Path+".") || strings.HasPrefix(here, repo.Path+string(filepath.Separator))) {
+			mark = "▸ "
+		}
+		fmt.Printf("%s%-*s  %s\n", mark, width, repo.Name, path)
 	}
 	return exitOK
 }
@@ -228,7 +238,7 @@ func cmdProjects(asJSON bool) int {
 // or the one named), `cd <worktree>` the path of one of the project here, for the shell
 // function to go to.
 func cmdProject(args []string, asJSON bool) int {
-	const form = "mia project ls [project]  ·  mia project cd <worktree>   (also: mia prj, mia p)"
+	const form = "mia p ls [project]  ·  mia p cd <worktree>   (also: mia project, mia pj, mia prj)"
 	sub := "ls"
 	if len(args) > 0 {
 		sub, args = args[0], args[1:]

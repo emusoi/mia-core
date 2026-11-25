@@ -13,7 +13,7 @@ const zshInit = `mia() {
     switch|sw|cd)
       local __mia_dir
       __mia_dir="$(command mia path "${@:2}")" && cd "$__mia_dir" ;;
-    project|prj|p)
+    project|prj|pj|p)
       if [ "$2" = cd ]; then
         local __mia_dir
         __mia_dir="$(command mia project cd "${@:3}")" && cd "$__mia_dir"
@@ -39,7 +39,7 @@ const bashInit = `mia() {
     switch|sw|cd)
       local dir
       dir="$(command mia path "${@:2}")" && cd "$dir" ;;
-    project|prj|p)
+    project|prj|pj|p)
       if [ "$2" = cd ]; then
         local dir
         dir="$(command mia project cd "${@:3}")" && cd "$dir"
@@ -62,7 +62,7 @@ const fishInit = `function mia
   switch "$argv[1]"
     case switch sw cd
       set -l dir (command mia path $argv[2..-1]); and cd $dir
-    case project prj p
+    case project prj pj p
       if test "$argv[2]" = cd
         set -l dir (command mia project cd $argv[3..-1]); and cd $dir
       else

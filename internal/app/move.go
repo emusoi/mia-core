@@ -149,7 +149,7 @@ func (a *App) Move(name, from, to string, dry bool, say io.Writer) (Moved, error
 	path, err := src.sh(`cd "$1" && `+src.mia+` path "$2"`, src.repo, name)
 	if err != nil {
 		if strings.Contains(err.Error(), "no worktree called") { // its mia answered: it is not there
-			return Moved{}, fmt.Errorf("there is no worktree called %s %s — `mia ls` shows what is here, `mia api machines` what is on each machine", name, src.where())
+			return Moved{}, fmt.Errorf("there is no worktree called %s %s — `mia p ls` shows what is here, `mia api machines` what is on each machine", name, src.where())
 		}
 		return Moved{}, err
 	}

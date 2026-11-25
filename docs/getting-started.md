@@ -57,7 +57,8 @@ monduli — due-dates in a worktree of its own
 ```bash
 mia shell monduli          # its tmux session
 mia switch monduli         # cd there
-mia ls                     # every worktree
+mia p ls                   # every worktree of this project
+mia ls                     # every project
 mia radar                  # find any worktree, or make one
 ```
 

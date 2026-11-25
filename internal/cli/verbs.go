@@ -23,8 +23,8 @@ var groupOf = map[string]string{
 
 var verbs = []Verb{
 	{"new", "mia new [--on <machine>] [--stack [--in <worktree>] [--worktree]] [--from <ref>] [--name <name>] [--bg] [--shell] <branch> | --pr <number> [--remote <remote>]", "create a worktree and name it, or one at a pull request's head", false, ""},
-	{"ls", "mia ls", "what exists: the worktrees of the repository here, or in no repository the projects mia knows", true, ""},
-	{"project", "mia project ls [project] | cd <worktree>", "a project's worktrees, here or by name, and the way into one; also `mia prj`, `mia p`", true, ""},
+	{"ls", "mia ls", "the projects mia knows, from any folder, the one you are in marked; a project's worktrees are `mia p ls`", true, ""},
+	{"project", "mia project ls [project] | cd <worktree>", "a project's worktrees, here or by name, and the way into one; also `mia p`, `mia pj`, `mia prj`", true, ""},
 	{"setup", "mia setup [worktree]", "run the configured setup in a worktree again", false, ""},
 	{"path", "mia path [worktree|stack|project|project/worktree]", "print a worktree's path, for scripts, matched loosely by name: one of the repository here, else a project; no argument is the main checkout", true, ""},
 	{"switch", "mia switch <worktree|stack|project|project/worktree>", "cd there, from any folder (also `mia cd`) — with `eval \"$(mia shell-init zsh)\"` in your rc", true, ""},

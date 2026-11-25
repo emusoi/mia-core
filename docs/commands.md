@@ -9,7 +9,9 @@
 |---|---|
 | `mia new <branch>` | make a worktree |
 | `mia adopt <path>` | take over a worktree |
-| `mia ls` | list worktrees |
+| `mia ls` | list the projects mia knows, from any folder |
+| `mia p ls [project]` | list a project's worktrees (also `mia project`, `pj`, `prj`) |
+| `mia cd <name>` | go to a worktree or a project, matched loosely by name |
 | `mia shell [worktree]` | attach to its session |
 | `mia switch <worktree>` | cd there |
 | `mia path [worktree]` | print its path |

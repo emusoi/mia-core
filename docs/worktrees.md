@@ -26,7 +26,8 @@ you get that worktree.
 ## Find and go
 
 ```bash
-mia ls                     # every worktree; ★ starred, dirty, session, +ahead −behind
+mia p ls                   # every worktree; ★ starred, dirty, session, +ahead −behind
+mia ls                     # every project mia knows, from any folder
 mia shell monduli          # attach to its session
 mia switch monduli         # cd there
 mia open monduli           # open it in your editor

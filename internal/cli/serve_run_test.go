@@ -79,7 +79,7 @@ func TestAVerbRunByTheServerIsHeardByItsListeners(t *testing.T) {
 	if missing, status := posted(t, verbAsked{Args: []string{"rm", "nowhere"}, Dir: repo.Root}); status != http.StatusOK || missing.Code != exitNotFound || !strings.Contains(missing.Stderr, "nowhere") {
 		t.Errorf("a verb that fails = %+v, %d", missing, status)
 	}
-	if nowhere, _ := posted(t, verbAsked{Args: []string{"ls"}, Dir: repo.Root + ".gone"}); nowhere.Code != exitFailed || nowhere.Stderr == "" {
+	if nowhere, _ := posted(t, verbAsked{Args: []string{"p", "ls"}, Dir: repo.Root + ".gone"}); nowhere.Code != exitFailed || nowhere.Stderr == "" {
 		t.Errorf("a verb in a folder there is not = %+v", nowhere)
 	}
 	response, err := serveClient(time.Second).Post("http://mia/run", "application/json", strings.NewReader("new quick"))
