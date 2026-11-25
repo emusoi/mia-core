@@ -162,3 +162,21 @@ func TestWhatIsTypedInTheListSaysWhatEnterDoes(t *testing.T) {
 		}
 	}
 }
+
+// An agent asking over MCP is told the tools, and a tool it calls answers in text; what is no
+// request is answered nothing.
+func TestMCPListsItsToolsAndAnswersACall(t *testing.T) {
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/list"}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"recall","arguments":{"text":" "}}}
+`)
+	var out strings.Builder
+	if err := serveMCP(in, &out); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 3 || !strings.Contains(lines[0], `"protocolVersion":"2025-06-18"`) || !strings.Contains(lines[1], `"name":"recall"`) || !strings.Contains(lines[1], `"name":"conversation"`) || !strings.Contains(lines[2], `"isError":true`) {
+		t.Fatalf("what mcp answered: %q", lines)
+	}
+}

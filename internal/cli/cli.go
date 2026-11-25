@@ -131,6 +131,8 @@ func Run(args []string) int {
 		}
 	case "go": // the tmux client to a worktree's session, by its name, from any folder
 		return cmdGo(rest)
+	case "mcp": // for an agent: the conversations had before, to look through and read
+		return cmdMCP()
 	case "recall": // the conversations that mention it: here, or in every project
 		return cmdRecall(rest, asJSON)
 	case "asks": // who waits on you, in every project
