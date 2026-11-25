@@ -32,7 +32,8 @@ type thread struct {
 // three seconds: a machine that is off, or whose mia is too old to look in every project,
 // has none to offer and holds nothing up.
 var elsewhere = func(machine runtime.Machine, text string, limit int) []thread {
-	out, err := runtime.RunWithin(3*time.Second, machine.SSH, "mia", "recall", "--all", "--here", "--json", text)
+	// (The mia Ship installs, named in full: a shell that is not a login one has no path to it.)
+	out, err := runtime.RunWithin(3*time.Second, machine.SSH, "sh", "-c", `"$HOME/.local/bin/mia" recall --all --here --json "$1"`, "sh", text)
 	var found []thread
 	if err != nil || json.Unmarshal([]byte(out), &found) != nil {
 		return nil

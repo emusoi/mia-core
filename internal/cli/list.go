@@ -2,6 +2,7 @@ package cli
 
 import (
 	"cmp"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/emusoi/mia-core/internal/app"
 	"github.com/emusoi/mia-core/internal/run"
+	"github.com/emusoi/mia-core/internal/runtime"
 )
 
 // The one list (design/tmux, version B): tmux's prefix k opens it over whatever is in front, and
@@ -46,6 +48,9 @@ type listed struct {
 // place is a worktree or a project to go to.
 type place struct{ name, project, branch, path, root string }
 
+// awayTree is a worktree of the project here that is on a machine.
+type awayTree struct{ name, branch, machine string }
+
 // layer is one branch of the stack the worktree here is on.
 type layer struct {
 	Branch       string `json:"branch"`
@@ -59,12 +64,14 @@ type listModel struct {
 	here     string   // the project the folder is in, "" in none
 	root     string   // and its main checkout
 	tree     string   // the worktree the folder is, by its name
+	main     bool     // and it is the main checkout, which stays where it is
 	machines []string // the machines mia knows other than this one
 	query    string
 	cursor   int
 	width    int
 	height   int
 	stack    []layer
+	away     []awayTree // the worktrees of the project here that are on a machine
 	places   []place
 	stand    app.Standing
 	agents   []agentKnown
@@ -79,6 +86,7 @@ type (
 	agentsMsg   []agentKnown
 	machinesMsg []string
 	stackMsg    []layer
+	awayMsg     []awayTree
 	threadsMsg  struct {
 		text  string
 		found []thread
@@ -115,12 +123,44 @@ func (m listModel) Init() tea.Cmd {
 			}
 			return machinesMsg(names)
 		},
+		func() tea.Msg { return awayMsg(treesAway(m.root)) },
 		func() tea.Msg {
 			var layers []layer
 			_ = apiSaid(self, &layers, "stack")
 			return stackMsg(layers)
 		},
 	)
+}
+
+// treesAway is the worktrees of the repository at root that are on a machine: each machine's
+// mia asked, three seconds given to it, in the folder the repository has there.
+func treesAway(root string) []awayTree {
+	a, err := app.Open(root)
+	if err != nil {
+		return nil
+	}
+	dir, err := a.RemoteDir()
+	if err != nil {
+		return nil
+	}
+	var away []awayTree
+	for _, machine := range otherMachines() {
+		out, err := runtime.RunWithin(3*time.Second, machine.SSH, "sh", "-c", `cd "$HOME/$1" 2>/dev/null && "$HOME/.local/bin/mia" api worktrees`, "sh", dir)
+		var there []struct {
+			Name   string `json:"name"`
+			Branch string `json:"branch"`
+			Main   bool   `json:"main"`
+		}
+		if err != nil || json.Unmarshal([]byte(out), &there) != nil {
+			continue
+		}
+		for _, t := range there {
+			if !t.Main {
+				away = append(away, awayTree{t.Name, t.Branch, machine.Name})
+			}
+		}
+	}
+	return away
 }
 
 // everyPlace is every worktree of every project mia knows, and each project; the repository at
@@ -162,6 +202,8 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.machines = msg
 	case stackMsg:
 		m.stack = msg
+	case awayMsg:
+		m.away = msg
 	case threadsMsg:
 		if msg.text == m.words() {
 			m.threads, m.asked = msg.found, msg.text
@@ -294,7 +336,7 @@ func (m listModel) rows() []listRow {
 	case q == "?": // what can be typed here, said in the list itself and nowhere else
 		for _, h := range [][2]string{{"a name", "go to that worktree or project"}, {"pi fix the test", "start that agent here on it"},
 			{"> codex", "hand this conversation to that agent"}, {"1", "give that answer to whoever waits"},
-			{"words said before", "find the conversation, and resume it"}, {"nvim · lazygit · shell", "open it in a new window"}, {"@ fedora", "move this worktree to that machine, @ local back"},
+			{"words said before", "find the conversation, and resume it"}, {"nvim · lazygit · shell", "open it in a new window"}, {"@ fedora", "move this worktree to that machine, or bring one back"},
 			{"new a-branch", "a new worktree on that branch, in the project here"}, {"rm a-name", "remove that worktree, its session and its name"},
 			{"stack", "the layers of the stack this worktree is on, to go to one"}} {
 			rows = append(rows, listRow{mark: " ", words: h[0], right: h[1]})
@@ -324,6 +366,15 @@ func (m listModel) rows() []listRow {
 			its = narrowed
 		}
 		places(its)
+		if project == m.here { // and those of it that are on a machine: its session there, in a window here
+			for _, t := range m.away {
+				if strings.TrimSpace(within) == "" || len(closest(strings.TrimSpace(within), []string{t.name + " " + t.branch})) > 0 {
+					rows = append(rows, listRow{mark: "⇄", words: t.name + "  " + t.branch, right: "on " + t.machine, do: func(l listed) error {
+						return l.openIn(m.root, run.ShellJoin([]string{l.self, "machine", "attach", t.name + "@" + t.machine}))
+					}})
+				}
+			}
+		}
 	case verb == "stack":
 		for _, layer := range m.stack {
 			mark, right := " ", fmt.Sprintf("%d ahead", layer.Ahead)
@@ -359,6 +410,9 @@ func (m listModel) rows() []listRow {
 		for _, i := range closest(rest, names) {
 			p := trees[i]
 			rows = append(rows, listRow{mark: "−", words: "remove worktree " + p.name + "  " + p.branch, right: p.project, do: func(l listed) error {
+				if p.root == m.root && p.name == m.tree {
+					l.leave()
+				}
 				return l.apart(p.root, "remove "+p.name, "rm", p.name)
 			}})
 		}
@@ -380,23 +434,22 @@ func (m listModel) rows() []listRow {
 				return l.beside(l.folder, "hand", "--window", l.window, name)
 			}})
 		}
-	case strings.HasPrefix(q, "@"): // the worktree here to a machine, or back to this one
-		names := append(slices.Clone(m.machines), "local")
-		at := closest(strings.TrimSpace(q[1:]), names)
-		if strings.TrimSpace(q[1:]) == "" {
-			at = at[:0]
-			for i := range names {
-				at = append(at, i)
+	case strings.HasPrefix(q, "@"): // the worktree here to a machine, and one that is on a machine back
+		want := strings.TrimSpace(q[1:])
+		for _, to := range m.machines {
+			if m.tree != "" && !m.main && (want == "" || len(closest(want, []string{to})) > 0) {
+				words := "move " + m.tree + " to " + to
+				rows = append(rows, listRow{mark: "⇄", words: words, right: "branch, uncommitted work, windows", do: func(l listed) error {
+					l.leave() // its session here ends with the move: the client is not to end with it
+					return l.apart(m.root, words, "move", m.tree, to)
+				}})
 			}
 		}
-		for _, i := range at {
-			to, words := names[i], "move "+m.tree+" to "+names[i]
-			if to == "local" {
-				words = "bring " + m.tree + " back to this computer"
-			}
-			if m.tree != "" {
-				rows = append(rows, listRow{mark: "⇄", words: words, right: "branch, uncommitted work, windows", do: func(l listed) error {
-					return l.apart(m.root, words, "move", m.tree, to)
+		for _, t := range m.away {
+			if want == "" || len(closest(want, []string{t.machine, t.name})) > 0 {
+				words := "bring " + t.name + " back from " + t.machine
+				rows = append(rows, listRow{mark: "⇄", words: words, right: t.branch, do: func(l listed) error {
+					return l.apart(m.root, words, "move", t.name+"@"+t.machine, "local")
 				}})
 			}
 		}
@@ -433,7 +486,11 @@ func (m listModel) rows() []listRow {
 				}
 				rows = append(rows, listRow{mark: "↺", words: who + ": " + t.Line, right: t.Project + " · " + whose + " · " + t.At.Local().Format("Jan 2"), do: func(l listed) error {
 					if t.Machine != "" { // on a machine: its worktree's session there, in a window here
-						return l.open(run.ShellJoin([]string{l.self, "machine", "attach", t.Worktree + "@" + t.Machine}))
+						at := slices.IndexFunc(m.places, func(p place) bool { return p.project == "project" && p.name == t.Project })
+						if at < 0 {
+							return fmt.Errorf("%s is on %s, and no project here is called that to reach it from", t.Project, t.Machine)
+						}
+						return l.openIn(m.places[at].root, run.ShellJoin([]string{l.self, "machine", "attach", t.Worktree + "@" + t.Machine}))
 					}
 					if err := l.goTo(t.Root, t.Cwd); err != nil {
 						return err
@@ -519,13 +576,16 @@ func (l listed) goTo(root, worktree string) error {
 
 // open opens a window in the client's session, in the folder the list was opened in, running
 // runs ("" a shell).
-func (l listed) open(runs string) error {
+func (l listed) open(runs string) error { return l.openIn(l.folder, runs) }
+
+// openIn is open in another folder.
+func (l listed) openIn(dir, runs string) error {
 	tmux := run.Local("tmux")
 	session, err := tmux.Capture("display-message", "-p", "-c", l.client, "#{session_id}")
 	if err != nil {
 		return err
 	}
-	argv := []string{"new-window", "-t", strings.TrimSpace(session) + ":", "-c", l.folder}
+	argv := []string{"new-window", "-t", strings.TrimSpace(session) + ":", "-c", dir}
 	if runs != "" {
 		argv = append(argv, runs)
 	}
@@ -533,6 +593,15 @@ func (l listed) open(runs string) error {
 		return fmt.Errorf("tmux new-window: %s", strings.TrimSpace(out))
 	}
 	return nil
+}
+
+// leave takes the client to the session it was in before, or the next: for when the session it
+// is in is about to end, which would end the client with it.
+func (l listed) leave() {
+	tmux := run.Local("tmux")
+	if _, err := tmux.Combined("switch-client", "-c", l.client, "-l"); err != nil {
+		_, _ = tmux.Combined("switch-client", "-c", l.client, "-n")
+	}
 }
 
 // apart runs this mia in dir and lets it go on by itself, as beside does, where it opens no
@@ -608,7 +677,7 @@ func cmdTmuxList(args []string) int {
 		if resolver, err := a.Resolver(); err == nil {
 			for _, r := range resolver.Records {
 				if r.Path == args[2] || strings.HasPrefix(args[2], r.Path+string(filepath.Separator)) {
-					m.tree = r.Name
+					m.tree, m.main = r.Name, r.Path == a.Root
 				}
 			}
 		}

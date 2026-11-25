@@ -141,6 +141,7 @@ func TestWhatIsTypedInTheListSaysWhatEnterDoes(t *testing.T) {
 		places: []place{{name: "kijenge", project: "demo", branch: "feat-one", path: "/d.kijenge", root: "/d"}, {name: "demo", project: "project", path: "/d", root: "/d"},
 			{name: "sinza", project: "other", path: "/o.sinza", root: "/o"}, {name: "other", project: "project", path: "/o", root: "/o"}},
 		root:   "/d",
+		away:   []awayTree{{"sanawari", "held", "fedora"}},
 		stack:  []layer{{Branch: "feat-one", Current: true, Ahead: 2}, {Branch: "feat-two", NeedsRestack: true}},
 		agents: []agentKnown{{Name: "pi", Installed: true}, {Name: "codex", Installed: true}}, tree: "kijenge", machines: []string{"fedora", "box"}}
 	m.stand.Waiting = []app.Stand{{Worktree: "sinza", Repository: "other", Line: "Run it now?", Options: []string{"yes", "no"}}}
@@ -167,8 +168,9 @@ func TestWhatIsTypedInTheListSaysWhatEnterDoes(t *testing.T) {
 		">":            "move this conversation to pi | move this conversation to codex",
 		"2":            "answer sinza: no",
 		"3":            "",
-		"@":            "move kijenge to fedora | move kijenge to box | bring kijenge back to this computer",
-		"@ fed":        "move kijenge to fedora",
+		"@":            "move kijenge to fedora | move kijenge to box | bring sanawari back from fedora",
+		"demo/":        "kijenge  feat-one | sanawari  held",
+		"@ fed":        "move kijenge to fedora | bring sanawari back from fedora",
 		"nvim":         "open the editor here",
 		"git":          "open lazygit here",
 	} {
