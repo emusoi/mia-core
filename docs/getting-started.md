@@ -37,6 +37,7 @@ non-fatal; direct HTTP needs no browser proxy or trusted certificate.
 | stack | several branches sharing one worktree, each on the one below |
 | environment | a container where a worktree's code runs |
 | machine | where environments run: this computer, or one you can ssh to |
+| conversation | what was said to an agent in a worktree, kept where the agent keeps it |
 | plugin | a program named `mia-<name>` that adds to mia |
 
 Anywhere mia takes a worktree, you can give its name, its path, or its branch.
@@ -59,8 +60,21 @@ mia shell monduli          # its tmux session
 mia switch monduli         # cd there
 mia p ls                   # every worktree of this project
 mia ls                     # every project
-mia radar                  # find any worktree, or make one
 ```
+
+## In tmux
+
+```bash
+mia tmux install
+```
+
+adds mia to your tmux config. Then `prefix k` opens the one list, where
+everything starts: type a name to go there, `claude fix the test` to start
+an agent on it, `new <branch>` for a worktree, or any words to find what
+was said. `?` in it says the rest. See [mia in tmux](tmux.md).
+
+With an agent at work in a few worktrees, the status line says who needs
+you, and a number in the list answers whoever has waited longest.
 
 ## Settings for a repository
 

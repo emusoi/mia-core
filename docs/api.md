@@ -1,10 +1,39 @@
 # Automation
 
-`mia` commands are the interface for scripts, `mia-ui` and plugins. Read
-commands that support structured output take `--json`; `mia api` always emits
-JSON. [`mia serve`](serve.md) answers the same queries over a socket, and
-tells a client that listens when an answer changes, so it need not ask
-again; `mia api` asks it when it runs.
+Scripts, plugins and apps read mia with `mia api <query>`, which always
+prints JSON. Every other read command takes `--json` as well. When a
+[`mia serve`](serve.md) of the same build runs, `mia api` asks it and prints
+what it answers, the same bytes and exit code. A client can also talk to the
+server directly and be told when an answer changes.
+
+| query | answers | asked from |
+|---|---|---|
+| [`capabilities`](#discover-the-interface) | the API version, its queries and its feature markers | anywhere |
+| [`worktrees [<worktree>…]`](#worktrees) | the repository's worktrees, their windows and signals | a repository |
+| [`machines`](#machines) | this computer and each machine added, and whether it answers | anywhere |
+| [`here`](#here) | how busy this computer is, and the machines it knows | anywhere |
+| [`repos`](#repos) | every repository mia has named a worktree in | anywhere |
+| [`stack [<worktree>]`](#stack-and-base) | the layers of a worktree's stack | a repository |
+| [`base`](#stack-and-base) | the repository's base branch | a repository |
+| [`status`](#status) | how the worktree a folder is in stands in git | a git folder |
+| [`env [<worktree>]`](#env) | a worktree's environment: container, ports, services | a repository |
+| [`window <index>`](#window) | whether a window's agent works, and what it asks | a repository |
+| [`sessions`, `signals`](#sessions-and-signals) | the sessions mia remembers, the signals that stand | a repository |
+| [`conversations`](#conversations) | the agent conversations of the repository | a repository |
+| [`conversation <id>`](#one-conversation) | one conversation as turns | a repository |
+| [`main`](#the-main-agent) | the main agent, its turns and its conversations | anywhere |
+| [`chats`, `chat <name>`](#chats) | every chat, one chat, a chat's turns | anywhere |
+| [`standing`](#standing) | who waits on you, who works, what finished unread, on every machine | anywhere |
+| [`agents`](#agents) | every agent mia knows, with its models and efforts | anywhere |
+| [`setups`](#setups) | the agent, model and effort setups used, and the roles | anywhere |
+| [`accounts`](#accounts) | every account of every agent | anywhere |
+| [`apps`](#apps) | every app with a manifest | anywhere |
+| [`plugins`](#plugins) | the plugins there are, enabled or not | anywhere |
+
+"Anywhere" means any folder. In a repository, `agents`, `plugins` and `apps`
+also read that repository's configuration, and `setups` answers for that
+repository. `machines` and `here` also answer outside a repository, with no
+repository's worktrees in them.
 
 ## Discover the interface
 
@@ -12,308 +41,340 @@ again; `mia api` asks it when it runs.
 mia api capabilities
 ```
 
-The answer names the API version, available queries and feature markers
-introduced by newer builds:
-
 ```json
 {
   "version": 1,
-  "queries": ["capabilities", "worktrees", "machines"],
-  "features": ["direct-http", "project-config", "doctor"]
+  "queries": ["capabilities", "worktrees", "machines", "…"],
+  "features": ["direct-http", "project-config", "doctor", "…"]
 }
 ```
 
-The actual answer includes every query and feature, not this shortened list.
-`capabilities`, `machines`, `here`, `repos`, `main`, `standing`,
-`agents`, `apps` and `plugins` answer from any folder; the other queries are about a repository and need one. Check capabilities before using a feature. Existing response shapes are not
-wrapped in a version envelope.
+`version` goes up only when a field changes meaning or goes away, never
+when one is added. `queries` is every query this mia answers. `features`
+are markers that newer builds add. Check for a feature before you rely on
+it. The sections below name the feature each one depends on. Answers are
+not wrapped in a version envelope.
 
-What the apps read is kept: `internal/cli/testdata/api` holds the shape of
-each `mia api` answer — every field by name, its type, whether it may be
-left out or null, and the values of a closed set such as a turn's `kind` or
-a machine's `reach.state` — and the inputs its usage names, read off the Go
-types rather than off a live answer. A test fails, naming the field, when one
-is removed or renamed, changes type, may newly be left out, loses a value, or
-when a query comes to need an input it did not. A field, value or optional
-flag that is added passes and says to keep it with
+The shape of every answer is kept in `internal/cli/testdata/api`: each
+field by name and type, whether it may be left out or null, the values of a
+closed set such as a turn's `kind`, and the inputs each query takes. These
+are read off the Go types. A test fails, naming the field, when a field is
+removed, renamed, changes type or may newly be left out, or when a query
+needs an input it did not need before. A field or value that is added
+passes. Record it with
 `go test ./internal/cli -run TestTheAPIAnAppWasBuiltOnStillAnswersTheSame -update`.
 
-## JSON commands
+## Exit status
 
-| command | returns |
+| code | means |
 |---|---|
-| `mia api <query>` | worktrees, machines, here, repositories, environments, stacks, base, conversations, the main agent, standing, agents, apps, a worktree's git status, a window's agent, and the sessions, signals and plugins mia keeps |
-| `mia config show --json` | effective global, project and local configuration |
-| `mia doctor --json` | every check and an overall `ok`; failures still exit non-zero |
-| `mia gateway status --json` | `running`, `address`, `pac`, `ca`, `trust`, `differentBuild`, `routes` |
-| `mia env host [worktree] --json` | `worktree`, `machine`, and remote `staging` when present |
-| `mia dev --json` | whether main is lent, and its `worktree`, `path`, `stashed` |
-| `mia env sync <worktree> status --json` | sync session, problems and conflict count |
-| `mia env sync <worktree> conflicts --json` | the same session with `conflictPaths` |
-| `mia env sync <worktree> preview --json` | ignore rules and secret paths excluded or allowed |
-| `mia gc --merged --json` | clean merged worktrees offered for removal, without removing them |
-| `mia stack sync --json` | fetched base, current layer, dropped landed layers and rebase count |
+| `0` | it worked |
+| `1` | it failed: the reason is on stderr, as `mia: …` |
+| `3` | not found: no such worktree, or no such query |
+| `64` | usage: the query was typed wrong; stderr gives its usage |
 
-In `mia api worktrees`, and in each machine's `worktrees` in `mia api
-machines`, two fields mean less than their names say. `adopted` is whether
-mia keeps the worktree: `true` for one made with `mia new` or taken over
-with `mia adopt`, `false` for one made by hand and for a main checkout
-that was never adopted. `where` is where the worktree's environment runs,
-as the mia that keeps the worktree says it: `local` is that mia's own
-computer, so beside `"machine": "fedora"` it means on fedora.
+A query that fails prints no JSON. A command that runs another command
+passes on that command's exit status where it can: `mia run`, `mia env run`,
+`mia env exec` and interactive shells.
 
-Each of a worktree's `windows` has a `kind`: what its first pane is for,
-one of `agent`, `shell`, `editor`, `server`, `tests` or `logs`. mia marks
-every pane it starts with one, as tmux's pane option `@mia_kind`, and
-keeps it when the session comes back after tmux went down or crossed to
-another machine. A window opened by hand in tmux has none: `kind` is left
-out. See [Pane kinds](tmux.md#pane-kinds) for how each is decided.
+## Worktrees
 
-A window that runs an app with a [manifest](apps.md) has `app`, the app's
-name; it is left out for any other. When only the pane's title told the
-app, under a command its manifest lists in `via`, the window's `command`
-is the app's name as well, as it is `pi` for pi; told by its command, the
-window keeps the `command` it has. An agent's window never has `app`.
+`mia api worktrees` is every worktree of the repository, its main checkout
+included. Name worktrees after it to get only those.
 
 ```json
-{"index":2,"name":"notes","command":"notes","quiet":"3s","active":false,"app":"notes"}
+[{"name":"monduli","path":"/home/user/src/shop.monduli","branch":"fix-login","dirty":true,
+  "session":true,"adopted":true,"where":"local","seen":"2026-11-21T17:40:02-05:00",
+  "ahead":2,"files":3,"added":41,"deleted":7,
+  "last_work":"2026-11-21T18:00:26-05:00","last_subject":"The login keeps the session",
+  "windows":[{"index":1,"name":"claude","command":"claude","quiet":"2s","active":true,
+              "kind":"agent","agent":"Fixing the login test","working":true},
+             {"index":2,"name":"notes","command":"notes","quiet":"3m10s","active":false,"app":"notes"}],
+  "signals":[{"worktree":"monduli","kind":"busy","rank":60,"from":"claude",
+              "at":"2026-11-21T18:00:20-05:00","pane":"%12","pid":48211}]}]
 ```
 
-`mia api stack [worktree]` and `mia stack show --json` are the same answer:
-the layers of the stack the worktree's branch is in, bottom first, each with
-`branch`, `parent`, `landed`, `ahead`, `needs_restack`, `current`,
-`base_moved` when the base moved on under the bottom layer, and `worktree`,
-the name of the worktree the layer is checked out in, left out when it is
-checked out in none.
+| field | is |
+|---|---|
+| `main` | true of the main checkout; left out otherwise |
+| `adopted` | mia keeps the worktree: made with `mia new` or taken over with `mia adopt`. False for one made by hand and for a main checkout never adopted |
+| `session` | its tmux session runs |
+| `where` | where its environment runs, as the mia that keeps it says it. `local` is that mia's own computer, so beside `"machine":"fedora"` it means fedora |
+| `machine`, `unreachable` | the machine whose mia keeps the worktree, left out for this one. `unreachable` is set when that machine did not answer and this is its last answer |
+| `starred`, `seen` | you starred it; when you last switched to it |
+| `ahead`, `behind`, `files`, `added`, `deleted` | its branch against the base: commits, and the files and lines it changes |
+| `last_work`, `last_subject` | its last commit's time and subject |
+| `layers`, `stack` | of a branch in a [stack](stacks.md): its layers, as [`stack`](#stack-and-base) gives them, and the stack's name |
+| `dev` | when [`mia dev`](environments.md#mains-dev-server) lends the main checkout's dev server: `has <worktree>'s files` on the main checkout, `on main's dev server` on the worktree |
+| `windows` | its session's windows, when it runs |
+| `signals` | what anything outside mia last said about it, best first: see [Signals](tmux.md#signals) |
+
+Each window has `index`, `name`, `command`, whether it is `active`, and
+`quiet`, how long since it last wrote (`3s`, `1m12s`). The rest are left
+out when they do not apply:
+
+| field | is |
+|---|---|
+| `kind` | what its first pane is for: `agent`, `shell`, `editor`, `server`, `tests` or `logs`. mia marks every pane it starts with the tmux pane option `@mia_kind`. A window opened by hand has none. See [Pane kinds](tmux.md#pane-kinds) |
+| `agent`, `working` | the title an agent gives its pane, and whether its spinner says it is at work now |
+| `app` | the [app](apps.md) a manifest says it runs. When only the pane's title named the app, `command` is the app's name too. An agent's window never has one |
+| `pid`, `panes` | its process, and how many panes it is split into |
+
+## Machines
+
+`mia api machines` is this computer, as `local`, then every machine
+`mia machine add` added, all asked at once. A machine linked to this
+repository also reports its worktrees, in the same shape as
+[`worktrees`](#worktrees), and its branches are fetched. One that does not
+answer keeps the worktrees it last reported, each marked `unreachable`.
+
+```json
+[{"name":"local","ssh":"","engine":"","answers":true,"reach":{"state":"ok"},
+  "health":{"load":[1.2,1.4,1.5],"cores":10,"mem_used":11.8,"mem_total":32,
+            "disk_used":402.1,"disk_total":926.4,"ports":{"/home/user/src/shop":[5173]}}},
+ {"name":"fedora","ssh":"user@fedora","engine":"podman","answers":false,
+  "detail":"fedora: ssh: connect to host fedora port 22: Operation timed out",
+  "reach":{"state":"unreachable","detail":"fedora cannot be reached over ssh: …","fix":"turn fedora on, or check its address with ssh user@fedora"},
+  "worktrees":[{"name":"goba","path":"/home/user/src/shop.goba","dirty":false,"session":true,"adopted":true,"unreachable":true}]}]
+```
+
+`health` is how busy it is: load averages, cores, memory and the disk the
+repository is on in GB, and the TCP ports listened on, by the folder of
+the process that listens. It is left out when the machine did not answer.
+
+`reach` says what not answering means, with the one step that fixes it.
+The same `reach` is in [`standing`](#standing) and in
+`mia machine ls --json`. Feature `machine-reach`.
+
+| `state` | is | `fix` |
+|---|---|---|
+| `ok` | it answered | |
+| `unreachable` | ssh could not connect: it is off, its name does not resolve, or it timed out | turn it on, or check its address |
+| `needs_login` | ssh got there and was not let in: a key refused, a host key not accepted, a password wanted. mia never asks for one | `ssh <target>` once in a terminal |
+| `no_mia` | it answers and has no mia at `~/.local/bin/mia` | `mia machine ship <name>` |
+| `old_mia` | its mia does not know the query; `detail` says its version | `mia machine ship <name>` |
+| `not_set_up` | its mia runs and this repository is not there. It has `answers` true | `mia machine link <name>` |
+| `failed` | its mia answered with another error; `detail` has its line | |
+
+`reach.warnings` are things that work now and will stop working, each with
+a `name`, `detail` and `fix`. The one there is today is `linger`: a Linux
+machine whose user services stop when you log out (`loginctl show-user`
+says `Linger=no`). Each machine's own mia checks this at most every ten
+minutes.
+
+A machine that does not answer within 8 seconds is not waited for, and is
+not asked again for 30 seconds by any mia. One that is `unreachable` or
+`needs_login` twice running is asked once a minute until it answers.
+
+## Here
+
+`mia api here` is this computer alone, for a client that asks each machine
+itself: its `health`, as above, and the names of the `machines` it can move
+worktrees to. Nothing is asked over ssh.
+
+```json
+{"health":{"load":[1.2,1.4,1.5],"cores":10,"mem_used":11.8,"mem_total":32,"disk_used":402.1,"disk_total":926.4},
+ "machines":["fedora"]}
+```
+
+## Repos
+
+`mia api repos` is every repository mia has named a worktree in, by the
+name of its main checkout's folder. One gone from disk, a bare one and one
+in a temporary folder are left out. `mia ls --json` prints the same.
+
+```json
+[{"name":"mia-core","path":"/home/user/src/mia-core"},{"name":"shop","path":"/home/user/src/shop"}]
+```
+
+## Stack and base
+
+`mia api stack [<worktree>]` is the layers of the stack the worktree's
+branch is in, bottom first, the same answer as `mia stack show --json`.
+With no worktree it is the one the folder is in. A branch in no stack, or a
+detached `HEAD`, gives `[]`.
 
 ```json
 [{"branch":"api","parent":"main","landed":false,"ahead":2,"needs_restack":false,"current":true,"worktree":"monduli"},
  {"branch":"ui","parent":"api","landed":false,"ahead":1,"needs_restack":true,"current":false}]
 ```
 
-`mia api status`, typed in a worktree, is how it stands in git, as
-[mia git](#mia-git) shows it: its `branch` (`""` detached), the commit it
-is at, `head`, what it follows, `upstream`, `gone` when that is no
-longer there, and the commits `to_push` and `to_pull`; its files
-`staged`, `changed` and `untracked`, each with its `path`, `from` when it
-was renamed, `state` (`new`, `deleted`, `renamed`, `conflict`; left out
-for one only changed), and its `size` and when it was last `written` in
-the worktree, left out of one that is not there; and how many `stashes`
-the repository keeps. It is git's own folder, no repository of mia's.
+`current` is the layer the worktree is on. `base_moved` is set on the
+bottom layer when the base moved on under it. `worktree` is where the layer
+is checked out, and is left out when it is checked out nowhere.
+
+`mia api base` is the repository's base branch: `{"branch":"main"}`.
+
+## Status
+
+`mia api status`, typed in any folder of a git repository, is how that
+worktree stands in git. It needs no repository of mia's.
 
 ```json
-{"branch":"feature","head":"5d1c…","upstream":"origin/feature","gone":false,"to_push":1,"to_pull":0,
+{"branch":"feature","head":"5d1c0a9e…","upstream":"origin/feature","gone":false,"to_push":1,"to_pull":0,
  "staged":[],"changed":[{"path":"main.go","size":2048,"written":"2026-11-21T18:00:26-05:00"}],"untracked":[],"stashes":0}
 ```
 
-`mia api sessions`, `mia api signals` and `mia api plugins` are what
-`mia resurrect --list --json`, `mia signal ls --json` and `mia plugin ls
---json` print, the same bytes: the sessions the repository remembers, the
-signals of its worktrees whose setter is still there, and the plugins
-there are, enabled or not. A client asks them of [mia serve](serve.md) as
-it asks any query, where it would have started those verbs.
+| field | is |
+|---|---|
+| `branch`, `head` | the branch, `""` when detached, and the commit it is at |
+| `upstream`, `gone` | what it follows, and whether that is no longer there |
+| `to_push`, `to_pull` | commits ahead of and behind the upstream |
+| `staged`, `changed`, `untracked` | its files, each with `path`; `from` when renamed; `state`, one of `new`, `deleted`, `renamed`, `conflict`, left out for a plain change; and `size` and `written`, when the file was last written, both left out of a file that is not there |
+| `stashes` | how many stashes the repository keeps |
 
-`mia api window <index> [--worktree <name>]` is a window of the worktree
-the folder is in, or of the one named: whether its agent is `working`, as
-[mia chat](#apps) says it, and what its screen `asks` when it asks
-something — its `text`, its `options` and the one `selected`. agy gives
-its pane no title to say it works by, so of agy's window it is what agy
-itself tells of the conversation the window has open: working until the
-last step it wrote is a reply that calls no tool.
+## Env
+
+`mia api env [<worktree>]` is the [environment](environments.md) a
+worktree's code runs in.
+
+```json
+{"worktree":"/home/user/src/shop.monduli","name":"monduli","container":"mia-monduli",
+ "image":{"ref":"mcr.microsoft.com/devcontainers/base:ubuntu","source":"default base"},
+ "state":"running","listening":[5173],"placement":{},"machine":"local",
+ "ports":{"listening":[5173],"declared":[5173],"page":5173},
+ "services":[{"id":"web","run":["npm","run","dev"],"running":true,"healthy":true}]}
+```
+
+| field | is |
+|---|---|
+| `worktree`, `name` | the worktree's path and its name |
+| `image.source` | where the image came from: `[env] image`, `devcontainer.json`, `detected stack`, `default base`, `compose file`, or `` built by `mia env image` `` |
+| `state` | what the container engine says, such as `running` or `exited`; `""` when there is no container |
+| `placement`, `machine` | where it runs: `{}` here, else `{"runtime":"<machine>","staging":"<folder there>"}`; and that machine's name, `local` for this one |
+| `mirror` | of one on another machine, how the file sync stands |
+| `ports` | the ports listened on, those the config declares, and the `page` to open |
+| `services` | each service, whether it runs, and `healthy` when it has a check |
+| `error`, `portsError`, `servicesError` | what could not be read, when something could not |
+
+## Window
+
+`mia api window <index> [--worktree <name>]` is one window of the worktree
+the folder is in, or of the one named: whether its agent is `working`, and
+what its screen `asks` when it waits on you, with the `options` and the one
+`selected`, the first being 1.
 
 ```json
 {"working":false,"asks":{"text":"Do you want to make this edit?","options":["Yes","No"],"selected":1}}
 ```
 
-[`GET /events`](serve.md#get-events) asks these two again each time the
-server looks, every second, as no file says when they change: `mia git`
-and `mia files` listen to `status` and `mia chat` to `window` when a
-server of their build answers.
+`working` comes from the spinner an agent puts in its pane's title, else
+from the worktree's [standing](#standing), as a `busy` signal says it.
+agy's pane has no such title, so for agy's window it comes from its
+conversation: at work until the last step it wrote is a reply that calls
+no tool.
+
+No file says when a window or a worktree's files change, so
+[`GET /events`](serve.md#get-events) asks `window` and
+[`status`](#status) again every second for whoever listens.
+
+## Sessions and signals
+
+`mia api sessions`, `mia api signals` and `mia api plugins` print the same
+bytes as `mia resurrect --list --json`, `mia signal ls --json` and
+`mia plugin ls --json`. A client can ask them of [mia serve](serve.md)
+instead of starting those commands.
+
+`sessions` is every session the repository remembers, the last seen first.
+`state` is `running`, `down` (it went down with tmux) or `closed` (it was
+closed while tmux ran). Each window is given as `mia resurrect` opens it
+again, in Go's own field names: `Name`, `Dir`, `Command`, and where they
+apply `Conversation`, `ID`, `Account`, `Kind`, `Label`, `Splits`, `Layout`
+and `Auto`.
+
+```json
+[{"name":"monduli","state":"down","seen":"2026-11-21T18:00:26-05:00",
+  "windows":[{"Name":"claude","Dir":"","Command":"claude","Conversation":"23f98c02-…","Kind":"agent"},
+             {"Name":"","Dir":"web","Command":"","Auto":true}]}]
+```
+
+`signals` is every signal of the repository's worktrees whose setter is
+still there, best first. Signals whose setter has gone are dropped.
+
+```json
+[{"worktree":"goba","kind":"asks","text":"wants to use Bash","rank":10,"from":"claude",
+  "at":"2026-11-21T18:00:26-05:00","pane":"%7","pid":51234,"started":"2026-11-21T17:12:00-05:00","yes":"1"}]
+```
+
+`until` is when it goes by itself, `until_seen` that it goes when the
+worktree is next switched to, and `yes` the keys that approve it, pressed
+with no Enter. See [Signals](tmux.md#signals).
+
+## Plugins
+
+`mia api plugins` is every plugin there is, enabled or not, by name.
+
+```json
+[{"name":"hello","path":"/home/user/.config/mia/plugins/mia-hello","enabled":true,
+  "manifest":{"protocol":1,"verbs":[{"name":"hello"}]}},
+ {"name":"pr","path":"/home/user/.local/bin/mia-pr","enabled":false,"manifest":{"protocol":0}}]
+```
+
+A manifest is read only from an enabled plugin. `by_config` is set when
+`plugins = [...]` in the config enables it. `problem` says why an enabled
+plugin cannot be used: it is not installed, or its manifest did not read.
+See [Plugins](plugins.md#the-manifest).
 
 ## Conversations
 
 `mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]`
-is the agent conversations of the repository — its main checkout and every
-worktree, one that was removed too — the last written to first. mia reads
-the agents' own transcripts, so nothing is recorded as they work. opencode
-keeps its conversations in a database of its own, so mia asks opencode
-for them as JSON (`opencode api GET /api/session`, `opencode session
-export <id>`), and only when opencode is installed and has a data folder;
-each is read again only once it has changed. agy writes each conversation
-in a folder of its own, `~/.gemini/antigravity-cli/brain/<id>`, as JSON
-lines, and keeps the folder it was made in apart from it, in what was
-typed into it, `history.jsonl`, and in its `cache`, which mia reads it
-from.
+is the agent conversations of the repository, from its main checkout and
+every worktree, removed ones too, the last written to first. mia reads the
+agents' own transcripts, so nothing is recorded while they work. opencode's
+come from opencode itself (`opencode api GET /api/session`,
+`opencode session export`), and only when it is installed. A conversation
+is read again only once it has changed. Feature `conversations`.
 
 ```json
-[{"id":"23f98c02-c52b-4de9-8c69-b322eb153bff","agent":"claude",
-  "cwd":"/Users/user/src/app.monduli","worktree":"monduli","gone":false,
+[{"id":"23f98c02-c52b-4de9-8c69-b322eb153bff","agent":"claude","account":"default",
+  "cwd":"/home/user/src/shop.monduli","worktree":"monduli","gone":false,
   "asked":"make the list faster","said":"It is faster now: one read for each file.",
   "started":"2026-11-02T10:00:00Z","active":"2026-11-02T10:41:07Z","turns":4,
-  "running":true,"window":{"index":2,"name":"claude"}}]
+  "running":true,"window":{"index":2,"name":"claude"},"model":"opus","effort":"high"}]
 ```
 
 | field | is |
 |---|---|
-| `agent` | whose it is: `claude`, `codex`, `pi`, `opencode`, `agy`, or the name of an agent a plugin adds |
-| `account` | the agent's [account](worktrees.md#an-agents-account) whose folder it is in, `default` for the agent's own; of a plugin's agent, the one its running window was started on. Left out for an agent mia keeps no accounts of |
-| `worktree` | the worktree `cwd` is or is in; a removed one by what followed the main checkout's path; empty when none of this repository's |
-| `gone` | the folder is no more |
-| `asked`, `said` | the first thing the person asked and the last thing the agent said, each on one line, cut at 200 characters |
-| `started`, `active` | when the first thing in it was said and when it was last written to, both in UTC as RFC 3339, to the millisecond at most |
-| `turns` | how many things the person asked |
-| `running`, `window` | a window of that worktree's session runs this agent with this conversation — one mia started too, which to tmux has the shell it was started by in front; `window` is left out otherwise |
-| `model`, `effort` | of a running one, what mia started its window's agent with or last switched it to — see [Agents](#agents); left out when mia chose none. Of opencode's, running or not, `model` is otherwise the `provider/model` opencode says the conversation runs on |
-| `continues`, `continued_by` | `{"agent":…,"id":…}`, another conversation of this list: the one this was begun from by a [handoff](worktrees.md#with-another-agent), and the one that went on from this. Left out of one that is neither |
+| `agent` | `claude`, `codex`, `pi`, `opencode`, `agy`, or an agent a plugin adds |
+| `account` | the [account](#accounts) whose folder it is in, `default` for the agent's own. For a plugin's agent, the account its running window was started on. Left out for an agent mia keeps no accounts of |
+| `worktree`, `gone` | the worktree `cwd` is in, `""` when it is none of this repository's; and whether that folder is gone |
+| `asked`, `said` | the first thing you asked and the last thing the agent said, each on one line, cut at 200 characters |
+| `started`, `active` | when it began and when it was last written to, in UTC |
+| `turns` | how many things you asked |
+| `running`, `window` | a window of the worktree's session has it open now, and which. `window` is left out otherwise |
+| `model`, `effort` | of a running one, what mia started its window with or last switched it to. mia keeps these per window and does not read them from the agent, so a switch made by hand inside the agent is not seen. For opencode, `model` is otherwise the `provider/model` opencode says the conversation runs on |
+| `continues`, `continued_by` | `{"agent":…,"id":…}`: the conversation this one was [handed over](conversations.md#with-another-agent) from, and the one that went on from it. Left out when neither applies. Feature `conversation-thread` |
 
 A conversation taken up in another worktree, or on another account, was
 copied there, so it is listed once for each folder it lives in: the same
-`id`, told apart by `worktree`, `cwd` and `account`, each with its own
-turns from where they parted.
+`id`, told apart by `worktree`, `cwd` and `account`.
 
-`mia conversation continue` hands a conversation to another agent, and
-the two are one thread: the first has `continued_by`, the conversation
-the other agent began from the handoff has `continues`, and a chat reads
-the first's turns, then the second's. A mia that says them is one whose
-capabilities have `conversation-thread`. The second is known once that
-agent has written its first turn — it is the first of that agent's in
-the worktree, begun no earlier than the handoff, whose first message
-names the handoff's file — and until then neither field is there; the
-`to.window` the command gave is where it is starting. Of a conversation
-handed on more than once, `continued_by` is the last that began.
+Which conversation a window has open, claude says itself. For any other
+agent it is the newest of that agent's in the worktree, on the account the
+window was started on. A conversation the agent has open but has not
+written to yet is listed all the same: `running`, with its `window`, and
+no `asked`, `said` or `turns`.
 
-Which conversation a window has open, claude says itself. Of any other
-agent it is the newest of that agent's in the worktree on the account
-the window was started on, so two of one agent in one worktree and
-account are told apart only by which was written to last. One an agent
-says it has and has written nothing of yet — just started, or cleared —
-is listed all the same, `running` with its `window`, nothing in `asked`
-and `said` and no `turns`; `mia api conversation` reads it as no
-turns, `[]`, and it is the same of the main agent's.
+When `mia conversation continue` hands a conversation to another agent,
+the two are one thread. The first gets `continued_by`, and the second gets
+`continues`. The second is known only once that agent has written its first
+turn. Until then neither field is there. Handed on more than once,
+`continued_by` is the last one that began.
 
-`mia api conversation <id> [--worktree <name>] [--after <n>] [--follow]` is one
-conversation as turns, in order, each with a number `n` that only grows.
-`--after` gives the turns with a greater `n`: a view that polls asks for
-what came after the last it has, and mia reads only what was written
-since. Of a conversation that is in several worktrees, `--worktree` reads
-the copy in the one named, as the list names it; with none it is the last
-written to, the first of them in the list.
+### One conversation
 
-`--follow` is for a view that shows it live, in place of polling. The
-turns come in one line of JSON, the same list without the indent, and
-mia keeps running: each time the conversation gains turns, one more line
-gives only those. Nothing is printed while nothing changes. A turn that
-grew — a reply opencode is still writing — comes again under the same
-`n`, so a view replaces the turn it has by `n`. A transcript is looked
-at every 150 ms and read on from where it stopped once it changed;
-opencode's conversations are exported again every second. It ends with
-exit 0 when stdin ends, when a line cannot be written because its reader
-has gone, or on SIGINT or SIGTERM: a view keeps stdin open as long as it
-reads. `mia api capabilities` lists `conversation-follow`.
-
-`mia chat [--window <index>] [--conversation <id>]` is that, shown (and
-`mia chat --chat <name>` the same of a [chat](chats.md#shown-as-a-chat)): run
-in a pane of a worktree's session, it follows a conversation of the
-worktree and has mia desk draw it as a chat over the pane, by desk's UI
-protocol — the whole view once, the last turns that fit a message, then
-every change as a patch (a turn put in or taken out, the status, a modal
-put over the chat or taken away, a toast), and the view again when the
-pane comes into sight. With no flag it is the conversation a window has open, else
-the last written to, which is only shown. What is sent, chosen and
-stopped in the chat is typed into that window as `mia window send`,
-`press` and `key` type; what was sent comes back as a turn once the
-agent has written it. Whether the agent is at work is looked at once a
-second. `q` or `⌃C` in the plain terminal leaves, and stdin that is no
-terminal is refused, exit 1. `mia api capabilities` lists `chat`.
-
-The view fills its pane: one quiet line over the chat says the agent, the
-model and effort mia started it with or last switched it to, and the
-account it is on, with two buttons at its right, `models` and `earlier`.
-Of opencode, where mia chose no model, it is the one opencode says the
-conversation runs on. The agent is the one the window runs, with a
-conversation or none yet: the one tmux names, or the one behind node,
-bun or the shell mia started the window by, as `ps` says it.
-The chat's field types every letter, so `tab` goes from it to the
-buttons, where `m` and `e` (or `⏎`) press them. A window named by
-`--window` that has no conversation mia can read yet is a chat all the
-same, and its conversation is looked for each second; of an agent mia
-reads no conversations of (cursor-agent) the status says once
-that its replies are in its terminal. When a [mia serve](serve.md) of
-its build answers, the chat does not look each second: it listens to
-`mia api window` for its window and looks when the server says the agent
-went to work or stopped or the screen asks another thing — its
-conversation, while it has none, among what it looks for then.
-
-- **What is sent** is said at once as an `asked` turn after the last, and
-  taken out (`unturn`) in the patch that puts in the transcript's own
-  turn of the same words. When the agent was at work and another turn
-  comes first, the turn is taken out and the status says it waits. A
-  send the window refuses — it asks something first — takes the turn
-  out, gives the words back to the chat's field (`draft`) and says why
-  as the status.
-- **Questions.** An answer chosen is pressed in the window as
-  `mia window press` presses it, for every agent: its digit where the
-  options are numbered, the cursor moved to it and Enter where they are
-  not. A press refused is said as the status, the question open again.
-  What the window's screen asks that the transcript does not — a
-  permission, a folder to trust — is a question of the chat's own after
-  the last turn, looked for each second and taken out once answered.
-- **How a thing went.** The status is said alone, as a change. What went
-  well — a model switched, a conversation taken up or handed over, an id
-  copied — is a toast, which goes by itself; what did not is the status,
-  or, of something asked in a modal, a line at the modal's foot.
-- **Models** (`m`), a modal over the chat, which stays in sight behind
-  it: a search line with the keys over one list in a room of its own —
-  the setups used in this repository, then the models of each agent
-  installed under its head, the one that runs checked, an item's menu
-  (`→`, or the pointer's other button) its efforts. A pick takes the
-  modal away. opencode's are those it lists, each with its
-  provider beside it, and none when it lists none: one row then, its
-  model chosen inside it. `⏎` on a model of the chat's own agent switches
-  the window as `mia window model` does — opencode by starting it again
-  on the conversation, in the same window. On another agent's it hands the
-  conversation over, in one step: its turns written out as
-  `mia conversation continue` writes a handoff, that agent started on
-  the model in a window of its own and told nothing, the old agent's
-  window closed once the new one runs — never before, and not when it is
-  the chat's own window — and the chat goes on in the new window, the
-  turns so far over a line `continued by <agent>`. The first thing then
-  sent has the handoff in front of it in the same message, under `The
-  conversation so far, with <agent>:` and over a rule; past 48 KB only
-  its last turns, with where the whole file is. The chat shows the
-  person's own words alone, of the transcript's turn too. No agent's own
-  files, session or sign-in is read, copied or converted. `esc` takes
-  the modal away and leaves the chat, its status and what runs as they
-  were. That the new window's agent was not told yet is kept on the
-  window itself, as its tmux window option `@mia_context` — whose
-  conversation, its id and the handoff's file — so a `mia chat` started
-  for that window after, in place of the one that handed it over, shows
-  the turns so far over the same line and says the handoff with the
-  first thing sent; whichever chat sends first takes it off the window,
-  so it is said once, and a send that did not go keeps it there.
-- **Earlier** (`e`), a modal over the chat: the worktree's conversations,
-  what was first asked with the agent and how long ago, the one a window
-  has open marked, and beside the list the one under the keys read back.
-  `⏎` on one a window has open shows it, on another takes it up again as
-  `mia conversation resume` does and follows it. `c` on a conversation
-  of another agent hands it to this chat's agent as
-  `mia conversation continue` does, told to read it: the first press
-  says at the modal's foot what that carries over, the second does it.
-  Each has a menu (`→`, or the pointer's other button): **Resume** (or
-  **Go to it**) as `⏎`, **Continue with** this chat's agent on another
-  agent's, at once, and **Copy its id**. `esc` takes the modal away.
-
-A turn desk was told stays as it was told, so a turn of the chat's own —
-what was sent, what the screen asks — has a place after any the
-transcript has (past 2^30) and is taken out by it, never said again
-otherwise; what is typed in the chat's field stays. A chat of another
-window or conversation is another piece (`chat`, `chat-1`, …).
+`mia api conversation <id> [--worktree <name>] [--after <n>] [--follow]` is
+one conversation as turns, in order. Each turn has a number `n` that only
+grows. `--after <n>` gives only the turns after `n`, so a view that polls
+asks for what came after the last turn it has. For a conversation that is
+in several worktrees, `--worktree` picks the copy. With none, it is the
+one last written to.
 
 ```json
 [{"n":1,"kind":"asked","at":"2026-11-02T10:00:00Z","text":"make the list faster"},
- {"n":2,"kind":"thought","at":"2026-11-02T10:00:02Z","text":"Where does the time go? The sort runs on every keypress.","seconds":2},
+ {"n":2,"kind":"thought","at":"2026-11-02T10:00:02Z","text":"The sort runs on every keypress.","seconds":2},
  {"n":3,"kind":"said","at":"2026-11-02T10:00:04Z","text":"I will **look** at where the time goes."},
- {"n":4,"kind":"tool","at":"2026-11-02T10:00:05Z","text":"Edited view.lua +12 −3","name":"Edit","file":"/Users/user/src/app.monduli/view.lua","status":"ok"},
+ {"n":4,"kind":"tool","at":"2026-11-02T10:00:05Z","text":"Edited view.lua +12 −3","name":"Edit","file":"/home/user/src/shop.monduli/view.lua","status":"ok"},
  {"n":5,"kind":"question","at":"2026-11-02T10:00:09Z","text":"Which one?","options":["Fast","Small"],"answer":"Fast"},
  {"n":6,"kind":"answer","at":"2026-11-02T10:00:30Z","text":"Fast","question":5},
  {"n":7,"kind":"commit","at":"2026-11-02T10:01:00Z","hash":"abc1234","subject":"The list is faster"}]
@@ -321,90 +382,172 @@ window or conversation is another piece (`chat`, `chat-1`, …).
 
 | kind | is |
 |---|---|
-| `asked` | what the person said: `text` |
-| `said` | what the agent said: `text`, markdown as written |
-| `thought` | what the agent thought, as its transcript keeps it: `text`, and `seconds`, how long it thought, where the transcript says (opencode's does). Claude's thinking, codex's reasoning summary, and what pi, opencode and agy write of it; thinking that is redacted or encrypted, and its signatures, are never given |
-| `tool` | what the agent did, in a line — `Ran go test ./...`, `Read 3 files` — with the tool's `name`, `file` when it is one file's, and `status`, how it went, once the transcript says: `ok`, or `error` when it failed — of files read together, an error once one of them is and ok once each is. Left out while it runs and where the transcript does not say: claude's and pi's say of every tool, opencode's of each tool's part, codex's of a command by the code it exited with and of a script by how it ended, and agy's of a command alone. Followed, a tool comes again under its `n` with its `status` once what it gave back is written; one begun before where a view began to read says none |
-| `question` | the agent asked the person to choose: `text`, `options`, and `answer` once it is given |
-| `answer` | the person chose: `text`, and `question`, the `n` of the turn it answers — so a view that already has the question learns of it |
+| `asked` | what you said: `text` |
+| `said` | what the agent said: `text`, as markdown |
+| `thought` | what the agent thought, where its transcript keeps it: `text`, and `seconds` where the transcript says how long. Redacted or encrypted thinking is never given |
+| `tool` | what the agent did, in a line (`Ran go test ./...`, `Read 3 files`), with the tool's `name`, `file` when it is about one file, and `status`, `ok` or `error`, once the transcript says how it went. `status` is left out while the tool runs and where the transcript does not say |
+| `question` | the agent asked you to choose: `text`, `options`, and `answer` once you gave it |
+| `answer` | what you chose: `text`, and `question`, the `n` of the turn it answers |
 | `commit` | the agent made a commit: `hash` and `subject` |
 
-What its tools gave back, but for how it went, and what the system told it are left out, and a
-handoff leaves out what the agent thought. `mia recall <text…> --json` gives each conversation that
-mentions the text with its `agent`, its `worktree` and `n`, the turn to
-open it at; `n` is 0 for words that were a subagent's. A conversation that
-was copied to another worktree is given once for each folder that mentions
-it, and `n` counts in that one's. Each says its `account`, as the list
-does; so does each conversation `mia why --json` gives.
+What the tools gave back and what the system told the agent are left out.
+The main agent's turns and a chat's also have [`did`](#what-the-main-agent-did)
+and [`switch`](#another-agent-mid-conversation) turns.
 
-## The main agent
+`--follow` is for a view that shows the conversation live instead of
+polling. It prints the turns as one line of JSON, then keeps running: each
+time there are new turns it prints one more line with only those, and
+nothing while nothing changes. A turn that grew, such as a reply opencode
+is still writing or a tool whose `status` came in, comes again under the
+same `n`, so replace turns by `n`. It ends with exit 0 when stdin ends,
+when its reader goes away, or on SIGINT or SIGTERM. Feature
+`conversation-follow`.
 
-`mia api main` is where the [main agent](main.md) stands. It answers from
-any folder, and starts and writes nothing.
+### Conversations from other commands
+
+`mia recall <text…> --json` is the conversations that mention the text, up
+to 10, newest first. In a repository it searches that repository. With
+`--all`, or outside a repository, it searches every project on every
+machine. Each result has the conversation's `session` (its id), `agent`,
+`cwd`, `worktree`, `account`, `at`, and `n`, the turn to open it at (0 for
+words a subagent wrote), `yours` (you said them), `line` (the words around
+them), `project`, `root`, `resume` (the command that goes on with it),
+`machine` when it is not this one, and `gone` when its folder is no more.
+
+`mia why <file:line|commit> --json` is the claude conversations that made
+or first saw a commit, in Go's field names: `Commit`, `Subject` and
+`Conversations`, each with `session`, `cwd`, `file`, `at`, `asked`, `made`
+and `account`.
+
+`mia conversation resume <id> --json` says what it opened: the `worktree`,
+the `window`, the `command`, `already` when a window had it open so nothing
+was opened, `copied` when it was copied in from another folder or account
+first, and the `model`, `effort` and `account` it runs on. Resumed with
+`--model` or `--effort` while a window has it open, it is refused.
+
+`mia conversation continue <id> --with <agent> [--worktree <name>]
+[--dry-run] --json` hands a conversation to another agent, as
+[Conversations](conversations.md#with-another-agent) describes. `--from <window>` names the
+conversation by the window that has it open instead. `mia hand --json`
+answers the same. Feature `conversation-thread`.
 
 ```json
-{"running":true,"agent":"claude","machine":"local",
- "home":"/Users/user/.config/mia/main","session":"mia-main",
- "window":{"index":1,"name":"claude"},
- "conversation":"23f98c02-c52b-4de9-8c69-b322eb153bff",
- "working":true,"since":"2026-11-02T10:00:00Z"}
+{"from":{"agent":"claude","id":"23f98c02-c52b-4de9-8c69-b322eb153bff","worktree":"monduli","window":{"index":2,"name":"claude"}},
+ "to":{"agent":"codex","window":{"index":3,"name":"codex"}},
+ "handoff":"/home/user/src/shop/.git/mia/handoffs/monduli/claude-23f98c02-….md",
+ "full":"/home/user/src/shop/.git/mia/handoffs/monduli/claude-23f98c02-…-full.md",
+ "turns":212,"left_out":158,"command":"codex",
+ "instruction":"Read /home/user/src/shop/.git/mia/handoffs/monduli/claude-23f98c02-….md — …",
+ "sent":true,"account":"default","dry_run":false}
 ```
 
 | field | is |
 |---|---|
-| `running` | the agent is in a window of its session |
-| `agent` | the one that runs — another than `[main] agent` when `mia main start --agent` started it, which a mia can when its capabilities have `main-start-agent`; when none runs, the one `[main] agent` names |
-| `machine` | the machine it lives on, as `mia api machines` calls it: `local` when that is the one asked, and the name `[main] machine` gives when it is another, whose mia answered |
-| `home`, `session` | its folder and its tmux session, whether or not they are there yet |
-| `window` | the agent's window; left out when it is not running |
-| `conversation` | the one it has open — claude says which — or, of another agent and when it is not running, the last written to in its folder; empty when there is none, or mia cannot read that agent's. Started with a [new conversation](main.md#a-new-conversation) — `mia main start --new`, which a mia has when its capabilities have `main-start-new` — it is that one, and empty until an agent that does not say which it has open has written the first of it: another id than before, or none, is a conversation that changed |
-| `working` | it is doing something now: claude's pane title says so, and of another agent, that its window wrote in the last three seconds |
-| `asks` | the question its window shows, waiting on you: `text`, `options` and `selected`, the option its cursor is on, the first being 1, what Enter alone would answer; left out when it asks nothing, and `working` is false while it asks. A mia has it when its capabilities have `main-asks` |
-| `since` | when its session was started; left out when it is not running |
-| `model`, `effort` | what mia started it with or last switched it to, as [Agents](#agents) says; left out when it is not running, or mia chose none |
-| `account` | the [account](#accounts) it runs on, `default` for its agent's own; left out when it is not running, or for an agent mia keeps no accounts of |
+| `from` | the conversation, its worktree, and the `window` that has it open, if any |
+| `to` | the agent it goes on with and the `window` opened for it; `worktree` when that is another worktree. `id` is the agent's own conversation, which is known only later, through `continued_by` |
+| `resumes` | when the conversation had gone on from this agent's own, that one is taken up again, and the handoff holds only what was said since |
+| `handoff`, `turns`, `left_out`, `full` | the file the conversation was written to, of `turns` turns. Over the budget, `left_out` turns of its middle are not in it and `full` has them all |
+| `upto` | for a fork, the turn it was made from |
+| `instruction`, `sent`, `problem` | the agent's first message, and whether mia typed it. An agent that asked something first, or ended, was typed nothing, and `problem` says which. That is still exit 0 |
+| `dry_run` | nothing was written or opened. `to.window` has the name it would have and no `index` |
+
+When it is refused (no such conversation, a window with none or several
+open, the agent it is already with), it prints no JSON, says why on stderr
+and exits 1.
+
+## The main agent
+
+`mia api main` is where the [main agent](main.md) stands. It starts and
+writes nothing. Feature `main-agent`.
 
 ```json
-{"running":true,"agent":"claude","working":false,
- "asks":{"text":"Is this a project you created or one you trust?",
-         "options":["No, exit","Yes, I trust this folder"],"selected":1}}
+{"name":"main","running":true,"agent":"claude","machine":"local",
+ "home":"/home/user/.config/mia/main","session":"mia-main",
+ "window":{"index":1,"name":"claude"},
+ "conversation":"23f98c02-c52b-4de9-8c69-b322eb153bff",
+ "working":true,"since":"2026-11-02T10:00:00Z","model":"opus","effort":"high","account":"default"}
 ```
 
-While it asks, `mia main say` and `mia main model` type nothing and fail,
-exit 1, with a line that says what it asks and how to answer; `mia main
-press <n>` answers it, as [The main agent](main.md#when-it-asks-first)
-says. `mia main start --json` is the same state, `asks` and all, once the
-agent has settled.
+| field | is |
+|---|---|
+| `agent` | the one that runs; when none runs, the one `[main] agent` names. `mia main start --agent` can start another (feature `main-start-agent`) |
+| `machine` | `local`, or the machine `[main] machine` names |
+| `home`, `session` | its folder and its tmux session, whether or not they exist yet |
+| `window`, `since` | its window and when its session started; left out when it is not running |
+| `conversation` | the one it has open (claude says which), or for another agent the last one written to in its folder. `""` when there is none. After `mia main start --new` (feature `main-start-new`) it is `""` until the new conversation's first turn is written. An id that changed means the conversation changed |
+| `working` | it is at work now: claude's pane title says so, and for another agent, its window wrote in the last three seconds |
+| `asks` | the question its window shows: `text`, `options`, and `selected`, the option Enter alone would answer, the first being 1. Left out when it asks nothing. `working` is false while it asks. Feature `main-asks` |
+| `model`, `effort`, `account` | what mia started it with or last switched it to, and the account it runs on; left out when it is not running or mia chose none |
 
-When `[main] machine` names another machine, `mia api main`,
-`mia api main conversations` and `mia api main turns` are that machine's answers, asked over ssh: `home`,
-`session` and `window` are its own. One that does not answer is an error
-in a line that names it, exit 1, and is not asked again for 30 seconds.
+While it asks, `mia main say` and `mia main model` type nothing and exit 1
+with a line that says what it asks. `mia main press <n>` answers it.
+`mia main status --json` and `mia main start --json` print this same
+state.
 
-`mia api main turns [--after <n>] [--follow]` is that conversation as
-[`mia api conversation`](#conversations) gives one, an empty list when
-there is none, and `--follow` follows it as it does there — the one
-open when it starts; with none open, `[]` and nothing more. `--follow`
-reads a main agent on this machine only, and is refused, exit 1, when
-`[main] machine` names another. It has one kind more:
+When `[main] machine` names another machine, `mia api main`, its
+`conversations` and its `turns` are that machine's answers, asked over
+ssh. A machine that does not answer is an error naming it, exit 1, and is
+not asked again for 30 seconds.
+
+### Its turns and conversations
+
+`mia api main turns [--conversation <id>] [--after <n>] [--follow]` is the
+conversation it has open, as [`conversation`](#one-conversation) gives
+one; `[]` when there is none. `--follow` follows the one open when it
+starts. It reads a main agent on this machine only, and is refused, exit 1,
+when `[main] machine` names another. `--conversation` reads one of its
+[earlier conversations](main.md#earlier-conversations) instead.
+
+`mia api main conversations` lists its conversations, as
+[`conversations`](#conversations) does: every one made in its folder,
+with every agent it ran as, the last written to first. `running` is true
+of the one it has open now. `worktree` is its folder's name. An id that is
+none of these is refused, exit 1. `mia main start --resume <id>` starts it
+going on with one. Feature `main-conversations`.
+
+### What the main agent did
+
+A `did` turn is a shell command the main agent ran that is one of mia's
+verbs and changes something. Nothing is logged for it: it is the `tool`
+turn of the same `n`, read again. `mia api conversation` on the same
+conversation gives the plain `tool` turn.
 
 ```json
 [{"n":7,"kind":"asked","at":"2026-11-02T10:00:00Z","text":"start goba on the login bug"},
- {"n":8,"kind":"did","at":"2026-11-02T10:00:04Z","text":"Started goba on mia-desk · claude","name":"Bash",
-  "verb":"window new","repository":"mia-desk","worktree":"goba"},
- {"n":9,"kind":"did","at":"2026-11-02T10:02:11Z","text":"Moved sakina to fedora","name":"Bash",
-  "verb":"move","repository":"mia-desk","worktree":"sakina","machine":"fedora"},
- {"n":10,"kind":"tool","at":"2026-11-02T10:02:15Z","text":"Ran mia api standing","name":"Bash"}]
+ {"n":8,"kind":"did","at":"2026-11-02T10:00:04Z","text":"Started goba on shop · claude","name":"Bash",
+  "verb":"window new","repository":"shop","worktree":"goba"},
+ {"n":9,"kind":"did","at":"2026-11-02T10:02:11Z","text":"Moved sinza to fedora","name":"Bash",
+  "verb":"move","repository":"shop","worktree":"sinza","machine":"fedora"}]
 ```
 
-Switched to another agent with [`mia main switch`](main.md#another-agent-mid-conversation),
-its turns are those of the conversations it went on from, each followed
-by a `switch` turn, then those of the one it has open, numbered on from
-them, what the person asked their own words without the conversation
-said in front of them. `--after` and `--follow` count them so. The last
-switch has `"tone":"warn"` and the note `context goes with your next
-message` while what it hands over is still to be sent. A mia has it when
-its capabilities have `chat-switch`.
+`verb` is the verb as typed. `repository` is the one the command ran in,
+by its main checkout's folder name. `worktree` and `machine` are there
+when the command names them, and `worktree` also when the command was
+typed inside it.
+
+| `verb` | `text` |
+|---|---|
+| `new` | `Made a worktree for fix-login on shop`, with `, on fedora` after `--on`; `worktree` only when `--name` gave it |
+| `agent run`, `window new` | `Started goba on shop · claude`; a window that runs no agent stays a `tool` |
+| `agent send`, `window send` | `Told kijenge: rebase onto main` |
+| the same, or `window press`, with a number | `Answered kijenge: 1` |
+| `agent stop` | `Stopped the agent in goba` |
+| `move` | `Moved sinza to fedora`, or `Moved sinza back here` |
+| `rm`, `archive` | `Removed goba on shop`, `Archived goba on shop` |
+
+Only `mia …` alone, or `cd <folder> && mia …`, is read, split as a shell
+splits it. A command with a pipe, a redirection, a variable, a
+substitution or a third command stays a `tool`, since what it ran may not
+be what its words say. So does a verb that only reads (`mia api …`,
+`mia ls`, `mia window read`), one with `--dry-run`, and one typed in a way
+its usage does not allow.
+
+### Another agent mid-conversation
+
+After [`mia main switch`](main.md#another-agent-mid-conversation), its
+turns are those of each conversation it went on from, each followed by a
+`switch` turn, then those of the one it has open, numbered on from them.
+`--after` and `--follow` count them the same way. Feature `chat-switch`.
 
 ```json
 [{"n":11,"kind":"said","at":"2026-11-02T10:05:00Z","text":"goba is on it"},
@@ -412,825 +555,461 @@ its capabilities have `chat-switch`.
  {"n":13,"kind":"asked","at":"2026-11-02T10:06:30Z","text":"and the tests?"}]
 ```
 
-`note` says what was handed over — `context handed over`, `took its own
-conversation up again` when it went back to an agent it went on from,
-with how many turns and how many were left out — and is `context goes
-with your next message` until the first thing is said to the agent.
-
-`mia api main turns --conversation <id> [--after <n>]` is one of its
-[earlier conversations](main.md#earlier-conversations) in the same way,
-and `mia api main conversations` lists them: the heads
-[`mia api conversations`](#conversations) gives, of the conversations
-made in the main agent's folder with every agent it was run as, the last
-written to first. `running` is true of the one it has open now, with its
-`window`; `worktree` is its folder's name. An id that is none of these is
-refused, exit 1. `mia main start --resume <id> [--restart]` starts it
-going on with one. A mia has all three when its capabilities have
-`main-conversations`.
-
-A `did` is a shell command the main agent ran that is one of mia's verbs
-and changes something. Nothing is logged for it: it is the `tool` turn of
-the same `n`, read again. `verb` is the verb as typed; `repository` is the
-one the command ran in, by its main checkout's folder name; `worktree` and
-`machine` are there when the command names them, the worktree also when
-the command was typed inside it.
-
-| `verb` | `text` |
-|---|---|
-| `new` | `Made a worktree for fix-login on mia-desk`, with `, on fedora` after `--on`; `worktree` only when `--name` gave it |
-| `agent run`, `window new` | `Started goba on mia-desk · claude`; a window that runs no agent stays a `tool` |
-| `agent send`, `window send` | `Told olasiti: rebase onto main` |
-| the same, or `window press`, with a number | `Answered kijenge: 1` |
-| `agent stop` | `Stopped the agent in goba` |
-| `move` | `Moved sakina to fedora`, or `Moved sakina back here` |
-| `rm`, `archive` | `Removed goba on mia-desk`, `Archived goba on mia-desk` |
-
-Only a command that is `mia …` alone, or `cd <folder> && mia …`, is read:
-its words, quotes and backslashes as a shell splits them. One with a pipe,
-a redirection, a variable, a substitution or a third command stays a
-`tool`, since what it ran is not what its words say. So does a verb that
-only reads — `mia api …`, `mia ls`, `mia window read` — one with
-`--dry-run`, and one typed in a way its usage does not have.
-`mia api conversation <id>` gives the same conversation with no `did` in it.
+`note` says what was handed over: `context handed over`, or
+`took its own conversation up again` when it went back to an agent it had
+gone on from, with how many turns and how many were left out. Until the
+first thing is said to the new agent, the last switch has `"tone":"warn"`
+and the note `context goes with your next message`. Your own words are
+given without the handed-over conversation in front of them.
 
 ## Chats
 
-`mia api chats` is every [chat](chats.md), the main agent first as the
-chat named `main`, then the others, the last said in first. It answers
-from any folder, and starts and writes nothing.
+`mia api chats` is every [chat](chats.md): the main agent first, as the
+chat named `main`, then the others, the last said in first. It starts and
+writes nothing. Feature `chats`.
 
 ```json
 [{"name":"main","main":true,"agent":"claude","model":"opus","effort":"high",
   "title":"mia","last":"goba is on it","at":"2026-11-02T10:00:04Z",
   "asks":false,"working":false,"running":true,"machine":"local"},
  {"name":"kilwa","main":false,"agent":"codex","model":"","effort":"",
-  "title":"what changed in mia-desk this week?","last":"Three things…",
+  "title":"what changed in shop this week?","last":"Three things…",
   "at":"2026-11-01T18:20:00Z","asks":false,"working":false,"running":false,"machine":"local"}]
 ```
 
 | field | is |
 |---|---|
-| `name` | its name, `main` for the main agent; what `mia chats …` and `mia api chat` take |
-| `main` | it is the main agent |
-| `agent`, `model`, `effort` | the agent it goes on with, and the model and effort it runs on, or is started with when it is not running; empty when mia chose none |
-| `title` | the first thing asked in it, on a line — the first words `mia chats new` was given — and `mia` for the main agent |
-| `last`, `at` | the last thing said in its last conversation, and when that was written; of one with none yet, empty, and when it was made |
-| `asks`, `working`, `running` | as `mia api main` says them: it asks something, it is at work, it runs |
-| `machine` | where it lives: `local`, or the machine `[main] machine` names, whose mia answered |
+| `name` | what `mia chats …` and `mia api chat` take; `main` for the main agent |
+| `agent`, `model`, `effort` | the agent it goes on with, and the model and effort it runs on, or is started with when it is not running; `""` when mia chose none |
+| `title` | the first thing asked in it, on one line; `mia` for the main agent |
+| `last`, `at` | the last thing said in its conversation and when; for one with nothing yet, `""` and when it was made |
+| `asks`, `working`, `running` | as [`main`](#the-main-agent) says them |
+| `machine` | `local`, or the machine `[main] machine` names |
 
-`mia api chat <name>` is where one stands, as [`mia api main`](#the-main-agent)
-says it, with its `name`; `mia api chat main` is `mia api main`. A name
+`mia api chat <name>` is where one chat stands, in the shape of
+[`main`](#the-main-agent); `mia api chat main` is `mia api main`. A name
 that is no chat's is refused, exit 1.
 
-`mia api chat turns <name> [--after <n>] [--follow]` is its conversation
-as `mia api main turns` gives it, `did` and `switch` turns and all; of
-`main` it is `mia api main turns`. `--follow` reads chats on this
-machine only, and follows the conversation open as it starts: switched,
-it is followed again.
-
-A mia has these when its capabilities have `chats`, and `mia serve`
-answers them and [says when they change](serve.md#get-events).
+`mia api chat turns <name> [--after <n>] [--follow]` is its conversation,
+as [`main turns`](#its-turns-and-conversations) gives it, `did` and
+`switch` turns included. `--follow` reads chats on this machine only, and
+follows on across a switch.
 
 ## Agents
 
-`mia api agents` is every agent mia knows, one a plugin adds too, with
-what it can be started with. It answers from any folder; in a
-repository, with that repository's config.
+`mia api agents` is every agent mia knows, plugins' agents included, with
+what each can be started with. Feature `agent-models`.
 
 ```json
 [{"name":"claude",
-  "models":[{"id":"opus","label":"Opus"},{"id":"sonnet","label":"Sonnet"},
-            {"id":"haiku","label":"Haiku"},{"id":"fable","label":"Fable"}],
+  "models":[{"id":"opus","label":"Opus"},{"id":"sonnet","label":"Sonnet"},{"id":"haiku","label":"Haiku"},{"id":"fable","label":"Fable"}],
   "efforts":["low","medium","high","xhigh","max"],
   "model":"opus","effort":"","live":true,"again":false,"account_env":"CLAUDE_CONFIG_DIR","installed":true},
- {"name":"opencode",
-  "models":[{"id":"openai/gpt-5","label":"gpt-5"},{"id":"ollama/qwen3:4b","label":"qwen3:4b"}],
+ {"name":"opencode","models":[{"id":"provider/model","label":"model"}],
   "efforts":[],"model":"","effort":"","live":false,"again":true,"account_env":"","installed":true},
  {"name":"cursor-agent","models":[],"efforts":[],"model":"","effort":"","live":false,"again":false,"account_env":"","installed":false}]
 ```
 
 | field | is |
 |---|---|
-| `models` | what it can be started with: `id` as the agent takes it, `label` to show. Empty for an agent mia knows none of |
-| `efforts` | its effort levels, how hard it thinks; empty when it has none mia knows |
-| `model`, `effort` | what the config starts it with, `[agents.<name>]`; empty when it says none, and the agent's own default is used |
-| `live` | it can be switched to another model while it runs, by what is typed into it |
-| `again` | it takes a model only as it starts: `mia window model` ends it and starts it again in its window, on the conversation it has open |
-| `account_env` | the variable that names the folder of each of its [accounts](#accounts); empty for an agent mia keeps no accounts of |
+| `models` | what it can be started with: `id` as the agent takes it, `label` to show. A model the config names is listed too. Empty for an agent mia knows no models of |
+| `efforts` | its effort levels; empty when mia knows none |
+| `model`, `effort` | what `[agents.<name>]` starts it with; `""` for the agent's own default |
+| `live` | it can be switched to another model while it runs, by what mia types into it |
+| `again` | it takes a model only as it starts, so `mia window model` starts it again in its window, on the conversation it has open. Feature `agent-again` |
+| `account_env` | the variable that names the folder of each of its [accounts](#accounts); `""` for an agent mia keeps no accounts of |
 | `installed` | its program is on this machine's `PATH` |
 
-opencode's models are those of the providers it is signed in to, which
-only it knows: mia asks it, `opencode models`, and lists each
-`provider/model` it prints under that id, labelled by what comes after
-the provider. What it said is kept for an hour, in the repository's
-`mia/cache/models/opencode.json`, so asking for the agents does not
-start opencode each time. When it cannot say — not installed, nothing
-kept by it yet, not signed in, no answer in 5 s — its `models` are
-empty, and that is kept for a minute. opencode's own interface has no
-word to be started with a model; its minimal one has, so with a model
-mia starts it as `opencode mini --model <provider/model>`, and with none
-as `opencode`. It has no effort mia can choose: its help names a variant
-of a model only for `opencode run`, and lists none. Neither has it a
-line to type that switches it, so it is switched by being started again,
-as `opencode mini --model <provider/model> --session <id>` in the pane
-it ran in: the window, its number and what is kept on it stay. One with
-no conversation yet is refused: close it and start it with `--model`.
+opencode's and agy's models are those their own accounts can use, so mia
+asks them (`opencode models`, `agy models`) and keeps the answer for an
+hour, in `~/.config/mia/cache/models/`. When one cannot say (not
+installed, not signed in, no answer in 5 seconds) its `models` are empty,
+and that is kept for a minute. opencode is started with a model as
+`opencode mini --model <provider/model>`, has no efforts, and is switched
+by being started again on its conversation; one with no conversation yet
+cannot be switched. agy is started as `agy --model <id> --effort <level>`
+and switched the same way.
 
-agy's models, the Antigravity CLI's, are those its account may use:
-mia asks it, `agy models`, and lists each line it prints that is an id
-and a name a tab apart, kept as opencode's are, in
-`mia/cache/models/agy.json`, and asked only where agy has made its
-folder, `~/.gemini/antigravity-cli`. It is started with one and an
-effort as `agy --model <id> --effort <level>`, its efforts `low` to
-`max`. A conversation of its is taken up again as `agy --conversation
-<id>`, and nothing typed into it is known to switch it, so it is
-switched as opencode is, started again in its pane as `agy --model <id>
---effort <level> --conversation <id>`.
-
-A model the config names that the list has not is in the list too.
 Start one with `mia window new <worktree> <agent> --model <id> --effort
-<level>` and switch one that runs with `mia window model <worktree>
-<window> <id> [--effort <level>]`; take a conversation up again with one
-with `mia conversation resume <id> --model <id> --effort <level>`; the
-main agent with `mia main start --model …` and `mia main model …`. A
-model or an effort not in its list is refused, with the list.
-
-To restart an agent with another model, stop it — `mia window key
-<worktree> <window> -- C-c` — and resume its conversation with the model.
-`mia conversation resume --json` says the `model` and `effort` it was
-started with, or those of the window that has it open already; resumed
-with `--model` or `--effort` while a window has it open, it is refused.
-A mia that can is one whose `mia api capabilities` has `resume-model`;
-one that lists opencode's models and starts it again to switch it has
-`agent-again`.
-
-`mia conversation resume --json` also says the `account` the agent was
-started on, and `copied` when the conversation was copied into that
-account's folder first.
-
-`mia conversation continue <id> --with <agent> [--worktree <name>]
-[--dry-run] --json` — a mia has it in this form when its capabilities
-have `conversation-thread` — goes on with one conversation [with another
-agent](worktrees.md#with-another-agent), and says what it did. `<id>` is
-the conversation's `id` as `mia api conversations` lists it, and
-`--worktree` its `worktree` there, needed only for one listed in two.
-`--from <window>` in place of the id is the one that window has open.
-
-```json
-{"from":{"agent":"claude","id":"23f98c02-c52b-4de9-8c69-b322eb153bff","worktree":"monduli","window":{"index":2,"name":"claude"}},
- "to":{"agent":"codex","window":{"index":3,"name":"codex"}},
- "handoff":"/src/app/.git/mia/handoffs/monduli/claude-23f98c02-c52b-4de9-8c69-b322eb153bff.md",
- "full":"/src/app/.git/mia/handoffs/monduli/claude-23f98c02-c52b-4de9-8c69-b322eb153bff-full.md",
- "turns":212,"left_out":158,"command":"codex",
- "instruction":"Read /src/app/.git/mia/handoffs/monduli/claude-23f98c02-….md — a conversation the person had with claude …",
- "sent":true,"account":"default","dry_run":false}
-```
-
-`from` is the conversation and the worktree it is in, with the `window`
-that has it open when one does. `to` is the agent it goes on with and
-the `window` opened for it; the conversation that agent begins has no id
-yet, so `to` has none: `continued_by` in [`mia api
-conversations`](#conversations) says it once the agent has written its
-first turn. `handoff` is the file the conversation was written out to,
-of `turns` turns; when it was over the budget, `left_out` is how many of
-its middle are not in it and `full` the file that has every one, both
-left out otherwise. `model`, `effort` and `account` are as a resume says
-them. `sent` is whether mia typed `instruction`, the agent's first
-message, into the window: an agent that asked something first, or ended
-as it started, is typed nothing, `problem` says which, and the window is
-open for `instruction` to be said there — with `--json` that is exit 0,
-`sent` false. With `--dry-run` nothing was written or opened: `dry_run`
-is true, `to.window` has the name it would have and no `index`, and
-`sent` is false. Refused — no such conversation, a window with none or
-several open, the agent it is already with — it prints no JSON, says why
-on standard error and exits 1.
-
-The `model` and `effort` that `mia api conversations` and `mia api main`
-give a running window are what mia started it with or last switched it
-to, kept by mia for the window: not read from the agent. One switched by
-hand in the agent is not known, and a window mia chose nothing for has
-neither.
+<level>`, and switch one that runs with `mia window model <worktree>
+<window> <id> [--effort <level>]`. Take a conversation up again with a
+model using `mia conversation resume <id> --model <id> --effort <level>`
+(feature `resume-model`). For the main agent, use `mia main start --model …`
+and `mia main model …`. A model or effort not in the agent's list is
+refused, and the refusal shows the list.
 
 ## Apps
 
-`mia api apps` is every app with a [manifest](apps.md), by name. It
-answers from any folder, and reads the manifests as they are then. Check
-capabilities for `apps`: an older mia has neither this nor a window's
-`app`.
+`mia api apps` is every app with a [manifest](apps.md), by name, read as
+the manifests are now. Feature `apps`. An older mia has neither this query
+nor a window's `app`.
 
 ```json
-[{"name":"lazygit","label":"Git","icon":"/Users/user/.config/mia/apps/lazygit/icon.svg",
-  "match":{"commands":["lazygit"],"via":[]},
-  "keys":[{"key":"c","label":"commit"}]},
+[{"name":"lazygit","label":"Git","icon":"/home/user/.config/mia/apps/lazygit/icon.svg",
+  "match":{"commands":["lazygit"],"via":[]},"keys":[{"key":"c","label":"commit"}]},
  {"name":"notes","match":{"commands":[],"title":"^notes","via":["node","python3"]},"keys":[]}]
 ```
 
-`label` is left out when the manifest has none, `icon` when it names none
-or the file is not there — it is the file's whole path otherwise — and
-`match.title` when the app is told by its command alone. `commands`, `via`
-and `keys` are always lists, empty when there are none. A manifest that
-does not read, or is named as an agent, is left out and said in a line on
-stderr; the others are listed all the same and the exit status is 0.
-
-### mia git
-
-`mia git` is an app of mia's own: run in a pane, in any folder of a
-repository, it has mia desk draw how that worktree stands in git over the
-pane, by desk's UI protocol, as `mia chat` draws a conversation. It needs
-no mia worktree: it is about the repository of the folder it is run in.
-`mia api capabilities` lists `git-app`.
-
-Over the view is the branch, where it stands against its base — `3 ahead
-of main, none behind`; the base is the layer under it in a
-[stack](stacks.md) mia knows, else the repository's base branch, and for
-the base branch itself what it follows — then, for a branch that follows
-one of a remote, what is to push and to pull (`2 to push, 1 to pull`),
-and how many files are staged, changed and untracked. Under it, side by
-side:
-
-- A list, `files`: the files under **Staged**, **Changed** and
-  **Untracked**, each head with its count and a group with none left out,
-  each file with its lines added and deleted and `new`, `deleted`,
-  `renamed` or `conflict`; then the commits ahead of the base, newest
-  first, 20 at most, each with its age; then, when there are any, the
-  **Stashes**, newest first, 10 at most. An item's id says its group:
-  `s:<path>`, `c:<path>`, `u:<path>`, `k:<short hash>`, `t:<the stash's
-  commit, 10 characters>`. At most 400 files are listed, and a head then
-  says how many of its group are shown. With more than 30 files the list
-  is behind `tabs` — **Changes**, **Commits**, **Stashes**, each with its
-  count, one with nothing left out — and shows the chosen one's groups
-  alone; with fewer it is the one list. Each row carries a menu of what
-  can be done to it, opened beside it with `→` and under the pointer's
-  other button, each choice with the key that does the same at its
-  right: on a file Stage or Unstage, Discard… (Delete… on an untracked
-  one), Open in editor, Copy path; on a commit Copy its hash, and Undo…
-  on the last one where it can be undone; on a stash Apply, Pop, Drop….
-- The diff of the row under the keys, a code `diff`: of a staged file
-  what is staged (`git diff --cached`), of a changed one what is not
-  (`git diff`), of an untracked one its lines as added, of a commit its
-  own (`git show`), of a stash what it changed and its untracked files.
-  Over a commit's diff are who wrote it and when, its subject, and the
-  files it changed, each with its lines added and deleted, the first 6
-  and then how many more. Each hunk has a head that says which of how many it
-  is, each line its number in the old file and the new, and the lines
-  git left out between two hunks are a gap. A tab is said as the spaces
-  to the next fourth column. A diff longer than a message is said on in
-  patches of `lines`, and past 1500 lines it ends in a gap that says how
-  many more there are.
-
-| key | where | does |
-|---|---|---|
-| `space` | a file | stages it, or unstages one that is staged |
-| `space` | a line of the diff | stages the hunk that line is in (`git apply --cached`), or unstages it in a staged file's (`--reverse`); in an untracked file's, stages the file |
-| `⏎` | a line added or deleted | stages that line alone, or unstages it in a staged file's: a patch of the hunk with that one change, the others written as the index has them |
-| `d` | a changed file, a line of its diff, an untracked file | discards what is changed and not staged (`git restore`), the hunk that line is in (`git apply --reverse`), or deletes the file (`git clean`). Asked first. A staged file is refused: unstage it first |
-| `e` | a file, a line of its diff | hands the file to `$EDITOR` (else `nvim`), at that line of it, as [`mia files`](#mia-files) does, and takes the pane again when it leaves. A deleted file is refused |
-| `y` | a file, a commit | copies the file's path, or the commit's hash, to the clipboard (the window's `copy`) |
-| `u` | the last commit | takes it off the branch and leaves what it changed staged (`git reset --soft HEAD~1`). Asked first. Refused on an older commit, and on one the branch's upstream has |
-| `space` `p` `d` | a stash | applies it and keeps it, pops it, drops it (asked first) |
-| `a` | | stages every file (`git add --all`) |
-| `c` | | the commit screen |
-| `b` | | the branches |
-| `s` | | stashes every change and every untracked file (`git stash push --include-untracked`) under `mia git: <branch> <date time>` |
-| `f` | | fetches the remote the branch follows, else `origin` (`git fetch --prune`) |
-| `P` | | pulls where the branch can only be moved on (`git pull --ff-only --no-rebase`); it never merges and never rebases, and says git's reason where it cannot |
-| `p` | | pushes the branch to what it follows, or with `--set-upstream` to `origin` under its own name where it follows nothing. Asked first. Never by force |
-| `r` | | reads the standing again |
-
-The foot says the keys of where the keys are: a file's on a file, a
-hunk's in its diff, `u` on the last commit, a stash's on a stash, then
-those of the worktree whole; `a` and `s` only when there is something to
-stage or stash. The window says the piece the keys are on as it changes
-(`focus`), and the keys are said again alone, by a patch's `keys`; what
-`⏎` does on a line of the diff is the code's own `does`, `stage line` or
-`unstage line`.
-
-**Asked first**: the first press does nothing and puts up a modal,
-`sure`, whose title says exactly what is lost or sent — `Discard hunk 2
-of 2 of talk.txt (+1 -1)?`, `Push 2 commits to origin/talk?` — over a
-line of what that means, with two buttons: the one that does it, `yes`,
-whose key is the key that asked, so the key pressed twice does it as `⏎`
-does; and `no`, which with `esc` takes the modal away and does nothing.
-What it says is checked again as it is confirmed: where the file or the
-count is another by then, nothing is done and the modal is said again in
-the new words. When it goes the keys are back on the piece they were on.
-
-**What was just done** — `committed a41c9e2`, `staged 3 files`,
-`discarded a hunk of talk.txt`, `on flags`, `copied src/talk.rs`, the
-line git wrote of a fetch — is a toast, said once. The status is for
-what was refused or failed and is yours to act on, and stays until the
-next thing is done; it and the keys are said by a patch's `status` and
-`keys` where nothing else of the view is another.
-
-**With a remote** (`f`, `P`, `p`) git runs beside the app, one at a time:
-a `progress` bar at the head's end says `fetching origin…` and the keys
-are taken meanwhile, another deed with a remote refused in a toast; the
-line git wrote last is a toast after, or of one that failed the first
-that says why is the status, and the standing is read again. git has no
-terminal there: a remote that wants a password typed fails and says so,
-and nothing is asked over the view.
-
-After each of these the standing is read again, and the keys stay on the
-same file where it still is — a file staged is followed into Staged —
-else on the row after it. It is read again by itself when the repository
-changes: `git status` is asked every 2 s, with `--no-optional-locks`, and
-the file the stash is kept in is looked at — or, when a [mia
-serve](serve.md) of its build answers, it is read again when the server
-says `mia api status` of the worktree is another, asked once a second for
-all who listen; the view is said again only when it would say something
-else. A file
-already changed that changes again is seen by its size and time; the
-base moving on is not seen until something else changes, or `r`.
-
-The commit screen has, in place of the diff alone, `Commit to <branch>`
-with what is staged, a text area for the message, a **Commit** button
-(`⌘⏎` in the area sends it too), an **Amend the last one** button and
-the diff of the row under the keys under them; the list stays, and `space` and `a` work in it. `esc` goes
-back to the files and keeps the words typed. The commit is `git commit
--m` with the message as typed: nothing is added to it, and hooks run.
-With nothing staged, or no message, nothing is done and the view's status
-says why; a hook that fails is said by its first line. Made, a toast
-says `committed <short hash>`, back on the files.
-
-**Amend the last one** (`amend`; `tab` to it and `⏎` — the `⌘A` on it is
-said and is no key the window takes) makes the last commit again with
-what is staged added, under the message typed, or with none under the
-one it had (`git commit --amend`). It is refused, with the reason as the
-status, when the branch's upstream has that commit already, when the
-commit is the base's and not this branch's, and with nothing staged and
-no message.
-
-**The branches** (`b`) are a modal, `switch`, over the view: a search
-field, `q`, over
-a list, `branches` — the repository's own (`l:<name>`), the one the
-worktree is on checked, each with how it stands against what it follows
-(`↑2 ↓1`, `level`, `gone`, `no upstream`), then under **Remote** the
-remotes' that no branch here is named for (`r:<remote>/<name>`), 300 at
-most. Words typed narrow them, whatever their case. `⏎` switches (`git
-switch`); on a remote's it makes the branch that follows it (`git switch
---track`); and words that are no branch's name offer `Create <name> from
-<current>` (`n:<name>`, `git switch --create`) — first where they are in
-no name, else last. What git refuses — a file changed that the branch
-has otherwise, a branch another worktree is on — is the status, in git's
-first line, said in the modal too, and the branches stay up. `esc` goes
-back to the files.
-
-What fails — a folder in no repository, git not installed, a hunk git
-will not apply — is the view's status, cut to 200 characters, and the app
-stays up. `q` or `⌃C` in the plain terminal leaves, as closing the view
-does; stdin that is no terminal is refused, exit 1.
-
-Not yet: merging and rebasing, resolving a conflict, a push by force,
-deleting and renaming a branch, tags, a commit older than those ahead of
-the base, and colour by syntax.
-
-### mia files
-
-`mia files` is an app of mia's own too: run in a pane, in any folder of a
-repository, it has mia desk draw that worktree's files over the pane, by
-desk's UI protocol. Editing is handed to your editor; of the worktree it
-writes only what `a`, `R` and `D` are asked to. In a folder of no
-repository the tree is that folder's, with no marks. `mia api
-capabilities` lists `files-app`.
-
-Side by side:
-
-- A list, `tree`, under a head with the repository's name and `3 changed
-  against main`: the files git tracks and those it does not, ignored ones
-  left out (`git ls-files --cached --others --exclude-standard`), as a
-  tree — in each folder its folders, then its files, by name; an item's
-  id is its path, its `depth` how far in it is, and a folder has `open`.
-  Only a folder you opened is listed under: `⏎` on one opens or shuts
-  it. As the view comes up the folders on the way to each changed file
-  are open, unless that is more than 30 folders. A file changed against
-  the base carries `A` (added, or untracked), `M` (changed) or `D`
-  (deleted; it is still listed). The base is the one `mia git` stands a
-  branch against, and the files are compared, as they are on disk, with
-  the commit the branch left it at; with no base, with the last commit.
-  At most 400 rows are listed, and a head then says how many more there
-  are. `c` lists only the files changed, with the folders on the way to
-  them, and the head says `only the 3 changed against main`; `c` again
-  lists all.
-- The file of the row under the keys: its path, `new against main · 19
-  lines`, and a code `file` with its lines numbered, a tab as the spaces
-  to the next fourth column. `l` passes the keys to it, `h` back. A
-  binary file, one over 2 MB and one that is no file are one gap that
-  says so. A UI holds 2000 pieces, the tree's rows among them, so of a
-  file of more than 1500 lines 1500 are said at a time, on in patches of
-  `lines` where they are more than a message, between a gap that says how
-  many lines are above and one that says how many more there are, and
-  the line over the code says which: `lines 701–2200 of 5000`. The code
-  is `live`: when the keys come within 100 lines of the last line said
-  and the file goes on, the view is said again with the lines around the
-  keys' line and the keys on it (the code's `selected`), and so within
-  100 of the first; any file is read to its end this way.
-
-| key | does |
-|---|---|
-| `e` | hands the file to the editor, at the line under the keys where they are in the file, else at its first: the view is closed, `$EDITOR` (else `nvim`) is run in the worktree's top folder with `+<line> <path>` and this terminal as its own, and when it leaves the files are read again and the view said again |
-| `f` | finds a file |
-| `/` | finds in files |
-| `a` | asks a name, in a one-line field `name` in a modal, `ask`, over the view (the message's `focus` puts the keys in it), for a new file in the folder under the keys, or the folder of the file under them: `⏎` makes it with the folders on the way to it, puts the keys on it in the tree and hands it to the editor at once; a name that ends in `/` makes a folder, listed while nothing is in it. A path that is there already, one outside the worktree and one in `.git` are refused in the status, said under the field too, and the modal stays; `esc` asks no more |
-| `R` | asks where the path under the keys goes, in the same modal, the field holding it as it is: `⏎` renames or moves the file or the folder, with `git mv` where git tracks it and on disk alone where it does not, and refuses a path that is there already |
-| `D` | deletes the path under the keys, asked first: pressed once it puts up a modal, `sure`, whose title says what goes — `Delete src/x.rs, 120 lines?`, and of a folder `Delete src/new and its 3 files?` — over whether git can bring it back (`It is not in git: nothing can bring it back.`, `Tracked: git can bring it back.`, `Tracked: git can bring back only what is committed.`, `1 of them not in git, which nothing can bring back.`), and deletes nothing. Its button **Delete** (`yes`, whose key is `D`, so `D` twice does it) deletes the path from disk (not from git's index); **Keep it** (`no`) and `esc` take the modal away. What goes is counted again as it is confirmed, and where it is another the modal says it anew and nothing is deleted |
-| `y` | copies the path under the keys, by its steps from the top, to the clipboard (a patch's `copy`), and a toast says `copied <path>` |
-| `c` | the tree of the changed files alone, and of all again |
-| `d` | on a changed file: its diff against the base in place of its lines — `git diff <base's commit> -- <path>`, hunks under heads with the lines added and deleted, a file git does not track all added — with `diff against main · +15 -3` over it; `d` again shows the file. It stays as the keys go to other changed files |
-| `B` | blame: each line of the file says at its `right` its commit by a short name and how long ago it was written (`3f9a2c1 3d`, from `git blame --porcelain`, asked once for a file as it stands), a line not committed `not committed`; `B` again takes them off. `⏎` on a line while they are there shows that commit in place of the file — its name, its date and its subject over what it changed of this file — and `esc` is back in the file on that line |
-| `:` | asks a line's number in a one-line field `line` in the modal: `⏎` says the file from around that line with the keys on it |
-| `r` | reads the files again |
-
-Each row of the tree carries a menu, opened beside it with `→` and under
-the pointer's other button, each choice with the key that does the same
-at its right: Open in editor, New file here…, Rename…, Delete…, Copy
-path, Diff against the base, Blame; a folder's has the four in the
-middle. What was just done — `made <path>`, `now <path>`, `deleted
-<path>`, `copied <path>` — is a toast, said once; the status is for a
-search and for what was refused, and it and the keys are said by a
-patch's `status` and `keys` where nothing else of the view is another.
-The foot's keys are those of the piece the window says the keys are on
-(`focus`): on a line of the file, those that are about the file.
-
-**Finding a file**, the left side is a field, `q`, over a list, `found`:
-the files whose path has the letters typed, in order and whatever their
-case — those with them in the file's name first, then the shorter path,
-50 at most — narrowed with each change of the words. The file under the
-keys is at the right. `⏎` goes back to the tree with every folder on the
-way to it open and the keys on it; `esc` goes back to the tree as it was.
-
-**Finding in files**, the field is over a list, `hits`: `⏎` searches for
-the words as they are written, not as a pattern (`git grep -n -I
---untracked -F`, and `-i` when they are all in lower case; binary and
-ignored files are passed over). Words after a `/` are a regular
-expression (`-E` in place of `-F`), and words after an `=` are found
-only where they are whole words (`-F -w`); the status says which, `6 in
-4 files · as a pattern`, and a pattern git cannot read is the status.
-What git finds is said as it finds it,
-the hits of a file under a head with its path and their count, each line
-by its text with its number at the right, in patches of `item` no more
-often than every 100 ms; the status is `searching…` and then `6 in 4
-files`. At 500 hits the search is stopped and the status says there are
-more. The hit under the keys is at the right: its file with the keys of
-the code on the hit's line, 960 lines of it at a time around that line
-where it has more. `↑`
-`↓` walk the hits from the field and `⏎` goes back to the tree with the
-keys on the hit's file; `e`, on a hit or a line, edits there. Other
-words typed drop what was found, so `⏎` searches for them; a new search
-and `esc` stop one at work.
-
-The files are read again by themselves when the repository changes, as
-`mia git` does it: `git status` is asked every 2 s, or the server is
-listened to, and the view is said again only when it would say something
-else. Listening, a file git ignores that is shown and written again is
-not seen until something else changes. What fails — a command git
-refuses, an editor that cannot be run — is the view's status, and the
-app stays up. `q` or `⌃C` in the plain terminal leaves; stdin that is no
-terminal is refused, exit 1.
-
-A key that is not the program's is not said to it, so a delete asked
-for once is dropped by the next thing done that is: the keys moved, or
-another of these keys.
-
-Not yet: editing in place, and a diff or a commit of more than 1500
-lines read past them.
-### mia review
-
-`mia review [<range> | pr <number> | w]` is an app of mia's own: run in a
-pane of a worktree, it has mia desk draw a code review of that worktree
-over the pane, by desk's UI protocol. The review itself is
-sawa's — `sw`, the local code-review tool, keeps the files, what was
-read, the findings, the gates and the verdict — and `mia review` is a
-face on it: everything it shows it asks `sw` for as JSON, and everything
-it does it has `sw` do, as you. `mia api capabilities` lists
-`review-app`.
-
-With no argument it shows the review sawa already has for this worktree:
-the one of the branch against its base (`<base>..HEAD`), else the one of
-this worktree last written to — never a pull request's, which is every
-worktree's. With none it opens one, `sw open -r <base>..HEAD`; the base
-is found as [`mia git`](#mia-git) finds it. An argument is opened as `sw
-nvim` takes one: `pr 14`, `w` for the working tree, anything else a
-range.
-
-Over the view is the change's title — a pull request's own, a branch's
-one commit's subject, else the branch — with, at its right, how the
-findings stand (`3 open`; by the filter `1 to answer`, or `3 open, 1
-resolved`) and the verdict. Under it are what the review is of (`words →
-main · 3 files · +5 -3 · sawa read it 4 min ago · layer 2 of 3`, the age
-that of the finding filed last, the layer said only where sawa reviews a
-stack) and sawa's summary, cut to 400 characters. Under the summary is a
-list, `general`, of the findings on the review as a whole — those on no
-file — each by its first line with its label before it and who filed it
-and how it stands at its right; `⏎` on one opens it under the list, all
-its words and its thread, as a file's is opened under its line.
-
-Under those, side by side:
-
-- A list, `files`, by folder: each folder open over its files, a file
-  with its lines added and deleted, how many findings stand on it, and
-  checked once read. `o` puts them in reading order instead — the files
-  on sawa's path first, in its order, each with the path's one line of
-  why — and says so where sawa has no path. At most 400 files are listed.
-- The diff of the file under the keys, a code `diff`, from `sw rows
-  --changed`: runs of lines under heads, with a gap for the lines left
-  out between two, and each finding as a note directly under the line it
-  is about: `issue · major` in its tone (bad for a blocker and a major
-  one, a warning below that), its first line, who filed it and how it
-  stands. A run's head says what it is in as git names it — `@@ fn
-  hear(&mut self)`, the words after the `@@` of `git diff <base> <head>
-  -- <file>` for the hunk that has the run's first line — and where git
-  has none, the line it begins at. A finding on no line shown is over
-  them all. Findings resolved or closed are left out until `u` or `f`.
-  Past 1500 lines the code ends in a gap that says how many more there
-  are.
-
-| key | does |
-|---|---|
-| `n` `N` | the keys on the next finding that is shown, or the one before, round again: those on the review as a whole first (the list `general`), then across files (the code's `selected`, and the message's `focus`) |
-| `⏎` | on a note, or a finding on the review as a whole: opens it — all its words, the edit it suggests as a small code of the lines deleted and added, the replies with who and when, a text area and **Reply** (`⌘⏎` in the area: `sw reply <id> -m`), **Reply and resolve** while it stands (then `sw resolve <id>`; with no words, only that), **Reopen** once it does not (`sw reopen <id>`, with the words typed as its `-m`), and **Apply** while it suggests an edit no one has applied (`sw apply <id>`: sawa makes the edit in the working tree, and refuses where the lines changed since). On a file: the keys on its diff |
-| `esc` | shuts what is open and keeps the words typed |
-| `c` | on a line of the diff: a comment under it, filed by **Comment** as a finding on that line (`sw add -f <file> -l <line> --side new\|old -m`); `issue:` or `suggestion:` before the words says its type, as in sawa |
-| `space` | marks the file under the keys read (`sw read -f`) and shows the next unread one; when every file is read the status says so and the verdicts come up with the keys on them |
-| `e` | hands the file to the editor as [`mia files`](#mia-files) does — `$EDITOR +<line> <path>`, else `nvim`, run in the worktree's top folder, the view said again when it leaves — at the line of the file the keys are on in the diff (a deleted line's and a note's being the next line the file has), and at its first on its row in the list |
-| `f` | which findings are shown: every open one, then only those an agent says it addressed and that wait on you, then the resolved too, and round again; the header's count, each file's, the notes and `n` follow |
-| `g` | sawa's gates in a modal, `gated`, over the view, a list `gates`: each by its name with what must hold (`.sawa/gates.md`), how it was judged, by whom and when at its right, and why on a line under it. `⏎` on one shows what was judged, with a text area for why and **Pass**, **Warn** and **Fail**, which record its result (`sw gate <name> pass\|warn\|fail -m`): sawa lets a person record one as it lets an agent. `esc` goes back to the gates, and again to the summary |
-| `v` | the verdicts in a modal, `judge`, over the view — approve, request changes, comment only, and none once one is given; `⏎` gives it (`sw verdict`), `esc` leaves it |
-| `y` | copies to the clipboard (a patch's `copy`) the path of the file under the keys in the list, and on a finding — its note in the diff, or its row over the files — what it says |
-| `o` `u` | reading order or by folder; resolved findings shown or not |
-| `[` `]` | where sawa reviews a stack (`sw stack --json` says its layers): the layer under and the one over, each a review of its own (`sw open -r <parent>..<branch>`), this worktree's own being the one found as above; the header says `layer 2 of 3`, and the status says so at the bottom and at the top |
-| `r` | has sawa look at the change again (`sw open` of the same target) |
-
-Each file of the list carries a menu, opened beside it with `→` and
-under the pointer's other button, each choice with the key that does the
-same at its right: Mark read (where it is not; sawa has no word that
-marks one unread), Open in editor, Copy path. A finding on the review
-as a whole has Reply, Resolve while it stands or Reopen once it does
-not — each with what is typed under it — and Copy its text. A finding
-under a line of the diff has no menu: the window's protocol has none on
-a line of code, and `⏎` opens it, as the code's `does` says in the foot.
-
-What was just done — `reply sent`, `t3 resolved`, `t3 reopened`, `filed
-t7`, `marked read: <path>`, the verdict as sawa words it, a gate's result,
-`copied <path>` — is a toast, said once. The status is for what sawa
-refused and for what is to be known of how things stand, and it and the
-keys are said by a patch's `status` and `keys` where nothing else of the
-view is another. The foot's keys are those of the piece the window says
-the keys are on (`focus`): `c` only off the list of files.
-Every `sw` is run with `-t <review>` and without `SAWA_AGENT`,
-`SAWA_AUTHOR` and `SAWA_SNAPSHOT`, so what is written is the person's
-whatever the pane's environment says. After each the review is read
-again, and it is read again by itself when sawa's record of it changes —
-the file `sw state` names as its `store` is looked at every 2 s — so a
-finding an agent files or answers comes in while you read; the view is
-said again only when it would say something else, and the keys stay on
-the line they were on.
-
-What sawa refuses — approving over a blocker, a line the file does not
-have, an edit whose lines changed — is the view's status, cut to 200
-characters, and the app stays up; so it does with no `sw` on `PATH` and
-with nothing to review, which the view says, and `r` asks again. `q` or
-`⌃C` in the plain terminal leaves, as closing the view does; stdin that
-is no terminal is refused, exit 1.
-
-Not yet: changing the words of a finding you filed (sawa has no verb for
-it: `sw type` changes only its type), filing a finding on the review as
-a whole, sawa's map and its patterns, and a pull request's comments on
-GitHub.
+`label` is left out when the manifest has none. `icon` is the file's full
+path, and is left out when the manifest names none or the file is not
+there. `match.title` is left out for an app told by its command alone.
+`commands`, `via` and `keys` are always lists. A manifest that does not
+read, or is named as an agent, is left out and named in a line on stderr.
+The others are listed all the same, and the exit status is 0.
 
 ## Setups
 
-`mia api setups` is the setups the person has used — an agent, a model
-and an effort, as one — each with how often and where last, for a picker
-to offer the ones they use. It answers from any folder: in a repository,
-that repository's; outside one, every repository's. `--repository <name>`
-asks for the one named, by its main checkout's folder name, and `--all`
-for every one.
+`mia api setups [--repository <name> | --all]` is the setups you have
+used, each an agent, a model and an effort taken together, with how often
+and where they were used last, so a picker can offer the ones you use. In a
+repository it answers for that repository. Outside one, or with `--all`,
+it answers for every repository. `--repository` names one by its main
+checkout's folder name. Feature `setups`.
 
 ```json
 [{"agent":"claude","model":"opus","effort":"high","uses":7,"sessions":6,
-  "last":{"repository":"mia-phone","worktree":"goba","machine":"local","at":"2026-11-15T10:00:00Z"},
-  "usual":true},
+  "last":{"repository":"shop","worktree":"goba","machine":"local","at":"2026-11-15T10:00:00Z"},"usual":true},
  {"agent":"claude","model":"sonnet","effort":"medium","uses":2,"sessions":2,
-  "last":{"repository":"mia-phone","worktree":"olasiti","machine":"fedora","at":"2026-11-12T16:20:00Z"},
-  "usual":false},
- {"agent":"codex","model":"","effort":"low","uses":0,"sessions":0,"usual":false}]
+  "last":{"repository":"shop","worktree":"themi","machine":"fedora","at":"2026-11-12T16:20:00Z"},"usual":false},
+ {"agent":"codex","model":"","effort":"low","uses":0,"sessions":0,"usual":false},
+ {"agent":"claude","model":"opus","effort":"max","uses":0,"sessions":0,"usual":false,
+  "role":"reviewer","body":"Review the branch against main…"}]
 ```
 
 | field | is |
 |---|---|
-| `agent`, `model`, `effort` | the setup; `""` for a model or an effort mia did not choose, so the agent's own — never both |
-| `uses` | how many times an agent was started with it or switched to it |
-| `sessions` | in how many worktrees |
-| `last` | where it was used last: the `repository`, the `worktree`, the `machine` it runs on — `local` for this one — and `at`; left out for one never used |
-| `usual` | the one used in the most of the repository's worktrees, the later used of a tie; none when every repository is asked |
-| `role`, `body`, `account` | of a [role](worktrees.md#a-role): its name, the first message its agent is sent, and the account it starts on when it says one; left out of a setup that is no role |
+| `agent`, `model`, `effort` | the setup; `""` for a model or effort mia did not choose, never both |
+| `uses`, `sessions` | how many times an agent was started with it or switched to it, and in how many worktrees |
+| `last` | where it was used last: `repository`, `worktree`, `machine` (`local` for this one) and `at`; left out of one never used |
+| `usual` | the one used in the most of the repository's worktrees, the later one of a tie; none when every repository is asked |
+| `role`, `body`, `account` | of a [role](agents.md#a-role): its name, the first message its agent is sent, and the account it starts on when it names one. Feature `roles` |
 
-The usual one comes first, then the last used first. After them come
-what the config starts agents with, `[main]` and `[agents.<name>]`, that
-were not used there, with `uses` 0: someone who has chosen nothing yet
-still has those. One of them with no model is there for its effort; one
-that says neither, or names an agent mia does not start with what it
-says — cursor-agent, an effort of opencode's, or one no
-enabled plugin adds — is left out.
+The usual setup comes first, then the rest, the last used first. After
+those come the setups the config starts agents with, `[main]` and
+`[agents.<name>]`, that were not used, with `uses` 0, so someone who has
+chosen nothing yet still has those. One that names nothing, or names
+something mia cannot start the agent with, is left out. Last come the
+roles, by name, each as `mia window new <worktree> --role <role>` would
+start it. A role file that does not read is left out; `mia role ls` says
+why.
 
-Last come the roles, by name, each with `uses` 0: the agent, model and
-effort it starts, those it leaves out the default setup's, as `mia window
-new <worktree> --role <role>` would start it. A role file that cannot be
-read is left out; `mia role ls` says why. A mia has roles when its
-capabilities have `roles`.
-
-Every `mia window new … --model`, `mia window model`, `mia conversation
-resume`, `mia main start` and `mia main model` writes down a use, in
-`setups.json` in the user-wide config folder of the machine whose mia
-started it; a start with no `--model` or `--effort` writes down what the
-config started the agent with, and nothing when it says none. The last 500 are kept. The main
-agent's are in the repository `main`, its folder's name, worktree `main`.
-Each use also keeps the `account` the agent was started on, when it was
-not the default, for the history: a setup is an agent, a model and an
-effort, whatever account they were used on.
+Every `mia window new … --model`, `mia window model`,
+`mia conversation resume`, `mia main start` and `mia main model` records a
+use in `setups.json` in the config folder of the machine whose mia started
+it. The last 500 are kept. The main agent's uses are under the repository
+`main`, worktree `main`.
 
 ## Accounts
 
-`mia api accounts` is every [account](worktrees.md#an-agents-account) of
-every agent mia keeps accounts of, by agent, each agent's own first. It
-answers from any folder, and starts and writes nothing. A capabilities
-list with `accounts` has it.
+`mia api accounts` is every [account](agents.md#an-agents-account) of every
+agent mia keeps accounts of, by agent, each agent's own first. It starts
+and writes nothing. Feature `accounts`.
 
 ```json
-[{"agent":"claude","name":"default","home":"/Users/user/.claude","default":true,
-  "logged_in":"unknown","sessions":["main","goba"],"user_default":false},
- {"agent":"claude","name":"work","home":"/Users/user/.config/mia/accounts/claude/work","default":false,
-  "logged_in":"unknown","sessions":["olasiti"],"user_default":true},
- {"agent":"codex","name":"default","home":"/Users/user/.codex","default":true,
-  "logged_in":"yes","sessions":[],"user_default":true},
- {"agent":"pi","name":"default","home":"/Users/user/.pi/agent","default":true,
-  "logged_in":"no","sessions":[],"user_default":true}]
+[{"agent":"claude","name":"default","home":"/home/user/.claude","default":true,
+  "logged_in":"unknown","sessions":["main","goba"],"user_default":false,"shared":[]},
+ {"agent":"claude","name":"work","home":"/home/user/.config/mia/accounts/claude/work","default":false,
+  "logged_in":"unknown","sessions":["themi"],"user_default":true,"shared":["settings.json","CLAUDE.md","skills"]},
+ {"agent":"pi","name":"default","home":"/home/user/.pi/agent","default":true,
+  "logged_in":"no","sessions":[],"user_default":true,"shared":[]}]
 ```
 
 | field | is |
 |---|---|
-| `name` | `default` for the agent's own folder, or the name it was added under |
-| `home` | its folder: the agent's own, as its variable or its usual place says, or mia's `accounts/<agent>/<name>`; empty for the default of a plugin's agent, whose folder mia does not know |
-| `logged_in` | `yes` when the file the agent writes once signed in is there, `no` when it is not and the agent keeps a sign-in nowhere else — or nothing but its shared setup is in the folder yet — and `unknown` when mia cannot tell: claude on macOS, which keeps it in the Keychain, codex, which may keep it in a keyring, and a plugin's agent. Only whether a file is there is read |
-| `shared` | what of the agent's own folder it links to, by name, as [its setup is shared](worktrees.md#its-setup-shared); empty for `default`, and for an agent mia shares nothing of |
-| `sessions` | the worktrees with a window that runs the agent on it now — `main` for the main agent, `accounts` for a window signing in to it — on this computer |
-| `user_default` | true of the one the user-wide config starts the agent's sessions on, `[agents.<agent>] account`, or of `default` when it names none; all of an agent's are false when it names one the agent has not. A repository can start its own on another: `--projects` says. A mia has it when its capabilities have `account-user-default`, which `mia account use <agent> <name> --global` sets |
-
-`mia account add --json` and `mia account login --json`, which opens a window to
-sign in to an account the agent has already — a mia has it when its
-capabilities have `account-login` — say what they opened:
-
-```json
-{"account":{"agent":"claude","name":"work","home":"/Users/user/.config/mia/accounts/claude/work",
-  "default":false,"logged_in":"no","sessions":[],"user_default":false},
- "worktree":"accounts","session":"mia-accounts","window":"claude-work","command":"CLAUDE_CONFIG_DIR='/Users/user/.config/mia/accounts/claude/work' claude",
- "shared":{"agent":"claude","name":"work","from":"/Users/user/.claude","linked":["settings.json","CLAUDE.md","skills"],"already":[],"kept":[]}}
-```
-
-`shared` is what was linked of the agent's own folder before the agent
-started: `linked` now, `already` linked, and `kept`, a name the account
-has of its own that mia links nothing over. `mia account share --json`
-is a list of the same, one for each account.
-
-`mia account signals <agent> [<name> | --all] [--dry-run] --json` — a mia
-has it when its capabilities have `account-signals` — is a list, one for
-each account, of what was done with the file that [makes pi say what it
-does](tmux.md#pi-says-what-it-does):
-
-```json
-[{"agent":"pi","name":"default","file":"/Users/user/.pi/agent/extensions/mia-signal.ts","did":"written","dry_run":false}]
-```
-
-`did` is `written`, `updated` — mia's own, of another version —
-`already`, or `kept`: a file there that is not mia's, left as it is. With
-`dry_run` nothing was written, and `did` is what would be.
+| `name`, `default` | `default` for the agent's own folder, else the name it was added under |
+| `home` | its folder: the agent's own, or mia's `accounts/<agent>/<name>`. `""` for the default account of a plugin's agent, whose folder mia does not know |
+| `logged_in` | `yes` when the file the agent writes on sign-in is there; `no` when it is not and the agent keeps a sign-in nowhere else; `unknown` when mia cannot tell (claude on macOS keeps it in the Keychain, codex may use a keyring, and a plugin's agent). Only whether the file exists is checked |
+| `sessions` | the worktrees with a window that runs the agent on this account now, on this computer: `main` for the main agent, `accounts` for a window signing in |
+| `user_default` | the one the user-wide `[agents.<agent>] account` starts sessions on, or `default` when it names none. Feature `account-user-default`, which `mia account use <agent> <name> --global` sets |
+| `shared` | what of the agent's own folder it links to, by name; empty for `default` |
 
 `mia api accounts --projects` is which account each repository starts
-each agent's sessions on: every repository mia has named a worktree in,
-the one asked from, and any `mia account use` named.
+each agent on: every repository mia has named a worktree in, the one
+asked from, and any `mia account use` named.
 
 ```json
-[{"repository":"mia-desk","agent":"claude","account":"work","from":"mia"},
- {"repository":"mia-desk","agent":"codex","account":"default","from":"default"},
- {"repository":"mia-phone","agent":"claude","account":"personal","from":"config"}]
+[{"repository":"shop","agent":"claude","account":"work","from":"mia"},
+ {"repository":"shop","agent":"codex","account":"default","from":"default"},
+ {"repository":"mia-core","agent":"claude","account":"personal","from":"config"}]
 ```
 
-| `from` | is |
-|---|---|
-| `mia` | `mia account use` said it, kept in mia's own state |
-| `config` | `[agents.<name>] account` in the repository's config, or the user-wide one |
-| `default` | nothing says one: the agent's own folder |
+`from` is `mia` when `mia account use` set it, `config` when
+`[agents.<name>] account` in the repository's or the user-wide config
+says it, and `default` when nothing does.
 
-Accounts are each machine's own: a folder there, signed in to there.
-Each machine answers for itself — `mia api accounts` asked on it, over
-ssh — and an app that shows them together keeps them apart by machine.
-An account of one name on two machines is the same only by its name,
-which is what `mia move` goes by.
+`mia account add --json` and `mia account login --json` (feature
+`account-login`) say what they opened: the `account`, in the shape above,
+the `worktree`, `session` and `window` it signs in from, the `command`, and
+`shared`, what was linked of the agent's own folder before it started
+(`linked` now, `already` linked, and `kept`, names the account has of its
+own that mia links nothing over). `mia account share --json` is a list of
+`shared`, one for each account.
+
+`mia account signals <agent> [<name> | --all] [--dry-run] --json`
+(feature `account-signals`) is a list, one for each account, of what was
+done with the file that [makes pi report what it does](tmux.md#pi-says-what-it-does):
+`did` is `written`, `updated`, `already`, or `kept` for a file there that
+is not mia's. With `dry_run` nothing was written.
+
+```json
+[{"agent":"pi","name":"default","file":"/home/user/.pi/agent/extensions/mia-signal.ts","did":"written","dry_run":false}]
+```
+
+Accounts belong to each machine. To show them for several machines, ask
+`mia api accounts` on each, over ssh, and keep them apart by machine. Two
+accounts on two machines are the same only by name, which is what
+`mia move` goes by.
 
 ## Standing
 
-`mia api standing` is every agent in every repository `mia api repos`
-lists, from any folder: which wait on you, which work, and which finished
-with nobody having looked. Nothing is worked out anew: it is each
-worktree's best [signal](tmux.md#signals), as the radar reads them.
+`mia api standing [--here] [--seen <repository>/<worktree>[@<machine>]]`
+is every agent in every repository on every machine: which wait on you,
+which work, and which finished with nobody having looked. It is read from
+each worktree's best [signal](tmux.md#signals), as the radar reads them.
+`mia asks --json` is its `waiting` list, the longest waiting first.
+Feature `standing`.
 
 ```json
-{"waiting":[{"repository":"mia-desk","root":"/Users/user/src/mia-desk","worktree":"goba",
+{"waiting":[{"repository":"shop","root":"/home/user/src/shop","worktree":"goba",
    "machine":"local","agent":"claude","window":{"index":1,"name":"claude"},
    "kind":"asks","line":"wants to use Bash",
    "options":["Yes","Yes, and don't ask again for mia commands","No"],"yes":"1",
    "since":"2026-11-02T10:00:00Z"}],
- "working":[{"repository":"mia-desk","root":"/Users/user/src/mia-desk","worktree":"kijenge",
+ "working":[{"repository":"shop","root":"/home/user/src/shop","worktree":"kijenge",
    "machine":"local","agent":"claude","kind":"busy","line":"","since":"2026-11-02T10:01:00Z"}],
- "done_unread":[{"repository":"api","root":"/home/user/src/api","worktree":"olasiti",
+ "done_unread":[{"repository":"mia-core","root":"/home/user/src/mia-core","worktree":"themi",
    "machine":"fedora","agent":"codex","kind":"done","line":"","since":"2026-11-02T09:40:00Z"}],
  "counts":{"waiting":1,"working":1,"done_unread":1},
  "machines":[{"name":"local","answers":true,"reach":{"state":"ok"}},
    {"name":"fedora","answers":true,"reach":{"state":"ok","warnings":[
-     {"name":"linger","detail":"user services stop at logout, and the agents with them","fix":"loginctl enable-linger"}]}},
-   {"name":"box","answers":false,"detail":"box: ssh: connect to host box port 22: Operation timed out",
-    "reach":{"state":"unreachable","detail":"box cannot be reached over ssh: ssh: connect to host box port 22: Operation timed out",
-      "fix":"turn box on, or check its address with ssh box"}}]}
+     {"name":"linger","detail":"user services stop at logout, and the agents with them","fix":"loginctl enable-linger"}]}}]}
 ```
 
 | group | holds the worktrees whose best signal |
 |---|---|
-| `waiting` | calls for you — ranked 50 or below — and stays until it is answered: an agent's `asks` |
-| `done_unread` | calls for you and lasts `--until seen`: `done`, `failed` |
+| `waiting` | calls for you (rank 50 or below) and stays until answered: an agent's `asks` |
+| `done_unread` | calls for you and lasts until the worktree is seen: `done`, `failed` |
 | `working` | does not call for you and was set by an agent: claude's `busy` |
 
 A worktree is in one group at most, and in none when it has no signal or
-only a note. Each group has the oldest first.
+only a note. Each group is oldest first.
 
 | field | is |
 |---|---|
-| `repository`, `root` | the repository's name and its main checkout on its machine, where a verb about the worktree is run |
-| `worktree`, `machine` | the worktree's name, and the machine whose mia keeps it: `local` is the one asked |
-| `agent` | the agent that set the signal, or the one in the window it was set from; empty when something else set it — a test watcher, you |
-| `window` | the window it was set from, where an answer is typed; left out when it was set from none |
-| `kind`, `line` | the signal's own: what its setter called it, and the line that says why |
-| `options` | of a waiting one, the numbered choices its window shows, the first being 1; left out when it shows none, and for one whose window is not known |
+| `repository`, `root` | the repository's name and its main checkout on its machine, where a command about the worktree is run |
+| `worktree`, `machine` | the worktree, and the machine whose mia keeps it; `local` is the one asked |
+| `agent` | the agent that set the signal; `""` when something else did, such as a test watcher or you |
+| `window` | the window it was set from, where an answer is typed; left out when there is none |
+| `kind`, `line` | the signal's kind and its line of text |
+| `options` | of a waiting one, the numbered choices its window shows, the first being 1 |
 | `yes` | the keys its setter says approve it, pressed with no Enter |
-| `since` | when the signal was set |
+| `since` | when it was set |
 
-Every machine `mia machine list` has is asked for its own, at once, by
-its own mia, and its entries carry its name. `machines` names each one
-asked: one that did not answer — it is off, or its mia is older than this
-query — has `answers` false and why, and no entries; that is not an
-error. One that has not answered in 8 seconds has not answered, and
-does not hold up the rest. It is not asked again for 30 seconds, by this
-mia or another. `--here` asks no machine.
+Every machine `mia machine list` has is asked for its own standing, at
+once, by its own mia. `machines` names each one asked: one that did not
+answer has `answers` false, a `detail` and a [`reach`](#machines), and no
+entries. That is not an error. `--here` asks no other machine.
+`--seen` first marks that worktree seen, as switching to it does, and
+answers with the standing after.
 
-`reach` says what a machine's not answering means: a `state`, a `detail`
-of one line, and the `fix`, the one command or step that puts it right —
-left out when mia knows none. Capability `machine-reach`; a machine in
-`mia api machines` and in `mia machine ls --json` has the same `reach`.
+## JSON commands
 
-| `state` | is | `fix` |
+These commands print JSON with `--json`, beside what `mia api` gives:
+
+| command | prints |
+|---|---|
+| `mia ls --json` | the projects, as [`repos`](#repos) |
+| `mia p ls [project] --json` | a project's worktrees, as [`worktrees`](#worktrees) |
+| `mia window ls [worktree] --json` | a worktree's windows, as in [`worktrees`](#worktrees) |
+| `mia new … --json`, `mia adopt … --json` | the worktree's record |
+| `mia stack show --json` | as [`stack`](#stack-and-base) |
+| `mia stack sync --json` | `base`, the one fetched; `current`, the layer it is on; `dropped`, the landed layers; `restacked`, how many were rebased |
+| `mia resurrect --list --json`, `mia signal ls --json`, `mia plugin ls --json` | as [`sessions`, `signals`](#sessions-and-signals) and [`plugins`](#plugins) |
+| `mia asks --json` | the waiting worktrees, as in [`standing`](#standing) |
+| `mia recall … --json`, `mia why … --json` | see [Conversations from other commands](#conversations-from-other-commands) |
+| `mia conversation resume … --json`, `mia conversation continue … --json`, `mia hand … --json` | the same |
+| `mia main status --json`, `mia main start --json` | as [`main`](#the-main-agent) |
+| `mia account … --json` | see [Accounts](#accounts) |
+| `mia role ls --json` | the roles |
+| `mia machine ls --json` | the machines, with `reach` |
+| `mia config show --json` | the effective global, project and local configuration |
+| `mia doctor --json` | `checks`, each a `name`, `status` and `detail`, with a machine's `state` and `fix`; and an overall `ok`. A failure still exits non-zero |
+| `mia gateway status --json` | `running`, `address`, `pac`, `ca`, `trust`, `differentBuild`, `routes` |
+| `mia env host [worktree] --json` | `worktree`, `machine`, and `staging` when it runs on another machine |
+| `mia env sync <worktree> status --json` | the sync session, its problems and how many conflicts |
+| `mia env sync <worktree> conflicts --json` | the same, with `conflictPaths` |
+| `mia env sync <worktree> preview --json` | the ignore rules, and the secret paths left out or let through |
+| `mia dev --json` | whether main is lent, and its `worktree`, `path` and `stashed`. `mia dev off --json` prints `{"lent":false}`. `--follow` cannot be combined with `--json` |
+| `mia gc --merged --json` | the clean merged worktrees it would remove, without removing them |
+
+```json
+{"running":true,"address":"127.0.0.1:7842","pac":"http://127.0.0.1:7842/proxy.pac","ca":"/home/user/.config/mia/gateway/ca.pem","routes":["monduli.mia"]}
+```
+
+## Apps mia desk draws
+
+`mia chat`, `mia git`, `mia files` and `mia review` run in a pane and have
+mia desk draw a view over that pane, using desk's UI protocol. mia
+itself draws nothing in them. Each one refuses stdin that is not a
+terminal (exit 1), and `q` or `⌃C` in the plain terminal leaves. Each is
+listed in capabilities: `chat`, `git-app`, `files-app`, `review-app`.
+Failures, such as a command git refuses, show up as the view's status, cut
+to 200 characters, and the app stays up. A toast reports what was just
+done. Each row's menu (`→`, or the pointer's other button) lists what its
+keys do. What loses or sends something is asked first, in a modal whose
+title says exactly what: press the same key again, or `⏎`, to do it, and
+`esc` to leave it.
+
+### mia chat
+
+`mia chat [--window <index>] [--conversation <id>]` follows a conversation
+of the worktree as a chat. With no flag it is the conversation a window
+has open, else the last one written to, which is then only shown.
+`mia chat --chat <name>` is a [chat](chats.md#shown-as-a-chat) of mia's,
+from any folder. What you send, choose and stop in the chat is typed into
+the agent's window, as `mia window send`, `press` and `key` type it. What
+you send shows at once as an `asked` turn. A question the window's screen
+asks that the transcript does not, such as a permission, is a question in
+the chat until it is answered.
+
+A line over the chat names the agent, the model, effort and account it
+runs on. Its buttons:
+
+| button | key | does |
 |---|---|---|
-| `ok` | it answered | |
-| `unreachable` | ssh could not connect: it is off, its name does not resolve, it timed out | turn it on, or check its address |
-| `needs_login` | ssh got there and was not let in: a key refused, a host key not accepted, a passphrase or password wanted. mia never asks for one | `ssh <target>` once in a terminal |
-| `no_mia` | it answers and has no mia at `~/.local/bin/mia` | `mia machine ship <name>` |
-| `old_mia` | its mia answers and does not know the query; `detail` says its version | `mia machine ship <name>` |
-| `not_set_up` | its mia runs and the repository asked about is not there: in `mia api machines`, of a machine linked to the repository. It has `answers` true | `mia machine link <name>` |
-| `failed` | its mia answered with an error that is none of these; `detail` has its line | |
+| Models | `m` | lists the setups used here and every installed agent's models. A model of this agent switches the window, as `mia window model` does. Another agent's hands the conversation over: written out as a handoff, that agent started in a window of its own, the old window closed once the new one runs, and the handoff sent with the first thing you say. While the agent is at work, the pick is kept to happen next: pick it again to drop it, or `tab` on it to stop the agent and do it now. `⇧⏎` marks rows so the next message goes to each of them too |
+| Fork | `f` | starts the chosen agent and model in a window of its own on the conversation up to the last reply. A reply's menu, **Continue from here with…**, forks from that reply |
+| Earlier | `e` | the worktree's conversations. `⏎` shows the one a window has open, or takes another up again as `mia conversation resume` does. `c` on another agent's conversation hands it to this chat's agent: the first press says what carries over, the second does it |
 
-One that is `unreachable` or `needs_login` twice running is asked once a
-minute from then on, not every 30 seconds, until it answers. `warnings`
-are what works now and will not go on working, each a `name`, a `detail`
-and a `fix`: `linger`, on a Linux machine whose user services stop when
-you log out (`loginctl show-user` says `Linger=no`). Each machine's own
-mia looks, at most every ten minutes, and says it of itself, so it costs
-no asking.
+That a new window's agent has not yet been sent its handoff is kept on the
+window, as the tmux option `@mia_context`, so any chat of that window sends
+it once. When a [mia serve](serve.md) of its build answers, the chat
+listens to [`window`](#window) instead of looking every second.
 
-`--seen <repository>/<worktree>` first marks that worktree seen, as
-switching to it does, so what it finished is unread no more; the
-repository by its name or its `root`, and `<worktree>@<machine>` for
-another machine's. The answer is the standing after.
+### mia git
 
-`mia dev <worktree> --json` reports the new lent state; `mia dev off --json`
-reports `{"lent": false}`. `--follow` cannot be combined with `--json`.
+`mia git`, in any folder of a git repository, shows how that worktree
+stands in git. Its head line gives the branch and where it stands against
+its base (`3 ahead of main, none behind`): the layer under it in a
+[stack](stacks.md), else the repository's base branch. Then come what is to
+push and pull, and how many files are staged, changed and untracked.
 
-Examples of placement and gateway state:
+On the left is a list: **Staged**, **Changed** and **Untracked** files,
+each with its lines added and deleted; then the commits ahead of the base,
+up to 20; then the **Stashes**, up to 10. Up to 400 files are listed. With
+more than 30, the list is split into tabs: **Changes**, **Commits**,
+**Stashes**. On the right is the diff of the row the keys are on: what is
+staged, what is not, an untracked file's lines, a commit's (`git show`), or
+a stash's. Diffs past 1500 lines are cut short with a note of how many are
+left.
 
-```json
-{"worktree":"monduli","machine":"build","staging":"/home/me/.mia/shop/monduli"}
-```
+| key | where | does |
+|---|---|---|
+| `space` | a file | stages it, or unstages one that is staged |
+| `space` | a line of the diff | stages the hunk that line is in, or unstages it in a staged file |
+| `⏎` | a line added or deleted | stages or unstages that line alone |
+| `d` | a changed file, a line of its diff, an untracked file | discards the unstaged change (`git restore`), the hunk, or deletes the file (`git clean`). Asked first. A staged file is refused |
+| `e` | a file, a line of its diff | opens `$EDITOR` (else `nvim`) at that line, and comes back when it exits |
+| `y` | a file, a commit | copies its path, or the commit's hash |
+| `u` | the last commit | `git reset --soft HEAD~1`, leaving its changes staged. Asked first. Refused when the upstream has the commit |
+| `space` `p` `d` | a stash | applies it, pops it, drops it (asked first) |
+| `a` | | stages everything (`git add --all`) |
+| `c` | | the commit screen |
+| `b` | | the branches |
+| `s` | | stashes everything, untracked files too, as `mia git: <branch> <date time>` |
+| `f` | | fetches the remote the branch follows, else `origin` (`git fetch --prune`) |
+| `P` | | pulls only when the branch can fast-forward (`git pull --ff-only --no-rebase`) |
+| `p` | | pushes to what the branch follows, or sets it upstream on `origin`. Asked first. Never by force |
+| `r` | | reads the standing again |
 
-```json
-{"running":true,"address":"127.0.0.1:7842","pac":"http://127.0.0.1:7842/proxy.pac","ca":"/home/me/.config/mia/gateway/ca.pem","routes":["monduli.mia"]}
-```
+The commit screen has a text area for the message, a **Commit** button
+(`⌘⏎` in the area), and **Amend the last one**. The commit is
+`git commit -m` with the message as typed, and hooks run. Amending is
+refused when the upstream has the commit, when the commit is the base's,
+or with nothing staged and no message. The branches (`b`) are a modal with
+a search field: `⏎` switches, a remote's branch is checked out to track
+it, and words that match no branch offer **Create <name> from <current>**.
+Fetch, pull and push run one at a time, with a progress bar. git has no
+terminal there, so a remote that wants a password fails and says so.
 
-## Exit status
+It reads the repository again on its own: `git status` every 2 seconds,
+or, when a mia serve of its build answers, each time the server says
+[`status`](#status) changed. The view is sent again only when it would look
+different.
 
-A command that runs another command preserves its exit status where possible,
-including `mia run`, `mia env run`, `mia env exec` and interactive shells.
-Mia itself uses `1` for failure, `3` for a missing worktree or query and `64`
-for usage errors.
+Not yet: merge, rebase, resolving conflicts, force push, deleting or
+renaming a branch, tags, and colour by syntax.
 
-## Plugin name collisions
+### mia files
 
-A verb declared by two enabled plugins is refused until all but one are
-disabled. A verb that shadows a core command is also reported by
-`mia plugin ls` and `mia doctor`.
+`mia files` shows the worktree's files, in any folder of a repository. In
+a folder that is not in a repository it shows that folder's tree, with no
+marks. It hands editing to your editor. Of the worktree, it writes only
+what `a`, `R` and `D` ask for.
+
+On the left is a tree of the files git tracks and the untracked ones not
+ignored. A folder opens and closes with `⏎`. The folders leading to each
+changed file start open. A file changed against the base (the one
+`mia git` uses) is marked `A`, `M` or `D`. On the right is the file the
+keys are on, with line numbers, read 1500 lines at a time as the keys move
+through it. A binary file, one over 2 MB, and one that is not a file are
+said to be so.
+
+| key | does |
+|---|---|
+| `e` | opens `$EDITOR` (else `nvim`) at the line the keys are on, in the worktree's top folder, and comes back when it exits |
+| `f` | finds a file by the letters of its path, in order |
+| `/` | finds in files: as written (`git grep -F`, case-blind when all lower case), after a `/` as a regular expression, after an `=` as whole words; up to 500 hits |
+| `a` | asks a name for a new file in the folder the keys are on and opens it in the editor; a name ending in `/` makes a folder |
+| `R` | renames or moves the path the keys are on, with `git mv` where git tracks it |
+| `D` | deletes the path the keys are on, asked first, saying whether git can bring it back |
+| `y` | copies the path |
+| `c` | lists only the changed files, or all again |
+| `d` | on a changed file, its diff against the base in place of its lines |
+| `B` | blame: each line's commit and age; `⏎` on a line shows that commit |
+| `:` | goes to a line by its number |
+| `r` | reads the files again |
+
+It reads the repository again on its own, as `mia git` does.
+
+Not yet: editing in place, and reading a diff or a commit past 1500 lines.
+
+### mia review
+
+`mia review [<range> | pr <number> | w]` shows a code review of the
+worktree. The review is sawa's: `sw`, the local code-review tool, keeps the
+files, what was read, the findings, the gates and the verdict.
+`mia review` asks `sw` for all of it as JSON and has `sw` do everything,
+as you. With no argument, it opens the review sawa has of the branch
+against its base, else the last one of this worktree, and with none it
+starts one (`sw open -r <base>..HEAD`). `pr 14` is a pull request, `w` the
+working tree, and anything else a range.
+
+Its head gives the change's title, how the findings stand and the verdict,
+then sawa's summary and the findings on the review as a whole. On the left
+are the files, by folder or in sawa's reading order. On the right is the
+diff of the file the keys are on, each finding under the line it is about.
+
+| key | does |
+|---|---|
+| `n` `N` | the next or previous finding shown |
+| `⏎` | opens a finding: its words, the edit it suggests, its replies, and **Reply**, **Reply and resolve**, **Reopen** and **Apply** (`sw apply`) |
+| `esc` | closes what is open, keeping what was typed |
+| `c` | on a line of the diff, comments on it as a finding (`issue:` or `suggestion:` in front sets its type) |
+| `space` | marks the file read and shows the next unread one |
+| `e` | opens the file in the editor at the line the keys are on |
+| `f` | which findings show: open ones, those waiting on you, or resolved ones too |
+| `g` | sawa's gates; `⏎` on one records **Pass**, **Warn** or **Fail** |
+| `v` | the verdicts: approve, request changes, comment only |
+| `y` | copies the file's path, or a finding's text |
+| `o` `u` | reading order or by folder; resolved findings shown or not |
+| `[` `]` | in a stack, the review of the layer under or over |
+| `r` | has sawa look at the change again |
+
+Every `sw` runs with `-t <review>` and without `SAWA_AGENT`, `SAWA_AUTHOR`
+and `SAWA_SNAPSHOT`, so what is written is yours. It reads the review
+again when sawa's record changes, every 2 seconds, so a finding an agent
+files comes in while you read.
+
+Not yet: editing a finding you filed, filing one on the review as a whole,
+sawa's map and patterns, and a pull request's comments on GitHub.

@@ -1,128 +1,123 @@
 # Commands
 
-`<worktree>` is a name, path or branch; leave it out for the one you are in.
-`mia <command> -h` shows a command's usage.
+Every command, grouped as `mia help` groups them. `<worktree>` is a name,
+path or branch; leave it out for the one you are in. `mia <command> -h`
+shows a command's usage, and every reading command takes `--json`.
 
 ## Worktrees
 
 | command | does |
 |---|---|
-| `mia new <branch>` | make a worktree |
-| `mia adopt <path>` | take over a worktree |
-| `mia ls` | list the projects mia knows, from any folder |
-| `mia p ls [project]` | list a project's worktrees (also `mia project`, `pj`, `prj`) |
-| `mia cd <name>` | go to a worktree or a project, matched loosely by name |
-| `mia shell [worktree]` | attach to its session |
-| `mia switch <worktree>` | cd there |
-| `mia path [worktree]` | print its path |
-| `mia open [worktree]` | open it in your editor |
-| `mia window …` | its session's windows |
-| `mia chat [--window <index>] [--conversation <id>] \| --chat <name>` | the worktree's conversation with its agent as a [chat](api.md#conversations) mia desk draws over the pane, followed as it is written, under a line that says the agent, its model, effort and account; what is sent shows at once, what the agent's screen asks is a question in it; `models` (m) is a modal over the chat that switches the model or hands the conversation to another agent, `earlier` (e) one that lists the worktree's conversations to read, go on with, or continue from another agent's; `esc` takes either away; `--chat <name>` is a [chat](chats.md#shown-as-a-chat) of mia's, `main` the main agent, the same chat from any folder |
-| `mia git` | how the worktree it is run in stands in git, as an [app](api.md#mia-git) mia desk draws over the pane: its files, commits ahead and stashes in a list, the diff of one beside it, and keys that stage a file, a hunk or a line, discard, commit, amend, undo the last commit, stash, switch branch, fetch, pull and push, with a menu of them on each row; what loses or sends something is asked in a modal first, and what was done is said in a toast |
-| `mia files` | the files of the worktree it is run in, as an [app](api.md#mia-files) mia desk draws over the pane: the tree with what changed against the base marked, the file under the keys beside it — any file, read to its end — and keys that find a file, find in files as written, by pattern or by whole words, hand one to your editor, make, rename and delete a file or a folder, copy a path, list only what changed, and show a file's diff against the base and each line's commit, each on a row's menu too; a name, a line and a delete are asked in a modal, and what was done is said in a toast |
-| `mia review [<range> \| pr <number> \| w]` | the review sawa keeps of the worktree it is run in, as an [app](api.md#mia-review) mia desk draws over the pane: its files, and the diff of one with each finding under its line, and keys that go through the findings, answer, resolve and reopen them, apply an edit one suggests, comment, mark a file read, hand it to your editor, show the gates and record one, go through a stack's layers and give the verdict, with a menu on each file and finding; the verdicts and the gates come up in a modal, and what was done is said in a toast |
-| `mia window new <worktree> <agent> [--model <m>] [--effort <e>] [-- command]` | a window running an agent, started with a model and an effort |
-| `mia window model <worktree> <window> <model> [--effort <e>]` | switch the agent in a window to another model while it runs; opencode, which takes one only as it starts, is started again in its window on its conversation |
-| `mia window new <worktree> [window] --role <role>` | a window running the agent a role says, with its model, effort and account, sent the role's body once it is ready |
-| `mia role [ls]`, `mia role show <role>`, `mia role path <role>` | the roles: setups with opening instructions, files of yours in `~/.config/mia/roles/<role>.md` |
-| `mia window new <worktree> [window] --kind <kind> [-- command]` | a window marked as another [kind](tmux.md#pane-kinds) than its command says: `agent`, `shell`, `editor`, `server`, `tests` or `logs` |
-| `mia window new <worktree> <agent> --account <a>` | a window running an agent on another account than the repository's, this once |
-| `mia window account <worktree> <window> <a>` | says how to put a running agent on another account: end it, then resume its conversation with `--account` |
-| `mia account [ls]` | every agent's accounts: its own folder, `default`, and the ones added — signed in or not, and what runs on each |
-| `mia account add <agent> <name> [--in <worktree>]` | a new account's folder, and a window running the agent on it to sign in to with the agent's own login |
-| `mia account login <agent> <name> [--in <worktree>]` | a window running the agent on an account it has, `default` too, to sign in to it again: one signed out, or whose sign-in ran out |
-| `mia account share <agent> <name>`, `mia account share <agent> --all` | link the agent's own [setup](worktrees.md#its-setup-shared) into an account, or every one of mia's: what is missing there, never a sign-in; `add` and `login` do it first |
-| `mia account signals <agent> [<name> \| --all] [--dry-run]` | write pi the [extension](tmux.md#pi-says-what-it-does) that tells mia what it does, in its own folder, an account's or every one's; never over a file of yours, and `--dry-run` only says |
-| `mia account use <agent> <name> [--repository <r>]` | the account a repository starts the agent's sessions on from now on; `default` gives it back to the config |
-| `mia account use <agent> <name> --global` | the user-wide one, `[agents.<agent>] account` in `~/.config/mia/config.toml`, for every repository that says none; `default` takes the line out |
-| `mia account rename <agent> <name> <new>`, `mia account rm [--force] <agent> <name>` | rename or remove one; one a window runs on is refused, and so is `default` |
-| `mia rename <worktree> <name>` | rename it |
-| `mia star [worktree]` | star or unstar it |
-| `mia setup [worktree]` | run setup again |
-| `mia run <worktree>[@machine] <cmd…>` | run a command in it, here or on a machine |
-| `mia rm <worktree>` | remove it |
-| `mia fork [worktree] <branch>` | a new worktree on a new branch from where that worktree is, its uncommitted and untracked work copied; the first stays as it is |
-| `mia archive [--stop-running] <worktree>` | put it away: everything in it, uncommitted and untracked work too, kept under `refs/mia/archive/<name>`; the worktree goes, its branch stays |
-| `mia archive ls` | what is archived |
-| `mia unarchive <name>` | bring it back as it was, under its old name when that is free |
-| `mia recall [--all] <text…>` | the agent conversations of this repository and its worktrees that mention it — claude's, codex's, pi's, opencode's, agy's — newest first: the words around it, and how to resume each. With `--all`, or in no repository, in every project, and on each machine mia knows (one found there is said to be on it). What is asked and said in each conversation is kept in an index, so asking again takes a fraction of a second |
-| `mia mcp` | an MCP server on stdio for an agent: `recall` searches those conversations in every project, `conversation` reads one around the turn that matched. It changes nothing. An agent is told of it by its own means: `claude mcp add mia -- mia mcp` |
-| `mia tmux list` | what tmux's prefix k opens: one list in which what is typed says what Enter does — nothing, who waits on you and the projects (Enter opens one to its worktrees); a name, that worktree or project; `pi fix the test`, that agent started here on it; `> codex`, this conversation handed to that agent; a number, that answer to whoever waits; words said before, the conversation that holds them, resumed; `nvim`, `git`, `shell`, it in a window; `new <branch>`, `rm <name>`, `stack`; `@ <machine>`, this worktree moved there, or one brought back; `?` says all of it |
-| `mia conversation resume <id> [--worktree <name>] [--in <worktree>] [--model <m>] [--effort <e>] [--account <a>]` | open a window with the agent taking the conversation up again, in the worktree it was made in or in another, started with a model and an effort, on the repository's account or the one named — copied into that account's folder when it was made on another; `--worktree` picks the copy of one that is in several |
-| `mia conversation continue <id> --with <agent> [--worktree <name>] [--model <m>] [--effort <e>] [--account <a>] [--dry-run]` · `mia conversation continue --from <window> --with <agent> [--worktree <name>] …` | go on with one conversation [with another agent](worktrees.md#with-another-agent), said by its id or by the one window that has it open: it is written out as a handoff in the repository's git folder, cut to a budget with the whole beside it, and a window opens in its worktree's session with that agent told to read it and go on from where it stops; the first agent's thinking and tool output are not carried over, and with the same agent it is refused, for `resume` loses nothing; `--dry-run` only says |
-| `mia why <file:line\|commit>` | the claude conversation that made a commit, or the line's last commit: what you asked, and how to resume it |
-| `mia resurrect [--dry-run] [--list] [<worktree>...]` | after tmux or the computer went down, open each session again — or any one named, closed on purpose or not: its windows in their folders, their programs restarted, each claude resuming its own conversation; `--list` shows every session remembered |
-| `mia gc [--apply\|--ask] [--days N]` | find, or remove, idle worktrees: clean, no session, not starred, untouched for N days (14); `--ask` shows them and removes on `y` |
-| `mia gc --merged [--apply]` | find, or remove, clean worktrees whose branch the base already holds |
+| `mia adopt <worktree>` | take over a worktree mia did not make, one from `git worktree add` or another tool |
+| `mia archive [--stop-running] <worktree>` · `mia archive ls` | put a worktree away, uncommitted and untracked work too, under `refs/mia/archive/<name>`; its branch stays. [Worktrees](worktrees.md) |
+| `mia chat [--window <index>] [--conversation <id>]` · `mia chat --chat <name>` | a worktree's conversation with its agent, as a chat mia desk draws over the pane; `--chat main` is the main agent's. [Chats](chats.md#shown-as-a-chat) |
+| `mia files` | the worktree's files, as an app mia desk draws over the pane. [Automation](api.md#mia-files) |
+| `mia fork [worktree] <branch>` | a second try: a new worktree on a new branch from where that one is, its uncommitted and untracked work copied |
+| `mia gc [--merged] [--apply\|--ask] [--days N]` | find, or remove, idle worktrees: clean, no session, not starred, untouched for N days (14); `--merged`, those whose branch is merged; `--ask` asks `y` first |
 | `mia gc --others [--apply\|--ask] [path…]` | find, or remove, the clean worktrees mia did not make; branches stay |
+| `mia git` | how the worktree stands in git, as an app mia desk draws over the pane. [Automation](api.md#mia-git) |
+| `mia go <worktree\|project\|project/worktree>` | in tmux, take this client to that worktree's session, started if it is not up. [mia in tmux](tmux.md#the-popup-terminal) |
+| `mia ls` | the projects mia knows, from any folder, the one you are in marked |
+| `mia move [--dry-run] <worktree>[@<machine>] <machine\|local>` | take a worktree to a machine or back: its branch, uncommitted work, windows and their agents' conversations. [Machines](machines.md#moving-a-worktree) |
+| `mia new [--from <ref>] [--name <name>] [--bg] [--shell] [--on <machine>] <branch>` | make a worktree on a branch, and name it. [Worktrees](worktrees.md) |
+| `mia new --stack [--in <worktree>] [--worktree] <branch>` | a new [stack](stacks.md) layer, in place or in a worktree of its own |
+| `mia new --pr <number> [--remote <remote>]` | a worktree at a pull request's head |
+| `mia open [worktree] [--in <cursor\|code\|zed\|idea\|subl\|xcode\|finder\|terminal>]` | open it in your editor, an IDE, Finder or a terminal |
+| `mia path [worktree\|stack\|project\|project/worktree]` | print a path, for scripts; with nothing, the main checkout |
+| `mia project ls [project]` · `mia project cd <worktree>` | a project's worktrees, here or by name, and the way into one; also `mia p`, `mia pj`, `mia prj` |
+| `mia rename <worktree> <name>` | give a worktree another name; its session follows now, its container on its next start |
+| `mia resurrect [--dry-run] [--list] [--ask] [<worktree>…]` | open sessions again after tmux went down, or any named: windows, programs, each claude on its own conversation; `--list` shows all remembered |
+| `mia review [<range> \| pr <number> \| w]` | the review sawa keeps of the worktree, as an app mia desk draws over the pane. [Automation](api.md#mia-review) |
+| `mia rm [--force] [--stop-running] [--branch] <worktree>` | remove a worktree and its name; `--force` even with uncommitted changes, `--stop-running` ending its session, `--branch` its branch too |
+| `mia run <worktree>[@machine] <cmd…>` | run a command once in a worktree, here or on a machine |
+| `mia setup [worktree]` | run the configured setup again |
+| `mia shell [--popup \| --view <name>] [worktree]` | attach to a worktree's session; `--view` at this terminal's own size and window; `name@machine` attaches there |
+| `mia shell-init <zsh\|bash\|fish>` | the shell function that lets `mia switch` and `mia cd` change folder, and completion: `eval "$(mia shell-init zsh)"` in your rc |
+| `mia star [worktree]` | star it, or unstar it; `mia gc` leaves a starred one alone |
+| `mia switch <worktree\|stack\|project\|project/worktree>` | cd there, from any folder, once `mia shell-init` is in your rc; in tmux the client goes to its session too. Also `mia cd` |
+| `mia unarchive <name>` | bring an archived worktree back as it was, under its old name when that is free |
+| `mia window [ls] [worktree]` | a worktree's windows. [Worktrees](worktrees.md) |
+| `mia window new [worktree] [window] [--editor] [--kind <kind>] [-- command]` | a new window: a shell, the editor, a `[launch]` name, or a command; `--kind` [marks it](tmux.md#pane-kinds) |
+| `mia window new [worktree] <agent> [--model <m>] [--effort <e>] [--account <a>] [--task <text>]` | a window running an agent, on that model and account, told the task once it is ready. [Agents](agents.md) |
+| `mia window new [worktree] [window] --role <role>` | a window running what a [role](agents.md#a-role) says, sent its instructions once ready |
+| `mia window open\|select\|close [worktree] <window>` | land in a window, pick it without landing, or close it |
+| `mia window read [worktree] <window>` | print what a window shows |
+| `mia window send\|press\|key [worktree] <window> -- <text\|keys>` | type a line and Enter, type with no Enter, or press keys by name (`C-c`, `Escape`) |
+| `mia window model [worktree] <window> <model> [--effort <e>]` | switch a running agent's model. [Agents](agents.md#an-agents-model) |
+| `mia window account [worktree] <window> <account>` | say how to put a running agent on another account. [Agents](agents.md#an-agents-account) |
 
-## Stacks
+## Working
 
 | command | does |
 |---|---|
-| `mia up`, `mia down` | move between layers |
-| `mia stack` | show the stack |
-| `mia stack go\|name\|sync\|merge\|restack\|diff\|rm` | work on it |
+| `mia account [ls]` | every agent's accounts, signed in or not, and what runs on each. [Agents](agents.md#an-agents-account) |
+| `mia account add\|login <agent> <name> [--in <worktree>]` | make an account and open a window to sign in to it, or sign in to one again |
+| `mia account share <agent> (<name> \| --all)` | link the agent's own setup into an account; never a sign-in |
+| `mia account use <agent> <name> [--repository <name> \| --global]` | the account a repository, or every repository, starts the agent on; `default` gives it back |
+| `mia account rename <agent> <name> <new>` · `mia account rm [--force] <agent> <name>` | rename or remove an account; one a window runs on is refused, and so is `default` |
+| `mia account signals <agent> [<name> \| --all] [--dry-run]` | write pi the [extension](tmux.md#pi-says-what-it-does) that tells mia what it does; never over a file of yours |
+| `mia asks [n [answer]]` | who waits on you in every project, longest first, with numbered answers; `mia asks 2` goes to the second, `mia asks 2 1` gives its first answer |
+| `mia chats [list]` | the [chats](chats.md), the main agent first |
+| `mia chats new --agent <agent> [--model <m>] [--effort <e>] [-- <first words…>]` | make a chat, print its name and start it, saying its first words once it is ready |
+| `mia chats say <name> -- <text…>` · `press <name> <keys…>` · `interrupt <name>` · `model <name> <model> [--effort <e>]` · `switch <name> --agent <agent>` | what `mia main` does, to that chat; `main` is the main agent |
+| `mia chats stop\|start\|remove <name>` | end its session, start it again on its last conversation, or remove it and its name |
+| `mia config` | open the repository's configuration in your editor. [Configuration](configuration.md) |
+| `mia config show\|validate` | print, or check, the configuration in effect |
+| `mia config [--global] <key> [<value>]` | say, or set, one setting: `base staging`, `keys.quizzicle.quiz K`; a setting mia would not load is refused |
+| `mia dash` | the radar, under its old name |
+| `mia down` · `mia up` | move to the [stack](stacks.md) layer below or above, in place |
+| `mia hand [--window <index>] <agent> [--model <m>] [--effort <e>] [--account <a>]` | the conversation in front goes on with another agent, in a window beside. [Conversations](conversations.md#with-another-agent) |
+| `mia main [status]` | the [main agent](main.md): whether it runs, and what it is doing |
+| `mia main start [--new \| --resume <id>] [--restart] [--role <role>] [--agent <agent>] [--model <m>] [--effort <e>] [--account <a>]` | start it on its last conversation, a new one, or an earlier one; `--restart` ends one that runs first |
+| `mia main stop` · `interrupt` | end its session, or stop it mid-work |
+| `mia main say <text…>` · `press <keys…>` | type a message and submit it, or type keys with no Enter to pick an option. [The main agent](main.md#saying-something-to-it) |
+| `mia main model <model> [--effort <e>]` · `switch --agent <agent> [--model <m>] [--effort <e>]` | switch its model while it runs, or have it go on as another agent |
+| `mia radar [--new]` | the [radar](tmux.md#the-radar), `prefix space`; `--new` the new-worktree popup, `prefix n` |
+| `mia role [ls]` · `mia role show\|path <name>` | the [roles](agents.md#a-role): setups with opening instructions, files of yours |
+| `mia shell-integration zsh` | the zsh lines that mark each prompt for tmux. [Prompt marks](tmux.md#prompt-marks) |
+| `mia stack [--in <worktree>] [show]` | the stack and its layers. [Stacks](stacks.md) |
+| `mia stack go <layer>\|name <name>\|track <branch> <parent>\|sync\|merge <layer> [onto <layer>]\|restack\|diff\|rm […]` | work on the stack |
+| `mia tmux [install\|uninstall]` | print, add or take out mia's part of `~/.tmux.conf`. [mia in tmux](tmux.md) |
+| `mia tmux keys <kitty\|ghostty>` | the lines a terminal app's config takes so its ⌘ keys send mia's |
 
 ## Environments
 
 | command | does |
 |---|---|
-| `mia env up [--wait] [--recreate]` | start; optionally wait for readiness or apply changed configuration |
-| `mia env down [--all]\|rm` | stop one or all, or remove |
-| `mia env shell` | a shell inside |
-| `mia env exec <cmd…>` | run a command inside |
-| `mia env run <worktree> <cmd…>` | run where its code runs |
-| `mia dev [worktree\|off]` | lend main's dev server a worktree's files |
-| `mia env browse [--direct]` | open it in the browser, with optional no-setup HTTP |
-| `mia env status\|ports\|service` | what it is doing |
-| `mia env host [machine]` | where it runs, or move it after a target preflight |
-| `mia env sync [worktree] [auto\|manual\|now\|status\|conflicts\|preview\|restart]` | control and inspect remote file synchronization |
-| `mia machine list\|add\|shell\|rm` | machines; the list says how each stood when last asked — `ok`, or what is wrong and the fix — and asks none |
-| `mia gateway status\|start\|stop\|setup\|trust` | the `<name>.mia` gateway |
+| `mia dev [<worktree> [--follow] \| off]` | lend the main checkout's running dev server a worktree's files. [Environments](environments.md#mains-dev-server) |
+| `mia env up [--wait] [--recreate] [worktree]` | start a worktree's environment; wait until it is ready, or apply a changed config. [Environments](environments.md) |
+| `mia env down [--all]` · `mia env rm` | stop it, or every one; remove it |
+| `mia env shell` · `exec <cmd…>` · `run <worktree> <cmd…>` | a shell inside, a command inside, or a command where its code runs |
+| `mia env status\|ports\|service` | what it is doing, its ports, its services; `service start\|stop\|restart\|logs <id>` |
+| `mia env browse [--direct]` | open it in the browser; `--direct` plain HTTP, no setup |
+| `mia env setup\|dotfiles\|tools\|image` | run setup inside, copy your dotfiles or tools in, build its image |
+| `mia env host [machine]` | where it runs, or move it there |
+| `mia env sync [auto\|manual\|now\|status\|conflicts\|preview\|restart]` | the file sync to an environment on a machine. [Environments](environments.md#sync) |
+| `mia gateway status\|start\|stop\|install\|uninstall\|setup\|trust\|untrust` | what makes `<name>.mia` reach an environment. [Environments](environments.md) |
+| `mia machine list` | the machines, and how each stood when last asked: `ok`, or what is wrong and the fix. [Machines](machines.md) |
+| `mia machine add <name> <ssh-target>` · `rm <name>` | add a machine, or forget one |
+| `mia machine shell <name>` | a shell on it |
+| `mia machine ship <name>` | put this mia on it. [Machines](machines.md#shipping-mia) |
+| `mia machine link <name>` | give it this repository, its base branch pushed |
+| `mia machine attach <worktree>@<name>` | attach to that worktree's session there |
+| `mia machine open <name> <port>` | open that port of it in the browser |
 
-## Other
+## Records
 
 | command | does |
 |---|---|
-| `mia radar [--new]` | find and switch to any worktree, or make one — `prefix space` and `prefix n` in tmux |
-| `mia dash` | the radar, under its old name |
-| `mia config [show\|validate]` | edit local overrides, or inspect the effective configuration |
-| `mia config [--global] <key> [<value>]` | say, or set, one setting: `base staging`, `keys.quizzicle.quiz K`, `plugin.agent.default codex`; one line edited, comments kept, and a setting mia would not load refused |
-| `mia plugin ls\|enable\|disable` | plugins |
-| `mia doctor` | check tools, config, gateway, machines, plugins and environment drift; of a machine that does not answer, what is wrong and the fix |
-| `mia api <query>` | state as JSON |
-| `mia api capabilities` | API version, queries and feature markers |
-| `mia api sessions` · `signals` · `plugins` | what `mia resurrect --list --json`, `mia signal ls --json` and `mia plugin ls --json` print |
-| `mia serve` | the [server](serve.md) of this machine, in the foreground: `mia api` over a socket, events when an answer changes, verbs run for whoever asks; `mia api` asks it when it runs, unless `MIA_NO_SERVE` is set |
-| `mia serve install\|uninstall\|start\|stop\|status` | the server as a [service](serve.md#as-a-service) of launchd or systemd, with the environment of the shell it is installed from; one that sees mia rebuilt ends, and the service starts the new build |
-| `mia api conversations [--worktree <name>] [--agent <agent>] [--limit <n>]` | the agent conversations of the repository and its worktrees, the last written to first |
-| `mia api accounts [--projects]` | every agent's accounts, or which one each repository starts each agent's sessions on |
-| `mia api conversation <id> [--worktree <name>] [--after <n>]` | one conversation as turns, for a chat view; `--worktree` picks the copy of one that is in several |
-| `mia main [status]` | the [main agent](main.md): whether it runs, and what it is doing |
-| `mia main start [--agent <name>] [--model <m>] [--effort <e>] [--account <a>]` | make its folder and session when they are not there and start the agent, going on with its last conversation; one that runs is left as it is. `--agent` starts another than `[main] agent`, this once |
-| `mia main start --resume <id> [--restart] [--model <m>] [--effort <e>]` | start it going on with one of its [earlier conversations](main.md#earlier-conversations), as the agent that had it; one that runs is refused, unless `--restart` says to end it |
-| `mia main start --new [--restart] [--agent <name>] [--model <m>] [--effort <e>] [--account <a>]` | start it with a [new conversation](main.md#a-new-conversation), going on with none; the one it had stays. One that runs is refused, unless `--restart` says to end it and start it again as it was |
-| `mia main stop` | end its session; its folder and conversations stay |
-| `mia main say <text…>` | type a message into it and submit it; refused while it [asks something](main.md#when-it-asks-first) |
-| `mia main press <keys…>` | type keys into it with no Enter after: `mia main press 1` picks an option when it is the main agent that asks, moving its cursor there and pressing Enter when its options have no numbers |
-| `mia main interrupt` | stop it mid-work |
-| `mia main switch --agent <name> [--model <m>] [--effort <e>]` | have it [go on with another agent](main.md#another-agent-mid-conversation), its conversation carried over and said in front of the next thing said to it; it is that agent from then on |
-| `mia chats [list]` | the [chats](chats.md), the main agent first: name, agent, what it is doing, its first words |
-| `mia chats new --agent <agent> [--model <m>] [--effort <e>] [-- <first words…>]` | make a chat, print its name and start it; its first words are said once it is ready, held while it asks something first |
-| `mia chats say <name> -- <text…>` · `press <name> <keys…>` · `interrupt <name>` · `model <name> <model> [--effort <e>]` | as `mia main say`, `press`, `interrupt` and `model`, to that chat; `main` is the main agent |
-| `mia chats switch <name> --agent <agent> [--model <m>] [--effort <e>]` | as `mia main switch`, to that chat |
-| `mia chats stop <name>` · `start <name>` · `remove <name>` | end its session, its folder and conversations staying; start it again going on with its last conversation; end it and take its folder and its name |
-| `mia api main` | where the main agent stands, from any folder |
-| `mia api main turns [--conversation <id>] [--after <n>]` | its conversation as turns, each of mia's verbs it ran said as what it did; `--conversation` reads one of its earlier ones |
-| `mia api main conversations` | the conversations made in its folder, with every agent it was run as, the one it has open marked `running` |
-| `mia api chats` | every [chat](chats.md), the main agent first, the others the last said in first |
-| `mia api chat <name>` · `mia api chat turns <name> [--after <n>]` | where one stands, as `mia api main` says it, and its conversation as `mia api main turns` gives it |
-| `mia api setups [--repository <name> \| --all]` | the agent · model · effort setups used, the repository's usual first, from any folder |
-| `mia api standing [--here] [--seen <repository>/<worktree>]` | every agent in every repository, and on every machine: which wait on you, which work, which finished unseen |
-| `mia help vocabulary` | the words |
-| `mia shell-integration zsh` | prints what marks each prompt and its output for tmux: `eval "$(mia shell-integration zsh)"` in your zshrc — see [Prompt marks](tmux.md#prompt-marks) |
-| `mia help tmux` | what `mia tmux install` adds: the one list, the popup terminal, the radar, a new worktree, the menu, the status line — see [mia in tmux](tmux.md) |
-| `mia tmux keys kitty\|ghostty` | the lines a terminal app's config takes so its ⌘ keys send mia's |
+| `mia api <query>` | mia's state as JSON, for apps and scripts; `mia api capabilities` lists the queries. [Automation](api.md) |
+| `mia conversation resume <id> [--worktree <name>] [--in <worktree>] [--model <m>] [--effort <e>] [--account <a>]` | a window with the agent taking a conversation up again. [Conversations](conversations.md#going-on-with-one) |
+| `mia conversation continue (<id> \| --from <window>) --with <agent> [--worktree <name>] [--model <m>] [--effort <e>] [--account <a>] [--dry-run]` | go on with a conversation as another agent, from a handoff it is told to read. [Conversations](conversations.md#with-another-agent) |
+| `mia doctor` | check tools, configuration, gateway, machines, plugins and environments, and say the fix |
+| `mia mcp` | an MCP server on stdio that lets an agent search and read past conversations; it changes nothing. [Conversations](conversations.md#for-agents-mia-mcp) |
+| `mia plugin [ls] \| enable <name> \| disable <name>` | programs named `mia-<name>` on your PATH that add verbs. [Plugins](plugins.md) |
+| `mia recall [--all] <text…>` | the agent conversations that mention it, newest first, and how to resume each; `--all` every project and machine. [Conversations](conversations.md#finding-one) |
+| `mia serve` | this machine's [server](serve.md): `mia api` over a socket, and events when an answer changes |
+| `mia serve install\|uninstall\|start\|stop\|status` | the server as a [launchd or systemd service](serve.md#as-a-service) |
+| `mia signal <worktree\|.> <kind> [text] [--style s] [--rank n] [--from source] [--for d \| --until seen] [--yes keys]` | say something about a worktree, shown as you ask. [Signals](tmux.md#signals) |
+| `mia signal <worktree> clear [--from source]` · `mia signal ls` | clear a worktree's signals, or list those standing |
+| `mia why <file:line\|commit>` | the claude conversation that made a commit, or a line's last commit, and how to resume it |
 
-Reading commands take `--json`.
+`mia help vocabulary` says what things are called; `mia help tmux` prints
+what `mia tmux install` adds; `mia version` prints the version.

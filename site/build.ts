@@ -13,12 +13,19 @@ const pages = [
   { file: "why.md", slug: "why", group: "Start" },
   { file: "getting-started.md", slug: "getting-started", group: "Start" },
   { file: "worktrees.md", slug: "worktrees", group: "Using mia" },
+  { file: "tmux.md", slug: "tmux", group: "Using mia" },
+  { file: "agents.md", slug: "agents", group: "Using mia" },
+  { file: "conversations.md", slug: "conversations", group: "Using mia" },
+  { file: "machines.md", slug: "machines", group: "Using mia" },
   { file: "stacks.md", slug: "stacks", group: "Using mia" },
   { file: "environments.md", slug: "environments", group: "Using mia" },
-  { file: "tmux.md", slug: "tmux", group: "Using mia" },
+  { file: "main.md", slug: "main", group: "Using mia" },
+  { file: "chats.md", slug: "chats", group: "Using mia" },
   { file: "configuration.md", slug: "configuration", group: "Reference" },
   { file: "commands.md", slug: "commands", group: "Reference" },
   { file: "api.md", slug: "api", group: "Reference" },
+  { file: "serve.md", slug: "serve", group: "Reference" },
+  { file: "apps.md", slug: "apps", group: "Reference" },
   { file: "plugins.md", slug: "plugins", group: "Reference" },
   { file: "changes.md", slug: "changes", group: "Reference" },
 ];
@@ -409,7 +416,7 @@ const home = `<main class="home">
         <p class="sense">Several branches sharing one worktree, each built on the one below, each its own pull request.</p>
       </summary>
       <div class="more">
-        ${sample("mia new schema --stack\nmia new api --stack\nmia stack pr")}
+        ${sample("mia new schema --stack\nmia new api --stack\nmia stack            # the layers, and what is behind")}
         <a href="/docs/stacks">Stacks</a>
       </div>
     </details>

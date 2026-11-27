@@ -2,8 +2,8 @@
 
 mia lives in your tmux: a worktree is a tmux session, a tab is a window,
 an agent is a program in one. mia adds a part of the status line, one
-list, a popup terminal, a menu and a few keys. It draws no screens of its
-own.
+list, a popup terminal, a radar, a menu and a few keys. It draws no
+screens of its own.
 
 ```bash
 mia tmux            # print what it adds
@@ -21,11 +21,12 @@ mia tmux keys kitty # the lines kitty (or ghostty) takes for the ⌘ keys
 | `m` | | [mia's menu](#the-menu) |
 | `a` | ⌘J | the next worktree here that needs you, best rank first, round again at the end |
 | `e` | ⌘. | this window: stop its agent, move it to another agent, a new agent window, its model, rename, close, fork into a new worktree, lazygit, the editor |
-| `b` / `B` | ⌘[ / ⌘] | back and forward through where you have been |
+| `b` / `B` | ⌘[ / ⌘] | back and forward through the sessions you have been in |
 
 The ⌘ keys need the terminal app to send them: `mia tmux keys kitty`
-prints the lines for its config. They take over the app's own ⌘T, ⌘W,
-⌘N, ⌘K and ⌘1–9 (a new shell window, close it, the windows by number).
+prints the lines for its config. They also give the app ⌘T (a new shell
+window), ⌘W (close it), ⌘⇧[ and ⌘⇧] (the window before and after) and
+⌘1–9 (a window by number), in place of the app's own.
 
 ## The one list
 
@@ -35,37 +36,55 @@ what Enter does, and the first row is what it does:
 | typed | Enter |
 |---|---|
 | nothing | who waits for you (their answers numbered), who works, then the projects, the one here first |
-| `project/` | that project's worktrees, those on a machine too |
-| a name | goes to that worktree or project, in any project |
-| a digit | answers whoever has waited longest |
+| `project/` | that project's worktrees; for the project here, those on a machine too |
+| a name | goes to that worktree, in any project; a project opens to its worktrees |
+| a number | gives that answer to whoever has waited longest |
 | `pi fix the test` | starts that agent here on that task (a second one is `pi-2`) |
 | `> codex` | hands this conversation to another agent; `> opencode son` lists it on each model the words mean |
 | `@` | moves this worktree to a machine, or brings one back |
 | `new <branch>` | makes a worktree here and goes to it |
-| `rm <name>` | removes one, refusing what `mia rm` refuses; a session of shells alone goes with it |
-| `stack` | the layers of the stack here |
-| `nvim`, `git`, `shell` | the editor, lazygit or a shell, in a window |
+| `rm <name>` | removes one, its session of shells with it; one an agent runs in is refused |
+| `stack` | the layers of the stack here, to go to one |
+| `nvim`, `git`, `shell` | the editor, lazygit or a shell, in a new window |
 | any other words | past conversations that mention them, in every project and on every machine; Enter resumes one |
 | `?` | says all of this |
 
 A worktree or conversation on another machine opens as that machine's
 session in a window here, named `worktree@machine`. Past conversations are
-[`mia recall`](commands.md)'s: a small index per repository keeps it to a
-fraction of a second, and `mia mcp` gives agents the same search.
+the ones [`mia recall`](conversations.md#finding-one) finds; `mia mcp` gives agents the
+same search.
+
+What takes a while — a move, a removal, a new worktree — goes on after the
+list closes, and says on the status line when it is done or why it failed.
 
 ## The popup terminal
 
-`prefix K` is one shell in a popup over the window, kept between openings,
-brought to the folder you were in. `mia cd <worktree>` typed there takes
-the client under it to that worktree and closes the popup.
+`prefix K` is one shell in a popup over the window, kept between openings
+and brought to the folder you were in when nothing runs in it. `mia cd
+<worktree>` typed there takes the client under it to that worktree and
+closes the popup. Anywhere in tmux, `mia go <worktree>` takes the client
+there without changing folder.
 
 ## The status line
 
-The right end of tmux's status line, for the pane you are in: the top
-signal (below), the worktree and its branch, its place in a stack with `⟳`
-when a layer has fallen behind the one under it, its uncommitted files, and a dot for each machine,
-red when it stops answering. It never waits on a machine; it reads their
-last answers and has them asked again every 30 seconds.
+In a session mia made, the left says the session, `mia-<worktree>`, the
+windows follow as `index:name`, and the right is left empty. mia still runs
+there every few seconds, unseen: that is what remembers each session's
+windows for [`mia resurrect`](worktrees.md) and has the machines asked
+again every 30 seconds.
+
+In any other session, the right end is mia's part, for the folder of the
+pane you are in:
+
+```
+● monduli asks · wants Bash +2  ·  monduli due-dates 2/3 ⟳ ±4  ·  fedora ●
+```
+
+The top [signal](#signals) of the repository's worktrees and machines, and
+how many more there are; the worktree and its branch; its layer of a
+stack, with `⟳` when a layer has fallen behind the one under it; how many
+files are uncommitted; and each machine, green while it answers, a red `○`
+when it stops. It never waits on a machine: it reads their last answers.
 
 ## Pane kinds
 
@@ -74,30 +93,27 @@ Every pane mia starts is marked with what it is for, in tmux's pane option
 
 | kind | when |
 |---|---|
-| `agent` | it runs an agent mia knows: `claude`, `codex`, `pi`, or one a plugin adds |
+| `agent` | it runs an agent mia knows: `claude`, `codex`, `pi`, `opencode`, `agy`, `cursor-agent`, or one a plugin adds |
 | `editor` | it runs `nvim`, `vim`, `vi`, `hx` or `emacs`, or was opened with `--editor` |
-| `tests` | its command starts as a test runner does: `go test`, `cargo test`, `npm test`, `pytest`, `vitest`… |
+| `tests` | its command starts as a test runner does: `go test`, `cargo test`, `npm test`, `pytest`, `vitest`, `make test`… |
 | `logs` | its command follows logs: `tail -f`, `journalctl`, `kubectl logs`, `docker logs`, `stern` |
-| `server` | its command is a dev server mia keeps (`npm run dev`, `pnpm dev`…) or what a `[[service]]` of the config runs |
+| `server` | its command is a dev server mia knows (`npm run dev`, `pnpm dev`…) or what a `[[service]]` of the config runs |
 | `shell` | anything else, and a window with no command |
 
 `mia window new … --kind <kind>` says it instead. A pane opened by hand in
 tmux has no kind. `tmux show-options -p -t <pane> @mia_kind` reads one.
 
-A pane is titled, on its border, by what it is for: an agent by its name
-(`claude`), an editor by its file (`nvim · main.go`) or, opened on a
-folder, by the folder it is in, a server by its name and port (`api
+A pane's border says what it is for: an agent its name (`claude`), an
+editor its file (`nvim · main.go`), a server its name and port (`api
 :8080`, as `PORT=`, `--port` or `-p` says it), tests `tests`, logs `logs`,
-and a shell `shell · <folder>`, following it as it goes. mia keeps the
-fixed part in the pane option `@mia_label`; the rest is tmux's own format,
-so a plain `tmux attach` shows the same titles as the apps.
+and anything else what runs and the folder, `shell · config`, following it
+as it goes. mia keeps the fixed part in the pane option `@mia_label`; the
+rest is tmux's own format, so a plain `tmux attach` shows the same titles.
 
-A window tmux names, one opened with `prefix c`, is named as its pane is
-titled (`shell · config`, `nvim · config`), so two in one folder are told
-apart by what runs in them. `mia window new` with no name calls the window
-so as well, with `-2`, `-3` after it when that name is taken. A window you
-rename keeps its name: tmux turns its own naming off for it, and mia only
-ever names a window it is opening.
+A window tmux names, one opened with `prefix c`, is named the same way, so
+two in one folder are told apart by what runs in them. `mia window new`
+with no name names it so too, with `-2`, `-3` after it when that name is
+taken. A window you rename keeps its name.
 
 ## Prompt marks
 
@@ -119,55 +135,83 @@ zshrc is read twice.
 
 ## The radar
 
-A popup 72 columns wide, one row per worktree, in four groups:
-
-| group | holds |
-|---|---|
-| needs you | worktrees with a [signal](#signals) ranked 50 or below, by rank: an agent asks, tests went red, a task is done |
-| active | the worktree you are in, an open session, uncommitted work, a stack, or anything touched in 14 days |
-| ▸ idle | clean, no session, not starred, untouched for 14 days: what `mia gc` removes. Folded |
-| ▸ not mia's | worktrees of the repository mia did not make, such as an agent's or another tool's. Folded, with how many hold changes |
-
-Another machine's worktrees come under `on <machine>`. `⏎` on a fold opens
-it, and its last row removes all of it at once (idle ones with `mia gc
---apply`, clean ones mia did not make with `mia gc --others --apply`);
-branches stay. `⏎` on a worktree mia did not make adopts it.
-
-A stack is one row: `→` opens it into its layers, and `⏎` on a layer moves
-there, in place. Type to find any worktree and what can be done with it.
-`⏎` switches there; a worktree on another machine hands this terminal over.
+`prefix space` is a popup of the repository's worktrees, the ones that
+need you first, so you can answer them without going there. A worktree
+needs you when its best [signal](#signals) is ranked 50 or below: an agent
+asks, tests went red, a task is done. The cursor opens on the first.
 
 | key | does |
 |---|---|
-| `⏎` | switch there |
-| `?` | the selected worktree in full, its windows as they are now, `←` `→` between them and its diff; `?` again for the list |
-| `^d` | remove it, after a `y`; one mia did not make only when nothing in it is uncommitted |
-| `^n` | a new worktree |
-| `tab` | only what needs you, this computer's (`local`), or one machine's |
-| `^x` | clear its signal |
 | `^y` | approve what it asks: presses its signal's `--yes` keys in the pane that set it |
 | `^r` | reply: type a line, `⏎` sends it with Enter to that pane, `esc` drops it |
-| `esc` | close |
+| `^x` | clear its signals |
+| `⏎` | switch there; a worktree on another machine hands this terminal over to it |
+| `?` | the selected worktree in full: its windows as they are now and its diff, `←` `→` between them; `?` again for the list |
+| `tab` | only what needs you, only this computer's (`local`), or one machine's |
+| `^n` | a new worktree |
+| `^d` | remove it, after a `y`; one mia did not make only when nothing in it is uncommitted |
+| `esc` | clear what is typed, then close |
+
+`^y` and `^r` type only into the pane the signal was set from, and only
+while that pane is still in the worktree's session. Once answered, the
+signal is dropped from the radar; the agent's hooks say what it does next.
+
+Under the ones that need you come the rest, in groups:
+
+| group | holds |
+|---|---|
+| went down with tmux | how many sessions tmux took down, and a row that brings them back (`mia resurrect`) |
+| active | the worktree you are in, an open session, uncommitted work, a stack, or anything touched in 14 days |
+| on `<machine>` | each machine's worktrees, and whether it answers |
+| ▸ idle | clean, no session, not starred, untouched for 14 days: what `mia gc` removes. Folded |
+| ▸ not mia's | worktrees of the repository mia did not make, such as an agent's or another tool's. Folded, with how many hold changes |
+
+`⏎` on a fold opens it, and its last row removes all of it at once, after a
+`y` (idle ones with `mia gc --apply`, clean ones mia did not make with `mia
+gc --others --apply`); branches stay. `⏎` on a worktree mia did not make
+adopts it. A stack is one row: `→` opens it into its layers, and `⏎` on a
+layer moves there, in place.
+
+Type to find a worktree by name or branch. Under what is found come what
+can be done with the first: switch there, bring its session back, move it
+to a machine or back here, open it in an editor, start its environment,
+restack, clear its signals, archive or remove it. A plugin's verbs are
+found by typing too, and a name nothing has offers a new worktree of it.
 
 ## The menu
 
-`prefix m` is tmux's own menu, built when you press it: the radar
-(`space`), a new worktree (`n`), bringing back sessions that went down
-(`b`), cleaning up what is idle (`c`) and what mia did not make (`o`) with
-how many of each there are, then the
-plugins' verbs your config's `menu` names, such as `menu = ["type", "quiz"]`.
-Every verb is still one word away in the radar. Cleaning up shows what would go and asks `y`
-first (`mia gc --ask`); branches stay.
+`prefix m` is tmux's own menu, built when you press it:
+
+| key | does |
+|---|---|
+| `space` | the radar |
+| `n` | a new worktree |
+| `b` | bring back the sessions that went down with tmux (`mia resurrect --ask`) |
+| `c` | clean up what is idle (`mia gc --ask`) |
+| `o` | clean up the clean worktrees mia did not make (`mia gc --others --ask`) |
+
+Each clean-up says how many there are, is greyed out at none, shows what
+would go and asks `y` first; branches stay. Below them come the plugins'
+verbs your config's `menu` names, such as `menu = ["type", "quiz"]`, each
+on its first free letter.
 
 ## A new worktree
 
-Type the branch. Under it, `from · on`: from your base branch, on this
-computer or a machine. From inside a stack it starts from the layer you
-are on, `as a layer, in place` or `in its own worktree`. `⇥` moves between
-the parts, `← →` changes one, `⏎` makes it while you watch; `esc` leaves
-it running. The first time in a repository it shows what it guessed —
-the base branch, the setup from the lockfile — and saves that as the
-repository's config.
+`prefix n` asks for the branch, with your `prefix` before it. Under it:
+
+| line | says |
+|---|---|
+| `from` | the base branch, or the branch of the worktree you are in |
+| `as` | when starting from a layer of a stack: `a layer, in place` or `a layer, own worktree` |
+| `on` | `local`, or a machine; a machine that did not answer last is marked `○` |
+
+`⇥` moves between the lines, `← →` changes one, `⏎` makes it while you
+watch the steps (`l` shows the log), and `⏎` again goes there. `esc` leaves
+it running. Inside a stack, `from` starts on the layer you are on.
+
+The first time in a repository it shows what it guessed — the base
+branch, the setup from the lockfile — and saves that as the repository's
+config when the worktree is made.
 
 ## Signals
 
@@ -181,31 +225,30 @@ mia signal <worktree> clear [--from claude]
 mia signal ls
 ```
 
+| option | does |
+|---|---|
+| `--style` | how it is drawn: `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `black`, `bold`, `dim`, `italics`, `underline` |
+| `--rank` | lower comes first; 50 if none is given. 50 or below needs you; above, such as claude's `busy` at 60, only says how a worktree is |
+| `--from` | who set it; one signal per source per worktree, `you` if none |
+| `--for` | it ends after that long: `90s`, `10m`, `2h` |
+| `--until seen` | it ends when you next switch to the worktree |
+| `--yes` | the keys that approve it, which the radar's `^y` presses |
+
 `.` is the worktree the command runs in, which is what a hook means. Set
-with `.`, a signal goes when the process behind it does, by its process id
-and when it began: the agent whose hook set it or, with no agent above it,
-whatever ran the hook's shell. An agent that asked and then died asks no
-more, even killed with no word, its pane left with a shell in it. One set
-from a tmux pane goes when that pane does too. A `--until seen` signal
-outlives its process: a done is news after the agent has gone. `mia
-signal ls` goes by the same rule as `mia ls`, the radar and standing: one
-whose setter is gone is not listed, and is forgotten. One signal per
-source per worktree. Lower ranks come first (50 if none is
-given). A signal ranked above 50, such as claude's `busy` at 60, says how a
-worktree is rather than asking for you: it is a word on its row, under
-active. `--for` ends it after a while, `--until seen` when you next switch
-to the worktree. A machine's signals arrive with its worktrees.
+with `.`, a signal goes when the process behind it does: the agent whose
+hook set it or, with no agent above it, whatever ran the hook's shell. An
+agent that asked and then died asks no more, even killed with its pane
+left open. One set from a tmux pane keeps that pane, so the radar can
+answer there, and goes when the pane does. A `--until seen` signal
+outlives its process: a done is news after the agent has gone.
 
-A note on where a worktree stands, one an agent leaves and that should
-outlive it, is a signal with no pane: `TMUX_PANE= mia signal . note "tests
-green, ready for review" --rank 60 --from note`. Emptied so, it keeps no
-process either. `mia ls` shows each
-worktree's best signal at the end of its row.
+A note an agent leaves that should outlive it is a signal with no pane:
+`TMUX_PANE= mia signal . note "tests green, ready for review" --rank 60
+--from note`. Emptied so, it keeps no process either.
 
-Set with `.` from inside tmux, a signal keeps the pane it came from, so the
-radar can answer there without switching: `^r` types a reply, and `^y`
-presses what `--yes` names as the approval. A pane no longer in the
-worktree's session is not typed into.
+`mia signal ls` lists the signals still standing; `mia p ls` shows each
+worktree's best at the end of its row. A machine's signals arrive with its
+worktrees.
 
 A claude hook, in `~/.claude/settings.json`; it reads its event on stdin:
 
@@ -236,9 +279,8 @@ pi account default: ~/.pi/agent/extensions/mia-signal.ts written — pi says wha
 
 The file begins with a line that says it is mia's. Run again, one that is
 as mia has it is left; an older one of mia's is written again; a file of
-that name without that line is yours, is left as it is, and the command
-fails saying so. Nothing else in the folder is read or written, and a pi
-that was never started there is given no folder.
+that name without that line is yours and is left as it is. A pi that was
+never started in a folder is given nothing there.
 
 | pi | signal |
 |---|---|
@@ -247,10 +289,14 @@ that was never started there is given no folder.
 | pi goes on with nothing by itself (`agent_settled`) | `done --style green --rank 30 --from pi --until seen` |
 | you stopped the run, or the session ends in one | `clear --from pi` |
 
-It runs `mia signal .` in pi's folder and nothing else. Where there is no
-`mia`, or the folder is no worktree of mia's, the first call says so and no
-other is made. pi waits for no call, each is ended after three seconds,
-and print and JSON modes say nothing. pi asks no permission of its own
-before a tool, so `asks` is what an extension asks — a question tool, a
-permission gate. On a pi older than `agent_settled`, `done` is said a
-second and a half after `agent_end` with no other run begun.
+It runs `mia signal .` in pi's folder. Where there is no `mia`, or the
+folder is no worktree of mia's, the first call says so and no other is
+made. pi waits for no call, each is ended after three seconds, and print
+and JSON modes say nothing. pi asks no permission of its own before a
+tool, so `asks` is what an extension asks — a question tool, a permission
+gate. On a pi older than `agent_settled`, `done` is said a second and a
+half after `agent_end` with no other run begun.
+
+It also writes pi's reply as it is being written beside pi's session file,
+as `<session file>.live`, so a [chat](chats.md) shows it live; the file
+goes once pi has written the reply itself.

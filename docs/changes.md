@@ -341,7 +341,7 @@ on GitHub; a tag without its section is not released.
   thread — `continues` on the one the other agent began, `continued_by`
   on the first — for a chat to read on from one into the other.
   Capabilities `conversation-continue` and `conversation-thread`. See
-  [With another agent](worktrees.md#with-another-agent).
+  [With another agent](conversations.md#with-another-agent).
 
 - **pi says what it does.** Only claude told mia it was working, asking
   or done, through its hooks. `mia account signals pi [<name> | --all]
@@ -369,7 +369,7 @@ on GitHub; a tag without its section is not released.
   those names is kept; run again, only what is missing is linked. `mia
   api accounts` and `mia account ls` say what each `shared`; codex and
   pi share nothing yet. See [Its setup,
-  shared](worktrees.md#its-setup-shared).
+  shared](agents.md#its-setup-shared).
 
 - **An account is signed in to again, and one is the user-wide default.**
   `mia account login <agent> <name> [--in <worktree>]` opens a window
@@ -382,7 +382,7 @@ on GitHub; a tag without its section is not released.
   `user_default`. `mia config --global agents.<agent>.<key>` reads and
   sets those keys. Capabilities `account-login` and
   `account-user-default`. See [An agent's
-  account](worktrees.md#an-agents-account).
+  account](agents.md#an-agents-account).
 
 - **Roles: a setup with opening instructions.** A file of yours,
   `~/.config/mia/roles/<name>.md`, says in its front matter the agent,
@@ -393,7 +393,7 @@ on GitHub; a tag without its section is not released.
   them; `mia api setups` lists them after the other setups, with `role`,
   `body` and `account`. An agent mia does not know, or a model it has
   not, is refused before anything starts. Capability `roles`. See
-  [A role](worktrees.md#a-role).
+  [A role](agents.md#a-role).
 
 - **The API the apps were built on is kept.** `internal/cli/testdata/api`
   holds the shape of every `mia api` answer and the inputs its usage
@@ -436,7 +436,7 @@ on GitHub; a tag without its section is not released.
   folder and say their `account`; one resumed on another account is
   copied there, and `mia move` carries one into the account of the same
   name on the other side. `mia api accounts [--projects]`. See [An agent's
-  account](worktrees.md#an-agents-account) and [Accounts](api.md#accounts).
+  account](agents.md#an-agents-account) and [Accounts](api.md#accounts).
 
 - **Setups.** `mia api setups` is the agents, models and efforts a
   person has used, as one, each with how often, in how many worktrees and
