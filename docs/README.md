@@ -7,7 +7,7 @@
 | [Why mia](why.md) | the problem, and the name |
 | [Getting started](getting-started.md) | install, the words mia uses, a first worktree |
 | [Worktrees](worktrees.md) | make, find, switch, remove; sessions and windows |
-| [mia in tmux](tmux.md) | the one list, the popup terminal, the radar, the status line, signals |
+| [mia in tmux](tmux.md) | the one list, the popup terminal, the status line, signals |
 | [Agents](agents.md) | which agent runs in a worktree, its model, a role, its account |
 | [Conversations](conversations.md) | find what was said, go on with it, hand it to another agent |
 | [Machines](machines.md) | work on another machine, and move a worktree there and back |

@@ -74,13 +74,13 @@ never picks an owner silently.
 
 A plugin draws nothing in mia. To show you something it uses
 [`mia signal`](tmux.md#signals): a kind, a line of text, a style and a
-rank. mia shows it in the status line and [the radar](tmux.md#the-radar),
+rank. mia shows it in the status line and [`mia signal ls`](tmux.md#signals),
 with everyone else's signals.
 
-What a plugin does on demand is a verb. Its verbs are listed in the radar:
-typing one's name there runs it, and its output stays up until a key is
-pressed. Name verbs in `menu = [...]` in the configuration and
-[the menu](tmux.md#the-menu), `prefix m`, offers them too.
+What a plugin does on demand is a verb: `mia <verb>`. Name verbs in
+`menu = [...]` in the configuration and typing one's name in
+[the one list](tmux.md#the-one-list), `prefix k`, runs it in a new
+window.
 
 ## Events
 

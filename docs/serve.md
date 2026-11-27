@@ -284,7 +284,7 @@ The server has no terminal, so a command that needs one is refused with
 
 | refused | because it |
 |---|---|
-| `chat`, `git`, `files`, `review`, `radar`, `dash`, `tmux menu`, `tmux next` | is drawn on the terminal it is typed in |
+| `chat`, `git`, `files`, `review`, `tmux next` | is drawn on the terminal it is typed in |
 | `shell`, `away`, `window open`, `machine attach`, `machine shell`, `env shell`, `new --shell` | attaches the terminal it is typed in |
 | `config` with nothing after it | opens an editor in it |
 | `gc --ask`, `resurrect --ask`, `gateway trust`, `gateway untrust` | asks it something |

@@ -383,7 +383,7 @@ const home = `<main class="home">
     <details id="one-list">
       <summary>
         <p class="head"><strong>one list</strong><em>noun</em></p>
-        <p class="sense">Where everything starts in tmux: what you type says what Enter does. A name goes there, an agent and words start it on them, any other words find what was said. <code>prefix k</code>.</p>
+        <p class="sense">Where everything starts in tmux: what you type says what Enter does. Nothing typed, who waits on you; a name goes there, an agent and words start it on them, any other words find what was said. <code>prefix k</code>.</p>
       </summary>
       <div class="more">
         ${sample("mia tmux install   # prefix k opens it\nmia tmux keys kitty # and ⌘K with it")}
@@ -398,16 +398,6 @@ const home = `<main class="home">
       <div class="more">
         ${sample("mia plugin enable agent\nmia agent run monduli")}
         <a href="/docs/plugins">Plugins</a>
-      </div>
-    </details>
-    <details id="radar">
-      <summary>
-        <p class="head"><strong>radar</strong><em>noun</em></p>
-        <p class="sense">The popup of who needs you, to answer: every worktree, what needs you first, and what is idle or not mia's folded away. <code>prefix space</code> in tmux.</p>
-      </summary>
-      <div class="more">
-        ${sample("mia tmux install   # prefix space opens it\nmia radar")}
-        <a href="/docs/tmux#the-radar">The radar</a>
       </div>
     </details>
     <details id="stack">

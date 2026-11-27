@@ -765,7 +765,7 @@ accounts on two machines are the same only by name, which is what
 `mia api standing [--here] [--seen <repository>/<worktree>[@<machine>]]`
 is every agent in every repository on every machine: which wait on you,
 which work, and which finished with nobody having looked. It is read from
-each worktree's best [signal](tmux.md#signals), as the radar reads them.
+each worktree's best [signal](tmux.md#signals), as `mia signal ls` reads them.
 `mia asks --json` is its `waiting` list, the longest waiting first.
 Feature `standing`.
 

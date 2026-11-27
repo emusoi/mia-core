@@ -80,10 +80,8 @@ In tmux:
   worktrees on every machine too, and Enter on one opens that machine's
   session in a window here, named `worktree@machine`. A past conversation
   on a machine opens the same way.
-- The [radar](tmux.md#the-radar) lists a machine's worktrees under `on
-  <machine>`; ⏎ on one hands this terminal over. While it is there, the
-  machine's radar lists this computer's worktrees too, and ⏎ hands it
-  back.
+- `new <branch> on <machine>` in the one list makes a worktree on that
+  machine, and `@` moves this worktree to one or brings one back.
 - The [status line](tmux.md#the-status-line) shows each machine's name
   with a green `●` while it answers and a red `○` when it does not, and a
   signal from a worktree there as `worktree@machine`. It never waits on a

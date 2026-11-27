@@ -16,8 +16,7 @@ on GitHub; a tag without its section is not released.
   to another agent and model (`> codex`), this worktree moved to a machine
   or brought back (`@`), `new` and `rm`, the stack, the editor, lazygit,
   and past conversations on every machine, resumed. `prefix K` (⌘O) is a
-  popup terminal, `prefix e` (⌘.) acts on this window, `prefix b` and `B`
-  go back and forward, and `mia tmux keys kitty|ghostty` prints the lines
+  popup terminal, `prefix b` and `B` go back and forward, and `mia tmux keys kitty|ghostty` prints the lines
   that give a terminal app the ⌘ keys. See [mia in tmux](tmux.md).
 
 - **A tool's turn says how it went.** A `tool` turn of
@@ -545,6 +544,20 @@ on GitHub; a tag without its section is not released.
 
 ### Changed
 
+- **One key in tmux.** Everything starts at `prefix k` (⌘K), the one
+  list; what the radar and the menus alone did is typed there, each a row
+  of `?`: `new <branch> on <machine>` makes a worktree on a machine,
+  `say <words>` types them and Enter to whoever waits, `clear` clears a
+  worktree's signal, `clean` removes the idle worktrees and the clean
+  ones mia did not make, `back` brings back the sessions that went down,
+  `stop` stops the agent in this window, `fork <branch>` forks this
+  worktree and goes there, `>` and this window's own agent and a model
+  switches its model where it runs, and a verb the config's `menu` names
+  runs in a new window — `menu` now names the plugins' verbs the list
+  runs by name. The keys that went keep their places, so every ⌘ key a
+  terminal app's config sends means what it meant; `mia tmux install`
+  again takes the old ones out of tmux. See [the one list](tmux.md#the-one-list).
+
 - **A worktree with no session is asked `git status` every five
   minutes.** Whether a listing says it is `dirty` is asked of git again
   after thirty seconds for a worktree with a session (eight while its
@@ -731,6 +744,15 @@ on GitHub; a tag without its section is not released.
   their folder's last conversation, are known behind node or by a version's path as `ps` shows them, and are kept
   by a window back at its shell as a claude is.
 ### Removed
+
+- **The keys and commands the one list does the work of.** `prefix
+  space` (⌘⇧J, the radar), `prefix n` (⌘N, a new worktree), `prefix m`
+  (mia's menu) and `prefix e` (⌘., this window's menu); `mia radar`
+  with `--new` and `--pick-to`, `mia dash`, `mia tmux menu` and `mia
+  tmux act`; the new-worktree form and its first-time guess of the
+  config, which `mia config` sets; and `mia switch` with its `sw`
+  spelling in `mia shell-init`, which `mia cd` does. `mia go` still
+  works, for `mia cd`, but `mia help` no longer lists it.
 
 - **gemini is no longer an agent mia knows.** Gemini CLI is gone; Google's
   agent is now agy, which mia starts, reads and switches as before. A

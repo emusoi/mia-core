@@ -22,15 +22,15 @@ eval "$(mia shell-init zsh)"     # in your shell's rc file
 ```bash
 mia new due-dates          # a worktree named for you, e.g. monduli
 mia shell monduli          # its tmux session
-mia radar                  # find any worktree, switch to it, or make one
+mia cd monduli             # cd there, from any folder
 mia env up                 # its container, at https://monduli.mia:<port>
 mia env browse --direct    # open its page; no proxy or certificate setup
 mia new api --stack        # a branch on top of this one, same worktree
 mia gc --others            # list worktrees mia did not make; --apply removes the clean ones
 ```
 
-In tmux, `mia tmux install` adds the radar on `prefix space`, a new worktree
-on `prefix n`, and mia's part of the status line.
+In tmux, `mia tmux install` adds the one list on `prefix k`, where everything
+starts, and mia's part of the status line.
 
 ## Build and test
 

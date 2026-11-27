@@ -70,7 +70,7 @@ Name a stack to go to it from anywhere:
 
 ```bash
 mia stack name payments
-mia switch payments        # cd to the worktree that has it checked out
+mia cd payments            # cd to the worktree that has it checked out
 ```
 
 ### In tmux
@@ -79,10 +79,7 @@ In the [one list](tmux.md#the-one-list) (`prefix k`), type `stack`: a row
 per layer, `▸` on the one you are on, each with how many commits it is
 ahead or `needs restack`. Enter goes to that layer, as `mia stack go`
 does. The status line shows `⟳` beside the branch when a layer has fallen
-behind the one under it, and the [radar](tmux.md#the-radar) shows a stack
-as one row that `→` opens into its layers. The tmux new-worktree form,
-opened from inside a stack, offers a new layer, in place or in its own
-worktree.
+behind the one under it.
 
 ## Keeping it in shape
 

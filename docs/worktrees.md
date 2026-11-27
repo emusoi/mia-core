@@ -50,15 +50,14 @@ mia p ls                   # this project's worktrees; ★ starred, dirty, sessi
 mia p ls shop              # another project's, from any folder
 mia ls                     # every project mia knows
 mia shell monduli          # attach to its session
-mia go monduli             # in tmux: take this client to its session, started if it is not up
-mia switch monduli         # cd there
+mia cd monduli             # cd there; in tmux, this client to its session too
 mia open monduli           # open it in your editor; --in code, zed, finder, terminal…
 mia path monduli           # print its path, for scripts
 ```
 
-A worktree answers to its name, its path or its branch. `go`, `switch` and
-`path` also take a project, or `project/worktree`, from any folder.
-`mia switch` (also `mia cd`) changes your shell's folder only with
+A worktree answers to its name, its path or its branch. `cd` and `path`
+also take a project, or `project/worktree`, from any folder. `mia cd`
+changes your shell's folder only with
 `eval "$(mia shell-init zsh)"` in your rc; `bash` and `fish` work too.
 
 In tmux, the [one list](tmux.md#the-one-list) (`prefix k`) finds and goes
@@ -139,7 +138,8 @@ mia gc --others --apply # remove the clean ones
 
 Branches always stay. `--merged` does not fetch, so update the base first,
 and it sees merges, not squash merges; it cannot be combined with `--days`.
-`prefix m` in tmux offers the same clean-up, and asks `y` first.
+In tmux, `clean` in [the one list](tmux.md#the-one-list) does the same
+clean-up, each row naming what goes.
 
 ## Put away, or try again
 

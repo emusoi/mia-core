@@ -1,6 +1,6 @@
 # mia in tmux
 
-How mia runs entirely in tmux, with mia desk not needed. This is what is built, as of 2026-11-25.
+How mia runs entirely in tmux, with mia desk not needed. This is what is built, as of 2026-11-27.
 `docs/commands.md` has every command; this page is the shape of it.
 
 ## The idea
@@ -20,11 +20,20 @@ a status line, one list, a popup terminal and commands. It draws no screens of i
 | a digit | answers whoever has waited longest |
 | `pi fix the test` | starts that agent here on that task (a second one is `pi-2`) |
 | `> codex` | moves this conversation to another agent |
+| `> claude opus`, in claude's window | that agent's model switched where it runs |
+| `say <words>` | types them and Enter to whoever waits, the longest first |
 | `@` | moves this worktree to a machine, or brings one back |
 | `new <branch>` | makes a worktree here and goes to it |
+| `new <branch> on <machine>` | makes it on that machine |
+| `fork <branch>` | forks this worktree and goes to it |
 | `rm <name>` | removes one, refusing what `mia rm` refuses |
+| `clean` | removes the idle worktrees, and the clean ones mia did not make |
+| `clear` | clears a worktree's signal |
+| `back` | brings back the sessions that went down |
+| `stop` | stops the agent in this window |
 | `stack` | the layers of the stack here |
 | `nvim`, `git`, `shell` | opens the editor, lazygit or a shell in a window |
+| a verb of the config's `menu` | runs that plugin's verb in a window |
 | any other words | past conversations that mention them, in every project and on every machine; Enter resumes |
 | `?` | says all of this |
 
@@ -34,15 +43,16 @@ a status line, one list, a popup terminal and commands. It draws no screens of i
 |---|---|---|
 | `k` | ⌘K | the list |
 | `K` | ⌘O | the popup terminal, in the folder you are in (`mia cd` there jumps and closes it) |
-| `Space` | ⌘⇧J | who needs you, to answer |
 | `a` | ⌘J | the next that needs you |
-| `m` | ⌘. | act on this window: stop the agent, move it to another agent, new agent window, its model, rename, close, fork, lazygit, editor |
-| `n` | ⌘N | new worktree |
 | `b` / `B` | ⌘[ / ⌘] | back and forward through where you have been |
+
+The radar (`Space`, ⌘⇧J), the new-worktree form (`n`, ⌘N), mia's menu (`m`) and this window's
+menu (`e`, ⌘.) are gone: the list does what they did. Their user keys stay in their places, bound
+to nothing, so a terminal app's lines keep their numbers.
 
 `mia tmux install` writes one marked block in the tmux config; `uninstall` removes it.
 `mia tmux keys kitty|ghostty` prints the terminal app's lines for the ⌘ keys. They are not in the
-kitty config yet: they would replace kitty's own ⌘T, ⌘W, ⌘N, ⌘K and ⌘1–9.
+kitty config yet: they would replace kitty's own ⌘T, ⌘W, ⌘K and ⌘1–9.
 
 ## Past conversations
 

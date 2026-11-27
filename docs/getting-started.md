@@ -10,7 +10,7 @@ mia runs on macOS and Linux and needs git and
 go install github.com/emusoi/mia-core/cmd/mia@latest
 ```
 
-Add this to your shell's rc file, for `mia switch` and completion
+Add this to your shell's rc file, for `mia cd` and completion
 (`bash` and `fish` work too):
 
 ```bash
@@ -57,7 +57,7 @@ monduli — due-dates in a worktree of its own
 
 ```bash
 mia shell monduli          # its tmux session
-mia switch monduli         # cd there
+mia cd monduli             # cd there
 mia p ls                   # every worktree of this project
 mia ls                     # every project
 ```

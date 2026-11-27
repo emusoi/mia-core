@@ -28,7 +28,7 @@ configs to copy into `.git/mia/config.toml`. Delete it when done.
 ## Style
 
 - `gofmt` and `go vet`; no new dependency for what a few lines can do.
-- Every radar action is a `mia` command.
+- Every row of the one list runs a `mia` command, or types into tmux.
 - mia writes nothing into the working tree; everything goes in `.git/mia`.
   `mia dev` is the one exception, and it must always give main its own files
   back.

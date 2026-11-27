@@ -34,9 +34,9 @@ stood still for a second, it asks something, or it ends — never into a
 question it asks first.
 
 In tmux, `pi fix the test` typed into the [one list](tmux.md#the-one-list)
-does the same in the worktree you are in, and `prefix e` opens a new agent
-window. A window named under `[launch]` that runs an agent is started the
-same way, with its own command.
+does the same in the worktree you are in, and `> claude opus` in claude's
+own window switches its model there. A window named under `[launch]` that
+runs an agent is started the same way, with its own command.
 
 ## An agent's model
 

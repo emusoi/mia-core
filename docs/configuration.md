@@ -35,9 +35,9 @@ name, but each named entry is replaced whole: an `[agents.claude]` in the
 repository's file that says only `account` drops the `model` your own file
 gave claude.
 
-The first worktree made from the [tmux new-worktree form](tmux.md#a-new-worktree)
-in a repository saves what it guessed (the base branch, the setup from the
-lockfile) into `.git/mia/config.toml`.
+`mia config` opens `.git/mia/config.toml` in your editor, the first time
+writing there a starter whose every line is a comment; `mia config base
+staging` sets one key without it.
 
 [examples/config.toml](../examples/config.toml) and
 [examples/compose.toml](../examples/compose.toml) are files to copy from.
@@ -57,7 +57,7 @@ Top-level keys, before any table.
 | `keep` | none | programs `mia resurrect` starts again even if they had ended, by their first words: `["tail -f"]`. Agents, `nvim`, `vim`, `hx`, `npm run dev`, `npm start`, `pnpm dev`, `pnpm run dev`, `bun dev`, `bun run dev` and `yarn dev` are kept already. Never name one that finishes, like a build |
 | `names` | none | names to give worktrees before mia's own place names, best in your own file. Lowercase letters, digits and hyphens, since a name becomes a hostname and a tmux session |
 | `plugins` | none | [plugins](plugins.md) enabled by the config, beside those `mia plugin enable` turned on; `mia plugin disable` refuses one named here |
-| `menu` | none | the plugins' verbs `prefix m` offers, in order: `["type", "quiz"]` |
+| `menu` | none | the plugins' verbs [the one list](tmux.md#the-one-list) runs by name, each in a new window: `["type", "quiz"]` |
 
 ## `[launch]`
 

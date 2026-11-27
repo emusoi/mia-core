@@ -10,13 +10,13 @@ shows a command's usage, and every reading command takes `--json`.
 |---|---|
 | `mia adopt <worktree>` | take over a worktree mia did not make, one from `git worktree add` or another tool |
 | `mia archive [--stop-running] <worktree>` · `mia archive ls` | put a worktree away, uncommitted and untracked work too, under `refs/mia/archive/<name>`; its branch stays. [Worktrees](worktrees.md) |
+| `mia cd <worktree\|stack\|project\|project/worktree>` | cd there, from any folder, once `mia shell-init` is in your rc; in tmux the client goes to its session too, as typed in [the popup terminal](tmux.md#the-popup-terminal) |
 | `mia chat [--window <index>] [--conversation <id>]` · `mia chat --chat <name>` | a worktree's conversation with its agent, as a chat mia desk draws over the pane; `--chat main` is the main agent's. [Chats](chats.md#shown-as-a-chat) |
 | `mia files` | the worktree's files, as an app mia desk draws over the pane. [Automation](api.md#mia-files) |
 | `mia fork [worktree] <branch>` | a second try: a new worktree on a new branch from where that one is, its uncommitted and untracked work copied |
 | `mia gc [--merged] [--apply\|--ask] [--days N]` | find, or remove, idle worktrees: clean, no session, not starred, untouched for N days (14); `--merged`, those whose branch is merged; `--ask` asks `y` first |
 | `mia gc --others [--apply\|--ask] [path…]` | find, or remove, the clean worktrees mia did not make; branches stay |
 | `mia git` | how the worktree stands in git, as an app mia desk draws over the pane. [Automation](api.md#mia-git) |
-| `mia go <worktree\|project\|project/worktree>` | in tmux, take this client to that worktree's session, started if it is not up. [mia in tmux](tmux.md#the-popup-terminal) |
 | `mia ls` | the projects mia knows, from any folder, the one you are in marked |
 | `mia move [--dry-run] <worktree>[@<machine>] <machine\|local>` | take a worktree to a machine or back: its branch, uncommitted work, windows and their agents' conversations. [Machines](machines.md#moving-a-worktree) |
 | `mia new [--from <ref>] [--name <name>] [--bg] [--shell] [--on <machine>] <branch>` | make a worktree on a branch, and name it. [Worktrees](worktrees.md) |
@@ -32,9 +32,8 @@ shows a command's usage, and every reading command takes `--json`.
 | `mia run <worktree>[@machine] <cmd…>` | run a command once in a worktree, here or on a machine |
 | `mia setup [worktree]` | run the configured setup again |
 | `mia shell [--popup \| --view <name>] [worktree]` | attach to a worktree's session; `--view` at this terminal's own size and window; `name@machine` attaches there |
-| `mia shell-init <zsh\|bash\|fish>` | the shell function that lets `mia switch` and `mia cd` change folder, and completion: `eval "$(mia shell-init zsh)"` in your rc |
+| `mia shell-init <zsh\|bash\|fish>` | the shell function that lets `mia cd` change folder, and completion: `eval "$(mia shell-init zsh)"` in your rc |
 | `mia star [worktree]` | star it, or unstar it; `mia gc` leaves a starred one alone |
-| `mia switch <worktree\|stack\|project\|project/worktree>` | cd there, from any folder, once `mia shell-init` is in your rc; in tmux the client goes to its session too. Also `mia cd` |
 | `mia unarchive <name>` | bring an archived worktree back as it was, under its old name when that is free |
 | `mia window [ls] [worktree]` | a worktree's windows. [Worktrees](worktrees.md) |
 | `mia window new [worktree] [window] [--editor] [--kind <kind>] [-- command]` | a new window: a shell, the editor, a `[launch]` name, or a command; `--kind` [marks it](tmux.md#pane-kinds) |
@@ -64,7 +63,6 @@ shows a command's usage, and every reading command takes `--json`.
 | `mia config` | open the repository's configuration in your editor. [Configuration](configuration.md) |
 | `mia config show\|validate` | print, or check, the configuration in effect |
 | `mia config [--global] <key> [<value>]` | say, or set, one setting: `base staging`, `keys.quizzicle.quiz K`; a setting mia would not load is refused |
-| `mia dash` | the radar, under its old name |
 | `mia down` · `mia up` | move to the [stack](stacks.md) layer below or above, in place |
 | `mia hand [--window <index>] <agent> [--model <m>] [--effort <e>] [--account <a>]` | the conversation in front goes on with another agent, in a window beside. [Conversations](conversations.md#with-another-agent) |
 | `mia main [status]` | the [main agent](main.md): whether it runs, and what it is doing |
@@ -72,7 +70,6 @@ shows a command's usage, and every reading command takes `--json`.
 | `mia main stop` · `interrupt` | end its session, or stop it mid-work |
 | `mia main say <text…>` · `press <keys…>` | type a message and submit it, or type keys with no Enter to pick an option. [The main agent](main.md#saying-something-to-it) |
 | `mia main model <model> [--effort <e>]` · `switch --agent <agent> [--model <m>] [--effort <e>]` | switch its model while it runs, or have it go on as another agent |
-| `mia radar [--new]` | the [radar](tmux.md#the-radar), `prefix space`; `--new` the new-worktree popup, `prefix n` |
 | `mia role [ls]` · `mia role show\|path <name>` | the [roles](agents.md#a-role): setups with opening instructions, files of yours |
 | `mia shell-integration zsh` | the zsh lines that mark each prompt for tmux. [Prompt marks](tmux.md#prompt-marks) |
 | `mia stack [--in <worktree>] [show]` | the stack and its layers. [Stacks](stacks.md) |
