@@ -55,26 +55,6 @@ func TestTrailKeepsWhereAClientHasBeen(t *testing.T) {
 
 // The agents' menu: an agent each on a letter of its own, opening its models; an agent's
 // models, the first "as it is set", each moving the window's conversation or starting it beside.
-func TestAgentsMenuIsALetterEachThenItsModels(t *testing.T) {
-	agents := []agentKnown{{Name: "claude", Installed: true}, {Name: "codex", Installed: true}}
-	agents[0].Models = append(agents[0].Models, struct {
-		ID    string `json:"id"`
-		Label string `json:"label"`
-	}{"opus", "Opus"})
-	first := agentsMenu("mia", "c1", "hand", "3", nil, agents)
-	if first[2] != "claude" || first[3] != "c" || first[5] != "codex" || first[6] != "o" || !strings.Contains(first[4], "tmux agents c1 hand 3 claude") {
-		t.Fatalf("the agents = %q", first)
-	}
-	models := agentsMenu("mia", "c1", "hand", "3", []string{"claude"}, agents)
-	if models[2] != "as it is set" || !strings.Contains(models[4], "hand --window 3 claude >/dev/null && tmux select-window -t :{end}'") || models[6] != "Opus" || !strings.Contains(models[8], "hand --window 3 claude --model opus") {
-		t.Fatalf("claude's models = %q", models)
-	}
-	if beside := agentsMenu("mia", "c1", "new", "3", []string{"codex"}, agents); !strings.Contains(beside[4], "window new codex >/dev/null && tmux select-window -t :{end}'") {
-		t.Fatalf("a new window = %q", beside)
-	}
-}
-
-// The terminal app's lines send the same key each of tmux's user keys is, by its number.
 func TestTerminalKeysSendWhatTmuxBinds(t *testing.T) {
 	snippet := tmuxSnippet("mia")
 	for _, app := range []string{"kitty", "ghostty"} {

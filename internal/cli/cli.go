@@ -118,8 +118,6 @@ func Run(args []string) int {
 				return cmdTmuxList(rest[1:])
 			case "go":
 				return cmdTmuxGo(rest[1:])
-			case "agents":
-				return cmdTmuxAgents(rest[1:])
 			case "seen":
 				return cmdTmuxSeen(rest[1:])
 			case "walk":
