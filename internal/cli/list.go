@@ -17,8 +17,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/emusoi/mia-core/internal/app"
+	"github.com/emusoi/mia-core/internal/plugin"
 	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/runtime"
+	"github.com/emusoi/mia-core/internal/session"
+	"github.com/emusoi/mia-core/internal/signal"
 )
 
 // The one list (design/tmux, version B): tmux's prefix k opens it over whatever is in front, and
@@ -29,6 +32,9 @@ import (
 //	agent words…   that agent started in the worktree here, told the words
 //	> agent        the conversation of the window in front goes on with that agent
 //	a number       that answer, given to whoever has waited longest
+//	say words      the words typed to whoever waits, and Enter
+//	clear · clean · back · stop · fork · new … on · a verb of the menu: what was the radar's and
+//	               the menus', each a row of ?
 
 // listRow is one row: a mark, its words, what is said at the right, and what Enter does.
 type listRow struct {
@@ -76,7 +82,11 @@ type listModel struct {
 	stand    app.Standing
 	agents   []agentKnown
 	threads  []thread
-	asked    string // what threads answers
+	asked    string        // what threads answers
+	local    []app.Listing // the worktrees of the project here, as `mia api worktrees` says them
+	down     int           // its sessions that went down with tmux
+	verbs    []string      // the config's menu: the plugins' verbs run by their name
+	front    string        // what runs in the window in front, an agent by its name
 	chosen   *listRow
 }
 
@@ -92,6 +102,12 @@ type (
 		found []thread
 	}
 	pausedMsg string
+	localMsg  struct {
+		local []app.Listing
+		down  int
+	}
+	verbsMsg []string
+	frontMsg string
 )
 
 func (m listModel) Init() tea.Cmd {
@@ -129,7 +145,87 @@ func (m listModel) Init() tea.Cmd {
 			_ = apiSaid(self, &layers, "stack")
 			return stackMsg(layers)
 		},
+		func() tea.Msg {
+			var local []app.Listing
+			_ = apiSaid(self, &local, "worktrees")
+			var sessions []app.Session
+			_ = apiSaid(self, &sessions, "sessions")
+			down := 0
+			for _, s := range sessions {
+				down += btoi(s.State == "down")
+			}
+			return localMsg{local, down}
+		},
+		func() tea.Msg { return verbsMsg(menuVerbs(m.root)) },
+		func() tea.Msg {
+			var windows []session.Window
+			ls := exec.Command(self, "window", "ls", "--json")
+			ls.Dir = m.at.folder
+			if out, err := ls.Output(); err == nil && json.Unmarshal(out, &windows) == nil {
+				for _, w := range windows {
+					if strconv.Itoa(w.Index) == m.at.window {
+						return frontMsg(w.Command)
+					}
+				}
+			}
+			return frontMsg("")
+		},
 	)
+}
+
+// menuVerbs is the config's menu of the repository at root: those of its verbs a plugin that
+// is on has, in its order.
+func menuVerbs(root string) []string {
+	a, err := app.Open(root)
+	if root == "" || err != nil {
+		return nil
+	}
+	enabled, err := enabledPlugins(a)
+	if err != nil {
+		return nil
+	}
+	var verbs []string
+	for _, verb := range a.Config.Menu {
+		if slices.ContainsFunc(enabled, func(p plugin.Plugin) bool {
+			return slices.ContainsFunc(p.Manifest.Verbs, func(v plugin.Verb) bool { return v.Name == verb })
+		}) {
+			verbs = append(verbs, verb)
+		}
+	}
+	return verbs
+}
+
+// idleDays is how long untouched before a worktree is idle, as mia gc counts it.
+const idleDays = 14
+
+// isIdle: nothing would be lost removing it, and nobody has touched it in idleDays — what
+// mia gc collects. here is the worktree you are in.
+func isIdle(l app.Listing, here string) bool {
+	if l.Main || l.Dirty || l.Session || l.Starred || len(l.Layers) > 1 || l.Name == here {
+		return false
+	}
+	return !l.LastWork.IsZero() && time.Since(l.LastWork) > idleDays*24*time.Hour
+}
+
+// sayTo types the words and Enter into the pane whose signal has the worktree wait, as the
+// radar's reply did: the pane that asks.
+func sayTo(w app.Stand, words string) error {
+	signals, err := signal.Store{Dir: filepath.Join(w.Root, ".git", "mia")}.Load()
+	if err != nil {
+		return err
+	}
+	at := slices.IndexFunc(signals, func(s signal.Signal) bool { return s.Worktree == w.Worktree && s.Calls() && s.Pane != "" })
+	if at < 0 {
+		return fmt.Errorf("%s: no pane to answer in — go there", w.Worktree)
+	}
+	return session.Here().Answer(w.Worktree, signals[at].Pane, words, true)
+}
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return "1 " + word
+	}
+	return fmt.Sprintf("%d %ss", n, word)
 }
 
 // treesAway is the worktrees of the repository at root that are on a machine: each machine's
@@ -204,6 +300,12 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.stack = msg
 	case awayMsg:
 		m.away = msg
+	case localMsg:
+		m.local, m.down = msg.local, msg.down
+	case verbsMsg:
+		m.verbs = msg
+	case frontMsg:
+		m.front = string(msg)
 	case threadsMsg:
 		if msg.text == m.words() {
 			m.threads, m.asked = msg.found, msg.text
@@ -260,7 +362,10 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // hand-over or an agent's task.
 func (m listModel) words() string {
 	q := strings.TrimSpace(m.query)
-	if verb, _, _ := strings.Cut(q, " "); verb == "rm" || verb == "new" || verb == "stack" || strings.Contains(q, "/") {
+	if verb, _, _ := strings.Cut(q, " "); slices.Contains([]string{"rm", "new", "stack", "say", "fork"}, verb) || strings.Contains(q, "/") {
+		return ""
+	}
+	if slices.Contains([]string{"clear", "clean", "back", "stop"}, q) || slices.Contains(m.verbs, q) {
 		return ""
 	}
 	if strings.HasPrefix(q, ">") || strings.HasPrefix(q, "@") || q == "?" || m.answer(q) != nil || m.task(q) != nil {
@@ -291,6 +396,20 @@ func (m listModel) task(q string) *listRow {
 	return &listRow{mark: "+", words: "start " + name + " here on: " + words, right: "new window", do: func(l listed) error {
 		return l.beside(l.folder, "window", "new", name, "--task", words)
 	}}
+}
+
+// onMachines is the machines what is typed after new means, by what follows its last " on ":
+// none when nothing does, or a branch comes before it, or no machine is called that.
+func (m listModel) onMachines(rest string) []string {
+	at := strings.LastIndex(rest, " on ")
+	if at < 0 || strings.TrimSpace(rest[:at]) == "" {
+		return nil
+	}
+	var on []string
+	for _, i := range closest(rest[at+len(" on "):], m.machines) {
+		on = append(on, m.machines[i])
+	}
+	return on
 }
 
 func (m listModel) rows() []listRow {
@@ -337,9 +456,16 @@ func (m listModel) rows() []listRow {
 		for _, h := range [][2]string{{"a name", "go to that worktree or project"}, {"pi fix the test", "start that agent here on it"},
 			{"> codex gpt", "hand this conversation to that agent, on that model"}, {"1", "give that answer to whoever waits"},
 			{"words said before", "find the conversation, and resume it"}, {"nvim · lazygit · shell", "open it in a new window"}, {"@ fedora", "move this worktree to that machine, or bring one back"},
-			{"new a-branch", "a new worktree on that branch, in the project here"}, {"rm a-name", "remove that worktree, its session and its name"},
-			{"stack", "the layers of the stack this worktree is on, to go to one"}} {
+			{"new a-branch", "a new worktree on that branch, in the project here"}, {"new a-branch on fedora", "a new worktree on that branch, on that machine"},
+			{"rm a-name", "remove that worktree, its session and its name"}, {"fork a-branch", "this worktree on a new branch, its uncommitted work too"},
+			{"stack", "the layers of the stack this worktree is on, to go to one"}, {"say yes, go on", "type that to whoever waits, and Enter"},
+			{"clear", "clear a worktree's signal"}, {"clean", "remove the idle worktrees, and the clean ones mia did not make"},
+			{"back", "bring back the sessions that went down with tmux"}, {"stop", "stop the agent in this window"},
+			{"> its agent opus", "this window's own agent on that model"}} {
 			rows = append(rows, listRow{mark: " ", words: h[0], right: h[1]})
+		}
+		for _, verb := range m.verbs {
+			rows = append(rows, listRow{mark: " ", words: verb, right: "run it, in a new window"})
 		}
 	case q == "":
 		stands(m.stand.Waiting, "●", true)
@@ -393,6 +519,15 @@ func (m listModel) rows() []listRow {
 				return nil
 			}})
 		}
+	case verb == "new" && rest != "" && m.root != "" && len(m.onMachines(rest)) > 0: // on a machine
+		at := strings.LastIndex(rest, " on ")
+		branch := strings.ReplaceAll(strings.TrimSpace(rest[:at]), " ", "-")
+		for _, on := range m.onMachines(rest) {
+			words := "new worktree on " + branch + " on " + on
+			rows = append(rows, listRow{mark: "+", words: words, right: "in " + m.here, do: func(l listed) error {
+				return l.apart(m.root, "make a worktree on "+branch+" on "+on, "new", "--on", on, branch)
+			}})
+		}
 	case verb == "new" && rest != "" && m.root != "":
 		branch := strings.ReplaceAll(rest, " ", "-")
 		rows = append(rows, listRow{mark: "+", words: "new worktree on " + branch + " in " + m.here, right: "and go there", do: func(l listed) error {
@@ -423,6 +558,78 @@ func (m listModel) rows() []listRow {
 				return l.apart(p.root, "remove "+p.name, "rm", "--stop-running", p.name)
 			}})
 		}
+	case verb == "fork" && rest != "" && m.tree != "":
+		branch := strings.ReplaceAll(rest, " ", "-")
+		rows = append(rows, listRow{mark: "+", words: "fork this worktree into " + branch, right: "and go there", do: func(l listed) error {
+			// (mia fork says the folder it made last: "name — branch, forked …, at <folder>".)
+			return l.script(l.folder, "fork "+m.tree+" into "+branch,
+				`p=$(`+run.ShellJoin([]string{l.self, "fork", branch})+` 2>/dev/null | tail -1 | sed 's/.* at //') && [ -d "$p" ] && `+run.ShellJoin([]string{l.self, "tmux", "go", l.client})+` "$p"`)
+		}})
+	case verb == "say" && rest != "": // whoever waits, the longest first, told the words as typed
+		for _, w := range m.stand.Waiting {
+			if w.Machine != "" && w.Machine != runtime.Local {
+				continue // its pane is on that machine
+			}
+			rows = append(rows, listRow{mark: "●", asks: true, words: "say to " + w.Worktree + ": " + rest, right: w.Repository, do: func(listed) error {
+				return sayTo(w, rest)
+			}})
+		}
+	case q == "clear":
+		for _, t := range m.local {
+			if len(t.Signals) > 0 && t.Machine == "" {
+				rows = append(rows, listRow{mark: "−", words: "clear " + t.Name + "'s signal", right: cmp.Or(t.Signals[0].Text, t.Signals[0].Kind), do: func(l listed) error {
+					return l.apart(m.root, "clear "+t.Name+"'s signal", "signal", t.Name, "clear")
+				}})
+			}
+		}
+	case q == "clean":
+		var idle, others []string
+		for _, t := range m.local {
+			switch {
+			case t.Machine != "":
+			case !t.Main && !t.Adopted:
+				if !t.Dirty {
+					others = append(others, t.Name)
+				}
+			case isIdle(t, m.tree):
+				idle = append(idle, t.Name)
+			}
+		}
+		if len(idle) > 0 {
+			doing := "remove " + plural(len(idle), "idle worktree")
+			rows = append(rows, listRow{mark: "−", words: doing + ": " + strings.Join(idle, ", "), right: "branches stay", do: func(l listed) error {
+				return l.apart(m.root, doing, "gc", "--apply")
+			}})
+		}
+		if len(others) > 0 {
+			doing := "remove " + plural(len(others), "clean worktree") + " mia did not make"
+			rows = append(rows, listRow{mark: "−", words: doing + ": " + strings.Join(others, ", "), right: "branches stay", do: func(l listed) error {
+				return l.apart(m.root, doing, "gc", "--others", "--apply")
+			}})
+		}
+	case q == "back":
+		if m.down > 0 {
+			doing := "bring back " + plural(m.down, "session") + " that went down"
+			rows = append(rows, listRow{mark: "↺", words: doing, right: "windows and agents as they were", do: func(l listed) error {
+				return l.apart(m.root, doing, "resurrect")
+			}})
+		}
+	case q == "stop":
+		rows = append(rows, listRow{mark: "−", words: "stop the agent in this window", right: "Escape", do: func(l listed) error {
+			tmux := run.Local("tmux")
+			pane, err := tmux.Capture("display-message", "-p", "-c", l.client, "#{pane_id}")
+			if err != nil {
+				return err
+			}
+			if out, err := tmux.Combined("send-keys", "-t", strings.TrimSpace(pane), "Escape"); err != nil {
+				return fmt.Errorf("tmux send-keys: %s", strings.TrimSpace(out))
+			}
+			return nil
+		}})
+	case slices.Contains(m.verbs, q): // a plugin's verb the config's menu names
+		rows = append(rows, listRow{mark: "+", words: "run " + q, right: "new window", do: func(l listed) error {
+			return l.open(run.ShellJoin([]string{l.self, q}))
+		}})
 	case strings.HasPrefix(q, ">"):
 		names := make([]string, len(m.agents))
 		for i, a := range m.agents {
@@ -446,6 +653,13 @@ func (m listModel) rows() []listRow {
 				}
 				found := closest(model, ids)
 				for _, j := range found[:min(len(found), 8)] {
+					if name == m.front { // its own agent, which `mia hand` will not hand it to: the model switched where it runs
+						words := name + " in this window on " + ids[j]
+						rows = append(rows, listRow{mark: "→", words: words, do: func(l listed) error {
+							return l.apart(l.folder, words, "window", "model", l.window, ids[j])
+						}})
+						continue
+					}
 					rows = append(rows, listRow{mark: "→", words: "move this conversation to " + name + ", on " + ids[j], do: func(l listed) error {
 						return l.beside(l.folder, "hand", "--window", l.window, name, "--model", ids[j])
 					}})
