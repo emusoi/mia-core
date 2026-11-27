@@ -1,19 +1,63 @@
 # mia in tmux
 
-mia lives in your tmux: a part of the status line, two popups and a menu.
+mia lives in your tmux: a worktree is a tmux session, a tab is a window,
+an agent is a program in one. mia adds a part of the status line, one
+list, a popup terminal, a menu and a few keys. It draws no screens of its
+own.
 
 ```bash
 mia tmux            # print what it adds
 mia tmux install    # add it to ~/.tmux.conf, and have tmux read it
 mia tmux uninstall  # take it out again
+mia tmux keys kitty # the lines kitty (or ghostty) takes for the ⌘ keys
 ```
 
-| key | opens |
+| prefix key | ⌘ key | does |
+|---|---|---|
+| `k` | ⌘K | [the one list](#the-one-list) |
+| `K` | ⌘O | [the popup terminal](#the-popup-terminal), in the folder you are in |
+| `space` | ⌘⇧J | [the radar](#the-radar): who needs you, to answer |
+| `n` | ⌘N | [a new worktree](#a-new-worktree) |
+| `m` | | [mia's menu](#the-menu) |
+| `a` | ⌘J | the next worktree here that needs you, best rank first, round again at the end |
+| `e` | ⌘. | this window: stop its agent, move it to another agent, a new agent window, its model, rename, close, fork into a new worktree, lazygit, the editor |
+| `b` / `B` | ⌘[ / ⌘] | back and forward through where you have been |
+
+The ⌘ keys need the terminal app to send them: `mia tmux keys kitty`
+prints the lines for its config. They take over the app's own ⌘T, ⌘W,
+⌘N, ⌘K and ⌘1–9 (a new shell window, close it, the windows by number).
+
+## The one list
+
+`prefix k` opens one list in the worktree you are in. What you type says
+what Enter does, and the first row is what it does:
+
+| typed | Enter |
 |---|---|
-| `prefix space` | the radar |
-| `prefix n` | a new worktree |
-| `prefix m` | mia's menu |
-| `prefix a` | the next worktree here that needs you, best rank first, round again at the end |
+| nothing | who waits for you (their answers numbered), who works, then the projects, the one here first |
+| `project/` | that project's worktrees, those on a machine too |
+| a name | goes to that worktree or project, in any project |
+| a digit | answers whoever has waited longest |
+| `pi fix the test` | starts that agent here on that task (a second one is `pi-2`) |
+| `> codex` | hands this conversation to another agent; `> opencode son` lists it on each model the words mean |
+| `@` | moves this worktree to a machine, or brings one back |
+| `new <branch>` | makes a worktree here and goes to it |
+| `rm <name>` | removes one, refusing what `mia rm` refuses; a session of shells alone goes with it |
+| `stack` | the layers of the stack here |
+| `nvim`, `git`, `shell` | the editor, lazygit or a shell, in a window |
+| any other words | past conversations that mention them, in every project and on every machine; Enter resumes one |
+| `?` | says all of this |
+
+A worktree or conversation on another machine opens as that machine's
+session in a window here, named `worktree@machine`. Past conversations are
+[`mia recall`](commands.md)'s: a small index per repository keeps it to a
+fraction of a second, and `mia mcp` gives agents the same search.
+
+## The popup terminal
+
+`prefix K` is one shell in a popup over the window, kept between openings,
+brought to the folder you were in. `mia cd <worktree>` typed there takes
+the client under it to that worktree and closes the popup.
 
 ## The status line
 
@@ -108,8 +152,9 @@ there, in place. Type to find any worktree and what can be done with it.
 ## The menu
 
 `prefix m` is tmux's own menu, built when you press it: the radar
-(`space`), a new worktree (`n`), cleaning up what is idle (`c`) and what
-mia did not make (`o`) with how many of each there are, then the
+(`space`), a new worktree (`n`), bringing back sessions that went down
+(`b`), cleaning up what is idle (`c`) and what mia did not make (`o`) with
+how many of each there are, then the
 plugins' verbs your config's `menu` names, such as `menu = ["type", "quiz"]`.
 Every verb is still one word away in the radar. Cleaning up shows what would go and asks `y`
 first (`mia gc --ask`); branches stay.

@@ -122,6 +122,7 @@
 | `mia api standing [--here] [--seen <repository>/<worktree>]` | every agent in every repository, and on every machine: which wait on you, which work, which finished unseen |
 | `mia help vocabulary` | the words |
 | `mia shell-integration zsh` | prints what marks each prompt and its output for tmux: `eval "$(mia shell-integration zsh)"` in your zshrc — see [Prompt marks](tmux.md#prompt-marks) |
-| `mia help tmux` | what `mia tmux install` adds: the radar, a new worktree, the menu, the status line |
+| `mia help tmux` | what `mia tmux install` adds: the one list, the popup terminal, the radar, a new worktree, the menu, the status line — see [mia in tmux](tmux.md) |
+| `mia tmux keys kitty\|ghostty` | the lines a terminal app's config takes so its ⌘ keys send mia's |
 
 Reading commands take `--json`.

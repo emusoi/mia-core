@@ -9,6 +9,17 @@ on GitHub; a tag without its section is not released.
 
 ### Added
 
+- **One list in tmux.** `prefix k` (⌘K) opens one list in which what is
+  typed says what Enter does: who waits and who works, a project's
+  worktrees (`project/`), any worktree by name, an answer by its number,
+  an agent started on a task (`pi fix the test`), this conversation handed
+  to another agent and model (`> codex`), this worktree moved to a machine
+  or brought back (`@`), `new` and `rm`, the stack, the editor, lazygit,
+  and past conversations on every machine, resumed. `prefix K` (⌘O) is a
+  popup terminal, `prefix e` (⌘.) acts on this window, `prefix b` and `B`
+  go back and forward, and `mia tmux keys kitty|ghostty` prints the lines
+  that give a terminal app the ⌘ keys. See [mia in tmux](tmux.md).
+
 - **A tool's turn says how it went.** A `tool` turn of
   `mia api conversation`, `mia api main turns` and a chat has `status`
   once the agent's transcript says: `ok`, or `error` when it failed —
