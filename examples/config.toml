@@ -15,14 +15,6 @@ names = ["kariakoo", "brooklyn"]   # places to name worktrees after, before mia'
 [launch]                            # named windows: `mia window new <worktree> <name>`
 logs = "tail -f log/dev.log"
 
-[popup]                             # the tmux popup the dashboard opens
-width = "80%"
-height = "75%"
-
-[keys]                              # rebind anything `?` lists in the dashboard
-down = ["j", "down"]
-quiet = "Q"
-
 [env]                               # the container a worktree's code runs in
 image = "node:22"                   # else devcontainer.json, else picked for the language
 image_setup = ["sh", "-c", "apt-get update && apt-get install -y socat"]  # baked in, survives `mia env rm`
@@ -37,7 +29,7 @@ sync_ignore = ["secrets/*"]       # extra paths excluded from remote sync
 sync_secrets = false               # true explicitly allows .env*, keys and credential files
 
 [tools]                             # files carried from this machine into environments
-copy = ["~/.gitconfig"]             # by `mia env tools`
+copy = ["~/.gitconfig"]             # on every `mia env up`, and by `mia env tools`
 credentials = ["~/.netrc"]          # only with `mia env tools --credentials`, 0600
 
 [[service]]                         # what an environment keeps running

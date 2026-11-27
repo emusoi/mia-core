@@ -1327,7 +1327,7 @@ func printTmuxHelp() int {
 	if err != nil {
 		return fail(err)
 	}
-	fmt.Print("# mia in tmux — `mia tmux install` adds this to ~/.tmux.conf:\n# prefix space the radar, prefix n a new worktree, prefix m the menu, prefix a the next that needs you, mia's part of the status line.\n\n")
+	fmt.Print("# mia in tmux — `mia tmux install` adds this to ~/.tmux.conf:\n# prefix k the one list, prefix K the popup terminal, prefix space the radar, prefix n a new worktree, prefix m the menu,\n# prefix a the next that needs you, prefix e this window, prefix b and B back and forward, mia's part of the status line.\n# mia tmux keys kitty|ghostty prints the lines that give a terminal app the ⌘ keys.\n\n")
 	fmt.Print(tmuxSnippet(self))
 	return exitOK
 }
