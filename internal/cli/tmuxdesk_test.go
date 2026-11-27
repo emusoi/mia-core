@@ -123,7 +123,7 @@ func TestTmuxReadsWhatInstallAdds(t *testing.T) {
 		t.Fatalf("tmux refused mia's block: %s %v", out, err)
 	}
 	keys, _ := tmux("list-keys")
-	for _, want := range []string{"tmux shell --popup '#{client_name}'", "tmux act", "tmux list --popup '#{client_name}' '#{window_index}'", "tmux walk", "User40", "User61"} {
+	for _, want := range []string{"tmux shell --popup '#{client_name}'", "tmux next", "tmux list --popup '#{client_name}' '#{window_index}'", "tmux walk", "User40", "User61"} {
 		if !strings.Contains(keys, want) {
 			t.Errorf("no key bound for %q", want)
 		}

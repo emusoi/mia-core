@@ -148,7 +148,7 @@ func cmdStack(a *app.App, args []string, asJSON bool) (code int) {
 		if err != nil {
 			return fail(err)
 		}
-		fmt.Printf("%s is the stack on %s — `mia switch %s` goes there\n", args[1], bottom, args[1])
+		fmt.Printf("%s is the stack on %s — `mia cd %s` goes there\n", args[1], bottom, args[1])
 		return exitOK
 
 	case "go":

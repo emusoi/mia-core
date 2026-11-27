@@ -10,7 +10,7 @@ import (
 
 const zshInit = `mia() {
   case "$1" in
-    switch|sw|cd)
+    cd)
       local __mia_dir
       __mia_dir="$(command mia path "${@:2}")" && cd "$__mia_dir" && { [ -z "$TMUX" ] || [ -z "$2" ] || command mia go --quiet "$__mia_dir"; } ;;
     project|prj|pj|p)
@@ -36,7 +36,7 @@ if (( ${+_comps} )); then compdef _mia mia; fi
 
 const bashInit = `mia() {
   case "$1" in
-    switch|sw|cd)
+    cd)
       local dir
       dir="$(command mia path "${@:2}")" && cd "$dir" && { [ -z "$TMUX" ] || [ -z "$2" ] || command mia go --quiet "$dir"; } ;;
     project|prj|pj|p)
@@ -60,7 +60,7 @@ complete -F _mia mia
 
 const fishInit = `function mia
   switch "$argv[1]"
-    case switch sw cd
+    case cd
       set -l dir (command mia path $argv[2..-1]); and cd $dir; and if set -q TMUX; and set -q argv[2]; command mia go --quiet $dir; end
     case project prj pj p
       if test "$argv[2]" = cd
@@ -105,7 +105,7 @@ func cmdComplete(a *app.App, args []string) int {
 		for _, verb := range Verbs() {
 			fmt.Println(verb.Name)
 		}
-		fmt.Println("switch")
+		fmt.Println("cd") // the shell function's own: no verb of mia's
 		return exitOK
 	case "names":
 		listings, err := a.List()

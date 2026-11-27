@@ -55,8 +55,8 @@ type Config struct {
 
 	Plugins []string `toml:"plugins" json:"plugins,omitempty"`
 
-	// Menu names the plugins' verbs prefix m offers, in order: type, quiz.
-	// Every verb stays one word away in the radar; the menu holds a few.
+	// Menu names the plugins' verbs the one list runs by name, typed there:
+	// type, quiz — each in a new window.
 	Menu []string `toml:"menu" json:"menu,omitempty"`
 
 	Names []string `toml:"names" json:"names,omitempty"`

@@ -968,7 +968,7 @@ func (a *App) ShellView(query, view string) error {
 func (a *App) SwitchClient(query, client string) error {
 	return a.shell(query, func(host session.Host, record model.Record, _ string) error {
 		if host.SSH != "" {
-			return fmt.Errorf("%s's session is on %s — prefix space hands this terminal over", record.Name, host.SSH)
+			return fmt.Errorf("%s's session is on %s — prefix k opens it in a window here, among its project's worktrees", record.Name, host.SSH)
 		}
 		out, err := run.Local("tmux").Combined("switch-client", "-c", client, "-t", "="+session.Name(record.Name))
 		if err != nil {

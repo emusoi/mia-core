@@ -1,114 +1,16 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/emusoi/mia-core/internal/app"
-	"github.com/emusoi/mia-core/internal/git"
-	"github.com/emusoi/mia-core/internal/radar"
 	"github.com/emusoi/mia-core/internal/run"
 )
-
-// cmdRadar is mia radar [--new]: the popup that shows and finds everything,
-// or straight to making a new worktree. What it picks runs once it closes.
-func cmdRadar(a *app.App, args []string) int {
-	newOnly := take(&args, "--new")
-	pickTo := takeValue(&args, "--pick-to")
-	data, err := radarData(a)
-	if err != nil {
-		return fail(err)
-	}
-	if a.PollDue(pollEvery) {
-		pollInBackground(a.Root)
-	}
-	choice, err := radar.Run(data, newOnly)
-	if err != nil || choice == nil {
-		return exitFor(err)
-	}
-	if pickTo != "" && choice.Name != "" && len(choice.Argv) == 0 {
-		// picked for someone else — an editor — to go to: say where, do not switch
-		path, err := a.RecordOrHere(choice.Name)
-		if err != nil {
-			return fail(err)
-		}
-		return exitFor(os.WriteFile(pickTo, []byte(path.Path+"\n"), 0o600))
-	}
-	return exitFor(carryOut(a, *choice))
-}
-
-func radarData(a *app.App) (radar.Data, error) {
-	local, err := a.List()
-	if err != nil {
-		return radar.Data{}, err
-	}
-	data := radar.Data{Repo: filepath.Base(a.Root), Root: a.Root, MiaDir: a.MiaDir, Base: a.BaseBranch(a.Root),
-		Prefix: a.Config.Prefix, Local: local, Machines: a.KnownMachines()}
-	if record, err := a.RecordOrHere(""); err == nil {
-		data.Here, data.HereDir = record.Name, record.Path
-		data.Branch = git.CurrentBranch(record.Path)
-	}
-	data.Away = a.ReadNote()
-	for _, s := range a.Sessions() {
-		if s.State != "running" {
-			if data.Down == nil {
-				data.Down = map[string]string{}
-			}
-			data.Down[s.Name] = s.State
-		}
-	}
-	if plugins, err := enabledPlugins(a); err == nil {
-		for _, p := range plugins {
-			for _, v := range p.Manifest.Verbs {
-				data.Verbs = append(data.Verbs, radar.Verb{Name: v.Name, Help: v.Help})
-			}
-		}
-	}
-	if _, err := os.Stat(filepath.Join(a.MiaDir, "config.toml")); os.IsNotExist(err) {
-		data.First = &radar.Guess{Base: data.Base, Setup: radar.GuessSetup(a.Root)}
-	}
-	return data, nil
-}
-
-// carryOut does what the radar picked: a mia command, then the switch.
-func carryOut(a *app.App, choice radar.Choice) error {
-	if len(choice.Argv) > 0 {
-		self, err := os.Executable()
-		if err != nil {
-			return err
-		}
-		cmd := exec.Command(self, choice.Argv...)
-		cmd.Dir = choice.Dir
-		if cmd.Dir == "" {
-			cmd.Dir = a.Root
-		}
-		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-		err = cmd.Run()
-		if choice.Wait {
-			fmt.Print("\n⏎ back")
-			_, _ = fmt.Scanln()
-		}
-		if err != nil {
-			return err
-		}
-	}
-	switch {
-	case choice.Return != "":
-		return goBack(choice.Return)
-	case choice.Remote != "":
-		if os.Getenv("TMUX") == "" {
-			return cmdErr(cmdAttachOn(a, []string{choice.Remote}))
-		}
-		return handOver(a, choice.Remote)
-	case choice.Name != "":
-		os.Unsetenv("TMUX_PANE") // from a popup, switch the client rather than nest
-		return a.Shell(choice.Name, false)
-	}
-	return nil
-}
 
 // handOver gives this terminal to the machine's tmux: the client here
 // detaches and ssh attaches the worktree's session there, so every tmux key
@@ -136,23 +38,19 @@ func handOver(a *app.App, target string) error {
 	return nil
 }
 
-func cmdErr(code int) error {
-	if code != exitOK {
-		return fmt.Errorf("exit %d", code)
-	}
-	return nil
-}
-
 const tmuxMarker = "# mia: status line and popups"
 
 // tmuxSnippet is what mia adds to a tmux config: its part of the status
-// line, refreshed every 5s, the two popups, and its menu.
+// line, refreshed every 5s, and its keys.
 func tmuxSnippet(self string) string {
 	mia := run.ShellJoin([]string{self})
 	in := `cd \"#{pane_current_path}\" && ` + mia
 	var keys strings.Builder
 	for i, k := range tmuxKeys(mia, in) {
 		// (Each on a prefix key, and on a key of its own the terminal app can send: `mia tmux keys`.)
+		if k.does == "" { // retired: its number stays taken, bound to nothing
+			continue
+		}
 		if k.prefix != "" {
 			fmt.Fprintf(&keys, "bind %s %s\n", k.prefix, k.does)
 		}
@@ -171,20 +69,23 @@ set -ga status-right ' #(` + mia + ` status-line "#{pane_current_path}") '
 const userKeysFrom = 40
 
 // tmuxKey is one thing mia does in tmux: its prefix key ("" for none), the key the terminal
-// app sends it by (`mia tmux keys`), what it is called, and the tmux command it runs.
+// app sends it by (`mia tmux keys`), what it is called, and the tmux command it runs. The
+// zero tmuxKey is a retired one: its place kept, nothing bound, no terminal key sent.
 type tmuxKey struct{ prefix, cmd, name, does string }
 
 // tmuxKeys is every key mia binds, in the order their user keys are numbered: never reordered,
-// only added to, so a terminal app's config keeps meaning what it meant.
+// only added to, so a terminal app's config keeps meaning what it meant. A key that goes stays
+// in its place, retired, so every key after it keeps its number: a terminal app's config
+// (kitty's) sends \e[99;N~ by the place.
 func tmuxKeys(mia, in string) []tmuxKey {
 	keys := []tmuxKey{
 		{"k", "cmd+k", "the one list: go somewhere, start an agent, hand on, answer, resume", `run-shell -b "` + mia + ` tmux list --popup '#{client_name}' '#{window_index}' '#{pane_current_path}'"`},
 		{"K", "cmd+o", "the popup terminal", `run-shell -b "` + mia + ` tmux shell --popup '#{client_name}' '#{pane_current_path}'"`},
-		{"Space", "cmd+shift+j", "who needs you", `display-popup -E -d "#{pane_current_path}" -w 72 -h 60% -T " mia " "` + mia + ` radar"`},
-		{"n", "cmd+n", "a new worktree", `display-popup -E -d "#{pane_current_path}" -w 110 -h 14 -T " new worktree " "` + mia + ` radar --new"`},
-		{"m", "", "mia's menu", `run-shell -b "` + in + ` tmux menu '#{client_name}'"`},
+		{}, // retired: prefix Space, cmd+shift+j — the radar; the one list has who needs you
+		{}, // retired: prefix n, cmd+n — a new worktree; `new <branch>` in the one list
+		{}, // retired: prefix m — mia's menu; `back`, `clean` and the menu's verbs in the one list
 		{"a", "cmd+j", "the next that needs you", `run-shell -b "` + in + ` tmux next '#{client_name}'"`},
-		{"e", "cmd+.", "what is done to this window", `run-shell -b "` + mia + ` tmux act '#{client_name}' '#{window_index}'"`},
+		{}, // retired: prefix e, cmd+. — this window's menu; `stop`, `fork` and `>` in the one list
 		{"b", "cmd+[", "back through where you have been", `run-shell -b "` + mia + ` tmux walk '#{client_name}' back"`},
 		{"B", "cmd+]", "forward again", `run-shell -b "` + mia + ` tmux walk '#{client_name}' forward"`},
 		{"", "cmd+t", "a new shell window", `new-window -c "#{pane_current_path}"`},
@@ -216,37 +117,6 @@ func terminalKeys(app string) (string, error) {
 		}
 	}
 	return b.String(), nil
-}
-
-// cmdTmuxAct is mia tmux act <client> <window>: tmux's own menu of what is done to the window
-// in front, a key each, in three parts: its agent, the window, its worktree.
-func cmdTmuxAct(args []string) int {
-	if len(args) != 2 {
-		return usageErr("mia tmux act <client> <window>")
-	}
-	self, err := os.Executable()
-	if err != nil {
-		return tmuxSay(args[:1], err)
-	}
-	mia := run.ShellJoin([]string{self})
-	in := `cd "#{pane_current_path}" && ` + mia
-	argv := []string{"display-menu", "-c", args[0], "-T", " this window ",
-		"Stop the agent", "s", "send-keys Escape",
-		"Move to another agent", "a", fmt.Sprintf("run-shell -b '%s tmux agents %s hand %s'", mia, args[0], args[1]),
-		"New agent window", "n", fmt.Sprintf("run-shell -b '%s tmux agents %s new %s'", mia, args[0], args[1]),
-		"Its model", "m", fmt.Sprintf(`command-prompt -p "model" "run-shell -b '%s window model %s %%%%'"`, in, args[1]),
-		"",
-		"Rename", "r", `command-prompt -I "#W" "rename-window -- '%%'"`,
-		"Close", "x", `confirm-before -p "close #W? (y/n)" kill-window`,
-		"",
-		"Fork into a new worktree", "f", fmt.Sprintf(`command-prompt -p "branch" "run-shell -b '%s fork %%%%'"`, in),
-		"lazygit", "g", `new-window -c "#{pane_current_path}" lazygit`,
-		"Editor", "o", `new-window -c "#{pane_current_path}" "${EDITOR:-nvim} ."`,
-	}
-	if out, err := run.Local("tmux").Combined(argv...); err != nil {
-		return tmuxSay(args[:1], fmt.Errorf("tmux display-menu: %s", strings.TrimSpace(out)))
-	}
-	return exitOK
 }
 
 // cmdTmux is mia tmux [install|uninstall]: print, add or remove mia's part
@@ -298,7 +168,7 @@ func cmdTmux(args []string) int {
 		if out, err := run.Local("tmux").Combined("source-file", conf); err != nil {
 			return fail(fmt.Errorf("tmux source-file %s: %s", conf, strings.TrimSpace(out)))
 		}
-		fmt.Println("tmux has read it: prefix k the one list (somewhere to go, `pi fix it` to start an agent on it, `> codex` to hand this conversation on, a number to answer, words to find a past conversation), K the popup terminal, space who needs you, a the next of them, e this window's menu, n a new worktree, m mia's menu, b and B back and forward; `mia tmux keys kitty` prints the ⌘ keys for your terminal app")
+		fmt.Println("tmux has read it: prefix k the one list (somewhere to go, `pi fix it` to start an agent on it, `> codex` to hand this conversation on, a number to answer, words to find a past conversation, ? for the rest), K the popup terminal, a the next that needs you, b and B back and forward; `mia tmux keys kitty` prints the ⌘ keys for your terminal app")
 	}
 	return exitOK
 }
@@ -319,4 +189,77 @@ func withoutBlock(conf string) string {
 		end++
 	}
 	return strings.TrimRight(conf[:start], "\n") + "\n" + conf[end:]
+}
+
+// cmdTmuxNext is mia tmux next <client>: prefix a. The client goes to the
+// next worktree here that needs you, after the one it is in, round again
+// at the end; best rank first.
+func cmdTmuxNext(a *app.App, args []string) int {
+	if len(args) != 1 {
+		return usageErr("mia tmux next <client>")
+	}
+	local, err := a.List()
+	if err != nil {
+		return tmuxSay(args, err)
+	}
+	here := ""
+	if record, err := a.RecordOrHere(""); err == nil {
+		here = record.Name
+	}
+	next := nextNeedingYou(local, here)
+	if next == "" {
+		_, _ = run.Local("tmux").Combined("display-message", "-c", args[0], "mia: nothing here needs you")
+		return exitOK
+	}
+	if err := a.SwitchClient(next, args[0]); err != nil {
+		return tmuxSay(args, err)
+	}
+	return exitOK
+}
+
+// nextNeedingYou is the worktree after here among those that need you — whose best signal
+// calls for you — in rank order then by name; "" when none does but here.
+// ponytail: this computer's alone; a machine's is reached from the one list.
+func nextNeedingYou(local []app.Listing, here string) string {
+	var waiting []app.Listing
+	for _, l := range local {
+		if len(l.Signals) > 0 && l.Signals[0].Calls() {
+			waiting = append(waiting, l)
+		}
+	}
+	slices.SortFunc(waiting, func(x, y app.Listing) int {
+		if c := x.Signals[0].Rank - y.Signals[0].Rank; c != 0 {
+			return c
+		}
+		return strings.Compare(x.Name, y.Name)
+	})
+	at := slices.IndexFunc(waiting, func(l app.Listing) bool { return l.Name == here })
+	for i := 1; i <= len(waiting); i++ {
+		if l := waiting[(at+i+len(waiting))%len(waiting)]; l.Name != here {
+			return l.Name
+		}
+	}
+	return ""
+}
+
+// tmuxSay shows what went wrong on the client that pressed a key: a
+// background run-shell has nowhere else to say it.
+func tmuxSay(args []string, err error) int {
+	if len(args) == 1 {
+		_, _ = run.Local("tmux").Combined("display-message", "-c", args[0], "mia: "+err.Error())
+	}
+	return fail(err)
+}
+
+// askYes asks on the terminal and is true only for y.
+func askYes(question string) bool {
+	fmt.Print(question)
+	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	return strings.TrimSpace(line) == "y"
+}
+
+// pressKey keeps a popup's last words up until ⏎.
+func pressKey() {
+	fmt.Print("\n⏎ close")
+	_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
 }

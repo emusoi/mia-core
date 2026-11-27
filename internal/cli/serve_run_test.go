@@ -96,9 +96,9 @@ func TestAVerbThatNeedsATerminalIsNotRunByTheServer(t *testing.T) {
 	repo := gittest.New(t)
 	serveIn(t)
 	for _, args := range [][]string{
-		{"shell", "quick"}, {"away"}, {"chat"}, {"git"}, {"files"}, {"review"}, {"radar"}, {"dash"},
+		{"shell", "quick"}, {"away"}, {"chat"}, {"git"}, {"files"}, {"review"},
 		{"window", "open", "quick"}, {"windows", "open"}, {"machine", "attach", "quick@fedora"}, {"machine", "shell", "fedora"},
-		{"env", "shell"}, {"new", "--shell", "quick"}, {"tmux", "menu", "x"}, {"config"},
+		{"env", "shell"}, {"new", "--shell", "quick"}, {"tmux", "next", "x"}, {"config"},
 		{"gc", "--others", "--ask"}, {"resurrect", "--ask"}, {"gateway", "trust"}, {"gateway", "serve"},
 		{"api", "conversation", "c1", "--follow"}, {"dev", "quick", "--follow"}, {"serve"}, {"serve", "stop"}, {},
 	} {

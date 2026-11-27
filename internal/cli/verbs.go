@@ -12,13 +12,14 @@ type Verb struct {
 
 var Groups = []string{"Worktrees", "Working", "Environments", "Records"}
 
+// groupOf is every core verb's group; go is one, though help leaves it out: `mia cd` calls it.
 var groupOf = map[string]string{
 	"new": "Worktrees", "ls": "Worktrees", "project": "Worktrees", "go": "Worktrees", "asks": "Working", "hand": "Working", "path": "Worktrees", "adopt": "Worktrees", "rm": "Worktrees", "gc": "Worktrees",
-	"star": "Worktrees", "open": "Worktrees", "shell": "Worktrees", "window": "Worktrees", "chat": "Worktrees", "git": "Worktrees", "files": "Worktrees", "review": "Worktrees", "rename": "Worktrees", "run": "Worktrees", "setup": "Worktrees", "switch": "Worktrees", "shell-init": "Worktrees", "shell-integration": "Working",
-	"dash": "Working", "stack": "Working", "up": "Working", "down": "Working",
+	"star": "Worktrees", "open": "Worktrees", "shell": "Worktrees", "window": "Worktrees", "chat": "Worktrees", "git": "Worktrees", "files": "Worktrees", "review": "Worktrees", "rename": "Worktrees", "run": "Worktrees", "setup": "Worktrees", "shell-init": "Worktrees", "shell-integration": "Working",
+	"stack": "Working", "up": "Working", "down": "Working",
 	"config": "Working",
 	"env":    "Environments", "dev": "Environments", "machine": "Environments", "gateway": "Environments",
-	"api": "Records", "serve": "Records", "role": "Working", "signal": "Records", "radar": "Working", "tmux": "Working", "move": "Worktrees", "resurrect": "Worktrees", "why": "Records", "recall": "Records", "mcp": "Records", "conversation": "Records", "archive": "Worktrees", "fork": "Worktrees", "unarchive": "Worktrees", "plugin": "Records", "doctor": "Records", "main": "Working", "chats": "Working", "account": "Working",
+	"api": "Records", "serve": "Records", "role": "Working", "signal": "Records", "tmux": "Working", "move": "Worktrees", "resurrect": "Worktrees", "why": "Records", "recall": "Records", "mcp": "Records", "conversation": "Records", "archive": "Worktrees", "fork": "Worktrees", "unarchive": "Worktrees", "plugin": "Records", "doctor": "Records", "main": "Working", "chats": "Working", "account": "Working",
 }
 
 var verbs = []Verb{
@@ -26,12 +27,10 @@ var verbs = []Verb{
 	{"ls", "mia ls", "the projects mia knows, from any folder, the one you are in marked; a project's worktrees are `mia p ls`", true, ""},
 	{"project", "mia project ls [project] | cd <worktree>", "a project's worktrees, here or by name, and the way into one; also `mia p`, `mia pj`, `mia prj`", true, ""},
 	{"setup", "mia setup [worktree]", "run the configured setup in a worktree again", false, ""},
-	{"go", "mia go <worktree|project|project/worktree>", "in tmux, take this client to that worktree's session, started if it is not up; `mia cd` does it after it changes folder, and typed in the popup terminal it moves the client the popup is over", true, ""},
 	{"asks", "mia asks [n [answer]]", "who waits on you in every project, the longest first, with the question and its numbered answers; `mia asks 2` goes to the second, `mia asks 2 1` gives its first answer", true, ""},
 	{"hand", "mia hand [--window <index>] <agent> [--model <model>] [--effort <effort>] [--account <account>]", "the conversation of the window in front goes on with another agent, written out as a handoff and opened in a window beside", false, ""},
 	{"path", "mia path [worktree|stack|project|project/worktree]", "print a worktree's path, for scripts, matched loosely by name: one of the repository here, else a project; no argument is the main checkout", true, ""},
-	{"switch", "mia switch <worktree|stack|project|project/worktree>", "cd there, from any folder (also `mia cd`) — with `eval \"$(mia shell-init zsh)\"` in your rc", true, ""},
-	{"shell-init", "mia shell-init <zsh|bash|fish>", "the shell function that makes `mia switch` change directory, and completion", true, ""},
+	{"shell-init", "mia shell-init <zsh|bash|fish>", "the shell function that makes `mia cd <worktree|stack|project|project/worktree>` change directory, from any folder, and completion", true, ""},
 	{"shell-integration", shellIntegrationUsage, "marks each prompt and each command's output, so tmux's previous-prompt and next-prompt jump between commands, and says the folder; mia prints it, your zshrc runs it", true, ""},
 	{"gc", "mia gc [--merged] [--apply] [--days N] | --others [--apply] [path...]", "worktrees nobody has touched: clean, no session, not starred, quiet for N days; --merged: those whose branch is merged; --others: clean ones mia did not make", false, ""},
 	{"adopt", "mia adopt <worktree>", "take over a worktree created by hand", false, ""},
@@ -63,14 +62,12 @@ var verbs = []Verb{
 	{"account", accountUsage, "an agent's logins: each a folder of its own the agent keeps its sign-in and conversations in, the agent's usual one called default; add makes one and opens a window to sign in to it with the agent's own login; signals writes pi the extension that tells mia what it does — working, asks, done — as claude's hooks do, only when asked, and never over a file of yours; mia never reads, copies or moves a sign-in", false, ""},
 	{"role", roleUsage, "the roles: each a setup — agent, model, effort, account — with opening instructions, a file of yours in roles/<name>.md, listed by mia api setups; mia window new --role and mia main start --role start one and send it its instructions once ready", true, ""},
 	{"why", "mia why <file:line|commit>", "the claude conversation that made a commit, or the line's last commit: what you asked, and how to resume it", true, ""},
-	{"radar", "mia radar [--new]", "the popup of who needs you, to answer, and every worktree; --new makes a worktree", false, ""},
-	{"tmux", "mia tmux [install|uninstall|keys <kitty|ghostty>]", "mia's part of tmux — the one list, the popup terminal, the radar, the menu, its keys and its part of the status line — printed, added to ~/.tmux.conf, or taken out; keys prints a terminal app's lines for the ⌘ keys", true, ""},
+	{"tmux", "mia tmux [install|uninstall|keys <kitty|ghostty>]", "mia's part of tmux — the one list, the popup terminal, its keys and its part of the status line — printed, added to ~/.tmux.conf, or taken out; keys prints a terminal app's lines for the ⌘ keys", true, ""},
 	{"signal", "mia signal <worktree> <kind> [text] [--style s] [--rank n] [--from source] [--for d|--until seen] · clear · ls", "what anything outside mia says about a worktree, shown as its setter asks", false, ""},
 	{"api", "mia api <query>", "structured state, for clients and scripts", true, ""},
 	{"serve", serveUsage, "the server of this machine, in the foreground or, installed, as a launchd or systemd service: over a socket in mia's config folder it answers `mia api`, which asks it when it is the same build, says when an answer changes and runs verbs; it holds no truth, and killing it loses nothing", false, ""},
 	{"doctor", "mia doctor", "check tools, configuration, gateway, machines and environments", true, ""},
 	{"plugin", "mia plugin [ls|enable <name>|disable <name>]", "programs named mia-<name> that add verbs; installed on PATH, run once enabled", true, ""},
-	{"dash", "mia dash", "the radar, under its old name", false, ""},
 	{"rename", "mia rename <worktree> <name>", "give a worktree the name you want; its session follows now, its container on its next start", false, ""},
 	{"open", "mia open [worktree] [--in <cursor|code|zed|idea|subl|xcode|finder|terminal>]", "open the worktree in your editor, IDE, Finder or a terminal", false, ""},
 	{"star", "mia star [worktree]", "mark the worktree you are on right now, or unmark it", false, ""},

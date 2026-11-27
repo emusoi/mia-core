@@ -120,15 +120,13 @@ func Run(args []string) int {
 				return cmdTmuxGo(rest[1:])
 			case "agents":
 				return cmdTmuxAgents(rest[1:])
-			case "act":
-				return cmdTmuxAct(rest[1:])
 			case "seen":
 				return cmdTmuxSeen(rest[1:])
 			case "walk":
 				return cmdTmuxWalk(rest[1:])
 			}
 		}
-		if len(rest) == 0 || (rest[0] != "menu" && rest[0] != "next") {
+		if len(rest) == 0 || rest[0] != "next" {
 			return cmdTmux(rest)
 		}
 	case "go": // the tmux client to a worktree's session, by its name, from any folder
@@ -185,13 +183,13 @@ func Run(args []string) int {
 	}
 	a, err := app.Open(here)
 	if err != nil {
-		if verb == "tmux" { // prefix m, where a printed error is seen by no one
+		if verb == "tmux" { // prefix a, where a printed error is seen by no one
 			return tmuxSay(rest[1:], err)
 		}
 		// In no repository: the projects mia knows, and the way to one by its name.
 		if errors.Is(err, git.ErrNotARepository) {
 			switch {
-			case (verb == "path" || verb == "switch") && len(rest) == 1:
+			case verb == "path" && len(rest) == 1:
 				return cmdPathAnywhere(nil, rest)
 			case verb == "__complete" && len(rest) == 1 && rest[0] == "names":
 				return completeProjects()
@@ -204,14 +202,9 @@ func Run(args []string) int {
 
 	switch verb {
 	case "tmux":
-		if rest[0] == "next" {
-			return cmdTmuxNext(a, rest[1:])
-		}
-		return cmdTmuxMenu(a, rest[1:])
+		return cmdTmuxNext(a, rest[1:])
 	case "signal", "signals":
 		return cmdSignal(a, rest, asJSON)
-	case "radar":
-		return cmdRadar(a, rest)
 	case "away":
 		return cmdAway(a, rest)
 	case "move":
@@ -307,7 +300,7 @@ func Run(args []string) int {
 	case "resurrect":
 		dry := take(&rest, "--dry-run")
 		if take(&rest, "--ask") {
-			defer pressKey() // from the tmux menu's popup: stay up until ⏎
+			defer pressKey() // from a popup: stay up until ⏎
 		}
 		if take(&rest, "--list") {
 			if asJSON {
@@ -432,7 +425,7 @@ func Run(args []string) int {
 		return exitOK
 	case "hand":
 		return cmdHand(a, rest, asJSON)
-	case "path", "switch":
+	case "path":
 		if len(rest) == 1 { // a worktree here, else a project, loosely by name
 			return cmdPathAnywhere(a, rest)
 		}
@@ -453,8 +446,6 @@ func Run(args []string) int {
 		return cmdEnv(a, rest, asJSON)
 	case "dev":
 		return cmdDev(a, rest, asJSON)
-	case "dash":
-		return cmdDash(a, rest)
 	case "stack":
 		return cmdStack(a, rest, asJSON)
 	case "up":
@@ -1024,7 +1015,7 @@ func usage(to *os.File) {
 	fmt.Fprintln(to)
 	fmt.Fprintln(to, "A worktree answers to its name, its path, or the branch checked out in it.")
 	fmt.Fprintln(to, "Every read command takes --json.")
-	fmt.Fprintln(to, "mia help vocabulary — what things are called.  mia help tmux — what mia adds to tmux: the radar, a new worktree, the status line.")
+	fmt.Fprintln(to, "mia help vocabulary — what things are called.  mia help tmux — what mia adds to tmux: the one list, its keys, the status line.")
 }
 
 func usageOf(name string) string {
@@ -1327,7 +1318,7 @@ func printTmuxHelp() int {
 	if err != nil {
 		return fail(err)
 	}
-	fmt.Print("# mia in tmux — `mia tmux install` adds this to ~/.tmux.conf:\n# prefix k the one list, prefix K the popup terminal, prefix space the radar, prefix n a new worktree, prefix m the menu,\n# prefix a the next that needs you, prefix e this window, prefix b and B back and forward, mia's part of the status line.\n# mia tmux keys kitty|ghostty prints the lines that give a terminal app the ⌘ keys.\n\n")
+	fmt.Print("# mia in tmux — `mia tmux install` adds this to ~/.tmux.conf:\n# prefix k the one list — everything starts there, ? in it says what can be typed —, prefix K the popup terminal,\n# prefix a the next that needs you, prefix b and B back and forward, mia's part of the status line.\n# mia tmux keys kitty|ghostty prints the lines that give a terminal app the ⌘ keys.\n\n")
 	fmt.Print(tmuxSnippet(self))
 	return exitOK
 }

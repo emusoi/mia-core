@@ -43,7 +43,7 @@ func notServed(args []string) string {
 	}
 	has := func(flag string) bool { return slices.Contains(rest, flag) }
 	switch verb {
-	case "chat", "git", "files", "review", "radar", "dash":
+	case "chat", "git", "files", "review":
 		return "is drawn on the terminal it is typed in"
 	case "shell", "away":
 		return "attaches the terminal it is typed in"
@@ -66,7 +66,7 @@ func notServed(args []string) string {
 			return "attaches the terminal it is typed in"
 		}
 	case "tmux":
-		if sub == "menu" || sub == "next" {
+		if sub == "next" {
 			return "is drawn on the terminal it is typed in"
 		}
 	case "config":

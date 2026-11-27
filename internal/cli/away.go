@@ -1,14 +1,12 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/emusoi/mia-core/internal/app"
-	"github.com/emusoi/mia-core/internal/run"
 	"github.com/emusoi/mia-core/internal/runtime"
 )
 
@@ -77,24 +75,6 @@ func keepNoting(a *app.App, machine runtime.Machine) (stop func()) {
 		}
 	}()
 	return func() { close(done); <-stopped }
-}
-
-// goBack leaves the pick for the computer that handed this terminal over,
-// and detaches, which ends its ssh and hands the terminal back.
-func goBack(picked string) error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	path := strings.Replace(awayReturn, "~", home, 1)
-	if err := os.WriteFile(path, []byte(picked+"\n"), 0o644); err != nil {
-		return err
-	}
-	out, err := run.Local("tmux").Combined("detach-client")
-	if err != nil {
-		return fmt.Errorf("detach: %s", strings.TrimSpace(out))
-	}
-	return nil
 }
 
 func syscallExec(argv ...string) error {
