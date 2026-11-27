@@ -70,8 +70,16 @@ function code(text: string, lang: string | undefined): string {
     themes: { light: "min-light", dark: "min-dark" },
     defaultColor: false,
   });
-  return `<div class="code">${html}<button class="copy" type="button" aria-label="Copy">Copy</button></div>`;
+  // (Each colour pair once, as a class in site.css, where it was a style on every token: the
+  // site is served from one ConfigMap, which holds no more than 1 MiB.)
+  const classed = html.replace(/ style="(--shiki-light:[^"]*)"/g, (_, style: string) => {
+    if (!tones.has(style)) tones.set(style, `k${tones.size}`);
+    return ` class="${tones.get(style)}"`;
+  });
+  return `<div class="code">${classed}<button class="copy" type="button" aria-label="Copy">Copy</button></div>`;
 }
+
+const tones = new Map<string, string>();
 
 type Heading = { depth: number; text: string; id: string };
 
@@ -438,7 +446,10 @@ await writeFile(
 await writeFile(join(out, "search.json"), JSON.stringify(index));
 await copyFile(join(root, "design", "exports", "mark-small.svg"), join(out, "mark.svg"));
 await copyFile(join(root, "design", "exports", "app-icon@2x.png"), join(out, "app-icon.png"));
-await copyFile(join(import.meta.dir, "site.css"), join(out, "site.css"));
+await writeFile(
+  join(out, "site.css"),
+  (await readFile(join(import.meta.dir, "site.css"), "utf8")) + [...tones].map(([style, name]) => `.${name}{${style}}`).join("\n") + "\n",
+);
 await copyFile(join(import.meta.dir, "site.js"), join(out, "site.js"));
 await writeFile(
   join(out, "404.html"),
